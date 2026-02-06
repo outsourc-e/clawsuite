@@ -186,6 +186,7 @@ export const Route = createFileRoute('/api/stream')({
                           content?: Array<{ type: string; text?: string }>
                           message?: { content?: Array<{ type: string; text?: string }> }
                         }
+                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
                         runId = payload?.runId ?? null
                         sendSSE('started', { runId })
 

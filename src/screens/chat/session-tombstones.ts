@@ -43,5 +43,6 @@ export function filterSessionsWithTombstones<T extends { key: string; friendlyId
     }
     return true
   })
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
   return changed ? next : sessions
 }

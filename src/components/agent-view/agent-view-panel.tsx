@@ -1,0 +1,815 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import {
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  BotIcon,
+  Cancel01Icon,
+  Link01Icon,
+} from '@hugeicons/core-free-icons'
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
+import { AgentCard } from './agent-card'
+import {
+  SwarmConnectionOverlay,
+} from './swarm-connection-overlay'
+import { useAgentSpawn } from './hooks/use-agent-spawn'
+import type { AgentNode, AgentNodeStatus, AgentStatusBubble } from './agent-card'
+import type { SwarmConnectionPath } from './swarm-connection-overlay'
+import type { ActiveAgent } from '@/hooks/use-agent-view'
+import { AgentChatModal } from '@/components/agent-chat/AgentChatModal'
+import { AgentAvatar } from '@/components/agent-avatar'
+import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogRoot,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  ScrollAreaCorner,
+  ScrollAreaRoot,
+  ScrollAreaScrollbar,
+  ScrollAreaThumb,
+  ScrollAreaViewport,
+} from '@/components/ui/scroll-area'
+import {
+  formatCost,
+  useAgentView,
+} from '@/hooks/use-agent-view'
+import { cn } from '@/lib/utils'
+
+type Point = {
+  x: number
+  y: number
+}
+
+function getLastUserMessageBubbleElement(): HTMLElement | null {
+  const nodes = document.querySelectorAll<HTMLElement>(
+    '[data-chat-message-role="user"] [data-chat-message-bubble="true"]',
+  )
+  return nodes.item(nodes.length - 1)
+}
+
+function buildConnectionPath(start: Point, end: Point): string {
+  const horizontal = Math.max(48, (end.x - start.x) * 0.4)
+  const controlA = { x: start.x + horizontal, y: start.y }
+  const controlB = { x: end.x - horizontal, y: end.y }
+  return `M ${start.x} ${start.y} C ${controlA.x} ${controlA.y}, ${controlB.x} ${controlB.y}, ${end.x} ${end.y}`
+}
+
+function formatRelativeMs(msAgo: number): string {
+  const seconds = Math.max(0, Math.floor(msAgo / 1000))
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}m ago`
+}
+
+function getHistoryPillClassName(status: 'success' | 'failed'): string {
+  if (status === 'failed') {
+    return 'border-red-500/50 bg-red-500/10 text-red-300'
+  }
+  return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+}
+
+function getStatusLabel(status: AgentNodeStatus): string {
+  if (status === 'failed') return 'failed'
+  if (status === 'thinking') return 'thinking'
+  if (status === 'complete') return 'complete'
+  if (status === 'queued') return 'queued'
+  return 'running'
+}
+
+function getAgentStatus(agent: ActiveAgent): AgentNodeStatus {
+  const status = agent.status.toLowerCase()
+  if (status === 'thinking') return 'thinking'
+  if (['failed', 'error', 'cancelled', 'canceled', 'killed'].includes(status)) {
+    return 'failed'
+  }
+  if (
+    ['complete', 'completed', 'success', 'succeeded', 'done'].includes(status) ||
+    agent.progress >= 99
+  ) {
+    return 'complete'
+  }
+  return 'running'
+}
+
+function getStatusBubble(status: AgentNodeStatus, progress: number): AgentStatusBubble {
+  if (status === 'thinking') {
+    return { type: 'thinking', text: 'Reasoning through next step' }
+  }
+  if (status === 'failed') {
+    return { type: 'error', text: 'Execution failed, awaiting retry' }
+  }
+  if (status === 'complete') {
+    return { type: 'checkpoint', text: 'Checkpoint complete' }
+  }
+  if (status === 'queued') {
+    return { type: 'question', text: 'Queued for dispatch' }
+  }
+  const clampedProgress = Math.max(0, Math.min(100, Math.round(progress)))
+  return { type: 'checkpoint', text: `${clampedProgress}% complete` }
+}
+
+function buildTranscriptText(agent: {
+  name: string
+  description: string
+  model: string
+}): string {
+  return [
+    `$ agent.start --name ${agent.name}`,
+    `[info] model=${agent.model}`,
+    `[info] task=${agent.description}`,
+    '[step] collecting requirements and constraints',
+    '[step] generating implementation plan',
+    '[step] writing files and validating output',
+    '[result] completed with artifacts attached',
+  ].join('\n')
+}
+
+export function AgentViewPanel() {
+  const {
+    isDesktop,
+    panelVisible,
+    showFloatingToggle,
+    panelWidth,
+    nowMs,
+    lastRefreshedMs,
+    activeAgents,
+    queuedAgents,
+    historyAgents,
+    historyOpen,
+    isLoading,
+    isDemoMode,
+    isLiveConnected,
+    errorMessage,
+    setOpen,
+    setHistoryOpen,
+    killAgent,
+    cancelQueueTask,
+    activeCount,
+  } = useAgentView()
+
+  const [selectedTranscript, setSelectedTranscript] = useState<{
+    title: string
+    content: string
+  } | null>(null)
+  const [selectedAgentChat, setSelectedAgentChat] = useState<{
+    sessionKey: string
+    agentName: string
+    statusLabel: string
+  } | null>(null)
+  const [viewMode, setViewMode] = useState<'expanded' | 'compact'>('expanded')
+
+  const syncedSessionCount = useMemo(function getSyncedSessionCount() {
+    return activeAgents.length + queuedAgents.length + historyAgents.length
+  }, [activeAgents.length, historyAgents.length, queuedAgents.length])
+
+  const totalCost = useMemo(function getTotalCost() {
+    return activeAgents.reduce(function sumCost(total, agent) {
+      return total + agent.estimatedCost
+    }, 0)
+  }, [activeAgents])
+
+  const activeNodes = useMemo(function buildActiveNodes() {
+    return activeAgents
+      .map(function mapAgentToNode(agent) {
+        const runtimeSeconds = Math.max(1, Math.floor((nowMs - agent.startedAtMs) / 1000))
+        const status = getAgentStatus(agent)
+
+        return {
+          id: agent.id,
+          name: agent.name,
+          task: agent.task,
+          model: agent.model,
+          progress: agent.progress,
+          runtimeSeconds,
+          tokenCount: agent.tokenCount,
+          cost: agent.estimatedCost,
+          status,
+          isLive: agent.isLive,
+          statusBubble: getStatusBubble(status, agent.progress),
+        } satisfies AgentNode
+      })
+      .sort(function sortByProgressDesc(left, right) {
+        if (right.progress !== left.progress) {
+          return right.progress - left.progress
+        }
+        return left.name.localeCompare(right.name)
+      })
+  }, [activeAgents, nowMs])
+
+  const queuedNodes = useMemo(function buildQueuedNodes() {
+    return queuedAgents.map(function mapQueuedAgent(task, index) {
+      return {
+        id: task.id,
+        name: task.name,
+        task: task.description,
+        model: 'queued',
+        progress: 5 + index * 7,
+        runtimeSeconds: 0,
+        tokenCount: 0,
+        cost: 0,
+        status: 'queued',
+        statusBubble: getStatusBubble('queued', 0),
+      } satisfies AgentNode
+    })
+  }, [queuedAgents])
+
+  const swarmNode = useMemo(function buildSwarmNode() {
+    const avgProgress =
+      activeAgents.length > 0
+        ? Math.round(
+            activeAgents.reduce(function sumProgress(total, agent) {
+              return total + agent.progress
+            }, 0) / activeAgents.length,
+          )
+        : 0
+
+    return {
+      id: 'main-swarm-node',
+      name: 'main-orchestrator',
+      task: 'Coordinating sub-agents, routing tool calls, and monitoring execution.',
+      model: 'swarm',
+      progress: avgProgress,
+      runtimeSeconds: Math.max(1, Math.floor((nowMs - lastRefreshedMs + 240000) / 1000)),
+      tokenCount: activeAgents.reduce(function sumTokens(total, agent) {
+        return total + agent.tokenCount
+      }, 0),
+      cost: totalCost,
+      status: 'running',
+      statusBubble: getStatusBubble('running', avgProgress),
+      isMain: true,
+    } satisfies AgentNode
+  }, [activeAgents, lastRefreshedMs, nowMs, totalCost])
+
+  const agentSpawn = useAgentSpawn(
+    activeNodes.map(function mapActiveNodeId(node) {
+      return node.id
+    }),
+  )
+  const shouldReduceMotion = useReducedMotion()
+  const networkLayerRef = useRef<HTMLDivElement | null>(null)
+  const mainCardRef = useRef<HTMLElement | null>(null)
+  const activeCardRefMap = useRef<Map<string, HTMLElement>>(new Map())
+  const [sourceBubbleRect, setSourceBubbleRect] = useState<DOMRect | null>(null)
+  const [connectionPaths, setConnectionPaths] = useState<Array<SwarmConnectionPath>>([])
+
+  const visibleActiveNodes = useMemo(function getVisibleActiveNodes() {
+    return activeNodes.filter(function keepRenderedNode(node) {
+      return agentSpawn.shouldRenderCard(node.id)
+    })
+  }, [activeNodes, agentSpawn])
+
+  const spawningNodes = useMemo(function getSpawningNodes() {
+    return activeNodes.filter(function keepSpawningNode(node) {
+      return agentSpawn.isSpawning(node.id)
+    })
+  }, [activeNodes, agentSpawn])
+
+  const updateSourceBubbleRect = useCallback(function updateSourceBubbleRect() {
+    if (typeof document === 'undefined') return
+    const element = getLastUserMessageBubbleElement()
+    if (!element) {
+      setSourceBubbleRect(null)
+      return
+    }
+    setSourceBubbleRect(element.getBoundingClientRect())
+  }, [])
+
+  const setMainCardElement = useCallback(function setMainCardElement(
+    element: HTMLElement | null,
+  ) {
+    mainCardRef.current = element
+  }, [])
+
+  const setActiveCardElement = useCallback(function setActiveCardElement(
+    agentId: string,
+    element: HTMLElement | null,
+  ) {
+    if (element) {
+      activeCardRefMap.current.set(agentId, element)
+      return
+    }
+    activeCardRefMap.current.delete(agentId)
+  }, [])
+
+  const updateConnectionPaths = useCallback(function updateConnectionPaths() {
+    const networkElement = networkLayerRef.current
+    const sourceElement = mainCardRef.current
+    if (!networkElement || !sourceElement || visibleActiveNodes.length === 0) {
+      setConnectionPaths([])
+      return
+    }
+
+    const networkRect = networkElement.getBoundingClientRect()
+    const sourceRect = sourceElement.getBoundingClientRect()
+    const start = {
+      x: sourceRect.left + sourceRect.width * 0.84 - networkRect.left,
+      y: sourceRect.top + sourceRect.height * 0.54 - networkRect.top,
+    } satisfies Point
+
+    const nextPaths = visibleActiveNodes
+      .map(function mapNodeToPath(node) {
+        const targetElement = activeCardRefMap.current.get(node.id)
+        if (!targetElement) return null
+        const targetRect = targetElement.getBoundingClientRect()
+        const end = {
+          x: targetRect.left + targetRect.width * 0.18 - networkRect.left,
+          y: targetRect.top + targetRect.height * 0.5 - networkRect.top,
+        } satisfies Point
+        return {
+          id: node.id,
+          status: node.status,
+          d: buildConnectionPath(start, end),
+        } satisfies SwarmConnectionPath
+      })
+      .filter(function filterMissingPath(path): path is SwarmConnectionPath {
+        return path !== null
+      })
+
+    setConnectionPaths(nextPaths)
+  }, [visibleActiveNodes])
+
+  useEffect(
+    function syncSourceBubbleRect() {
+      if (!panelVisible) return
+      updateSourceBubbleRect()
+      window.addEventListener('resize', updateSourceBubbleRect)
+      window.addEventListener('scroll', updateSourceBubbleRect, true)
+      return function cleanupSourceBubbleTracking() {
+        window.removeEventListener('resize', updateSourceBubbleRect)
+        window.removeEventListener('scroll', updateSourceBubbleRect, true)
+      }
+    },
+    [panelVisible, updateSourceBubbleRect],
+  )
+
+  useEffect(
+    function syncConnectionPaths() {
+      if (!panelVisible) return
+      let animationFrameId = window.requestAnimationFrame(function tick() {
+        updateConnectionPaths()
+        animationFrameId = window.requestAnimationFrame(tick)
+      })
+
+      window.addEventListener('resize', updateConnectionPaths)
+      window.addEventListener('scroll', updateConnectionPaths, true)
+
+      return function cleanupConnectionPaths() {
+        window.cancelAnimationFrame(animationFrameId)
+        window.removeEventListener('resize', updateConnectionPaths)
+        window.removeEventListener('scroll', updateConnectionPaths, true)
+      }
+    },
+    [panelVisible, updateConnectionPaths],
+  )
+
+  const statusCounts = useMemo(function getStatusCounts() {
+    return visibleActiveNodes.reduce(
+      function summarizeCounts(counts, item) {
+        if (item.status === 'thinking') {
+          return { ...counts, thinking: counts.thinking + 1 }
+        }
+        if (item.status === 'failed') {
+          return { ...counts, failed: counts.failed + 1 }
+        }
+        if (item.status === 'complete') {
+          return { ...counts, complete: counts.complete + 1 }
+        }
+        return { ...counts, running: counts.running + 1 }
+      },
+      { running: 0, thinking: 0, failed: 0, complete: 0 },
+    )
+  }, [visibleActiveNodes])
+
+  function handleView(agent: ActiveAgent) {
+    setSelectedTranscript({
+      title: agent.name,
+      content: buildTranscriptText({
+        name: agent.name,
+        description: agent.task,
+        model: agent.model,
+      }),
+    })
+  }
+
+  function handleViewByNodeId(nodeId: string) {
+    const activeMatch = activeAgents.find(function findActiveNode(agent) {
+      return agent.id === nodeId
+    })
+    if (activeMatch) {
+      handleView(activeMatch)
+      return
+    }
+
+    const historyMatch = historyAgents.find(function findHistoryNode(item) {
+      return item.id === nodeId
+    })
+    if (!historyMatch) return
+
+    setSelectedTranscript({
+      title: historyMatch.name,
+      content: buildTranscriptText({
+        name: historyMatch.name,
+        description: historyMatch.description,
+        model: historyMatch.model,
+      }),
+    })
+  }
+
+  function handleChatByNodeId(nodeId: string) {
+    const activeNode = activeNodes.find(function matchActiveNode(node) {
+      return node.id === nodeId
+    })
+    if (activeNode) {
+      setSelectedAgentChat({
+        sessionKey: activeNode.id,
+        agentName: activeNode.name,
+        statusLabel: getStatusLabel(activeNode.status),
+      })
+      return
+    }
+
+    const queuedNode = queuedNodes.find(function matchQueuedNode(node) {
+      return node.id === nodeId
+    })
+    if (!queuedNode) return
+
+    setSelectedAgentChat({
+      sessionKey: queuedNode.id,
+      agentName: queuedNode.name,
+      statusLabel: getStatusLabel(queuedNode.status),
+    })
+  }
+
+  return (
+    <>
+      {isDesktop ? (
+        <motion.aside
+          initial={false}
+          animate={{ x: panelVisible ? 0 : panelWidth }}
+          transition={{ duration: 0.22, ease: 'easeInOut' }}
+          className={cn(
+            'fixed inset-y-0 right-0 z-40 w-80 border-l border-primary-300/70 bg-primary-100/92 backdrop-blur-xl',
+            panelVisible ? 'pointer-events-auto' : 'pointer-events-none',
+          )}
+        >
+          <div className="flex h-13 items-center justify-between border-b border-primary-300/70 px-3">
+            <div className="min-w-0">
+              <h2 className="flex items-center gap-1.5 text-sm font-medium text-balance text-primary-900">
+                <AgentAvatar size="sm" />
+                Agent Swarm
+              </h2>
+              <p className="truncate text-[11px] text-primary-700 tabular-nums">
+                {activeCount} active · {queuedAgents.length} queued · {formatCost(totalCost)} total
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {isDemoMode ? (
+                <div className="inline-flex items-center rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-[11px] text-orange-300 tabular-nums">
+                  Demo Mode
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-primary-200/60 px-2 py-1 text-[11px] text-primary-700 tabular-nums">
+                  {isLiveConnected ? (
+                    <motion.span
+                      animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.18, 1] }}
+                      transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                      className="size-1.5 rounded-full bg-emerald-400"
+                    />
+                  ) : (
+                    <span className="size-1.5 rounded-full bg-primary-500/60" />
+                  )}
+                  {isLoading ? 'syncing...' : `live ${syncedSessionCount}`}
+                </div>
+              )}
+              <div className="inline-flex items-center rounded-full border border-primary-300/70 bg-primary-200/50 p-0.5">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={cn(
+                    'h-6 rounded-full px-2 text-[11px]',
+                    viewMode === 'expanded' ? 'bg-primary-300/70 text-primary-900' : 'text-primary-700',
+                  )}
+                  onClick={function handleExpandedMode() {
+                    setViewMode('expanded')
+                  }}
+                >
+                  Expanded
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={cn(
+                    'h-6 rounded-full px-2 text-[11px]',
+                    viewMode === 'compact' ? 'bg-primary-300/70 text-primary-900' : 'text-primary-700',
+                  )}
+                  onClick={function handleCompactMode() {
+                    setViewMode('compact')
+                  }}
+                >
+                  Compact
+                </Button>
+              </div>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={function handleClosePanel() {
+                  setOpen(false)
+                }}
+                aria-label="Hide Agent View"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={1.5} />
+              </Button>
+            </div>
+          </div>
+
+          <ScrollAreaRoot className="h-[calc(100vh-3.25rem)]">
+            <ScrollAreaViewport>
+              <div className="space-y-3 p-3">
+                <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2.5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-medium text-balance text-primary-900">Active Network</h3>
+                      <p className="text-[11px] text-primary-700 tabular-nums">
+                        {isLoading
+                          ? 'syncing...'
+                          : `synced ${formatRelativeMs(nowMs - lastRefreshedMs)}`}
+                      </p>
+                      {errorMessage ? (
+                        <p className="line-clamp-1 text-[11px] text-red-300 tabular-nums">
+                          {errorMessage}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="text-right text-[11px] text-primary-700 tabular-nums">
+                      <p>{statusCounts.running} running</p>
+                      <p>{statusCounts.thinking} thinking</p>
+                    </div>
+                  </div>
+
+                  <LayoutGroup id="agent-swarm-grid">
+                    <motion.div
+                      ref={networkLayerRef}
+                      layout
+                      transition={{ layout: { type: 'spring', stiffness: 320, damping: 30 } }}
+                      className="relative rounded-2xl border border-primary-300/70 bg-linear-to-b from-primary-100 via-primary-100 to-primary-200/40 p-2"
+                    >
+                      <SwarmConnectionOverlay paths={connectionPaths} />
+
+                      <motion.div layout className="mb-2">
+                        <AgentCard
+                          node={swarmNode}
+                          layoutId={agentSpawn.getSharedLayoutId(swarmNode.id)}
+                          cardRef={setMainCardElement}
+                          viewMode={viewMode}
+                          className="w-full"
+                        />
+                      </motion.div>
+
+                      <AnimatePresence initial={false}>
+                        {spawningNodes.map(function renderSpawningGhost(node, index) {
+                          const fallbackLeft = 24 + index * 14
+                          const fallbackTop = 128 + index * 10
+                          const width = sourceBubbleRect ? Math.min(sourceBubbleRect.width, 152) : 124
+                          const height = sourceBubbleRect ? Math.min(sourceBubbleRect.height, 44) : 32
+                          const top = sourceBubbleRect ? sourceBubbleRect.top : fallbackTop
+                          const left = sourceBubbleRect
+                            ? sourceBubbleRect.left + sourceBubbleRect.width - width
+                            : fallbackLeft
+
+                          return (
+                            <motion.div
+                              key={`spawn-ghost-${node.id}`}
+                              layoutId={agentSpawn.getSharedLayoutId(node.id)}
+                              initial={
+                                shouldReduceMotion
+                                  ? { opacity: 0, scale: 0.96 }
+                                  : { opacity: 0, scale: 0.9 }
+                              }
+                              animate={
+                                shouldReduceMotion
+                                  ? { opacity: 0.65, scale: 1 }
+                                  : { opacity: [0.5, 0.85, 0.5], scale: [0.94, 1, 0.94] }
+                              }
+                              exit={{ opacity: 0, scale: 0.94 }}
+                              transition={
+                                shouldReduceMotion
+                                  ? { duration: 0.12, ease: 'easeOut' }
+                                  : { duration: 0.42, ease: 'easeInOut' }
+                              }
+                              className="pointer-events-none fixed z-30 rounded-full border border-orange-500/40 bg-orange-500/20 shadow-sm backdrop-blur-sm"
+                              style={{ top, left, width, height }}
+                            />
+                          )
+                        })}
+                      </AnimatePresence>
+
+                      {activeNodes.length > 0 || spawningNodes.length > 0 ? (
+                        <motion.div
+                          layout
+                          transition={{ layout: { type: 'spring', stiffness: 360, damping: 34 } }}
+                          className={cn(
+                            'grid gap-2',
+                            viewMode === 'compact'
+                              ? 'grid-cols-[repeat(auto-fit,minmax(132px,1fr))]'
+                              : 'grid-cols-1',
+                          )}
+                        >
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            {visibleActiveNodes.map(function renderActiveNode(node) {
+                              return (
+                                <motion.div
+                                  key={node.id}
+                                  layout="position"
+                                  initial={{ y: -18, opacity: 0, scale: 0.96 }}
+                                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                                  exit={{ y: 10, opacity: 0, scale: 0.88 }}
+                                  transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                                >
+                                  <AgentCard
+                                    node={node}
+                                    cardRef={function setNodeCardRef(element) {
+                                      setActiveCardElement(node.id, element)
+                                    }}
+                                    layoutId={agentSpawn.getSharedLayoutId(node.id)}
+                                    viewMode={viewMode}
+                                    onChat={handleChatByNodeId}
+                                    onView={handleViewByNodeId}
+                                    onKill={killAgent}
+                                    className={cn(
+                                      agentSpawn.isSpawning(node.id) ? 'ring-2 ring-orange-500/35' : '',
+                                    )}
+                                  />
+                                </motion.div>
+                              )
+                            })}
+                          </AnimatePresence>
+                        </motion.div>
+                      ) : (
+                        <p className="rounded-xl border border-primary-300/60 bg-primary-200/30 px-2 py-1.5 text-[11px] text-pretty text-primary-700">
+                          No active agents.
+                        </p>
+                      )}
+
+                      {queuedNodes.length > 0 ? (
+                        <motion.div layout className="mt-2 space-y-1.5">
+                          <p className="text-[11px] text-primary-700 tabular-nums">Queue</p>
+                          <motion.div
+                            layout
+                            className={cn(
+                              'grid gap-2',
+                              viewMode === 'compact'
+                                ? 'grid-cols-[repeat(auto-fit,minmax(132px,1fr))]'
+                                : 'grid-cols-1',
+                            )}
+                          >
+                            {queuedNodes.map(function renderQueuedNode(node) {
+                              return (
+                                <AgentCard
+                                  key={node.id}
+                                  node={node}
+                                  layoutId={agentSpawn.getCardLayoutId(node.id)}
+                                  viewMode={viewMode}
+                                  onChat={handleChatByNodeId}
+                                  onCancel={cancelQueueTask}
+                                />
+                              )
+                            })}
+                          </motion.div>
+                        </motion.div>
+                      ) : null}
+                    </motion.div>
+                  </LayoutGroup>
+                </section>
+
+                <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+                  <div className="flex items-center justify-between">
+                    <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
+                      <HugeiconsIcon
+                        icon={historyOpen ? ArrowDown01Icon : ArrowRight01Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                      History
+                    </CollapsibleTrigger>
+                    <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
+                      {historyAgents.length}
+                    </span>
+                  </div>
+                  <CollapsiblePanel contentClassName="pt-1">
+                    <div className="flex flex-wrap gap-2">
+                      {historyAgents.slice(0, 10).map(function renderHistoryPill(item) {
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className={cn(
+                              'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tabular-nums',
+                              getHistoryPillClassName(item.status),
+                            )}
+                            onClick={function handleHistoryView() {
+                              handleViewByNodeId(item.id)
+                            }}
+                          >
+                            <HugeiconsIcon icon={Link01Icon} size={20} strokeWidth={1.5} />
+                            <span className="truncate">{item.name}</span>
+                            <span className="opacity-80">{formatCost(item.cost)}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </CollapsiblePanel>
+                </Collapsible>
+              </div>
+            </ScrollAreaViewport>
+            <ScrollAreaScrollbar>
+              <ScrollAreaThumb />
+            </ScrollAreaScrollbar>
+            <ScrollAreaCorner />
+          </ScrollAreaRoot>
+        </motion.aside>
+      ) : null}
+
+      <AnimatePresence>
+        {showFloatingToggle ? (
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onClick={function handleOpenPanel() {
+              setOpen(true)
+            }}
+            className="fixed right-4 bottom-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-linear-to-br from-orange-500 to-orange-600 text-primary-50 shadow-lg"
+            aria-label="Open Agent View"
+          >
+            <motion.span
+              animate={
+                activeCount > 0
+                  ? {
+                      scale: [1, 1.05, 1],
+                      opacity: [0.95, 1, 0.95],
+                    }
+                  : { scale: 1, opacity: 1 }
+              }
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+              className="inline-flex"
+            >
+              <HugeiconsIcon icon={BotIcon} size={20} strokeWidth={1.5} />
+            </motion.span>
+            <span className="absolute -top-1 -right-1 inline-flex size-5 items-center justify-center rounded-full bg-primary-950 text-[11px] font-medium text-primary-50 tabular-nums">
+              {activeCount}
+            </span>
+          </motion.button>
+        ) : null}
+      </AnimatePresence>
+
+      <DialogRoot
+        open={selectedTranscript !== null}
+        onOpenChange={function handleTranscriptOpenChange(open) {
+          if (!open) {
+            setSelectedTranscript(null)
+          }
+        }}
+      >
+        <DialogContent className="w-[min(640px,92vw)] bg-primary-100">
+          <div className="space-y-3 p-4">
+            <DialogTitle className="text-base text-balance">
+              {selectedTranscript ? `${selectedTranscript.title} Transcript` : 'Transcript'}
+            </DialogTitle>
+            <DialogDescription className="text-pretty text-primary-700">
+              Recent execution trace and summarized tool activity.
+            </DialogDescription>
+            <pre className="max-h-[360px] overflow-auto rounded-lg border border-primary-300/70 bg-primary-200/40 p-3 text-xs text-primary-900">
+              {selectedTranscript?.content}
+            </pre>
+            <div className="flex justify-end">
+              <DialogClose className="h-8">Close</DialogClose>
+            </div>
+          </div>
+        </DialogContent>
+      </DialogRoot>
+
+      <AgentChatModal
+        open={selectedAgentChat !== null}
+        sessionKey={selectedAgentChat?.sessionKey ?? ''}
+        agentName={selectedAgentChat?.agentName ?? 'Agent'}
+        statusLabel={selectedAgentChat?.statusLabel ?? 'running'}
+        onOpenChange={function handleAgentChatOpenChange(nextOpen) {
+          if (!nextOpen) {
+            setSelectedAgentChat(null)
+          }
+        }}
+      />
+    </>
+  )
+}

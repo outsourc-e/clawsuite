@@ -88,6 +88,7 @@ function PromptInput({
   children,
   disabled = false,
   onClick,
+  onPointerDown,
   ...props
 }: PromptInputProps) {
   const [internalValue, setInternalValue] = useState(value || '')
@@ -105,6 +106,13 @@ function PromptInput({
     onClick?.(e)
   }
 
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!disabled && e.pointerType === 'touch') {
+      textareaRef.current?.focus()
+    }
+    onPointerDown?.(e)
+  }
+
   return (
     <TooltipProvider>
       <PromptInputContext.Provider
@@ -120,6 +128,7 @@ function PromptInput({
       >
         <div
           onClick={handleClick}
+          onPointerDown={handlePointerDown}
           className={cn(
             'bg-surface cursor-text rounded-[22px] outline outline-ink/10 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.05)] py-3 gap-3 flex flex-col',
             disabled && 'cursor-not-allowed opacity-60',
@@ -213,6 +222,7 @@ function PromptInputTextarea({
         className,
       )}
       rows={1}
+      enterKeyHint="send"
       readOnly={disabled}
       aria-disabled={disabled}
       {...props}

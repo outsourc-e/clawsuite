@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { chatQueryKeys, fetchSessions } from '../chat-queries'
 import { isRecentSession } from '../pending-send'
 import { filterSessionsWithTombstones } from '../session-tombstones'
-import { useSessionTitles, type SessionTitleInfo } from '../session-title-store'
+import {  useSessionTitles } from '../session-title-store'
+import type {SessionTitleInfo} from '../session-title-store';
 import type { SessionMeta } from '../types'
 
 function mergeSessionTitle(
@@ -17,6 +18,7 @@ function mergeSessionTitle(
   const derivedTitle = hasManualTitle
     ? session.derivedTitle
     : stored.title ?? session.derivedTitle
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
   const titleStatus = stored.status ?? session.titleStatus
   const titleSource = hasManualTitle
     ? 'manual'
@@ -83,6 +85,8 @@ export function useChatSessions({
 
   const sessionsError =
     sessionsQuery.error instanceof Error ? sessionsQuery.error.message : null
+  const sessionsLoading = sessionsQuery.isLoading && !sessionsQuery.data
+  const sessionsFetching = sessionsQuery.isFetching
 
   return {
     sessionsQuery,
@@ -92,5 +96,8 @@ export function useChatSessions({
     activeSessionKey,
     activeTitle,
     sessionsError,
+    sessionsLoading,
+    sessionsFetching,
+    refetchSessions: sessionsQuery.refetch,
   }
 }

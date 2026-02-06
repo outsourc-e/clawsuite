@@ -1,18 +1,19 @@
 'use client'
 
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsiblePanel,
-} from '@/components/ui/collapsible'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon, Wrench01Icon } from '@hugeicons/core-free-icons'
-import { Button } from '@/components/ui/button'
-import { Tool, type ToolPart } from './tool'
 import { useLayoutEffect, useState } from 'react'
+import { Tool  } from './tool'
+import type {ToolPart} from './tool';
+import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 
 export type ToolIndicatorProps = {
-  tools: ToolPart[]
+  tools: Array<ToolPart>
   defaultOpen?: boolean
 }
 

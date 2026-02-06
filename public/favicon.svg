@@ -1,4 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" fill="none">
-  <rect x="0.5" y="0.5" width="79" height="79" fill="oklch(0.25 0.003 80)" />
-  <path d="M56.343 44.1513C56.7813 43.2831 57.1357 42.581 57.408 41.6289C61.865 32.3874 62.4007 22.0378 60.0033 15.1717C59.0614 12.3089 56.9095 12.312 56.8172 14.6528C55.9163 20.6969 54.1958 24.5178 52.98 26.9262C49.9119 33.0037 45.1248 38.6396 40.4708 42.1544C32.919 47.8252 30.4248 43.4776 29.9327 38.7481C29.5892 34.7 30.1781 30.0994 31.2457 24.9825C31.8513 22.9009 29.949 21.9406 28.6338 23.664C27.147 25.7271 25.849 27.8855 24.8831 30.2116C21.9386 35.6315 20.1097 43.9829 20.8551 52.6203C21.4024 56.7713 22.0623 60.1929 22.7221 63.6144C23.5382 67.7022 26.2713 67.9925 29.8909 66.9397C40.7669 64.1786 50.8494 53.4948 54.7601 46.6301C55.474 45.8726 55.9123 45.0044 56.343 44.1513Z" fill="oklch(0.95 0.004 80)" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="orangeBgFinal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ea580c;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#f97316;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fb923c;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Orange background -->
+  <rect x="5" y="5" width="90" height="90" rx="16" fill="url(#orangeBgFinal)"/>
+  
+  <!-- Terminal window frame - dark outline, no fill -->
+  <rect x="20" y="25" width="60" height="50" rx="4" stroke="#1e293b" stroke-width="3" fill="none"/>
+  
+  <!-- Terminal header dots - dark fill -->
+  <circle cx="28" cy="32" r="2.5" fill="#1e293b"/>
+  <circle cx="37" cy="32" r="2.5" fill="#1e293b"/>
+  <circle cx="46" cy="32" r="2.5" fill="#1e293b"/>
+  
+  <!-- Left claw bracket - dark -->
+  <path d="M 38 45 L 32 50 L 38 55" stroke="#1e293b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Right claw bracket - dark -->
+  <path d="M 62 45 L 68 50 L 62 55" stroke="#1e293b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Center cursor bar - dark fill -->
+  <rect x="47" y="46" width="4" height="10" rx="2" fill="#1e293b"/>
 </svg>

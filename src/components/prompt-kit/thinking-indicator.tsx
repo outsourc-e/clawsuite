@@ -1,14 +1,15 @@
 'use client'
 
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsiblePanel,
-} from '@/components/ui/collapsible'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon, Idea01Icon } from '@hugeicons/core-free-icons'
-import { Button } from '@/components/ui/button'
 import { useLayoutEffect, useState } from 'react'
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import { Button } from '@/components/ui/button'
+import { LoadingIndicator } from '@/components/loading-indicator'
 
 export type ThinkingIndicatorProps = {
   content: string
@@ -52,9 +53,7 @@ function ThinkingIndicator({
             {isStreaming ? 'Thinking live' : 'Thought process'}
           </span>
           {isStreaming ? (
-            <span className="chat-streaming-lobster" aria-hidden="true">
-              🦞
-            </span>
+            <LoadingIndicator ariaLabel="Toggle loading indicator" />
           ) : null}
           <HugeiconsIcon
             icon={ArrowDown01Icon}

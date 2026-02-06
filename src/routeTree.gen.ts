@@ -9,22 +9,89 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TerminalRouteImport } from './routes/terminal'
+import { Route as SkillsRouteImport } from './routes/skills'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as NewRouteImport } from './routes/new'
+import { Route as MemoryRouteImport } from './routes/memory'
+import { Route as LogsRouteImport } from './routes/logs'
+import { Route as FilesRouteImport } from './routes/files'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CronRouteImport } from './routes/cron'
 import { Route as ConnectRouteImport } from './routes/connect'
+import { Route as BrowserRouteImport } from './routes/browser'
+import { Route as AuroraDemoRouteImport } from './routes/aurora-demo'
+import { Route as AgentSwarmRouteImport } from './routes/agent-swarm'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
+import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
+import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
+import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
+import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
 import { Route as ApiStreamRouteImport } from './routes/api/stream'
+import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 import { Route as ApiSessionTitleRouteImport } from './routes/api/session-title'
+import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
+import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
+import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiCronToggleRouteImport } from './routes/api/cron/toggle'
+import { Route as ApiCronRunRouteImport } from './routes/api/cron/run'
+import { Route as ApiCronListRouteImport } from './routes/api/cron/list'
+import { Route as ApiBrowserTabsRouteImport } from './routes/api/browser/tabs'
+import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
+import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
 
+const TerminalRoute = TerminalRouteImport.update({
+  id: '/terminal',
+  path: '/terminal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SkillsRoute = SkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewRoute = NewRouteImport.update({
   id: '/new',
   path: '/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MemoryRoute = MemoryRouteImport.update({
+  id: '/memory',
+  path: '/memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogsRoute = LogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilesRoute = FilesRouteImport.update({
+  id: '/files',
+  path: '/files',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CronRoute = CronRouteImport.update({
+  id: '/cron',
+  path: '/cron',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConnectRoute = ConnectRouteImport.update({
@@ -32,9 +99,29 @@ const ConnectRoute = ConnectRouteImport.update({
   path: '/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BrowserRoute = BrowserRouteImport.update({
+  id: '/browser',
+  path: '/browser',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuroraDemoRoute = AuroraDemoRouteImport.update({
+  id: '/aurora-demo',
+  path: '/aurora-demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentSwarmRoute = AgentSwarmRouteImport.update({
+  id: '/agent-swarm',
+  path: '/agent-swarm',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatIndexRoute = ChatIndexRouteImport.update({
+  id: '/chat/',
+  path: '/chat/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
@@ -42,9 +129,34 @@ const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   path: '/chat/$sessionKey',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
+  id: '/api/terminal-stream',
+  path: '/api/terminal-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTerminalResizeRoute = ApiTerminalResizeRouteImport.update({
+  id: '/api/terminal-resize',
+  path: '/api/terminal-resize',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTerminalInputRoute = ApiTerminalInputRouteImport.update({
+  id: '/api/terminal-input',
+  path: '/api/terminal-input',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
+  id: '/api/terminal-close',
+  path: '/api/terminal-close',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStreamRoute = ApiStreamRouteImport.update({
   id: '/api/stream',
   path: '/api/stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSkillsRoute = ApiSkillsRouteImport.update({
+  id: '/api/skills',
+  path: '/api/skills',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionsRoute = ApiSessionsRouteImport.update({
@@ -57,6 +169,11 @@ const ApiSessionTitleRoute = ApiSessionTitleRouteImport.update({
   path: '/api/session-title',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionStatusRoute = ApiSessionStatusRouteImport.update({
+  id: '/api/session-status',
+  path: '/api/session-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
   id: '/api/send-stream',
   path: '/api/send-stream',
@@ -65,6 +182,11 @@ const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
 const ApiSendRoute = ApiSendRouteImport.update({
   id: '/api/send',
   path: '/api/send',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
+  id: '/api/provider-usage',
+  path: '/api/provider-usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPingRoute = ApiPingRouteImport.update({
@@ -82,117 +204,401 @@ const ApiHistoryRoute = ApiHistoryRouteImport.update({
   path: '/api/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFilesRoute = ApiFilesRouteImport.update({
+  id: '/api/files',
+  path: '/api/files',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
+  id: '/send',
+  path: '/send',
+  getParentRoute: () => ApiSessionsRoute,
+} as any)
+const ApiCronToggleRoute = ApiCronToggleRouteImport.update({
+  id: '/api/cron/toggle',
+  path: '/api/cron/toggle',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronRunRoute = ApiCronRunRouteImport.update({
+  id: '/api/cron/run',
+  path: '/api/cron/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronListRoute = ApiCronListRouteImport.update({
+  id: '/api/cron/list',
+  path: '/api/cron/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBrowserTabsRoute = ApiBrowserTabsRouteImport.update({
+  id: '/api/browser/tabs',
+  path: '/api/browser/tabs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBrowserScreenshotRoute = ApiBrowserScreenshotRouteImport.update({
+  id: '/api/browser/screenshot',
+  path: '/api/browser/screenshot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronRunsJobIdRoute = ApiCronRunsJobIdRouteImport.update({
+  id: '/api/cron/runs/$jobId',
+  path: '/api/cron/runs/$jobId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agent-swarm': typeof AgentSwarmRoute
+  '/aurora-demo': typeof AuroraDemoRoute
+  '/browser': typeof BrowserRoute
   '/connect': typeof ConnectRoute
+  '/cron': typeof CronRoute
+  '/dashboard': typeof DashboardRoute
+  '/files': typeof FilesRoute
+  '/logs': typeof LogsRoute
+  '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
+  '/settings': typeof SettingsRoute
+  '/skills': typeof SkillsRoute
+  '/terminal': typeof TerminalRoute
+  '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
+  '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
+  '/api/session-status': typeof ApiSessionStatusRoute
   '/api/session-title': typeof ApiSessionTitleRoute
-  '/api/sessions': typeof ApiSessionsRoute
+  '/api/sessions': typeof ApiSessionsRouteWithChildren
+  '/api/skills': typeof ApiSkillsRoute
   '/api/stream': typeof ApiStreamRoute
+  '/api/terminal-close': typeof ApiTerminalCloseRoute
+  '/api/terminal-input': typeof ApiTerminalInputRoute
+  '/api/terminal-resize': typeof ApiTerminalResizeRoute
+  '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/chat/': typeof ChatIndexRoute
+  '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
+  '/api/browser/tabs': typeof ApiBrowserTabsRoute
+  '/api/cron/list': typeof ApiCronListRoute
+  '/api/cron/run': typeof ApiCronRunRoute
+  '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/sessions/send': typeof ApiSessionsSendRoute
+  '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agent-swarm': typeof AgentSwarmRoute
+  '/aurora-demo': typeof AuroraDemoRoute
+  '/browser': typeof BrowserRoute
   '/connect': typeof ConnectRoute
+  '/cron': typeof CronRoute
+  '/dashboard': typeof DashboardRoute
+  '/files': typeof FilesRoute
+  '/logs': typeof LogsRoute
+  '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
+  '/settings': typeof SettingsRoute
+  '/skills': typeof SkillsRoute
+  '/terminal': typeof TerminalRoute
+  '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
+  '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
+  '/api/session-status': typeof ApiSessionStatusRoute
   '/api/session-title': typeof ApiSessionTitleRoute
-  '/api/sessions': typeof ApiSessionsRoute
+  '/api/sessions': typeof ApiSessionsRouteWithChildren
+  '/api/skills': typeof ApiSkillsRoute
   '/api/stream': typeof ApiStreamRoute
+  '/api/terminal-close': typeof ApiTerminalCloseRoute
+  '/api/terminal-input': typeof ApiTerminalInputRoute
+  '/api/terminal-resize': typeof ApiTerminalResizeRoute
+  '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/chat': typeof ChatIndexRoute
+  '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
+  '/api/browser/tabs': typeof ApiBrowserTabsRoute
+  '/api/cron/list': typeof ApiCronListRoute
+  '/api/cron/run': typeof ApiCronRunRoute
+  '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/sessions/send': typeof ApiSessionsSendRoute
+  '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agent-swarm': typeof AgentSwarmRoute
+  '/aurora-demo': typeof AuroraDemoRoute
+  '/browser': typeof BrowserRoute
   '/connect': typeof ConnectRoute
+  '/cron': typeof CronRoute
+  '/dashboard': typeof DashboardRoute
+  '/files': typeof FilesRoute
+  '/logs': typeof LogsRoute
+  '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
+  '/settings': typeof SettingsRoute
+  '/skills': typeof SkillsRoute
+  '/terminal': typeof TerminalRoute
+  '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
+  '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
+  '/api/session-status': typeof ApiSessionStatusRoute
   '/api/session-title': typeof ApiSessionTitleRoute
-  '/api/sessions': typeof ApiSessionsRoute
+  '/api/sessions': typeof ApiSessionsRouteWithChildren
+  '/api/skills': typeof ApiSkillsRoute
   '/api/stream': typeof ApiStreamRoute
+  '/api/terminal-close': typeof ApiTerminalCloseRoute
+  '/api/terminal-input': typeof ApiTerminalInputRoute
+  '/api/terminal-resize': typeof ApiTerminalResizeRoute
+  '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/chat/': typeof ChatIndexRoute
+  '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
+  '/api/browser/tabs': typeof ApiBrowserTabsRoute
+  '/api/cron/list': typeof ApiCronListRoute
+  '/api/cron/run': typeof ApiCronRunRoute
+  '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/sessions/send': typeof ApiSessionsSendRoute
+  '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agent-swarm'
+    | '/aurora-demo'
+    | '/browser'
     | '/connect'
+    | '/cron'
+    | '/dashboard'
+    | '/files'
+    | '/logs'
+    | '/memory'
     | '/new'
+    | '/settings'
+    | '/skills'
+    | '/terminal'
+    | '/api/files'
     | '/api/history'
     | '/api/paths'
     | '/api/ping'
+    | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
+    | '/api/session-status'
     | '/api/session-title'
     | '/api/sessions'
+    | '/api/skills'
     | '/api/stream'
+    | '/api/terminal-close'
+    | '/api/terminal-input'
+    | '/api/terminal-resize'
+    | '/api/terminal-stream'
     | '/chat/$sessionKey'
+    | '/chat/'
+    | '/api/browser/screenshot'
+    | '/api/browser/tabs'
+    | '/api/cron/list'
+    | '/api/cron/run'
+    | '/api/cron/toggle'
+    | '/api/sessions/send'
+    | '/api/cron/runs/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agent-swarm'
+    | '/aurora-demo'
+    | '/browser'
     | '/connect'
+    | '/cron'
+    | '/dashboard'
+    | '/files'
+    | '/logs'
+    | '/memory'
     | '/new'
+    | '/settings'
+    | '/skills'
+    | '/terminal'
+    | '/api/files'
     | '/api/history'
     | '/api/paths'
     | '/api/ping'
+    | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
+    | '/api/session-status'
     | '/api/session-title'
     | '/api/sessions'
+    | '/api/skills'
     | '/api/stream'
+    | '/api/terminal-close'
+    | '/api/terminal-input'
+    | '/api/terminal-resize'
+    | '/api/terminal-stream'
     | '/chat/$sessionKey'
+    | '/chat'
+    | '/api/browser/screenshot'
+    | '/api/browser/tabs'
+    | '/api/cron/list'
+    | '/api/cron/run'
+    | '/api/cron/toggle'
+    | '/api/sessions/send'
+    | '/api/cron/runs/$jobId'
   id:
     | '__root__'
     | '/'
+    | '/agent-swarm'
+    | '/aurora-demo'
+    | '/browser'
     | '/connect'
+    | '/cron'
+    | '/dashboard'
+    | '/files'
+    | '/logs'
+    | '/memory'
     | '/new'
+    | '/settings'
+    | '/skills'
+    | '/terminal'
+    | '/api/files'
     | '/api/history'
     | '/api/paths'
     | '/api/ping'
+    | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
+    | '/api/session-status'
     | '/api/session-title'
     | '/api/sessions'
+    | '/api/skills'
     | '/api/stream'
+    | '/api/terminal-close'
+    | '/api/terminal-input'
+    | '/api/terminal-resize'
+    | '/api/terminal-stream'
     | '/chat/$sessionKey'
+    | '/chat/'
+    | '/api/browser/screenshot'
+    | '/api/browser/tabs'
+    | '/api/cron/list'
+    | '/api/cron/run'
+    | '/api/cron/toggle'
+    | '/api/sessions/send'
+    | '/api/cron/runs/$jobId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgentSwarmRoute: typeof AgentSwarmRoute
+  AuroraDemoRoute: typeof AuroraDemoRoute
+  BrowserRoute: typeof BrowserRoute
   ConnectRoute: typeof ConnectRoute
+  CronRoute: typeof CronRoute
+  DashboardRoute: typeof DashboardRoute
+  FilesRoute: typeof FilesRoute
+  LogsRoute: typeof LogsRoute
+  MemoryRoute: typeof MemoryRoute
   NewRoute: typeof NewRoute
+  SettingsRoute: typeof SettingsRoute
+  SkillsRoute: typeof SkillsRoute
+  TerminalRoute: typeof TerminalRoute
+  ApiFilesRoute: typeof ApiFilesRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
+  ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
+  ApiSessionStatusRoute: typeof ApiSessionStatusRoute
   ApiSessionTitleRoute: typeof ApiSessionTitleRoute
-  ApiSessionsRoute: typeof ApiSessionsRoute
+  ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
+  ApiSkillsRoute: typeof ApiSkillsRoute
   ApiStreamRoute: typeof ApiStreamRoute
+  ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
+  ApiTerminalInputRoute: typeof ApiTerminalInputRoute
+  ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
+  ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
+  ChatIndexRoute: typeof ChatIndexRoute
+  ApiBrowserScreenshotRoute: typeof ApiBrowserScreenshotRoute
+  ApiBrowserTabsRoute: typeof ApiBrowserTabsRoute
+  ApiCronListRoute: typeof ApiCronListRoute
+  ApiCronRunRoute: typeof ApiCronRunRoute
+  ApiCronToggleRoute: typeof ApiCronToggleRoute
+  ApiCronRunsJobIdRoute: typeof ApiCronRunsJobIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terminal': {
+      id: '/terminal'
+      path: '/terminal'
+      fullPath: '/terminal'
+      preLoaderRoute: typeof TerminalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/skills': {
+      id: '/skills'
+      path: '/skills'
+      fullPath: '/skills'
+      preLoaderRoute: typeof SkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/new': {
       id: '/new'
       path: '/new'
       fullPath: '/new'
       preLoaderRoute: typeof NewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/memory': {
+      id: '/memory'
+      path: '/memory'
+      fullPath: '/memory'
+      preLoaderRoute: typeof MemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logs': {
+      id: '/logs'
+      path: '/logs'
+      fullPath: '/logs'
+      preLoaderRoute: typeof LogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/files': {
+      id: '/files'
+      path: '/files'
+      fullPath: '/files'
+      preLoaderRoute: typeof FilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cron': {
+      id: '/cron'
+      path: '/cron'
+      fullPath: '/cron'
+      preLoaderRoute: typeof CronRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/connect': {
@@ -202,11 +608,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/browser': {
+      id: '/browser'
+      path: '/browser'
+      fullPath: '/browser'
+      preLoaderRoute: typeof BrowserRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aurora-demo': {
+      id: '/aurora-demo'
+      path: '/aurora-demo'
+      fullPath: '/aurora-demo'
+      preLoaderRoute: typeof AuroraDemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agent-swarm': {
+      id: '/agent-swarm'
+      path: '/agent-swarm'
+      fullPath: '/agent-swarm'
+      preLoaderRoute: typeof AgentSwarmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat/': {
+      id: '/chat/'
+      path: '/chat'
+      fullPath: '/chat/'
+      preLoaderRoute: typeof ChatIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/chat/$sessionKey': {
@@ -216,11 +650,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatSessionKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/terminal-stream': {
+      id: '/api/terminal-stream'
+      path: '/api/terminal-stream'
+      fullPath: '/api/terminal-stream'
+      preLoaderRoute: typeof ApiTerminalStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/terminal-resize': {
+      id: '/api/terminal-resize'
+      path: '/api/terminal-resize'
+      fullPath: '/api/terminal-resize'
+      preLoaderRoute: typeof ApiTerminalResizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/terminal-input': {
+      id: '/api/terminal-input'
+      path: '/api/terminal-input'
+      fullPath: '/api/terminal-input'
+      preLoaderRoute: typeof ApiTerminalInputRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/terminal-close': {
+      id: '/api/terminal-close'
+      path: '/api/terminal-close'
+      fullPath: '/api/terminal-close'
+      preLoaderRoute: typeof ApiTerminalCloseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/stream': {
       id: '/api/stream'
       path: '/api/stream'
       fullPath: '/api/stream'
       preLoaderRoute: typeof ApiStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/skills': {
+      id: '/api/skills'
+      path: '/api/skills'
+      fullPath: '/api/skills'
+      preLoaderRoute: typeof ApiSkillsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sessions': {
@@ -237,6 +706,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionTitleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/session-status': {
+      id: '/api/session-status'
+      path: '/api/session-status'
+      fullPath: '/api/session-status'
+      preLoaderRoute: typeof ApiSessionStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/send-stream': {
       id: '/api/send-stream'
       path: '/api/send-stream'
@@ -249,6 +725,13 @@ declare module '@tanstack/react-router' {
       path: '/api/send'
       fullPath: '/api/send'
       preLoaderRoute: typeof ApiSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/provider-usage': {
+      id: '/api/provider-usage'
+      path: '/api/provider-usage'
+      fullPath: '/api/provider-usage'
+      preLoaderRoute: typeof ApiProviderUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ping': {
@@ -272,22 +755,116 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/files': {
+      id: '/api/files'
+      path: '/api/files'
+      fullPath: '/api/files'
+      preLoaderRoute: typeof ApiFilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sessions/send': {
+      id: '/api/sessions/send'
+      path: '/send'
+      fullPath: '/api/sessions/send'
+      preLoaderRoute: typeof ApiSessionsSendRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/cron/toggle': {
+      id: '/api/cron/toggle'
+      path: '/api/cron/toggle'
+      fullPath: '/api/cron/toggle'
+      preLoaderRoute: typeof ApiCronToggleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cron/run': {
+      id: '/api/cron/run'
+      path: '/api/cron/run'
+      fullPath: '/api/cron/run'
+      preLoaderRoute: typeof ApiCronRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cron/list': {
+      id: '/api/cron/list'
+      path: '/api/cron/list'
+      fullPath: '/api/cron/list'
+      preLoaderRoute: typeof ApiCronListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/browser/tabs': {
+      id: '/api/browser/tabs'
+      path: '/api/browser/tabs'
+      fullPath: '/api/browser/tabs'
+      preLoaderRoute: typeof ApiBrowserTabsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/browser/screenshot': {
+      id: '/api/browser/screenshot'
+      path: '/api/browser/screenshot'
+      fullPath: '/api/browser/screenshot'
+      preLoaderRoute: typeof ApiBrowserScreenshotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cron/runs/$jobId': {
+      id: '/api/cron/runs/$jobId'
+      path: '/api/cron/runs/$jobId'
+      fullPath: '/api/cron/runs/$jobId'
+      preLoaderRoute: typeof ApiCronRunsJobIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface ApiSessionsRouteChildren {
+  ApiSessionsSendRoute: typeof ApiSessionsSendRoute
+}
+
+const ApiSessionsRouteChildren: ApiSessionsRouteChildren = {
+  ApiSessionsSendRoute: ApiSessionsSendRoute,
+}
+
+const ApiSessionsRouteWithChildren = ApiSessionsRoute._addFileChildren(
+  ApiSessionsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgentSwarmRoute: AgentSwarmRoute,
+  AuroraDemoRoute: AuroraDemoRoute,
+  BrowserRoute: BrowserRoute,
   ConnectRoute: ConnectRoute,
+  CronRoute: CronRoute,
+  DashboardRoute: DashboardRoute,
+  FilesRoute: FilesRoute,
+  LogsRoute: LogsRoute,
+  MemoryRoute: MemoryRoute,
   NewRoute: NewRoute,
+  SettingsRoute: SettingsRoute,
+  SkillsRoute: SkillsRoute,
+  TerminalRoute: TerminalRoute,
+  ApiFilesRoute: ApiFilesRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
+  ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
+  ApiSessionStatusRoute: ApiSessionStatusRoute,
   ApiSessionTitleRoute: ApiSessionTitleRoute,
-  ApiSessionsRoute: ApiSessionsRoute,
+  ApiSessionsRoute: ApiSessionsRouteWithChildren,
+  ApiSkillsRoute: ApiSkillsRoute,
   ApiStreamRoute: ApiStreamRoute,
+  ApiTerminalCloseRoute: ApiTerminalCloseRoute,
+  ApiTerminalInputRoute: ApiTerminalInputRoute,
+  ApiTerminalResizeRoute: ApiTerminalResizeRoute,
+  ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
+  ChatIndexRoute: ChatIndexRoute,
+  ApiBrowserScreenshotRoute: ApiBrowserScreenshotRoute,
+  ApiBrowserTabsRoute: ApiBrowserTabsRoute,
+  ApiCronListRoute: ApiCronListRoute,
+  ApiCronRunRoute: ApiCronRunRoute,
+  ApiCronToggleRoute: ApiCronToggleRoute,
+  ApiCronRunsJobIdRoute: ApiCronRunsJobIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

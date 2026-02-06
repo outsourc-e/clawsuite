@@ -128,16 +128,37 @@ code {
   }
 }
 
-.chat-streaming-lobster {
+.chat-streaming-loader {
   display: inline-flex;
   margin-left: 0.25rem;
-  transform-origin: 50% 65%;
   vertical-align: text-bottom;
+  cursor: pointer;
+}
+
+.chat-streaming-lobster {
+  transform-origin: 50% 65%;
   animation: chatLobsterSpinPulse 1.2s ease-in-out infinite;
 }
 
+.logo-loader-track {
+  --logo-loader-step: 0.55rem;
+
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  width: calc(1rem + (var(--logo-loader-step) * 2));
+  height: 1.125rem;
+}
+
+.logo-loader-icon {
+  transform-origin: 50% 80%;
+  will-change: transform, opacity;
+  animation: logoLoaderIconBounce 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+}
+
 .chat-streaming-message {
-  animation: chatStreamingFadeIn 260ms ease-out both;
+  /* Keep streamed text visually stable; avoid opacity fades on chunk updates. */
+  animation: none;
 }
 
 @keyframes chatLobsterSpinPulse {
@@ -159,13 +180,61 @@ code {
   }
 }
 
-@keyframes chatStreamingFadeIn {
+@keyframes logoLoaderIconBounce {
   0% {
-    opacity: 0;
-    transform: translateY(6px);
+    opacity: 0.82;
+    transform: translate3d(0, 1px, 0) scale(0.94);
+  }
+  10% {
+    opacity: 1;
+    transform: translate3d(0, -3px, 0) scale(1);
+  }
+  20% {
+    opacity: 0.9;
+    transform: translate3d(0, 1px, 0) scale(0.95);
+  }
+  25% {
+    transform: translate3d(var(--logo-loader-step), 1px, 0) scale(0.94);
+  }
+  35% {
+    opacity: 1;
+    transform: translate3d(var(--logo-loader-step), -3px, 0) scale(1);
+  }
+  45% {
+    opacity: 0.9;
+    transform: translate3d(var(--logo-loader-step), 1px, 0) scale(0.95);
+  }
+  50% {
+    transform: translate3d(calc(var(--logo-loader-step) * 2), 1px, 0) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(calc(var(--logo-loader-step) * 2), -3px, 0) scale(1);
+  }
+  70% {
+    opacity: 0.9;
+    transform: translate3d(calc(var(--logo-loader-step) * 2), 1px, 0) scale(0.95);
+  }
+  75% {
+    transform: translate3d(var(--logo-loader-step), 1px, 0) scale(0.94);
+  }
+  85% {
+    opacity: 1;
+    transform: translate3d(var(--logo-loader-step), -3px, 0) scale(1);
+  }
+  95% {
+    opacity: 0.9;
+    transform: translate3d(var(--logo-loader-step), 1px, 0) scale(0.95);
   }
   100% {
-    opacity: 1;
-    transform: translateY(0);
+    opacity: 0.82;
+    transform: translate3d(0, 1px, 0) scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-streaming-lobster,
+  .logo-loader-icon {
+    animation: none;
   }
 }

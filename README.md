@@ -1,8 +1,16 @@
-# WebClaw
+# OpenClaw Studio
 
 ![Cover](./public/cover.webp)
 
-Fast web client for OpenClaw
+**Supercharged chat interface for OpenClaw AI agents**
+
+A modern, feature-rich web client for OpenClaw with:
+- 💬 **Real-time streaming** - ChatGPT-style character-by-character responses
+- 📊 **Usage Tracking** - Session & provider-level token/cost monitoring with alerts
+- 📁 **File Explorer** - Browse, edit, and manage workspace files with Monaco editor
+- 💻 **Integrated Terminal** - Full terminal access with tabs and history
+- 🎨 **Dark mode** - Beautiful, responsive UI that adapts to your preferences
+- 📱 **PWA support** - Install as a native app
 
 Currently in beta.
 

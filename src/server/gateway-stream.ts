@@ -3,10 +3,11 @@ import EventEmitter from 'node:events'
 import WebSocket from 'ws'
 
 import {
+  
   buildConnectParams,
-  getGatewayConfig,
-  type GatewayFrame,
+  getGatewayConfig
 } from './gateway'
+import type {GatewayFrame} from './gateway';
 
 export type GatewayStreamEvent =
   | { type: 'agent'; payload: any }
@@ -88,6 +89,7 @@ class GatewayStreamConnection extends EventEmitter {
       error?: { code: string; message: string }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     if (!res || res.type !== 'res') {
       throw new Error('Invalid gateway response')
     }

@@ -2,33 +2,49 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { chatQueryKeys } from '../chat-queries'
-import { updateSessionTitleState, useSessionTitleInfo } from '../session-title-store'
+import {
+  updateSessionTitleState,
+  useSessionTitleInfo,
+} from '../session-title-store'
 import { textFromMessage } from '../utils'
 import type { GatewayMessage, SessionMeta } from '../types'
+import { generateSessionTitle } from '@/utils/generate-session-title'
 
 const MIN_MESSAGES_FOR_TITLE = 3
-const MAX_MESSAGES_FOR_TITLE = 6
-const MAX_TOTAL_CHARS = 900
+const MAX_MESSAGES_FOR_TITLE = 5
 const MAX_PER_MESSAGE_CHARS = 400
 
 function buildSnippet(messages: Array<GatewayMessage>) {
+  let firstUser: string | null = null
+  let firstAssistant: string | null = null
+
+  for (const message of messages) {
+    if (message.role === 'user' && firstUser === null) {
+      const text = textFromMessage(message)
+      if (text) firstUser = text.slice(0, MAX_PER_MESSAGE_CHARS)
+      continue
+    }
+    if (message.role === 'assistant' && firstUser && firstAssistant === null) {
+      const text = textFromMessage(message)
+      if (text) firstAssistant = text.slice(0, MAX_PER_MESSAGE_CHARS)
+    }
+    if (firstUser && firstAssistant) break
+  }
+
   const snippet: Array<{ role: string; text: string }> = []
-  let totalChars = 0
+  if (firstUser) snippet.push({ role: 'user', text: firstUser })
+  if (firstAssistant) snippet.push({ role: 'assistant', text: firstAssistant })
+  return snippet
+}
+
+function countRelevantMessages(messages: Array<GatewayMessage>) {
+  let count = 0
   for (const message of messages) {
     if (message.role !== 'user' && message.role !== 'assistant') continue
-    const text = textFromMessage(message)
-    if (!text) continue
-    const clipped = text.slice(0, MAX_PER_MESSAGE_CHARS)
-    snippet.push({ role: message.role ?? 'user', text: clipped })
-    totalChars += clipped.length
-    if (
-      snippet.length >= MAX_MESSAGES_FOR_TITLE ||
-      totalChars >= MAX_TOTAL_CHARS
-    ) {
-      break
-    }
+    if (!textFromMessage(message)) continue
+    count += 1
   }
-  return snippet
+  return count
 }
 
 function computeSignature(
@@ -46,6 +62,7 @@ type UseAutoSessionTitleInput = {
   sessionKey: string | undefined
   activeSession?: SessionMeta
   messages: Array<GatewayMessage>
+  messageCount?: number
   enabled: boolean
 }
 
@@ -69,6 +86,7 @@ export function useAutoSessionTitle({
   sessionKey,
   activeSession,
   messages,
+  messageCount,
   enabled,
 }: UseAutoSessionTitleInput) {
   const queryClient = useQueryClient()
@@ -85,18 +103,19 @@ export function useAutoSessionTitle({
     [friendlyId, snippet],
   )
 
-  const userCount = useMemo(
-    () => snippet.filter((part) => part.role === 'user').length,
-    [snippet],
-  )
+  const resolvedMessageCount = useMemo(() => {
+    if (typeof messageCount === 'number') return messageCount
+    return countRelevantMessages(messages)
+  }, [messageCount, messages])
 
   const shouldGenerate = useMemo(() => {
     if (!enabled) return false
     if (!friendlyId || friendlyId === 'new') return false
     if (!sessionKey || sessionKey === 'new') return false
     if (!snippetSignature) return false
-    if (snippet.length < MIN_MESSAGES_FOR_TITLE) return false
-    if (userCount === 0) return false
+    if (snippet.length < 2) return false
+    if (resolvedMessageCount < MIN_MESSAGES_FOR_TITLE) return false
+    if (resolvedMessageCount > MAX_MESSAGES_FOR_TITLE) return false
     if (activeSession?.label || activeSession?.title) return false
     if (activeSession?.derivedTitle && activeSession.titleSource === 'auto')
       return false
@@ -110,13 +129,48 @@ export function useAutoSessionTitle({
     activeSession?.titleSource,
     enabled,
     friendlyId,
+    resolvedMessageCount,
     sessionKey,
     snippet.length,
     snippetSignature,
     titleInfo.status,
     titleInfo.title,
-    userCount,
   ])
+
+  const applyTitle = (
+    friendlyIdToUpdate: string,
+    title: string,
+    source: 'auto' | 'manual' = 'auto',
+  ) => {
+    updateSessionTitleState(friendlyIdToUpdate, {
+      title,
+      source,
+      status: 'ready',
+      error: null,
+    })
+    queryClient.setQueryData(
+      chatQueryKeys.sessions,
+      function updateSessions(existing: unknown) {
+        if (!Array.isArray(existing)) return existing
+        return existing.map((session) => {
+          if (
+            session &&
+            typeof session === 'object' &&
+            (session as SessionMeta).friendlyId === friendlyIdToUpdate
+          ) {
+            return {
+              ...(session as SessionMeta),
+              derivedTitle: title,
+              titleStatus: 'ready',
+              titleSource: source,
+              titleError: null,
+            }
+          }
+          return session
+        })
+      },
+    )
+  }
 
   const mutation = useMutation({
     mutationFn: async (payload: GenerateTitlePayload) => {
@@ -139,36 +193,17 @@ export function useAutoSessionTitle({
       return { payload, data }
     },
     onSuccess: ({ payload, data }) => {
-      updateSessionTitleState(payload.friendlyId, {
-        title: data.title,
-        source: 'auto',
-        status: 'ready',
-        error: null,
-      })
-      queryClient.setQueryData(
-        chatQueryKeys.sessions,
-        function updateSessions(existing: unknown) {
-          if (!Array.isArray(existing)) return existing
-          return existing.map((session) => {
-            if (
-              session &&
-              typeof session === 'object' &&
-              (session as SessionMeta).friendlyId === payload.friendlyId
-            ) {
-              return {
-                ...(session as SessionMeta),
-                derivedTitle: data.title,
-                titleStatus: 'ready',
-                titleSource: 'auto',
-                titleError: null,
-              }
-            }
-            return session
-          })
-        },
-      )
+      applyTitle(payload.friendlyId, data.title, 'auto')
     },
     onError: (error: unknown, payload) => {
+      const fallbackTitle = generateSessionTitle(payload.snippet, {
+        maxLength: 40,
+        maxWords: 6,
+      })
+      if (fallbackTitle) {
+        applyTitle(payload.friendlyId, fallbackTitle, 'auto')
+        return
+      }
       updateSessionTitleState(payload.friendlyId, {
         status: 'error',
         error: error instanceof Error ? error.message : String(error ?? ''),

@@ -105,6 +105,7 @@ export const Route = createFileRoute('/api/session-title')({
                 maxWords,
               },
             )
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
             if (payload && typeof payload.title === 'string') {
               title = payload.title.trim()
             }

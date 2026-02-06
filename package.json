@@ -1,5 +1,7 @@
 {
-  "name": "webclaw",
+  "name": "openclaw-studio",
+  "version": "1.0.0",
+  "description": "Supercharged chat interface for OpenClaw AI agents with file explorer, terminal, and usage tracking",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +14,7 @@
     "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@base-ui/react": "^1.1.0",
     "@hugeicons/core-free-icons": "^3.1.1",
     "@hugeicons/react": "^1.1.4",
@@ -37,6 +40,10 @@
     "use-stick-to-bottom": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
     "ws": "^8.19.0",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0",
+    "xterm-addon-search": "^0.13.0",
+    "xterm-addon-web-links": "^0.9.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

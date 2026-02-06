@@ -16,20 +16,13 @@ import { Thinking } from '@/components/prompt-kit/thinking'
 import { ThinkingIndicator } from '@/components/prompt-kit/thinking-indicator'
 import { Tool } from '@/components/prompt-kit/tool'
 import { ToolIndicator } from '@/components/prompt-kit/tool-indicator'
+import { LoadingIndicator } from '@/components/loading-indicator'
 import { useChatSettings } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
 
 // Streaming cursor component
 function StreamingCursor() {
-  return (
-    <span
-      className="chat-streaming-lobster"
-      role="img"
-      aria-label="Assistant is streaming"
-    >
-      🦞
-    </span>
-  )
+  return <LoadingIndicator ariaLabel="Assistant is streaming" />
 }
 
 type MessageItemProps = {
@@ -310,7 +303,7 @@ function MessageItemComponent({
   const isUser = role === 'user'
   const timestamp = getMessageTimestamp(message)
   const attachments = Array.isArray(message.attachments)
-    ? (message.attachments as Array<GatewayAttachment>).filter(
+    ? (message.attachments).filter(
         (attachment) => attachmentSource(attachment).length > 0,
       )
     : []
@@ -324,6 +317,7 @@ function MessageItemComponent({
   return (
     <div
       ref={wrapperRef}
+      data-chat-message-role={role}
       style={
         typeof wrapperScrollMarginTop === 'number'
           ? { scrollMarginTop: `${wrapperScrollMarginTop}px` }
@@ -351,6 +345,7 @@ function MessageItemComponent({
       {(hasText || hasAttachments) && (
         <Message className={cn(isUser ? 'flex-row-reverse' : '')}>
           <div
+            data-chat-message-bubble={isUser ? 'true' : undefined}
             className={cn(
               'rounded-[12px] break-words whitespace-normal min-w-0 text-primary-900 flex flex-col gap-2',
               effectiveIsStreaming && !isUser ? 'chat-streaming-message' : '',

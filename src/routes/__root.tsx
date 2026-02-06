@@ -5,16 +5,25 @@ import {
   createRootRoute,
 } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-
 import appCss from '../styles.css?url'
+import { SearchModal } from '@/components/search/search-modal'
+import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
+
 
 const themeScript = `
 (() => {
   try {
-    const stored = localStorage.getItem('chat-settings')
-    let theme = 'system'
+    const stored = localStorage.getItem('openclaw-settings')
+    const fallback = localStorage.getItem('chat-settings')
+    let theme = 'dark'
     if (stored) {
       const parsed = JSON.parse(stored)
+      const storedTheme = parsed?.state?.settings?.theme
+      if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
+        theme = storedTheme
+      }
+    } else if (fallback) {
+      const parsed = JSON.parse(fallback)
       const storedTheme = parsed?.state?.settings?.theme
       if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
         theme = storedTheme
@@ -48,11 +57,11 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'WebClaw',
+        title: 'OpenClaw Studio',
       },
       {
         name: 'description',
-        content: 'a fast web client for OpenClaw',
+        content: 'Supercharged chat interface for OpenClaw AI agents with file explorer, terminal, and usage tracking',
       },
       {
         property: 'og:image',
@@ -93,7 +102,9 @@ const queryClient = new QueryClient()
 function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
+      <TerminalShortcutListener />
       <Outlet />
+      <SearchModal />
     </QueryClientProvider>
   )
 }

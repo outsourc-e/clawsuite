@@ -1,13 +1,23 @@
 import { memo } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Menu01Icon } from '@hugeicons/core-free-icons'
+import { Folder01Icon, Menu01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
+import { UsageMeter } from '@/components/usage-meter'
+import {
+  TooltipContent,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 type ChatHeaderProps = {
   activeTitle: string
   wrapperRef?: React.Ref<HTMLDivElement>
   showSidebarButton?: boolean
   onOpenSidebar?: () => void
+  showFileExplorerButton?: boolean
+  fileExplorerCollapsed?: boolean
+  onToggleFileExplorer?: () => void
 }
 
 function ChatHeaderComponent({
@@ -15,6 +25,9 @@ function ChatHeaderComponent({
   wrapperRef,
   showSidebarButton = false,
   onOpenSidebar,
+  showFileExplorerButton = false,
+  fileExplorerCollapsed = true,
+  onToggleFileExplorer,
 }: ChatHeaderProps) {
   return (
     <div
@@ -32,7 +45,30 @@ function ChatHeaderComponent({
           <HugeiconsIcon icon={Menu01Icon} size={18} strokeWidth={1.6} />
         </Button>
       ) : null}
+      {showFileExplorerButton ? (
+        <TooltipProvider>
+          <TooltipRoot>
+            <TooltipTrigger
+              onClick={onToggleFileExplorer}
+              render={
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="mr-2 text-primary-800 hover:bg-primary-100"
+                  aria-label={fileExplorerCollapsed ? 'Show files' : 'Hide files'}
+                >
+                  <HugeiconsIcon icon={Folder01Icon} size={18} strokeWidth={1.6} />
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">
+              {fileExplorerCollapsed ? 'Show files' : 'Hide files'}
+            </TooltipContent>
+          </TooltipRoot>
+        </TooltipProvider>
+      ) : null}
       <div className="text-sm font-medium truncate">{activeTitle}</div>
+      <UsageMeter />
     </div>
   )
 }

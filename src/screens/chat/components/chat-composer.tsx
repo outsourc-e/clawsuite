@@ -1,6 +1,13 @@
 import { ArrowUp02Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import type { Ref } from 'react'
 
 import {
@@ -30,12 +37,19 @@ type ChatComposerProps = {
   isLoading: boolean
   disabled: boolean
   wrapperRef?: Ref<HTMLDivElement>
+  composerRef?: Ref<ChatComposerHandle>
+  focusKey?: string
 }
 
 type ChatComposerHelpers = {
   reset: () => void
   setValue: (value: string) => void
   setAttachments: (attachments: Array<ChatComposerAttachment>) => void
+}
+
+type ChatComposerHandle = {
+  setValue: (value: string) => void
+  insertText: (value: string) => void
 }
 
 function formatFileSize(size: number): string {
@@ -76,6 +90,8 @@ function ChatComposerComponent({
   isLoading,
   disabled,
   wrapperRef,
+  composerRef,
+  focusKey,
 }: ChatComposerProps) {
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<
@@ -115,6 +131,11 @@ function ChatComposerComponent({
     focusPrompt()
   }, [focusAfterSubmitTick, focusPrompt])
 
+  useLayoutEffect(() => {
+    if (disabled) return
+    focusPrompt()
+  }, [disabled, focusKey, focusPrompt])
+
   const reset = useCallback(() => {
     setValue('')
     setAttachments([])
@@ -136,6 +157,20 @@ function ChatComposerComponent({
       focusPrompt()
     },
     [focusPrompt],
+  )
+
+  const insertText = useCallback(
+    (text: string) => {
+      setValue((prev) => (prev.trim().length > 0 ? `${prev}\n${text}` : text))
+      focusPrompt()
+    },
+    [focusPrompt],
+  )
+
+  useImperativeHandle(
+    composerRef,
+    () => ({ setValue: setComposerValue, insertText }),
+    [insertText, setComposerValue],
   )
 
   const handleRemoveAttachment = useCallback((id: string) => {
@@ -271,7 +306,7 @@ function ChatComposerComponent({
 
   return (
     <div
-      className="mx-auto w-full max-w-full px-5 sm:max-w-[768px] sm:min-w-[400px] relative pb-3"
+      className="sticky bottom-0 z-30 mx-auto w-full max-w-full bg-surface/95 px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 backdrop-blur sm:max-w-[768px] sm:min-w-[400px]"
       ref={wrapperRef}
     >
       <PromptInput
@@ -346,11 +381,12 @@ function ChatComposerComponent({
             <Button
               onClick={handleSubmit}
               disabled={submitDisabled}
-              size="icon-sm"
-              className="rounded-full"
+              size="sm"
+              className="rounded-full px-4"
               aria-label="Send message"
             >
               <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={1.5} />
+              <span>Send</span>
             </Button>
           </PromptInputAction>
         </PromptInputActions>
@@ -362,4 +398,4 @@ function ChatComposerComponent({
 const MemoizedChatComposer = memo(ChatComposerComponent)
 
 export { MemoizedChatComposer as ChatComposer }
-export type { ChatComposerAttachment, ChatComposerHelpers }
+export type { ChatComposerAttachment, ChatComposerHelpers, ChatComposerHandle }

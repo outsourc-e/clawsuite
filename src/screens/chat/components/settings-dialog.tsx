@@ -6,6 +6,7 @@ import {
   Sun01Icon,
 } from '@hugeicons/core-free-icons'
 import type { PathsPayload } from '../types'
+import type { ThemeMode } from '@/hooks/use-chat-settings'
 import {
   DialogClose,
   DialogContent,
@@ -16,7 +17,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
 import { useChatSettings } from '@/hooks/use-chat-settings'
-import type { ThemeMode } from '@/hooks/use-chat-settings'
+import { useSettings } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 
 type SettingsSectionProps = {
@@ -70,6 +71,7 @@ export function SettingsDialog({
   onClose,
 }: SettingsDialogProps) {
   const { settings, updateSettings } = useChatSettings()
+  const { updateSettings: updateStudioSettings } = useSettings()
   const themeOptions = [
     { value: 'system', label: 'System', icon: ComputerIcon },
     { value: 'light', label: 'Light', icon: Sun01Icon },
@@ -94,7 +96,7 @@ export function SettingsDialog({
             <div>
               <DialogTitle className="mb-1">Settings</DialogTitle>
               <DialogDescription className="hidden">
-                Configure WebClaw
+                Configure OpenClaw Studio
               </DialogDescription>
             </div>
             <DialogClose
@@ -132,6 +134,7 @@ export function SettingsDialog({
                   const theme = value as ThemeMode
                   applyTheme(theme)
                   updateSettings({ theme })
+                  updateStudioSettings({ theme })
                 }}
               >
                 <TabsList
@@ -173,10 +176,10 @@ export function SettingsDialog({
           </SettingsSection>
 
           <SettingsSection title="About">
-            <div className="text-sm text-primary-800">WebClaw (beta)</div>
+            <div className="text-sm text-primary-800">OpenClaw Studio (beta)</div>
             <div className="flex gap-4 pt-2">
               <a
-                href="https://github.com/ibelick/webclaw"
+                href="https://github.com/myauroraagi-dev/webclaw"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-primary-600 hover:text-primary-900 hover:underline"

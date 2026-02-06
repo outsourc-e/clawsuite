@@ -3,11 +3,13 @@
 import { Link } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  Delete01Icon,
   MoreHorizontalIcon,
   Pen01Icon,
-  Delete01Icon,
 } from '@hugeicons/core-free-icons'
-import { motion, AnimatePresence } from 'motion/react'
+import { memo, useMemo } from 'react'
+import { getMessageTimestamp } from '../../utils'
+import type { SessionMeta } from '../../types'
 import { cn } from '@/lib/utils'
 import {
   MenuContent,
@@ -15,9 +17,6 @@ import {
   MenuRoot,
   MenuTrigger,
 } from '@/components/ui/menu'
-import { memo, useMemo } from 'react'
-import type { SessionMeta } from '../../types'
-import { getMessageTimestamp } from '../../utils'
 
 type SessionItemProps = {
   session: SessionMeta
@@ -77,8 +76,6 @@ function SessionItemComponent({
     return parts.join(' • ')
   }, [isError, session.friendlyId, session.titleError, updatedAt])
 
-  const titleKey = `${session.key}:${baseTitle}:${session.titleStatus || 'idle'}`
-
   return (
     <Link
       to="/chat/$sessionKey"
@@ -94,23 +91,16 @@ function SessionItemComponent({
       )}
     >
       <div className="flex-1 min-w-0 py-1.5">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={titleKey}
-            initial={{ opacity: 0, y: 2 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -2 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className={cn(
-              'text-sm font-[500] truncate',
-              isGenerating ? 'text-primary-700' : '',
-            )}
-          >
-            <span className={cn(isGenerating ? 'animate-pulse' : undefined)}>
-              {baseTitle}
-            </span>
-          </motion.div>
-        </AnimatePresence>
+        <div
+          className={cn(
+            'truncate text-sm font-[500]',
+            isGenerating ? 'text-primary-700' : '',
+          )}
+        >
+          <span className={cn(isGenerating ? 'animate-pulse' : undefined)}>
+            {baseTitle}
+          </span>
+        </div>
         <div
           className={cn(
             'mt-0.5 text-[11px] text-primary-600 truncate',

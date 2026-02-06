@@ -47,21 +47,22 @@ function ensureLoaded() {
           Object.entries(parsed as Record<string, PersistedTitle>).map(
             ([key, value]) => {
               const normalized: PersistedTitle = {}
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
               if (value && typeof value === 'object') {
                 if (
-                  typeof (value as PersistedTitle).title === 'string' &&
-                  (value as PersistedTitle).title!.trim().length > 0
+                  typeof (value).title === 'string' &&
+                  (value).title.trim().length > 0
                 ) {
-                  normalized.title = (value as PersistedTitle).title!.trim()
+                  normalized.title = (value).title.trim()
                 }
                 if (
-                  (value as PersistedTitle).source === 'auto' ||
-                  (value as PersistedTitle).source === 'manual'
+                  (value).source === 'auto' ||
+                  (value).source === 'manual'
                 ) {
-                  normalized.source = (value as PersistedTitle).source
+                  normalized.source = (value).source
                 }
-                if (typeof (value as PersistedTitle).updatedAt === 'number') {
-                  normalized.updatedAt = (value as PersistedTitle).updatedAt
+                if (typeof (value).updatedAt === 'number') {
+                  normalized.updatedAt = (value).updatedAt
                 }
               }
               return [key, normalized]
@@ -149,6 +150,7 @@ export function useSessionTitles() {
 
 export function useSessionTitleInfo(friendlyId: string): SessionTitleInfo {
   const map = useSessionTitles()
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
   return friendlyId && map[friendlyId]
     ? map[friendlyId]
     : { status: 'idle', error: null }
@@ -165,7 +167,7 @@ export function updateSessionTitleState(
   const prevPersisted = persistedTitles[friendlyId] ?? {}
   const prevRuntime = runtimeStates.get(friendlyId) ?? {}
   let nextPersisted: PersistedTitle = { ...prevPersisted }
-  let nextRuntime: RuntimeState = { ...prevRuntime }
+  const nextRuntime: RuntimeState = { ...prevRuntime }
 
   if ('title' in patch) {
     const nextTitle = patch.title?.trim() ?? ''

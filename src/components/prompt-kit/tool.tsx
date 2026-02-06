@@ -1,12 +1,12 @@
 'use client'
 
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsiblePanel,
-} from '@/components/ui/collapsible'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
 
 export type ToolPart = {

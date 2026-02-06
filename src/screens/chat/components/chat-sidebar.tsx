@@ -1,12 +1,28 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  BrainIcon,
+  Clock01Icon,
+  ComputerTerminal01Icon,
+  File01Icon,
+  GlobeIcon,
+  Home01Icon,
+  ListViewIcon,
   PencilEdit02Icon,
+  PuzzleIcon,
+  Search01Icon,
   Settings01Icon,
   SidebarLeft01Icon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
+import { Link, useRouterState } from '@tanstack/react-router'
+import { useChatSettings } from '../hooks/use-chat-settings'
+import { useDeleteSession } from '../hooks/use-delete-session'
+import { useRenameSession } from '../hooks/use-rename-session'
 import { SettingsDialog } from './settings-dialog'
+import { SessionRenameDialog } from './sidebar/session-rename-dialog'
+import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
+import { SidebarSessions } from './sidebar/sidebar-sessions'
 import type { SessionMeta } from '../types'
 import {
   TooltipContent,
@@ -14,16 +30,13 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { SessionRenameDialog } from './sidebar/session-rename-dialog'
-import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
-import { SidebarSessions } from './sidebar/sidebar-sessions'
 import { cn } from '@/lib/utils'
-import { useChatSettings } from '../hooks/use-chat-settings'
-import { useDeleteSession } from '../hooks/use-delete-session'
-import { useRenameSession } from '../hooks/use-rename-session'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Link } from '@tanstack/react-router'
-import { WebClawIconBig } from '@/components/icons/webclaw-big'
+import { OpenClawStudioIcon } from '@/components/icons/openclaw-studio'
+import {
+  SEARCH_MODAL_EVENTS,
+  useSearchModal,
+} from '@/hooks/use-search-modal'
 
 type ChatSidebarProps = {
   sessions: Array<SessionMeta>
@@ -34,6 +47,10 @@ type ChatSidebarProps = {
   onToggleCollapse: () => void
   onSelectSession?: () => void
   onActiveSessionDelete?: () => void
+  sessionsLoading: boolean
+  sessionsFetching: boolean
+  sessionsError: string | null
+  onRetrySessions: () => void
 }
 
 function ChatSidebarComponent({
@@ -45,6 +62,10 @@ function ChatSidebarComponent({
   onToggleCollapse,
   onSelectSession,
   onActiveSessionDelete,
+  sessionsLoading,
+  sessionsFetching,
+  sessionsError,
+  onRetrySessions,
 }: ChatSidebarProps) {
   const {
     settingsOpen,
@@ -59,6 +80,23 @@ function ChatSidebarComponent({
   } = useChatSettings()
   const { deleteSession } = useDeleteSession()
   const { renameSession } = useRenameSession()
+  const openSearchModal = useSearchModal((state) => state.openModal)
+  const isSearchModalOpen = useSearchModal((state) => state.isOpen)
+  const pathname = useRouterState({
+    select: function selectPathname(state) {
+      return state.location.pathname
+    },
+  })
+  const isDashboardActive = pathname === '/dashboard'
+  const isFilesActive = pathname === '/files'
+  const isMemoryActive = pathname === '/memory'
+  const isLogsActive = pathname === '/logs'
+  const isCronActive = pathname === '/cron'
+  const isBrowserActive = pathname === '/browser'
+  const isSettingsRouteActive = pathname === '/settings'
+  const isSkillsActive = pathname === '/skills'
+  const isTerminalActive = pathname === '/terminal'
+  const isNewSessionActive = pathname === '/new'
   const transition = {
     duration: 0.15,
     ease: isCollapsed ? 'easeIn' : 'easeOut',
@@ -121,8 +159,35 @@ function ChatSidebarComponent({
 
   const asideProps = {
     className:
-      'border-r border-primary-200 h-full overflow-hidden bg-primary-100 flex flex-col',
+      'border-r border-primary-200 h-full overflow-hidden bg-surface flex flex-col',
   }
+
+  function navItemClass(active = false): string {
+    return cn(
+      buttonVariants({ variant: 'ghost', size: 'sm' }),
+      'w-full h-auto justify-start gap-2.5 px-3 py-2',
+      active
+        ? 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/15'
+        : 'text-primary-900 hover:bg-primary-200',
+    )
+  }
+
+  useEffect(() => {
+    function handleOpenSettingsFromSearch() {
+      handleOpenSettings()
+    }
+
+    window.addEventListener(
+      SEARCH_MODAL_EVENTS.OPEN_SETTINGS,
+      handleOpenSettingsFromSearch,
+    )
+    return () => {
+      window.removeEventListener(
+        SEARCH_MODAL_EVENTS.OPEN_SETTINGS,
+        handleOpenSettingsFromSearch,
+      )
+    }
+  }, [handleOpenSettings])
 
   return (
     <motion.aside
@@ -151,8 +216,8 @@ function ChatSidebarComponent({
                   'w-full pl-1.5 justify-start',
                 )}
               >
-                <WebClawIconBig className="size-5 rounded-sm" />
-                WebClaw
+                <OpenClawStudioIcon className="size-5 rounded-sm" />
+                OpenClaw Studio
               </Link>
             </motion.div>
           ) : null}
@@ -162,12 +227,20 @@ function ChatSidebarComponent({
             <TooltipTrigger
               onClick={onToggleCollapse}
               render={
-                <Button size="icon-sm" variant="ghost">
-                  <HugeiconsIcon
-                    icon={SidebarLeft01Icon}
-                    size={20}
-                    strokeWidth={1.5}
-                  />
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                >
+                  {isCollapsed ? (
+                    <OpenClawStudioIcon className="size-5 rounded-sm" />
+                  ) : (
+                    <HugeiconsIcon
+                      icon={SidebarLeft01Icon}
+                      size={20}
+                      strokeWidth={1.5}
+                    />
+                  )}
                 </Button>
               }
             />
@@ -178,7 +251,38 @@ function ChatSidebarComponent({
         </TooltipProvider>
       </motion.div>
 
-      <div className="px-2 mb-4">
+      <div className="mb-4 space-y-1 px-2">
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/dashboard"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isDashboardActive)}
+          >
+            <HugeiconsIcon
+              icon={Home01Icon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Dashboard
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
         <motion.div
           layout
           transition={{ layout: transition }}
@@ -190,13 +294,13 @@ function ChatSidebarComponent({
             size="sm"
             onClick={onCreateSession}
             onMouseUp={onSelectSession}
-            className="w-full pl-1.5 justify-start"
+            className={navItemClass(isNewSessionActive)}
           >
             <HugeiconsIcon
               icon={PencilEdit02Icon}
               size={20}
               strokeWidth={1.5}
-              className="min-w-5"
+              className="size-5 shrink-0"
             />
             <AnimatePresence initial={false} mode="wait">
               {!isCollapsed && (
@@ -212,6 +316,287 @@ function ChatSidebarComponent({
               )}
             </AnimatePresence>
           </Button>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openSearchModal}
+            className={navItemClass(isSearchModalOpen)}
+            title={isCollapsed ? 'Search' : undefined}
+          >
+            <HugeiconsIcon
+              icon={Search01Icon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Search
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Button>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/skills"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isSkillsActive)}
+          >
+            <HugeiconsIcon
+              icon={PuzzleIcon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Skills
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/browser"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isBrowserActive)}
+          >
+            <HugeiconsIcon
+              icon={GlobeIcon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Browser
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/terminal"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isTerminalActive)}
+          >
+            <HugeiconsIcon
+              icon={ComputerTerminal01Icon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Terminal
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/logs"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isLogsActive)}
+          >
+            <HugeiconsIcon
+              icon={ListViewIcon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Logs
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/cron"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isCronActive)}
+          >
+            <HugeiconsIcon
+              icon={Clock01Icon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Cron
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/files"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isFilesActive)}
+          >
+            <HugeiconsIcon
+              icon={File01Icon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Files
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/memory"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isMemoryActive)}
+          >
+            <HugeiconsIcon
+              icon={BrainIcon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Memory
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/settings"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isSettingsRouteActive)}
+          >
+            <HugeiconsIcon
+              icon={Settings01Icon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Settings
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
         </motion.div>
       </div>
 
@@ -233,6 +618,10 @@ function ChatSidebarComponent({
                   onSelect={onSelectSession}
                   onRename={handleOpenRename}
                   onDelete={handleOpenDelete}
+                  loading={sessionsLoading}
+                  fetching={sessionsFetching}
+                  error={sessionsError}
+                  onRetry={onRetrySessions}
                 />
               </div>
             </motion.div>
@@ -240,24 +629,20 @@ function ChatSidebarComponent({
         </AnimatePresence>
       </div>
 
-      <div className="px-2 py-3 border-t border-primary-200 bg-primary-100">
-        <motion.div
-          layout
-          transition={{ layout: transition }}
-          className="w-full"
-        >
+      <div className="px-2 py-3 border-t border-primary-200 bg-surface shrink-0">
+        <div className="w-full">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleOpenSettings}
             title={isCollapsed ? 'Settings' : undefined}
-            className="w-full justify-start pl-1.5"
+            className="w-full h-auto justify-start gap-2.5 px-3 py-2"
           >
             <HugeiconsIcon
               icon={Settings01Icon}
               size={20}
               strokeWidth={1.5}
-              className="min-w-5"
+              className="size-5 shrink-0"
             />
             <AnimatePresence initial={false} mode="wait">
               {!isCollapsed && (
@@ -273,7 +658,7 @@ function ChatSidebarComponent({
               )}
             </AnimatePresence>
           </Button>
-        </motion.div>
+        </div>
       </div>
 
       <SettingsDialog
@@ -347,6 +732,10 @@ function areSidebarPropsEqual(
   if (prevProps.activeFriendlyId !== nextProps.activeFriendlyId) return false
   if (prevProps.creatingSession !== nextProps.creatingSession) return false
   if (prevProps.isCollapsed !== nextProps.isCollapsed) return false
+  if (prevProps.sessionsLoading !== nextProps.sessionsLoading) return false
+  if (prevProps.sessionsFetching !== nextProps.sessionsFetching) return false
+  if (prevProps.sessionsError !== nextProps.sessionsError) return false
+  if (prevProps.onRetrySessions !== nextProps.onRetrySessions) return false
   if (!areSessionsEqual(prevProps.sessions, nextProps.sessions)) return false
   return true
 }

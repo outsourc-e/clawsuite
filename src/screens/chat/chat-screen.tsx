@@ -6,9 +6,9 @@ import {
   useRef,
   useState,
 } from 'react'
-import { useStreamingMessage } from './hooks/use-streaming-message'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useStreamingMessage } from './hooks/use-streaming-message'
 
 import {
   deriveFriendlyIdFromKey,
@@ -18,8 +18,8 @@ import {
 } from './utils'
 import { createOptimisticMessage } from './chat-screen-utils'
 import {
-  chatQueryKeys,
   appendHistoryMessage,
+  chatQueryKeys,
   clearHistoryMessages,
   fetchGatewayStatus,
   removeHistoryMessageByClientId,
@@ -38,8 +38,8 @@ import {
   hasPendingSend,
   isRecentSession,
   resetPendingSend,
-  setRecentSession,
   setPendingGeneration,
+  setRecentSession,
   stashPendingSend,
 } from './pending-send'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
@@ -49,10 +49,17 @@ import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
 import type {
   ChatComposerAttachment,
+  ChatComposerHandle,
   ChatComposerHelpers,
 } from './components/chat-composer'
 import type { GatewayAttachment, GatewayMessage, HistoryResponse } from './types'
 import { cn } from '@/lib/utils'
+import { FileExplorerSidebar } from '@/components/file-explorer'
+import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
+import { TerminalPanel } from '@/components/terminal-panel'
+import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
+import { useAgentViewStore } from '@/hooks/use-agent-view'
+import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -129,7 +136,16 @@ export function ChatScreen({
   const activeStreamRef = useRef<ActiveStreamContext | null>(null)
   const refreshHistoryRef = useRef<() => void>(() => {})
   const pendingStartRef = useRef(false)
+  const composerHandleRef = useRef<ChatComposerHandle | null>(null)
+  const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const stored = localStorage.getItem('webclaw-file-explorer-collapsed')
+    return stored === null ? true : stored === 'true'
+  })
   const { isMobile } = useChatMobile(queryClient)
+  const isAgentViewOpen = useAgentViewStore((state) => state.isOpen)
+  const isTerminalPanelOpen = useTerminalPanelStore((state) => state.isPanelOpen)
+  const terminalPanelHeight = useTerminalPanelStore((state) => state.panelHeight)
   const {
     sessionsQuery,
     sessions,
@@ -138,11 +154,15 @@ export function ChatScreen({
     activeSessionKey,
     activeTitle,
     sessionsError,
+    sessionsLoading,
+    sessionsFetching,
+    refetchSessions,
   } = useChatSessions({ activeFriendlyId, isNewChat, forcedSessionKey })
   const {
     historyQuery,
     historyMessages,
     displayMessages,
+    messageCount,
     historyError,
     resolvedSessionKey,
     activeCanonicalKey,
@@ -163,6 +183,7 @@ export function ChatScreen({
     sessionKey: resolvedSessionKey,
     activeSession,
     messages: historyMessages,
+    messageCount,
     enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
   })
 
@@ -188,6 +209,12 @@ export function ChatScreen({
       streamIdleTimer.current = null
     }
   }, [])
+
+  useEffect(() => {
+    return () => {
+      streamStop()
+    }
+  }, [streamStop])
 
   const streamFinish = useCallback(() => {
     streamStop()
@@ -221,9 +248,7 @@ export function ChatScreen({
       const maxAttempts = 12
 
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-        const cached = queryClient.getQueryData(historyKey) as
-          | HistoryResponse
-          | undefined
+        const cached = queryClient.getQueryData(historyKey)
         const cachedMessages = Array.isArray(cached?.messages)
           ? cached.messages
           : []
@@ -343,6 +368,7 @@ export function ChatScreen({
   const handleGatewayRefetch = useCallback(() => {
     void gatewayStatusQuery.refetch()
   }, [gatewayStatusQuery])
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
   const isSidebarCollapsed = uiQuery.data?.isSidebarCollapsed ?? false
   const handleActiveSessionDelete = useCallback(() => {
     setError(null)
@@ -354,10 +380,22 @@ export function ChatScreen({
     if (streamTimer.current) window.clearInterval(streamTimer.current)
     streamTimer.current = window.setInterval(() => {
       refreshHistoryRef.current()
-    }, 350)
+    }, 1200)
   }, [activeFriendlyId, isNewChat])
-  const stableContentStyle = useMemo<React.CSSProperties>(() => ({}), [])
+  const terminalPanelInset =
+    !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
+  const stableContentStyle = useMemo<React.CSSProperties>(() => {
+    const composerPadding =
+      'calc(var(--chat-composer-height, 0px) + env(safe-area-inset-bottom, 0px) + 12px)'
+    return {
+      paddingBottom:
+        terminalPanelInset > 0
+          ? `calc(${composerPadding} + ${terminalPanelInset}px)`
+          : composerPadding,
+    }
+  }, [terminalPanelInset])
   refreshHistoryRef.current = function refreshHistory() {
+    if (historyQuery.isFetching) return
     void historyQuery.refetch()
   }
 
@@ -444,10 +482,29 @@ export function ChatScreen({
   ])
 
   const hideUi = shouldRedirectToNew || isRedirecting
+  const showComposer = !isRedirecting
 
   useEffect(() => {
     const latestMessage = historyMessages[historyMessages.length - 1]
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     if (!latestMessage || latestMessage.role !== 'assistant') return
+
+    const activeContext = activeStreamRef.current
+    if (activeContext) {
+      const finalText = textFromMessage(latestMessage)
+      if (hasResolvedAssistantMessage(historyMessages, activeContext, finalText)) {
+        removeHistoryMessageByClientId(
+          queryClient,
+          activeContext.friendlyId,
+          activeContext.sessionKey,
+          activeContext.streamId,
+        )
+        clearActiveStream(activeContext.streamId)
+        streamFinish()
+        return
+      }
+    }
+
     const signature = `${historyMessages.length}:${textFromMessage(latestMessage).slice(-64)}`
     if (signature !== lastAssistantSignature.current) {
       lastAssistantSignature.current = signature
@@ -458,7 +515,7 @@ export function ChatScreen({
         streamFinish()
       }, 4000)
     }
-  }, [historyMessages, streamFinish])
+  }, [clearActiveStream, historyMessages, queryClient, streamFinish])
 
   useEffect(() => {
     const resetKey = isNewChat ? 'new' : activeFriendlyId
@@ -491,9 +548,7 @@ export function ChatScreen({
       pending.friendlyId,
       pending.sessionKey,
     )
-    const cached = queryClient.getQueryData(historyKey) as
-      | HistoryResponse
-      | undefined
+    const cached = queryClient.getQueryData(historyKey)
     const cachedMessages = Array.isArray(cached?.messages)
       ? cached.messages
       : []
@@ -621,8 +676,7 @@ export function ChatScreen({
         message: body,
         thinking: 'low',
         attachments: payloadAttachments.length > 0 ? payloadAttachments : undefined,
-      }).catch((err) => {
-        console.warn('Streaming failed, falling back to polling:', err)
+      }).catch(() => {
         setUseStreamingApi(false)
         if (activeStreamRef.current?.streamId === streamContext.streamId) {
           removeHistoryMessageByClientId(
@@ -757,6 +811,7 @@ export function ChatScreen({
       const attachmentPayload: Array<GatewayAttachment> = attachments.map(
         (attachment) => ({
           ...attachment,
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
           id: attachment.id ?? crypto.randomUUID(),
         }),
       )
@@ -864,7 +919,39 @@ export function ChatScreen({
     })
   }, [queryClient])
 
+  const handleToggleFileExplorer = useCallback(() => {
+    setFileExplorerCollapsed((prev) => {
+      const next = !prev
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('webclaw-file-explorer-collapsed', String(next))
+      }
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    function handleToggleFileExplorerFromSearch() {
+      handleToggleFileExplorer()
+    }
+
+    window.addEventListener(
+      SEARCH_MODAL_EVENTS.TOGGLE_FILE_EXPLORER,
+      handleToggleFileExplorerFromSearch,
+    )
+    return () => {
+      window.removeEventListener(
+        SEARCH_MODAL_EVENTS.TOGGLE_FILE_EXPLORER,
+        handleToggleFileExplorerFromSearch,
+      )
+    }
+  }, [handleToggleFileExplorer])
+
+  const handleInsertFileReference = useCallback((reference: string) => {
+    composerHandleRef.current?.insertText(reference)
+  }, [])
+
   const historyLoading =
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     (historyQuery.isLoading && !historyQuery.data) || isRedirecting
   const showGatewayDown = Boolean(gatewayStatusError)
   const showGatewayNotice =
@@ -893,18 +980,30 @@ export function ChatScreen({
       onToggleCollapse={handleToggleSidebarCollapse}
       onSelectSession={handleSelectSession}
       onActiveSessionDelete={handleActiveSessionDelete}
+      sessionsLoading={sessionsLoading}
+      sessionsFetching={sessionsFetching}
+      sessionsError={sessionsError}
+      onRetrySessions={refetchSessions}
     />
   )
   const hasActiveStreamPlaceholder = streamingMessageId !== null
 
   return (
-    <div className="h-screen bg-surface text-primary-900">
+    <div className="relative h-dvh bg-surface text-primary-900">
       <div
         className={cn(
           'h-full overflow-hidden',
-          isMobile ? 'relative' : 'grid grid-cols-[auto_1fr]',
+          isMobile ? 'relative' : 'grid grid-cols-[auto_auto_1fr]',
         )}
       >
+        {hideUi ? null : isMobile ? null : (
+          <FileExplorerSidebar
+            collapsed={fileExplorerCollapsed}
+            onToggle={handleToggleFileExplorer}
+            onInsertReference={handleInsertFileReference}
+          />
+        )}
+
         {hideUi ? null : isMobile ? (
           <>
             <div
@@ -920,43 +1019,59 @@ export function ChatScreen({
           sidebar
         )}
 
-        <main className="flex flex-col h-full min-h-0" ref={mainRef}>
+        <main
+          className={cn(
+            'flex h-full min-h-0 flex-col transition-[margin-right,margin-bottom] duration-200',
+            isAgentViewOpen ? 'min-[1024px]:mr-80' : 'mr-0',
+          )}
+          style={{ marginBottom: terminalPanelInset > 0 ? `${terminalPanelInset}px` : undefined }}
+          ref={mainRef}
+        >
           <ChatHeader
             activeTitle={activeTitle}
             wrapperRef={headerRef}
             showSidebarButton={isMobile}
             onOpenSidebar={handleOpenSidebar}
+            showFileExplorerButton={!isMobile}
+            fileExplorerCollapsed={fileExplorerCollapsed}
+            onToggleFileExplorer={handleToggleFileExplorer}
           />
 
           {hideUi ? null : (
-            <>
-              <ChatMessageList
-                messages={displayMessages}
-                loading={historyLoading}
-                empty={historyEmpty}
-                notice={gatewayNotice}
-                noticePosition="end"
-                waitingForResponse={waitingForResponse}
-                sessionKey={activeCanonicalKey}
-                pinToTop={pinToTop}
-                pinGroupMinHeight={pinGroupMinHeight}
-                headerHeight={headerHeight}
-                contentStyle={stableContentStyle}
-                isStreaming={streaming.isStreaming || hasActiveStreamPlaceholder}
-                streamingMessageId={streamingMessageId}
-                streamingText={streamingText}
-                streamingThinking={streamingThinking}
-              />
-              <ChatComposer
-                onSubmit={send}
-                isLoading={sending}
-                disabled={sending}
-                wrapperRef={composerRef}
-              />
-            </>
+            <ChatMessageList
+              messages={displayMessages}
+              loading={historyLoading}
+              empty={historyEmpty}
+              notice={gatewayNotice}
+              noticePosition="end"
+              waitingForResponse={waitingForResponse}
+              sessionKey={activeCanonicalKey}
+              pinToTop={pinToTop}
+              pinGroupMinHeight={pinGroupMinHeight}
+              headerHeight={headerHeight}
+              contentStyle={stableContentStyle}
+              bottomOffset={terminalPanelInset}
+              isStreaming={streaming.isStreaming || hasActiveStreamPlaceholder}
+              streamingMessageId={streamingMessageId}
+              streamingText={streamingText}
+              streamingThinking={streamingThinking}
+            />
           )}
+          {showComposer ? (
+            <ChatComposer
+              onSubmit={send}
+              isLoading={sending}
+              disabled={sending || hideUi}
+              wrapperRef={composerRef}
+              composerRef={composerHandleRef}
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+              focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
+            />
+          ) : null}
         </main>
+        <AgentViewPanel />
       </div>
+      {hideUi || isMobile ? null : <TerminalPanel />}
     </div>
   )
 }

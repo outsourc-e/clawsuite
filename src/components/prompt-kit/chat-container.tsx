@@ -51,6 +51,7 @@ function ChatContainerShell({
     >
       <ScrollAreaViewport
         className="relative"
+        data-chat-scroll-viewport
         ref={viewportRef}
         {...viewportProps}
       />

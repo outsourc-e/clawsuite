@@ -45,6 +45,7 @@ export function useChatMeasurements(): ChatMeasurements {
     const observer = new ResizeObserver(() => applySizes())
     if (headerEl) observer.observe(headerEl)
     if (composerEl) observer.observe(composerEl)
+    observer.observe(mainEl)
     return () => observer.disconnect()
   }, [])
 

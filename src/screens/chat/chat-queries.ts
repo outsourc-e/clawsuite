@@ -162,9 +162,7 @@ export function moveHistoryMessages(
 ) {
   const fromKey = chatQueryKeys.history(fromFriendlyId, fromSessionKey)
   const toKey = chatQueryKeys.history(toFriendlyId, toSessionKey)
-  const fromData = queryClient.getQueryData(fromKey) as
-    | HistoryResponse
-    | undefined
+  const fromData = queryClient.getQueryData(fromKey)
   if (!fromData) return
   const messages = Array.isArray(fromData.messages) ? fromData.messages : []
   queryClient.setQueryData(toKey, {

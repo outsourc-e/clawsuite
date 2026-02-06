@@ -2,9 +2,9 @@ import type {
   GatewayMessage,
   SessionMeta,
   SessionSummary,
-  ToolCallContent,
   SessionTitleSource,
   SessionTitleStatus,
+  ToolCallContent,
 } from './types'
 
 export function deriveFriendlyIdFromKey(key: string | undefined): string {

@@ -45,6 +45,7 @@ type ChatMessageListProps = {
   streamingText?: string
   streamingThinking?: string
   isStreaming?: boolean
+  bottomOffset?: number
 }
 
 function ChatMessageListComponent({
@@ -64,6 +65,7 @@ function ChatMessageListComponent({
   streamingText,
   streamingThinking,
   isStreaming = false,
+  bottomOffset = 0,
 }: ChatMessageListProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
   const lastUserRef = useRef<HTMLDivElement | null>(null)
@@ -127,9 +129,17 @@ function ChatMessageListComponent({
 
   const scrollToAnchor = useCallback(
     function scrollToAnchor(behavior: ScrollBehavior, activeForMs: number) {
-      if (!anchorRef.current) return
+      const anchor = anchorRef.current
+      if (!anchor) return
       setProgrammaticScroll(activeForMs)
-      anchorRef.current.scrollIntoView({ behavior, block: 'end' })
+      const viewport = anchor.closest(
+        '[data-chat-scroll-viewport]'
+      )
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior })
+        return
+      }
+      anchor.scrollIntoView({ behavior, block: 'end' })
     },
     [setProgrammaticScroll],
   )
@@ -311,7 +321,7 @@ function ChatMessageListComponent({
     }
     smoothScrollFrameRef.current = window.requestAnimationFrame(() => {
       smoothScrollFrameRef.current = null
-      scrollToAnchor('smooth', 180)
+      scrollToAnchor('auto', 72)
     })
   }, [isStreaming, loading, pinToTop, streamingText, streamingThinking])
 
@@ -346,16 +356,26 @@ function ChatMessageListComponent({
   }, [scrollToAnchor])
 
   const scrollToBottomOverlay = useMemo(() => {
+    const isVisible = !isNearBottom && displayMessages.length > 0
     return (
-      <div className="pointer-events-none absolute bottom-6 right-6 z-40">
+      <div
+        className="pointer-events-none fixed left-1/2 z-40 -translate-x-1/2"
+        style={{ bottom: `${bottomOffset + 24}px` }}
+      >
         <ScrollToBottomButton
-          isVisible={!isNearBottom}
+          isVisible={isVisible}
           unreadCount={unreadCount}
           onClick={handleScrollToBottom}
         />
       </div>
     )
-  }, [handleScrollToBottom, isNearBottom, unreadCount])
+  }, [
+    bottomOffset,
+    displayMessages.length,
+    handleScrollToBottom,
+    isNearBottom,
+    unreadCount,
+  ])
 
   useEffect(() => {
     return () => {
@@ -371,7 +391,7 @@ function ChatMessageListComponent({
   return (
     // mt-2 is to fix the prompt-input cut off
     <ChatContainerRoot
-      className="flex-1 min-h-0 -mb-4"
+      className="flex-1 min-h-0"
       onUserScroll={handleUserScroll}
       overlay={scrollToBottomOverlay}
     >
@@ -498,12 +518,33 @@ function getStableMessageId(message: GatewayMessage, index: number): string {
     }
   }
 
-  const timestamp = getMessageTimestamp(message)
+  const timestamp = getRawMessageTimestamp(message)
   if (timestamp) {
-    return `${message.role ?? 'assistant'}-${timestamp}`
+    return `${message.role ?? 'assistant'}-${timestamp}-${index}`
   }
 
   return `${message.role ?? 'assistant'}-${index}`
+}
+
+function getRawMessageTimestamp(message: GatewayMessage): number | null {
+  const candidates = [
+    (message as any).createdAt,
+    (message as any).created_at,
+    (message as any).timestamp,
+    (message as any).time,
+    (message as any).ts,
+  ]
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      if (candidate < 1_000_000_000_000) return candidate * 1000
+      return candidate
+    }
+    if (typeof candidate === 'string') {
+      const parsed = Date.parse(candidate)
+      if (!Number.isNaN(parsed)) return parsed
+    }
+  }
+  return null
 }
 
 function areChatMessageListEqual(

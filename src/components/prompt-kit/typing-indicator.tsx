@@ -1,6 +1,7 @@
 'use client'
 
 import { TextShimmer } from './text-shimmer'
+import { LoadingIndicator } from '@/components/loading-indicator'
 import { cn } from '@/lib/utils'
 
 export type TypingIndicatorProps = {
@@ -19,9 +20,7 @@ function TypingIndicator({ className }: TypingIndicatorProps) {
           }}
         />
       </div>
-      <span className="chat-streaming-lobster" aria-hidden="true">
-        🦞
-      </span>
+      <LoadingIndicator ariaLabel="Toggle loading indicator" />
       <TextShimmer className="text-sm text-pretty" duration={2}>
         Lobster is cooking your answer...
       </TextShimmer>
