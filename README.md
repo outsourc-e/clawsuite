@@ -1,6 +1,6 @@
 # OpenClaw Studio
 
-**"VSCode for AI Agents"** - Desktop interface for OpenClaw Gateway
+**"OpenClaw’s all-in-one command center."** - Desktop interface for OpenClaw Gateway
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/outsourc-e/openclaw-studio)](https://github.com/outsourc-e/openclaw-studio/releases)
