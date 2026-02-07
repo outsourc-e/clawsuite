@@ -179,7 +179,7 @@ export function SettingsDialog({
             <div className="text-sm text-primary-800">OpenClaw Studio (beta)</div>
             <div className="flex gap-4 pt-2">
               <a
-                href="https://github.com/myauroraagi-dev/webclaw"
+                href="https://github.com/outsourc-e/openclaw-studio"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-primary-600 hover:text-primary-900 hover:underline"

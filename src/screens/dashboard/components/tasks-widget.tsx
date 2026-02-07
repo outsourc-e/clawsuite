@@ -9,7 +9,7 @@ type SessionsApiResponse = {
   sessions?: Array<Record<string, unknown>>
 }
 
-const TASKS_STORAGE_KEY = 'webclaw-dashboard-local-tasks'
+const TASKS_STORAGE_KEY = 'openclaw-studio-dashboard-local-tasks'
 
 const fallbackLocalTasks: Array<TodoTask> = [
   { id: 'local-1', text: 'Review system status', completed: false, source: 'local' },

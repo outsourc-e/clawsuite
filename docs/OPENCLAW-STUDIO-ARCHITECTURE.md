@@ -585,12 +585,12 @@ interface Skill {
    - Agent 5: Search modal + global search
    - Agent 6: Widget library (Tasks, Weather, Notes, etc.)
 3. **Test with mock data** to validate UI/UX
-4. **Iterate based on Eric's feedback**
+4. **Iterate based on user feedback**
 5. **Polish and launch**
 
 ---
 
-**Questions for Eric:**
+**Open Questions:**
 1. Widget priority? Which widgets are must-haves for Phase 1?
 2. Skills browser: Embed ClawdHub or just link to it?
 3. Terminal: Bottom panel vs. dedicated route vs. both?

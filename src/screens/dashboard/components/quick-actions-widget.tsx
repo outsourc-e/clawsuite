@@ -16,7 +16,7 @@ export function QuickActionsWidget({
   return (
     <DashboardGlassCard
       title="Quick Actions"
-      description="Jump into the most common WebClaw workflows."
+      description="Jump into the most common OpenClaw Studio workflows."
       icon={Task01Icon}
       className="h-full"
     >

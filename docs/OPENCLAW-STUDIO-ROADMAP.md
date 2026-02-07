@@ -159,7 +159,7 @@ All architecture and agent specs are ready:
 
 ---
 
-## ❓ Questions for Eric
+## ❓ Open Questions
 
 ### Priorities
 1. **Widget selection for Phase 1?**  
@@ -194,7 +194,7 @@ All architecture and agent specs are ready:
 
 3. **GitHub repo?**  
    - Public or private initially?
-   - Same repo as WebClaw or new one?
+   - Same repo or new one?
 
 ---
 
@@ -263,7 +263,7 @@ Build and test each feature sequentially.
 ## 🏁 Ready to Execute
 
 All specs are complete and ready for Codex agents. Just need:
-1. ✅ Eric's approval on priorities
+1. ✅ User approval on priorities
 2. ✅ Answers to questions above
 3. ✅ Go/no-go decision
 

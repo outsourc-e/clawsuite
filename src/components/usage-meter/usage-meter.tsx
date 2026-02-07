@@ -8,7 +8,7 @@ import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
 
 const POLL_INTERVAL_MS = 10_000
 const PROVIDER_POLL_INTERVAL_MS = 30_000
-const STORAGE_KEY = 'webclaw-usage-meter-alerts'
+const STORAGE_KEY = 'openclaw-studio-usage-meter-alerts'
 const THRESHOLDS = [50, 75, 90]
 
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {

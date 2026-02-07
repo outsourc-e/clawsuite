@@ -2,7 +2,7 @@
 
 ## Overview
 
-WebClaw built with React + TanStack Router + Tailwind CSS v4.
+OpenClaw Studio built with React + TanStack Router + Tailwind CSS v4.
 
 ## Commands
 

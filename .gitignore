@@ -12,3 +12,15 @@ count.txt
 .vinxi
 todos.json
 releases/
+
+# Internal docs (not for public repo)
+SHIP-REPORT.md
+CURRENT-STATUS.md
+BUG-REPORT.md
+LINT-FIX-TASK.md
+docs/OVERNIGHT-SHIP-REPORT.md
+docs/RELEASE-SETUP.md
+docs/PHASE-3-ACTION-PLAN.md
+docs/TAURI-PACKAGING-PLAN.md
+.env.local
+.github/

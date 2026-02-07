@@ -68,7 +68,7 @@ export function buildConnectParams(token: string, password: string): ConnectPara
     maxProtocol: 3,
     client: {
       id: 'gateway-client',
-      displayName: 'webclaw',
+      displayName: 'openclaw-studio',
       version: 'dev',
       platform: process.platform,
       mode: 'ui',
