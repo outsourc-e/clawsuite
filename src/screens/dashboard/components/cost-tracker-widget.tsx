@@ -37,8 +37,13 @@ export function CostTrackerWidget({ days }: CostTrackerWidgetProps) {
       icon={MoneyBag02Icon}
       className="h-full"
     >
-      <div className="grid grid-cols-7 items-end gap-2">
-        {days.map(function mapDay(day) {
+      {days.length === 0 ? (
+        <div className="flex h-32 items-center justify-center rounded-lg border border-primary-200 bg-primary-100/50 text-sm text-primary-600">
+          No cost data available from Gateway
+        </div>
+      ) : (
+        <div className="grid grid-cols-7 items-end gap-2">
+          {days.map(function mapDay(day) {
           const ratio = maxValue > 0 ? day.amountUsd / maxValue : 0
           const height = Math.max(16, Math.round(ratio * 120))
 
@@ -62,11 +67,14 @@ export function CostTrackerWidget({ days }: CostTrackerWidgetProps) {
             </div>
           )
         })}
-      </div>
-      <div className="mt-4 flex items-center justify-between rounded-xl border border-primary-200 bg-primary-100/50 px-3 py-2.5">
-        <span className="text-sm text-primary-700 text-pretty">7-day total</span>
-        <span className="text-base font-medium text-ink tabular-nums">{formatUsd(total)}</span>
-      </div>
+        </div>
+      )}
+      {days.length > 0 && (
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-primary-200 bg-primary-100/50 px-3 py-2.5">
+          <span className="text-sm text-primary-700 text-pretty">7-day total</span>
+          <span className="text-base font-medium text-ink tabular-nums">{formatUsd(total)}</span>
+        </div>
+      )}
     </DashboardGlassCard>
   )
 }

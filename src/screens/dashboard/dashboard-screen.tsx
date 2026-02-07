@@ -78,25 +78,10 @@ const quickActions: Array<QuickAction> = [
   },
 ]
 
-const mockSystemStatus: SystemStatus = {
-  gateway: {
-    connected: true,
-    checkedAtIso: '2026-02-06T09:00:00.000Z',
-  },
-  uptimeSeconds: 122640,
-  currentModel: 'gpt-5-codex',
-  sessionCount: 14,
-}
+// Removed mockSystemStatus - now built entirely from real API data
 
-const mockCostDays: Array<CostDay> = [
-  { dateIso: '2026-01-31', amountUsd: 3.42 },
-  { dateIso: '2026-02-01', amountUsd: 4.1 },
-  { dateIso: '2026-02-02', amountUsd: 2.84 },
-  { dateIso: '2026-02-03', amountUsd: 5.22 },
-  { dateIso: '2026-02-04', amountUsd: 4.88 },
-  { dateIso: '2026-02-05', amountUsd: 3.67 },
-  { dateIso: '2026-02-06', amountUsd: 4.53 },
-]
+// Cost tracking will be added when Gateway exposes usage/cost API
+const costDays: Array<CostDay> = []
 
 const fallbackRecentSessions: Array<RecentSession> = [
   {
@@ -171,15 +156,18 @@ export function DashboardScreen() {
 
   const systemStatus = useMemo(function buildSystemStatus() {
     const nowIso = new Date().toISOString()
+    const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
+    
     return {
-      ...mockSystemStatus,
       gateway: {
-        connected: gatewayStatusQuery.data?.ok ?? mockSystemStatus.gateway.connected,
+        connected: gatewayStatusQuery.data?.ok ?? false,
         checkedAtIso: nowIso,
       },
-      sessionCount: sessionsQuery.data?.length ?? mockSystemStatus.sessionCount,
+      uptimeSeconds: 0, // Gateway doesn't expose uptime via current API
+      currentModel: 'sonnet', // Could be read from session-status if we fix that endpoint
+      sessionCount: sessions.length,
     }
-  }, [gatewayStatusQuery.data?.ok, sessionsQuery.data?.length])
+  }, [gatewayStatusQuery.data?.ok, sessionsQuery.data])
 
   return (
     <motion.main
@@ -233,7 +221,7 @@ export function DashboardScreen() {
           </motion.div>
 
           <motion.div variants={cardMotion} className="md:col-span-2 xl:col-span-3 2xl:col-span-1">
-            <CostTrackerWidget days={mockCostDays} />
+            <CostTrackerWidget days={costDays} />
           </motion.div>
         </motion.section>
       </section>
