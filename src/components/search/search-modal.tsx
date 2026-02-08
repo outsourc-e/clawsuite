@@ -25,6 +25,7 @@ import {
   emitSearchModalEvent,
   useSearchModal
 } from '@/hooks/use-search-modal'
+import { useSearchData, filterResults } from '@/hooks/use-search-data'
 import { cn } from '@/lib/utils'
 
 const SCOPE_TABS: Array<{ value: SearchScope; label: string }> = [
@@ -245,6 +246,9 @@ export function SearchModal() {
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
 
+  // Real data (Phase 3.2)
+  const { sessions, files, skills, activity } = useSearchData(scope)
+
   const quickActions = useMemo<Array<QuickAction>>(
     () => [
       {
@@ -373,62 +377,55 @@ export function SearchModal() {
     const normalized = debouncedQuery.trim()
     if (!normalized) return []
 
-    const chats = CHAT_RESULTS.filter((entry) => {
-      return (
-        includesQuery(entry.sessionName, normalized) ||
-        includesQuery(entry.message, normalized)
-      )
-    }).map<SearchResultItemData>((entry) => ({
+    // Real sessions data
+    const chats = filterResults(sessions, normalized, ['friendlyId', 'key', 'title']).map<SearchResultItemData>((entry) => ({
       id: entry.id,
       scope: 'chats',
       icon: <HugeiconsIcon icon={Chat01Icon} size={20} strokeWidth={1.5} />,
-      title: entry.sessionName,
-      snippet: entry.message,
-      meta: entry.timestamp,
+      title: entry.title || entry.friendlyId,
+      snippet: entry.preview || `Session: ${entry.key}`,
+      meta: entry.updatedAt ? new Date(entry.updatedAt).toLocaleTimeString() : '',
       onSelect: () => {
+        closeModal()
         navigate({
           to: '/chat/$sessionKey',
-          params: { sessionKey: entry.sessionKey },
+          params: { sessionKey: entry.key },
         })
       },
     }))
 
-    const files = FILE_RESULTS.filter((entry) => {
-      return (
-        includesQuery(entry.path, normalized) ||
-        includesQuery(entry.snippet, normalized)
-      )
-    }).map<SearchResultItemData>((entry) => ({
+    // Real files data
+    const fileResults = filterResults(files.filter((f) => f.type === 'file'), normalized, ['path', 'name']).map<SearchResultItemData>((entry) => ({
       id: entry.id,
       scope: 'files',
       icon: <HugeiconsIcon icon={File01Icon} size={20} strokeWidth={1.5} />,
-      title: `${entry.path}:${entry.line}`,
-      snippet: entry.snippet,
-      meta: `L${entry.line}`,
-      badge: getFileBadge(entry.ext),
+      title: entry.name,
+      snippet: entry.path,
+      meta: entry.type,
+      badge: getFileBadge(entry.name.split('.').pop() || ''),
       onSelect: () => {
-        window.alert(`File opening is coming soon.\n${entry.path}:${entry.line}`)
+        closeModal()
+        navigate({ to: '/files', search: { open: entry.path } })
       },
     }))
 
-    const agents = AGENT_RESULTS.filter((entry) => {
-      return includesQuery(`${entry.name} ${entry.task} ${entry.status}`, normalized)
-    }).map<SearchResultItemData>((entry) => ({
+    // Real activity data
+    const activityResults = filterResults(activity, normalized, ['title', 'detail', 'source']).map<SearchResultItemData>((entry) => ({
       id: entry.id,
       scope: 'agents',
       icon: <HugeiconsIcon icon={AiBrain01Icon} size={20} strokeWidth={1.5} />,
-      title: entry.name,
-      snippet: entry.task,
-      meta: entry.runtime,
-      badge: entry.status,
+      title: entry.title,
+      snippet: entry.detail || '',
+      meta: new Date(entry.timestamp).toLocaleTimeString(),
+      badge: entry.level,
       onSelect: () => {
-        navigate({ to: '/dashboard' })
+        closeModal()
+        navigate({ to: '/activity' })
       },
     }))
 
-    const skills = SKILL_RESULTS.filter((entry) => {
-      return includesQuery(`${entry.name} ${entry.description}`, normalized)
-    }).map<SearchResultItemData>((entry) => ({
+    // Real skills data (static)
+    const skillResults = filterResults(skills, normalized, ['name', 'description']).map<SearchResultItemData>((entry) => ({
       id: entry.id,
       scope: 'skills',
       icon: <HugeiconsIcon icon={LanguageSkillIcon} size={20} strokeWidth={1.5} />,
@@ -437,6 +434,7 @@ export function SearchModal() {
       meta: entry.installed ? 'Installed' : 'Available',
       badge: entry.installed ? 'Installed' : 'Not Installed',
       onSelect: () => {
+        closeModal()
         navigate({ to: '/skills' })
       },
     }))
@@ -466,13 +464,13 @@ export function SearchModal() {
       }))
 
     if (scope === 'chats') return chats
-    if (scope === 'files') return files
-    if (scope === 'agents') return agents
-    if (scope === 'skills') return skills
+    if (scope === 'files') return fileResults
+    if (scope === 'agents') return activityResults
+    if (scope === 'skills') return skillResults
     if (scope === 'actions') return actions
 
-    return [...chats, ...files, ...agents, ...skills, ...actions]
-  }, [debouncedQuery, navigate, quickActions, scope])
+    return [...chats, ...fileResults, ...activityResults, ...skillResults, ...actions]
+  }, [debouncedQuery, navigate, quickActions, scope, sessions, files, skills, activity, closeModal])
 
   useEffect(() => {
     setSelectedIndex(0)
