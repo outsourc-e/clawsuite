@@ -136,7 +136,7 @@ function ChatSidebarComponent({
   const isDashboardActive = pathname === '/dashboard'
   const isFilesActive = pathname === '/files'
   const isMemoryActive = pathname === '/memory'
-  const isLogsActive = pathname === '/logs'
+  const isLogsActive = pathname === '/activity' || pathname === '/logs'
   const isDebugActive = pathname === '/debug'
   const isCronActive = pathname === '/cron'
   const isBrowserActive = pathname === '/browser'
@@ -540,7 +540,7 @@ function ChatSidebarComponent({
           className="w-full"
         >
           <Link
-            to="/logs"
+            to="/activity"
             onMouseUp={onSelectSession}
             className={navItemClass(isLogsActive)}
           >
@@ -559,7 +559,7 @@ function ChatSidebarComponent({
                   transition={transition}
                   className="overflow-hidden whitespace-nowrap"
                 >
-                  Logs
+                  Activity
                 </motion.span>
               ) : null}
             </AnimatePresence>

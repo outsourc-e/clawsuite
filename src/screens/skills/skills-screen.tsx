@@ -642,7 +642,7 @@ function FeaturedGrid({
             </div>
 
             <div className="mb-3 flex size-full min-h-[102px] items-center justify-center rounded-xl border border-primary-200 bg-linear-to-br from-muted/80 via-muted/50 to-muted/80 text-sm text-primary-500 text-pretty">
-              Screenshot placeholder
+              Preview unavailable
             </div>
 
             <p className="line-clamp-3 text-sm text-primary-500 text-pretty">

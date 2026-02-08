@@ -21,36 +21,6 @@ type AgentRow = {
 
 type SessionAgentSource = SessionMeta & Record<string, unknown>
 
-const DEMO_AGENTS: Array<AgentRow> = [
-  {
-    id: 'demo-planner',
-    name: 'Planner-Agent',
-    task: 'Refactor Slice',
-    model: 'gpt-5-codex',
-    status: 'validating',
-    progress: 84,
-    elapsedSeconds: 1 * 3600 + 19 * 60 + 2,
-  },
-  {
-    id: 'demo-search',
-    name: 'Search-Agent',
-    task: 'API Dependency Graph',
-    model: 'gpt-5',
-    status: 'running',
-    progress: 62,
-    elapsedSeconds: 56 * 60 + 3,
-  },
-  {
-    id: 'demo-qa',
-    name: 'QA-Agent',
-    task: 'Snapshot Diff Checker',
-    model: 'gpt-4.1-mini',
-    status: 'indexing',
-    progress: 47,
-    elapsedSeconds: 47 * 60 + 2,
-  },
-]
-
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -224,10 +194,9 @@ export function AgentStatusWidget() {
     refetchInterval: 15_000,
   })
 
-  const hasLiveAgents = Array.isArray(sessionsQuery.data) && sessionsQuery.data.length > 0
   const agents = useMemo(function buildAgents() {
     const rows = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
-    if (rows.length === 0) return DEMO_AGENTS
+    if (rows.length === 0) return []
 
     const now = Date.now()
     return [...rows].sort(compareSessionRecency).map(function mapAgent(session) {
@@ -240,70 +209,75 @@ export function AgentStatusWidget() {
       title="Active Agents"
       description="Running agent sessions, model, and live progress."
       icon={UserGroupIcon}
-      badge={hasLiveAgents ? undefined : 'Demo'}
       className="h-full"
     >
-      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-        {agents.map(function renderAgent(agent) {
-          return (
-            <article
-              key={agent.id}
-              className="rounded-xl border border-primary-200 bg-primary-100/45 px-3 py-2.5"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="min-w-0 flex-1 line-clamp-1 text-sm font-medium text-ink text-pretty">
-                  {agent.name}
-                  <span className="text-primary-500"> / </span>
-                  <span className="text-primary-700">{agent.task}</span>
-                </p>
-                <div className="flex shrink-0 items-center gap-1.5 tabular-nums">
-                  <span className="rounded-md border border-primary-200 bg-primary-50/80 px-2 py-0.5 text-xs text-primary-700">
-                    {agent.model}
-                  </span>
-                  <span className="text-xs text-primary-600">
-                    {formatElapsed(agent.elapsedSeconds)}
-                  </span>
+      {agents.length === 0 ? (
+        <div className="flex h-40 items-center justify-center rounded-xl border border-primary-200 bg-primary-100/45 text-sm text-primary-600 text-pretty">
+          No active agent sessions
+        </div>
+      ) : (
+        <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+          {agents.map(function renderAgent(agent) {
+            return (
+              <article
+                key={agent.id}
+                className="rounded-xl border border-primary-200 bg-primary-100/45 px-3 py-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 flex-1 line-clamp-1 text-sm font-medium text-ink text-pretty">
+                    {agent.name}
+                    <span className="text-primary-500"> / </span>
+                    <span className="text-primary-700">{agent.task}</span>
+                  </p>
+                  <div className="flex shrink-0 items-center gap-1.5 tabular-nums">
+                    <span className="rounded-md border border-primary-200 bg-primary-50/80 px-2 py-0.5 text-xs text-primary-700">
+                      {agent.model}
+                    </span>
+                    <span className="text-xs text-primary-600">
+                      {formatElapsed(agent.elapsedSeconds)}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="mt-2">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span
-                    className={cn(
-                      'rounded-md px-1.5 py-0.5 text-xs text-pretty',
-                      agent.status === 'validating' && 'bg-amber-100 text-amber-800',
-                      agent.status === 'running' && 'bg-amber-100 text-amber-700',
-                      agent.status === 'indexing' && 'bg-amber-50 text-amber-700',
-                      agent.status !== 'validating' &&
-                        agent.status !== 'running' &&
-                        agent.status !== 'indexing' &&
-                        'bg-primary-100 text-primary-700',
-                    )}
+                <div className="mt-2">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span
+                      className={cn(
+                        'rounded-md px-1.5 py-0.5 text-xs text-pretty',
+                        agent.status === 'validating' && 'bg-amber-100 text-amber-800',
+                        agent.status === 'running' && 'bg-amber-100 text-amber-700',
+                        agent.status === 'indexing' && 'bg-amber-50 text-amber-700',
+                        agent.status !== 'validating' &&
+                          agent.status !== 'running' &&
+                          agent.status !== 'indexing' &&
+                          'bg-primary-100 text-primary-700',
+                      )}
+                    >
+                      {agent.status}
+                    </span>
+                    <span className="text-xs text-primary-600 tabular-nums">
+                      {agent.progress}%
+                    </span>
+                  </div>
+                  <div
+                    className="h-1.5 w-full overflow-hidden rounded-full bg-primary-200/70"
+                    role="progressbar"
+                    aria-label={`${agent.name} progress`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={agent.progress}
                   >
-                    {agent.status}
-                  </span>
-                  <span className="text-xs text-primary-600 tabular-nums">
-                    {agent.progress}%
-                  </span>
+                    <span
+                      className="block h-full rounded-full bg-amber-500 transition-all duration-300"
+                      style={{ width: `${agent.progress}%` }}
+                    />
+                  </div>
                 </div>
-                <div
-                  className="h-1.5 w-full overflow-hidden rounded-full bg-primary-200/70"
-                  role="progressbar"
-                  aria-label={`${agent.name} progress`}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={agent.progress}
-                >
-                  <span
-                    className="block h-full rounded-full bg-amber-500 transition-all duration-300"
-                    style={{ width: `${agent.progress}%` }}
-                  />
-                </div>
-              </div>
-            </article>
-          )
-        })}
-      </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
     </DashboardGlassCard>
   )
 }

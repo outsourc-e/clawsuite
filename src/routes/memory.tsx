@@ -41,61 +41,6 @@ type SaveState = 'saved' | 'saving' | 'unsaved' | 'error'
 
 type MemoryIndexData = {
   files: Array<MemoryViewerFile>
-  isDemo: boolean
-  fallbackError: string | null
-}
-
-const MOCK_MEMORY_CONTENTS: Record<string, string> = {
-  'MEMORY.md': `# OpenClaw Memory
-
-## Project Summary
-- Building Memory Viewer Phase 2 with browser, editor, preview, and search.
-- Keep daily notes under \`memory/YYYY-MM-DD.md\`.
-
-## Working Agreements
-- Use markdown for all memory records.
-- Keep entries concise and timestamp major updates.
-`,
-  'memory/2026-02-06.md': `# Daily Memory - 2026-02-06
-
-## Goals
-- Build /memory route with Monaco and markdown preview.
-- Add search across memory files.
-
-## Notes
-- API fallback is active in this demo.
-- Validate save flow before final delivery.
-`,
-}
-
-function byteLength(value: string): number {
-  return new TextEncoder().encode(value).length
-}
-
-function buildMockFiles(): Array<MemoryViewerFile> {
-  const modifiedAt = '2026-02-06T10:00:00.000Z'
-  return [
-    {
-      name: 'MEMORY.md',
-      path: 'MEMORY.md',
-      size: byteLength(MOCK_MEMORY_CONTENTS['MEMORY.md']),
-      modifiedAt,
-      source: 'mock',
-      isRootMemory: true,
-      isDaily: false,
-      dateGroup: null,
-    },
-    {
-      name: '2026-02-06.md',
-      path: 'memory/2026-02-06.md',
-      size: byteLength(MOCK_MEMORY_CONTENTS['memory/2026-02-06.md']),
-      modifiedAt,
-      source: 'mock',
-      isRootMemory: false,
-      isDaily: true,
-      dateGroup: '2026-02',
-    },
-  ]
 }
 
 function isMarkdownFile(pathValue: string): boolean {
@@ -199,31 +144,19 @@ function mapApiFiles(entries: Array<ApiFileEntry>): Array<MemoryViewerFile> {
 }
 
 async function loadMemoryIndex(): Promise<MemoryIndexData> {
-  try {
-    const memoryResponse = await fetchJson('/api/files?path=memory/*.md')
-    const rootResponse = await fetchJson('/api/files?path=MEMORY.*')
-    const entries = [
-      ...(memoryResponse.entries || []),
-      ...(rootResponse.entries || []),
-    ]
-    const files = mapApiFiles(entries).filter(function filterMemory(file) {
-      return file.path === 'MEMORY.md' || file.path.startsWith('memory/')
-    })
-    if (files.length === 0) {
-      throw new Error('No memory files found from API responses')
-    }
-    return {
-      files,
-      isDemo: false,
-      fallbackError: null,
-    }
-  } catch (error) {
-    return {
-      files: buildMockFiles(),
-      isDemo: true,
-      fallbackError: error instanceof Error ? error.message : String(error),
-    }
+  const memoryResponse = await fetchJson('/api/files?path=memory/*.md')
+  const rootResponse = await fetchJson('/api/files?path=MEMORY.*')
+  const entries = [
+    ...(memoryResponse.entries || []),
+    ...(rootResponse.entries || []),
+  ]
+  const files = mapApiFiles(entries).filter(function filterMemory(file) {
+    return file.path === 'MEMORY.md' || file.path.startsWith('memory/')
+  })
+  if (files.length === 0) {
+    throw new Error('No memory files found')
   }
+  return { files }
 }
 
 type MemoryContentMap = Record<string, string>
@@ -280,8 +213,6 @@ function MemoryRoute() {
   const [readOnly, setReadOnly] = useState(false)
   const [drafts, setDrafts] = useState<MemoryContentMap>({})
   const [savedOverrides, setSavedOverrides] = useState<MemoryContentMap>({})
-  const [mockContents, setMockContents] =
-    useState<MemoryContentMap>(MOCK_MEMORY_CONTENTS)
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
 
@@ -297,7 +228,6 @@ function MemoryRoute() {
   const groups = useMemo(function memoGroups() {
     return buildMemoryGroups(files)
   }, [files])
-  const isDemo = memoryIndexQuery.data?.isDemo || false
 
   const contentQueryKey = useMemo(function memoKey() {
     const joinedPaths = files
@@ -305,14 +235,13 @@ function MemoryRoute() {
         return file.path
       })
       .join('|')
-    return ['memory-contents', joinedPaths, isDemo]
-  }, [files, isDemo])
+    return ['memory-contents', joinedPaths]
+  }, [files])
 
   const memoryContentsQuery = useQuery({
     enabled: files.length > 0,
     queryKey: contentQueryKey,
     queryFn: async function queryMemoryContents() {
-      if (isDemo) return MOCK_MEMORY_CONTENTS
       const entries = await Promise.all(
         files.map(async function mapFile(file) {
           const content = await readFileContent(file.path)
@@ -323,8 +252,7 @@ function MemoryRoute() {
     },
   })
 
-  const fallbackPath =
-    (rootFile?.path || files[0]?.path || Object.keys(mockContents)[0] || null)
+  const fallbackPath = rootFile?.path || files[0]?.path || null
 
   const activePath = useMemo(function memoActivePath() {
     if (!fallbackPath) return null
@@ -337,12 +265,11 @@ function MemoryRoute() {
   }, [fallbackPath, files, selectedPath])
 
   const savedContentMap = useMemo(function memoSavedContentMap() {
-    if (isDemo) return mockContents
     return {
       ...(memoryContentsQuery.data || {}),
       ...savedOverrides,
     }
-  }, [isDemo, memoryContentsQuery.data, mockContents, savedOverrides])
+  }, [memoryContentsQuery.data, savedOverrides])
 
   const mergedContentMap = useMemo(function memoMergedContentMap() {
     return {
@@ -364,40 +291,31 @@ function MemoryRoute() {
       const nextContent = mergedContentMap[pathValue] || ''
       setSaveState('saving')
       try {
-        if (isDemo) {
-          setMockContents(function setMockContent(previous) {
-            return {
-              ...previous,
-              [pathValue]: nextContent,
-            }
-          })
-        } else {
-          const response = await fetch('/api/files', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              action: 'write',
-              path: pathValue,
-              content: nextContent,
-            }),
-          })
-          if (!response.ok) {
-            throw new Error(`Failed to save ${pathValue}`)
-          }
-          setSavedOverrides(function setOverride(previous) {
-            return {
-              ...previous,
-              [pathValue]: nextContent,
-            }
-          })
+        const response = await fetch('/api/files', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'write',
+            path: pathValue,
+            content: nextContent,
+          }),
+        })
+        if (!response.ok) {
+          throw new Error(`Failed to save ${pathValue}`)
         }
+        setSavedOverrides(function setOverride(previous) {
+          return {
+            ...previous,
+            [pathValue]: nextContent,
+          }
+        })
         setLastSavedAt(new Date().toISOString())
         setSaveState('saved')
       } catch {
         setSaveState('error')
       }
     },
-    [isDemo, mergedContentMap],
+    [mergedContentMap],
   )
 
   useEffect(
@@ -433,7 +351,7 @@ function MemoryRoute() {
               selectedPath={activePath}
               loading={isLoading}
               error={loadError}
-              isDemo={isDemo}
+              isDemo={false}
               collapsed={collapsedList}
               onToggleCollapse={function onToggleCollapse() {
                 setCollapsedList(true)
@@ -497,14 +415,6 @@ function MemoryRoute() {
                 </Button>
               </div>
             </div>
-            {isDemo ? (
-              <p className="mt-2 rounded-md border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-xs text-orange-600 text-pretty">
-                Demo memory data is active.
-                {memoryIndexQuery.data?.fallbackError
-                  ? ` API error: ${memoryIndexQuery.data.fallbackError}`
-                  : ''}
-              </p>
-            ) : null}
           </header>
 
           <MemorySearch

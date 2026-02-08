@@ -266,10 +266,12 @@ function ChatComposerComponent({
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const dragCounterRef = useRef(0)
   const shouldRefocusAfterSendRef = useRef(false)
   const modelSelectorRef = useRef<HTMLDivElement | null>(null)
   const isVoiceInputDisabled = true
+  const isSupplementalActionDisabled = true
   const modelsQuery = useQuery({
     queryKey: ['gateway', 'models'],
     queryFn: fetchModels,
@@ -607,11 +609,42 @@ function ChatComposerComponent({
   const submitDisabled =
     disabled || (value.trim().length === 0 && attachments.length === 0)
 
+  const handleOpenAttachmentPicker = useCallback(
+    function handleOpenAttachmentPicker(
+      event: React.MouseEvent<HTMLButtonElement>,
+    ) {
+      event.preventDefault()
+      if (disabled) return
+      attachmentInputRef.current?.click()
+    },
+    [disabled],
+  )
+
+  const handleAttachmentInputChange = useCallback(
+    function handleAttachmentInputChange(
+      event: React.ChangeEvent<HTMLInputElement>,
+    ) {
+      const files = Array.from(event.target.files ?? [])
+      event.target.value = ''
+      if (files.length === 0) return
+      void addAttachments(files)
+    },
+    [addAttachments],
+  )
+
   return (
     <div
       className="sticky bottom-0 z-30 mx-auto w-full max-w-full bg-surface/95 px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 backdrop-blur sm:max-w-[768px] sm:min-w-[400px]"
       ref={wrapperRef}
     >
+      <input
+        ref={attachmentInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleAttachmentInputChange}
+      />
       <PromptInput
         value={value}
         onValueChange={setValue}
@@ -687,36 +720,53 @@ function ChatComposerComponent({
                 variant="ghost"
                 className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
                 aria-label="Add attachment"
+                disabled={disabled}
+                onClick={handleOpenAttachmentPicker}
               >
                 <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.5} />
               </Button>
             </PromptInputAction>
-            <PromptInputAction tooltip="Web Search">
+            <PromptInputAction tooltip="Unavailable">
               <Button
                 size="icon-sm"
                 variant="ghost"
-                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                className={cn(
+                  'rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500',
+                  isSupplementalActionDisabled && 'cursor-not-allowed opacity-50',
+                )}
                 aria-label="Web Search"
+                aria-disabled={isSupplementalActionDisabled}
+                disabled={isSupplementalActionDisabled}
               >
                 <HugeiconsIcon icon={GlobeIcon} size={20} strokeWidth={1.5} />
               </Button>
             </PromptInputAction>
-            <PromptInputAction tooltip="Quick Commands">
+            <PromptInputAction tooltip="Unavailable">
               <Button
                 size="icon-sm"
                 variant="ghost"
-                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                className={cn(
+                  'rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500',
+                  isSupplementalActionDisabled && 'cursor-not-allowed opacity-50',
+                )}
                 aria-label="Quick Commands"
+                aria-disabled={isSupplementalActionDisabled}
+                disabled={isSupplementalActionDisabled}
               >
                 <HugeiconsIcon icon={FlashIcon} size={20} strokeWidth={1.5} />
               </Button>
             </PromptInputAction>
-            <PromptInputAction tooltip="Code">
+            <PromptInputAction tooltip="Unavailable">
               <Button
                 size="icon-sm"
                 variant="ghost"
-                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                className={cn(
+                  'rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500',
+                  isSupplementalActionDisabled && 'cursor-not-allowed opacity-50',
+                )}
                 aria-label="Code"
+                aria-disabled={isSupplementalActionDisabled}
+                disabled={isSupplementalActionDisabled}
               >
                 <HugeiconsIcon icon={SourceCodeIcon} size={20} strokeWidth={1.5} />
               </Button>
@@ -832,7 +882,7 @@ function ChatComposerComponent({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <PromptInputAction tooltip="Coming Soon">
+            <PromptInputAction tooltip="Voice input unavailable">
               <Button
                 size="icon-sm"
                 variant="ghost"

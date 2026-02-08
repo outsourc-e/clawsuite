@@ -1,6 +1,6 @@
 {
   "name": "openclaw-studio",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Supercharged chat interface for OpenClaw AI agents with file explorer, terminal, and usage tracking",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
