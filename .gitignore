@@ -23,4 +23,4 @@ docs/RELEASE-SETUP.md
 docs/PHASE-3-ACTION-PLAN.md
 docs/TAURI-PACKAGING-PLAN.md
 .env.local
-.github/
+# Keep .github/workflows for CI
