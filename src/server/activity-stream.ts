@@ -3,7 +3,13 @@ import { pushEvent } from './activity-events'
 import { createGatewayStreamConnection } from './gateway-stream'
 import type { ActivityEvent } from '../types/activity-event'
 
-type ActivityStreamStatus = 'connecting' | 'connected' | 'disconnected'
+export type ActivityStreamStatus = 'connecting' | 'connected' | 'disconnected'
+
+export type ActivityStreamDiagnostics = {
+  status: ActivityStreamStatus
+  connectedSinceMs: number | null
+  lastDisconnectedAtMs: number | null
+}
 
 type GatewayStreamConnection = Awaited<
   ReturnType<typeof createGatewayStreamConnection>
@@ -22,9 +28,19 @@ let streamStatus: ActivityStreamStatus = 'disconnected'
 let activeConnection: GatewayStreamConnection | null = null
 let connectInFlight: Promise<void> | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let connectedSinceMs: number | null = null
+let lastDisconnectedAtMs: number | null = null
 
 export function getActivityStreamStatus(): ActivityStreamStatus {
   return streamStatus
+}
+
+export function getActivityStreamDiagnostics(): ActivityStreamDiagnostics {
+  return {
+    status: streamStatus,
+    connectedSinceMs,
+    lastDisconnectedAtMs,
+  }
 }
 
 export function ensureActivityStreamStarted(): Promise<void> {
@@ -46,6 +62,7 @@ async function connectToGateway() {
 
     activeConnection = connection
     streamStatus = 'connected'
+    connectedSinceMs = Date.now()
 
     pushEvent(
       createActivityEvent({
@@ -87,6 +104,8 @@ function bindConnectionListeners(connection: GatewayStreamConnection) {
 
     activeConnection = null
     streamStatus = 'disconnected'
+    connectedSinceMs = null
+    lastDisconnectedAtMs = Date.now()
 
     pushEvent(
       createActivityEvent({
@@ -103,9 +122,34 @@ function bindConnectionListeners(connection: GatewayStreamConnection) {
 function handleGatewayUnavailable(error: unknown) {
   activeConnection = null
   streamStatus = 'disconnected'
+  connectedSinceMs = null
+  lastDisconnectedAtMs = Date.now()
 
   pushEvent(normalizeErrorEvent(error))
   scheduleReconnect()
+}
+
+export async function reconnectActivityStream(): Promise<void> {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+
+  const connection = activeConnection
+  activeConnection = null
+  streamStatus = 'connecting'
+  connectedSinceMs = null
+  lastDisconnectedAtMs = Date.now()
+
+  if (connection) {
+    try {
+      await connection.close()
+    } catch {
+      // ignore close errors and reconnect anyway
+    }
+  }
+
+  await ensureActivityStreamStarted()
 }
 
 function scheduleReconnect() {
@@ -492,7 +536,7 @@ function containsSensitiveKeyword(key: string): boolean {
   })
 }
 
-function sanitizeText(value: string): string {
+export function sanitizeText(value: string): string {
   return value.replace(
     /(api[_-]?key|token|secret|password|refresh)(\s*[:=]\s*)([^\s,;]+)/gi,
     '$1$2[redacted]',

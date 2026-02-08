@@ -16,6 +16,7 @@ import { Route as NewRouteImport } from './routes/new'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as FilesRouteImport } from './routes/files'
+import { Route as DebugRouteImport } from './routes/debug'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CronRouteImport } from './routes/cron'
 import { Route as ConnectRouteImport } from './routes/connect'
@@ -49,6 +50,8 @@ import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCostRouteImport } from './routes/api/cost'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
 import { Route as ApiEventsRecentRouteImport } from './routes/api/events/recent'
+import { Route as ApiDebugStatusRouteImport } from './routes/api/debug/status'
+import { Route as ApiDebugReconnectRouteImport } from './routes/api/debug/reconnect'
 import { Route as ApiCronToggleRouteImport } from './routes/api/cron/toggle'
 import { Route as ApiCronRunRouteImport } from './routes/api/cron/run'
 import { Route as ApiCronListRouteImport } from './routes/api/cron/list'
@@ -89,6 +92,11 @@ const LogsRoute = LogsRouteImport.update({
 const FilesRoute = FilesRouteImport.update({
   id: '/files',
   path: '/files',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DebugRoute = DebugRouteImport.update({
+  id: '/debug',
+  path: '/debug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -256,6 +264,16 @@ const ApiEventsRecentRoute = ApiEventsRecentRouteImport.update({
   path: '/recent',
   getParentRoute: () => ApiEventsRoute,
 } as any)
+const ApiDebugStatusRoute = ApiDebugStatusRouteImport.update({
+  id: '/api/debug/status',
+  path: '/api/debug/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDebugReconnectRoute = ApiDebugReconnectRouteImport.update({
+  id: '/api/debug/reconnect',
+  path: '/api/debug/reconnect',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCronToggleRoute = ApiCronToggleRouteImport.update({
   id: '/api/cron/toggle',
   path: '/api/cron/toggle',
@@ -296,6 +314,7 @@ export interface FileRoutesByFullPath {
   '/connect': typeof ConnectRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
+  '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
@@ -331,6 +350,8 @@ export interface FileRoutesByFullPath {
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/debug/reconnect': typeof ApiDebugReconnectRoute
+  '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
@@ -344,6 +365,7 @@ export interface FileRoutesByTo {
   '/connect': typeof ConnectRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
+  '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
@@ -379,6 +401,8 @@ export interface FileRoutesByTo {
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/debug/reconnect': typeof ApiDebugReconnectRoute
+  '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
@@ -393,6 +417,7 @@ export interface FileRoutesById {
   '/connect': typeof ConnectRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
+  '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
@@ -428,6 +453,8 @@ export interface FileRoutesById {
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/debug/reconnect': typeof ApiDebugReconnectRoute
+  '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
@@ -443,6 +470,7 @@ export interface FileRouteTypes {
     | '/connect'
     | '/cron'
     | '/dashboard'
+    | '/debug'
     | '/files'
     | '/logs'
     | '/memory'
@@ -478,6 +506,8 @@ export interface FileRouteTypes {
     | '/api/cron/list'
     | '/api/cron/run'
     | '/api/cron/toggle'
+    | '/api/debug/reconnect'
+    | '/api/debug/status'
     | '/api/events/recent'
     | '/api/sessions/send'
     | '/api/cron/runs/$jobId'
@@ -491,6 +521,7 @@ export interface FileRouteTypes {
     | '/connect'
     | '/cron'
     | '/dashboard'
+    | '/debug'
     | '/files'
     | '/logs'
     | '/memory'
@@ -526,6 +557,8 @@ export interface FileRouteTypes {
     | '/api/cron/list'
     | '/api/cron/run'
     | '/api/cron/toggle'
+    | '/api/debug/reconnect'
+    | '/api/debug/status'
     | '/api/events/recent'
     | '/api/sessions/send'
     | '/api/cron/runs/$jobId'
@@ -539,6 +572,7 @@ export interface FileRouteTypes {
     | '/connect'
     | '/cron'
     | '/dashboard'
+    | '/debug'
     | '/files'
     | '/logs'
     | '/memory'
@@ -574,6 +608,8 @@ export interface FileRouteTypes {
     | '/api/cron/list'
     | '/api/cron/run'
     | '/api/cron/toggle'
+    | '/api/debug/reconnect'
+    | '/api/debug/status'
     | '/api/events/recent'
     | '/api/sessions/send'
     | '/api/cron/runs/$jobId'
@@ -588,6 +624,7 @@ export interface RootRouteChildren {
   ConnectRoute: typeof ConnectRoute
   CronRoute: typeof CronRoute
   DashboardRoute: typeof DashboardRoute
+  DebugRoute: typeof DebugRoute
   FilesRoute: typeof FilesRoute
   LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
@@ -623,6 +660,8 @@ export interface RootRouteChildren {
   ApiCronListRoute: typeof ApiCronListRoute
   ApiCronRunRoute: typeof ApiCronRunRoute
   ApiCronToggleRoute: typeof ApiCronToggleRoute
+  ApiDebugReconnectRoute: typeof ApiDebugReconnectRoute
+  ApiDebugStatusRoute: typeof ApiDebugStatusRoute
   ApiCronRunsJobIdRoute: typeof ApiCronRunsJobIdRoute
 }
 
@@ -675,6 +714,13 @@ declare module '@tanstack/react-router' {
       path: '/files'
       fullPath: '/files'
       preLoaderRoute: typeof FilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/debug': {
+      id: '/debug'
+      path: '/debug'
+      fullPath: '/debug'
+      preLoaderRoute: typeof DebugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -908,6 +954,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEventsRecentRouteImport
       parentRoute: typeof ApiEventsRoute
     }
+    '/api/debug/status': {
+      id: '/api/debug/status'
+      path: '/api/debug/status'
+      fullPath: '/api/debug/status'
+      preLoaderRoute: typeof ApiDebugStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/debug/reconnect': {
+      id: '/api/debug/reconnect'
+      path: '/api/debug/reconnect'
+      fullPath: '/api/debug/reconnect'
+      preLoaderRoute: typeof ApiDebugReconnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cron/toggle': {
       id: '/api/cron/toggle'
       path: '/api/cron/toggle'
@@ -986,6 +1046,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConnectRoute: ConnectRoute,
   CronRoute: CronRoute,
   DashboardRoute: DashboardRoute,
+  DebugRoute: DebugRoute,
   FilesRoute: FilesRoute,
   LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
@@ -1021,6 +1082,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCronListRoute: ApiCronListRoute,
   ApiCronRunRoute: ApiCronRunRoute,
   ApiCronToggleRoute: ApiCronToggleRoute,
+  ApiDebugReconnectRoute: ApiDebugReconnectRoute,
+  ApiDebugStatusRoute: ApiDebugStatusRoute,
   ApiCronRunsJobIdRoute: ApiCronRunsJobIdRoute,
 }
 export const routeTree = rootRouteImport

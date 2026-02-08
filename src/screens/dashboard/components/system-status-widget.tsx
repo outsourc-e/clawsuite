@@ -1,6 +1,8 @@
 import { Activity01Icon } from '@hugeicons/core-free-icons'
+import { useNavigate } from '@tanstack/react-router'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import type { SystemStatus } from './dashboard-types'
+import { Button } from '@/components/ui/button'
 
 type SystemStatusWidgetProps = {
   status: SystemStatus
@@ -27,6 +29,12 @@ function formatCheckedAt(value: string): string {
 }
 
 export function SystemStatusWidget({ status }: SystemStatusWidgetProps) {
+  const navigate = useNavigate()
+
+  function handleOpenDebugConsole() {
+    void navigate({ to: '/debug' })
+  }
+
   return (
     <DashboardGlassCard
       title="System Status"
@@ -65,6 +73,16 @@ export function SystemStatusWidget({ status }: SystemStatusWidgetProps) {
       <p className="mt-3 text-xs text-primary-500 tabular-nums">
         Last check {formatCheckedAt(status.gateway.checkedAtIso)}
       </p>
+      <div className="mt-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleOpenDebugConsole}
+          className="h-8 px-3 text-xs tabular-nums"
+        >
+          Open Debug Console
+        </Button>
+      </div>
     </DashboardGlassCard>
   )
 }

@@ -7,6 +7,7 @@ import {
   GlobeIcon,
   Home01Icon,
   ListViewIcon,
+  Notification03Icon,
   PencilEdit02Icon,
   PuzzleIcon,
   Search01Icon,
@@ -15,6 +16,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useChatSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
@@ -52,6 +54,49 @@ type ChatSidebarProps = {
   sessionsFetching: boolean
   sessionsError: string | null
   onRetrySessions: () => void
+}
+
+type RecentEventsResponse = {
+  events?: Array<unknown>
+}
+
+const DEBUG_ERROR_WINDOW_MS = 5 * 60 * 1000
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object') return null
+  if (Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function hasRecentIssueEvent(item: unknown, cutoffMs: number): boolean {
+  const record = toRecord(item)
+  if (!record) return false
+
+  const level = record.level
+  const timestamp = record.timestamp
+  if (level !== 'warn' && level !== 'error') return false
+  if (typeof timestamp !== 'number') return false
+  if (!Number.isFinite(timestamp)) return false
+  return timestamp >= cutoffMs
+}
+
+async function fetchHasRecentIssues(): Promise<boolean> {
+  try {
+    const response = await fetch('/api/events/recent?count=40')
+    if (!response.ok) return false
+
+    const payload = (await response.json()) as RecentEventsResponse
+    const events = Array.isArray(payload.events) ? payload.events : []
+    const cutoffMs = Date.now() - DEBUG_ERROR_WINDOW_MS
+
+    for (const item of events) {
+      if (hasRecentIssueEvent(item, cutoffMs)) return true
+    }
+
+    return false
+  } catch {
+    return false
+  }
 }
 
 function ChatSidebarComponent({
@@ -92,6 +137,7 @@ function ChatSidebarComponent({
   const isFilesActive = pathname === '/files'
   const isMemoryActive = pathname === '/memory'
   const isLogsActive = pathname === '/logs'
+  const isDebugActive = pathname === '/debug'
   const isCronActive = pathname === '/cron'
   const isBrowserActive = pathname === '/browser'
   const isSettingsRouteActive = pathname === '/settings'
@@ -102,6 +148,13 @@ function ChatSidebarComponent({
     duration: 0.15,
     ease: isCollapsed ? 'easeIn' : 'easeOut',
   } as const
+  const recentIssuesQuery = useQuery({
+    queryKey: ['activity', 'recent-issues-indicator'],
+    queryFn: fetchHasRecentIssues,
+    refetchInterval: 20_000,
+    retry: false,
+  })
+  const showDebugErrorDot = Boolean(recentIssuesQuery.data)
 
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
   const [renameSessionKey, setRenameSessionKey] = useState<string | null>(null)
@@ -279,6 +332,42 @@ function ChatSidebarComponent({
                   className="overflow-hidden whitespace-nowrap"
                 >
                   Dashboard
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/debug"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isDebugActive)}
+          >
+            <span className="relative inline-flex size-5 shrink-0 items-center justify-center">
+              <HugeiconsIcon
+                icon={Notification03Icon}
+                size={20}
+                strokeWidth={1.5}
+                className="size-5 shrink-0"
+              />
+              {showDebugErrorDot ? (
+                <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500" />
+              ) : null}
+            </span>
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Debug
                 </motion.span>
               ) : null}
             </AnimatePresence>
