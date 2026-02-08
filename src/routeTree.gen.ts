@@ -22,6 +22,7 @@ import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as BrowserRouteImport } from './routes/browser'
 import { Route as AuroraDemoRouteImport } from './routes/aurora-demo'
 import { Route as AgentSwarmRouteImport } from './routes/agent-swarm'
+import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
@@ -44,8 +45,10 @@ import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCostRouteImport } from './routes/api/cost'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiEventsRecentRouteImport } from './routes/api/events/recent'
 import { Route as ApiCronToggleRouteImport } from './routes/api/cron/toggle'
 import { Route as ApiCronRunRouteImport } from './routes/api/cron/run'
 import { Route as ApiCronListRouteImport } from './routes/api/cron/list'
@@ -116,6 +119,11 @@ const AuroraDemoRoute = AuroraDemoRouteImport.update({
 const AgentSwarmRoute = AgentSwarmRouteImport.update({
   id: '/agent-swarm',
   path: '/agent-swarm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActivityRoute = ActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -228,6 +236,11 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEventsRoute = ApiEventsRouteImport.update({
+  id: '/api/events',
+  path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCostRoute = ApiCostRouteImport.update({
   id: '/api/cost',
   path: '/api/cost',
@@ -237,6 +250,11 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   id: '/send',
   path: '/send',
   getParentRoute: () => ApiSessionsRoute,
+} as any)
+const ApiEventsRecentRoute = ApiEventsRecentRouteImport.update({
+  id: '/recent',
+  path: '/recent',
+  getParentRoute: () => ApiEventsRoute,
 } as any)
 const ApiCronToggleRoute = ApiCronToggleRouteImport.update({
   id: '/api/cron/toggle',
@@ -271,6 +289,7 @@ const ApiCronRunsJobIdRoute = ApiCronRunsJobIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
   '/aurora-demo': typeof AuroraDemoRoute
   '/browser': typeof BrowserRoute
@@ -285,6 +304,7 @@ export interface FileRoutesByFullPath {
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/api/cost': typeof ApiCostRoute
+  '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
@@ -311,11 +331,13 @@ export interface FileRoutesByFullPath {
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/events/recent': typeof ApiEventsRecentRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
   '/aurora-demo': typeof AuroraDemoRoute
   '/browser': typeof BrowserRoute
@@ -330,6 +352,7 @@ export interface FileRoutesByTo {
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/api/cost': typeof ApiCostRoute
+  '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
@@ -356,12 +379,14 @@ export interface FileRoutesByTo {
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/events/recent': typeof ApiEventsRecentRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
   '/aurora-demo': typeof AuroraDemoRoute
   '/browser': typeof BrowserRoute
@@ -376,6 +401,7 @@ export interface FileRoutesById {
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/api/cost': typeof ApiCostRoute
+  '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
@@ -402,6 +428,7 @@ export interface FileRoutesById {
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/events/recent': typeof ApiEventsRecentRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
 }
@@ -409,6 +436,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/activity'
     | '/agent-swarm'
     | '/aurora-demo'
     | '/browser'
@@ -423,6 +451,7 @@ export interface FileRouteTypes {
     | '/skills'
     | '/terminal'
     | '/api/cost'
+    | '/api/events'
     | '/api/files'
     | '/api/history'
     | '/api/model-switch'
@@ -449,11 +478,13 @@ export interface FileRouteTypes {
     | '/api/cron/list'
     | '/api/cron/run'
     | '/api/cron/toggle'
+    | '/api/events/recent'
     | '/api/sessions/send'
     | '/api/cron/runs/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/activity'
     | '/agent-swarm'
     | '/aurora-demo'
     | '/browser'
@@ -468,6 +499,7 @@ export interface FileRouteTypes {
     | '/skills'
     | '/terminal'
     | '/api/cost'
+    | '/api/events'
     | '/api/files'
     | '/api/history'
     | '/api/model-switch'
@@ -494,11 +526,13 @@ export interface FileRouteTypes {
     | '/api/cron/list'
     | '/api/cron/run'
     | '/api/cron/toggle'
+    | '/api/events/recent'
     | '/api/sessions/send'
     | '/api/cron/runs/$jobId'
   id:
     | '__root__'
     | '/'
+    | '/activity'
     | '/agent-swarm'
     | '/aurora-demo'
     | '/browser'
@@ -513,6 +547,7 @@ export interface FileRouteTypes {
     | '/skills'
     | '/terminal'
     | '/api/cost'
+    | '/api/events'
     | '/api/files'
     | '/api/history'
     | '/api/model-switch'
@@ -539,12 +574,14 @@ export interface FileRouteTypes {
     | '/api/cron/list'
     | '/api/cron/run'
     | '/api/cron/toggle'
+    | '/api/events/recent'
     | '/api/sessions/send'
     | '/api/cron/runs/$jobId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActivityRoute: typeof ActivityRoute
   AgentSwarmRoute: typeof AgentSwarmRoute
   AuroraDemoRoute: typeof AuroraDemoRoute
   BrowserRoute: typeof BrowserRoute
@@ -559,6 +596,7 @@ export interface RootRouteChildren {
   SkillsRoute: typeof SkillsRoute
   TerminalRoute: typeof TerminalRoute
   ApiCostRoute: typeof ApiCostRoute
+  ApiEventsRoute: typeof ApiEventsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
@@ -679,6 +717,13 @@ declare module '@tanstack/react-router' {
       path: '/agent-swarm'
       fullPath: '/agent-swarm'
       preLoaderRoute: typeof AgentSwarmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/activity': {
+      id: '/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof ActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -835,6 +880,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/events': {
+      id: '/api/events'
+      path: '/api/events'
+      fullPath: '/api/events'
+      preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cost': {
       id: '/api/cost'
       path: '/api/cost'
@@ -848,6 +900,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/sessions/send'
       preLoaderRoute: typeof ApiSessionsSendRouteImport
       parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/events/recent': {
+      id: '/api/events/recent'
+      path: '/recent'
+      fullPath: '/api/events/recent'
+      preLoaderRoute: typeof ApiEventsRecentRouteImport
+      parentRoute: typeof ApiEventsRoute
     }
     '/api/cron/toggle': {
       id: '/api/cron/toggle'
@@ -894,6 +953,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ApiEventsRouteChildren {
+  ApiEventsRecentRoute: typeof ApiEventsRecentRoute
+}
+
+const ApiEventsRouteChildren: ApiEventsRouteChildren = {
+  ApiEventsRecentRoute: ApiEventsRecentRoute,
+}
+
+const ApiEventsRouteWithChildren = ApiEventsRoute._addFileChildren(
+  ApiEventsRouteChildren,
+)
+
 interface ApiSessionsRouteChildren {
   ApiSessionsSendRoute: typeof ApiSessionsSendRoute
 }
@@ -908,6 +979,7 @@ const ApiSessionsRouteWithChildren = ApiSessionsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActivityRoute: ActivityRoute,
   AgentSwarmRoute: AgentSwarmRoute,
   AuroraDemoRoute: AuroraDemoRoute,
   BrowserRoute: BrowserRoute,
@@ -922,6 +994,7 @@ const rootRouteChildren: RootRouteChildren = {
   SkillsRoute: SkillsRoute,
   TerminalRoute: TerminalRoute,
   ApiCostRoute: ApiCostRoute,
+  ApiEventsRoute: ApiEventsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,

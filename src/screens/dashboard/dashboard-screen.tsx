@@ -11,6 +11,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import { useMemo } from 'react'
 import { AgentStatusWidget } from './components/agent-status-widget'
+import { ActivityLogWidget } from './components/activity-log-widget'
 import { CostTrackerWidget } from './components/cost-tracker-widget'
 import { NotificationsWidget } from './components/notifications-widget'
 import { QuickActionsWidget } from './components/quick-actions-widget'
@@ -255,7 +256,7 @@ export function DashboardScreen() {
           </motion.div>
         </motion.section>
 
-        {/* Row 4: Recent Sessions | System Status | Notifications */}
+        {/* Row 4: Recent Sessions | System Status */}
         <motion.section
           className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
           variants={containerMotion}
@@ -275,9 +276,19 @@ export function DashboardScreen() {
           <motion.div variants={cardMotion}>
             <SystemStatusWidget status={systemStatus} />
           </motion.div>
+        </motion.section>
 
-          <motion.div variants={cardMotion} className="md:col-span-3">
+        {/* Row 5: Notifications | Activity Log */}
+        <motion.section
+          className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
+          variants={containerMotion}
+        >
+          <motion.div variants={cardMotion} className="md:col-span-2">
             <NotificationsWidget />
+          </motion.div>
+
+          <motion.div variants={cardMotion}>
+            <ActivityLogWidget />
           </motion.div>
         </motion.section>
       </section>
