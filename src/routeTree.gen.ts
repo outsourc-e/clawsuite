@@ -29,6 +29,7 @@ import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
+import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
@@ -159,6 +160,11 @@ const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
   path: '/chat/$sessionKey',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
+  id: '/api/workspace',
+  path: '/api/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUsageRoute = ApiUsageRouteImport.update({
@@ -355,6 +361,7 @@ export interface FileRoutesByFullPath {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -407,6 +414,7 @@ export interface FileRoutesByTo {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
@@ -461,6 +469,7 @@ export interface FileRoutesById {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -516,6 +525,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/usage'
+    | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
@@ -568,6 +578,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/usage'
+    | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat'
@@ -621,6 +632,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/usage'
+    | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
@@ -675,6 +687,7 @@ export interface RootRouteChildren {
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiUsageRoute: typeof ApiUsageRoute
+  ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiBrowserScreenshotRoute: typeof ApiBrowserScreenshotRoute
@@ -827,6 +840,13 @@ declare module '@tanstack/react-router' {
       path: '/chat/$sessionKey'
       fullPath: '/chat/$sessionKey'
       preLoaderRoute: typeof ChatSessionKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace': {
+      id: '/api/workspace'
+      path: '/api/workspace'
+      fullPath: '/api/workspace'
+      preLoaderRoute: typeof ApiWorkspaceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/usage': {
@@ -1125,6 +1145,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiUsageRoute: ApiUsageRoute,
+  ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiBrowserScreenshotRoute: ApiBrowserScreenshotRoute,
