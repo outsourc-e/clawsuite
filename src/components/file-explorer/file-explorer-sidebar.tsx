@@ -414,9 +414,56 @@ export function FileExplorerSidebar({
           {loading ? (
             <div className="px-3 py-2 text-xs text-primary-500">Loading…</div>
           ) : error ? (
-            <div className="px-3 py-2 text-xs text-red-600">{error}</div>
+            <div className="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+              <div className="flex size-10 items-center justify-center rounded-xl border border-primary-200 bg-primary-100/60">
+                <HugeiconsIcon icon={Folder01Icon} size={20} strokeWidth={1.5} className="text-primary-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-primary-800">No workspace selected</p>
+                <p className="mt-1 text-xs text-primary-500 text-pretty">
+                  Select a folder to browse and edit files.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={refresh}
+                className="mt-1"
+              >
+                <HugeiconsIcon icon={RefreshIcon} size={16} />
+                Retry
+              </Button>
+            </div>
           ) : entries.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-primary-500">No files</div>
+            <div className="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+              <div className="flex size-10 items-center justify-center rounded-xl border border-primary-200 bg-primary-100/60">
+                <HugeiconsIcon icon={Folder01Icon} size={20} strokeWidth={1.5} className="text-primary-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-primary-800">Workspace is empty</p>
+                <p className="mt-1 text-xs text-primary-500 text-pretty">
+                  Create files or upload content to get started.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openPrompt({ mode: 'new-file', targetPath: '' })}
+                >
+                  <HugeiconsIcon icon={PlusSignIcon} size={16} />
+                  New file
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleUploadClick('')}
+                >
+                  <HugeiconsIcon icon={Upload01Icon} size={16} />
+                  Upload
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="pb-4">
               {filteredEntries.map((entry) => renderEntry(entry, 0))}

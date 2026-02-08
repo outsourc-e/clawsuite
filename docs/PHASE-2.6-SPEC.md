@@ -61,6 +61,32 @@ Empty state should show:
 - **google-antigravity model mismatch** — Deferred, not blocking
 - **OpenAI embeddings quota** — P1, see `docs/EMBEDDINGS-QUOTA-P1.md`
 
+## Manual QA Test Steps
+
+### Test 1: Auto-detect (fresh state)
+1. Clear localStorage (`localStorage.removeItem('openclaw-studio-workspace')`)
+2. Refresh page
+3. **Expected:** File explorer loads files from `~/.openclaw/workspace`
+
+### Test 2: Graceful empty state
+1. Stop the Gateway or configure a non-existent workspace path
+2. Refresh the page
+3. **Expected:** File explorer shows "No workspace selected" with retry button (NOT "Failed to load files")
+
+### Test 3: Empty workspace
+1. Point to an empty directory
+2. **Expected:** Shows "Workspace is empty" with New File + Upload buttons
+
+### Test 4: Persist workspace
+1. Load page, verify files appear
+2. Refresh page
+3. **Expected:** Same workspace loads from localStorage
+
+### Test 5: Stale saved path
+1. Set localStorage to a deleted folder path
+2. Refresh page
+3. **Expected:** Falls back to auto-detect, loads default workspace
+
 ## Definition of Done
 
 - File explorer works on fresh install without manual config
