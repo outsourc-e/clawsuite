@@ -212,6 +212,7 @@ export function TasksWidget() {
       title="Tasks"
       description="Kanban board for active engineering work."
       icon={TaskListTodoIcon}
+      badge="Demo"
       className="h-full"
     >
       <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">

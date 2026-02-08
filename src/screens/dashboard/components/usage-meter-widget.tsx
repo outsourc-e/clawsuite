@@ -151,6 +151,7 @@ export function UsageMeterWidget() {
     refetchInterval: 30_000,
   })
 
+  const isDemo = !usageQuery.data
   const data = usageQuery.data ?? demoUsageData
   const rows = data.models.slice(0, 4)
   const maxTokens = useMemo(function computeMaxTokens() {
@@ -168,6 +169,7 @@ export function UsageMeterWidget() {
       title="Usage Meter"
       description="Token utilization and per-model usage today."
       icon={ChartLineData02Icon}
+      badge={isDemo ? 'Demo' : undefined}
       className="h-full"
     >
       <div className="grid grid-cols-1 gap-5 md:grid-cols-[220px_minmax(0,1fr)]">

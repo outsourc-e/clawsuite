@@ -7,6 +7,7 @@ type DashboardGlassCardProps = {
   title: string
   description: string
   icon: DashboardIcon
+  badge?: string
   className?: string
   children: React.ReactNode
 }
@@ -15,6 +16,7 @@ export function DashboardGlassCard({
   title,
   description,
   icon,
+  badge,
   className,
   children,
 }: DashboardGlassCardProps) {
@@ -30,7 +32,14 @@ export function DashboardGlassCard({
           <HugeiconsIcon icon={icon} size={20} strokeWidth={1.5} />
         </span>
         <div className="min-w-0">
-          <h2 className="text-base font-medium text-ink text-balance">{title}</h2>
+          <h2 className="text-base font-medium text-ink text-balance">
+            {title}
+            {badge ? (
+              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                {badge}
+              </span>
+            ) : null}
+          </h2>
           <p className="mt-1 text-sm text-primary-600 text-pretty">{description}</p>
         </div>
       </header>

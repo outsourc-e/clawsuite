@@ -135,6 +135,7 @@ function getSparklineFromDays(days: Array<CostDay>): { values: Array<number>; la
 
 export function CostTrackerWidget({ days }: CostTrackerWidgetProps) {
   const hasLiveData = days.length > 0
+  const isDemo = !hasLiveData
   const metrics = hasLiveData ? getMetricsFromDays(days) : DEMO_METRICS
   const sparkline = hasLiveData ? getSparklineFromDays(days) : { values: DEMO_SPARKLINE_VALUES, labels: DEMO_SPARKLINE_LABELS }
 
@@ -147,6 +148,7 @@ export function CostTrackerWidget({ days }: CostTrackerWidgetProps) {
       title="Cost Tracker"
       description="Cost metrics and recent daily spend trend."
       icon={MoneyBag02Icon}
+      badge={isDemo ? 'Demo' : undefined}
       className="h-full"
     >
       <div className="space-y-4">

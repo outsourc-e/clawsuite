@@ -131,6 +131,8 @@ function ChatComposerComponent({
   const dragCounterRef = useRef(0)
   const shouldRefocusAfterSendRef = useRef(false)
   const modelSelectorRef = useRef<HTMLDivElement | null>(null)
+  const isModelSwitcherDisabled = true
+  const isVoiceInputDisabled = true
 
   const focusPrompt = useCallback(() => {
     if (typeof window === 'undefined') return
@@ -466,21 +468,31 @@ function ChatComposerComponent({
                 <HugeiconsIcon icon={SourceCodeIcon} size={20} strokeWidth={1.5} />
               </Button>
             </PromptInputAction>
-            <div className="relative ml-1" ref={modelSelectorRef}>
+            <div className="relative ml-1 flex items-center gap-2" ref={modelSelectorRef}>
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation()
+                  if (isModelSwitcherDisabled) return
                   setIsModelMenuOpen((prev) => !prev)
                 }}
-                className="inline-flex h-8 items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-3 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100"
+                className={cn(
+                  'inline-flex h-8 items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-3 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100',
+                  isModelSwitcherDisabled && 'cursor-not-allowed opacity-50',
+                )}
                 aria-haspopup="listbox"
-                aria-expanded={isModelMenuOpen}
+                aria-expanded={!isModelSwitcherDisabled && isModelMenuOpen}
+                aria-disabled={isModelSwitcherDisabled}
+                disabled={isModelSwitcherDisabled}
+                title={isModelSwitcherDisabled ? 'Not wired yet' : undefined}
               >
                 <span className="max-w-[10rem] truncate">{selectedModel}</span>
                 <HugeiconsIcon icon={ArrowDown01Icon} size={20} strokeWidth={1.5} />
               </button>
-              {isModelMenuOpen ? (
+              {isModelSwitcherDisabled ? (
+                <span className="text-xs text-primary-500 text-pretty">Not wired yet</span>
+              ) : null}
+              {!isModelSwitcherDisabled && isModelMenuOpen ? (
                 <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-40 min-w-[12rem] rounded-xl border border-primary-200 bg-surface p-1 shadow-lg">
                   {AVAILABLE_MODELS.map((model) => (
                     <button
@@ -506,12 +518,17 @@ function ChatComposerComponent({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <PromptInputAction tooltip="Voice input">
+            <PromptInputAction tooltip="Coming Soon">
               <Button
                 size="icon-sm"
                 variant="ghost"
-                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                className={cn(
+                  'rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500',
+                  isVoiceInputDisabled && 'cursor-not-allowed opacity-50',
+                )}
                 aria-label="Voice input"
+                aria-disabled={isVoiceInputDisabled}
+                disabled={isVoiceInputDisabled}
               >
                 <HugeiconsIcon icon={Mic01Icon} size={20} strokeWidth={1.5} />
               </Button>

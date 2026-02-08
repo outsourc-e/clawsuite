@@ -224,6 +224,7 @@ export function AgentStatusWidget() {
     refetchInterval: 15_000,
   })
 
+  const hasLiveAgents = Array.isArray(sessionsQuery.data) && sessionsQuery.data.length > 0
   const agents = useMemo(function buildAgents() {
     const rows = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
     if (rows.length === 0) return DEMO_AGENTS
@@ -239,6 +240,7 @@ export function AgentStatusWidget() {
       title="Active Agents"
       description="Running agent sessions, model, and live progress."
       icon={UserGroupIcon}
+      badge={hasLiveAgents ? undefined : 'Demo'}
       className="h-full"
     >
       <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
