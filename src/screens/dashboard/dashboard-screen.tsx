@@ -33,7 +33,6 @@ import { HeroMetricsRow } from './components/hero-metrics-row'
 import { NotificationsWidget } from './components/notifications-widget'
 import { QuickActionsWidget } from './components/quick-actions-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
-import { SystemStatusWidget } from './components/system-status-widget'
 import { TasksWidget } from './components/tasks-widget'
 import { UsageMeterWidget } from './components/usage-meter-widget'
 import type {
@@ -273,24 +272,25 @@ export function DashboardScreen() {
       <section className="mx-auto w-full max-w-[1600px]">
         <header className="relative z-20 mb-4 rounded-lg border border-primary-200 bg-primary-50/90 px-4 py-2.5 md:mb-5 md:px-5">
           <div className="flex items-center gap-4">
-            {/* LEFT — Identity */}
-            <div className="flex shrink-0 items-center gap-2.5">
+            {/* LEFT — Identity + System Context */}
+            <div className="flex min-w-0 items-center gap-2.5">
               <OpenClawStudioIcon className="size-7 shrink-0 rounded-lg" />
-              <h1 className="text-sm font-semibold text-ink">
+              <h1 className="shrink-0 text-sm font-semibold text-ink">
                 OpenClaw <span className="font-medium text-primary-400">Studio</span>
               </h1>
-            </div>
-
-            {/* CENTER — System Context Strip */}
-            <div className="hidden min-w-0 flex-1 items-center justify-center gap-3 text-[11px] tabular-nums text-primary-500 md:flex">
-              <span className="inline-flex items-center gap-1.5">
-                <span className={`size-1.5 shrink-0 rounded-full ${systemStatus.gateway.connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+              <span className="hidden items-center gap-2 text-[11px] tabular-nums text-primary-500 md:inline-flex">
+                <span className="text-primary-200">|</span>
+                <span className="inline-flex items-center gap-1">
+                  <span className={`size-1.5 shrink-0 rounded-full ${systemStatus.gateway.connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                  <span className="text-primary-500">{systemStatus.gateway.connected ? 'Connected' : 'Disconnected'}</span>
+                </span>
+                <span className="text-primary-300">·</span>
                 <span className="font-medium text-primary-600">{systemStatus.currentModel || '—'}</span>
+                <span className="text-primary-300">·</span>
+                <span>{systemStatus.sessionCount} sessions</span>
+                <span className="text-primary-300">·</span>
+                <span className="truncate">Up {systemStatus.uptimeSeconds > 0 ? (() => { const d = Math.floor(systemStatus.uptimeSeconds / 86400); const h = Math.floor((systemStatus.uptimeSeconds % 86400) / 3600); const m = Math.floor((systemStatus.uptimeSeconds % 3600) / 60); return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m` })() : '—'}</span>
               </span>
-              <span className="text-primary-300">·</span>
-              <span><span className="uppercase tracking-wide text-primary-400">Sessions </span>{systemStatus.sessionCount}</span>
-              <span className="text-primary-300">·</span>
-              <span className="truncate"><span className="uppercase tracking-wide text-primary-400">Up </span>{systemStatus.uptimeSeconds > 0 ? (() => { const d = Math.floor(systemStatus.uptimeSeconds / 86400); const h = Math.floor((systemStatus.uptimeSeconds % 86400) / 3600); const m = Math.floor((systemStatus.uptimeSeconds % 3600) / 60); return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m` })() : '—'}</span>
             </div>
 
             {/* RIGHT — Utilities */}
@@ -373,9 +373,6 @@ export function DashboardScreen() {
                 onOpenSession={(sessionKey) => navigate({ to: '/chat/$sessionKey', params: { sessionKey } })}
                 draggable
               />
-            </div>
-            <div key="system-status" className="h-full">
-              <SystemStatusWidget status={systemStatus} draggable />
             </div>
             <div key="notifications" className="h-full">
               <NotificationsWidget draggable />

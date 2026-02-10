@@ -57,7 +57,6 @@ export type WidgetId =
   | 'agent-status'
   | 'cost-tracker'
   | 'recent-sessions'
-  | 'system-status'
   | 'notifications'
   | 'activity-log'
 
@@ -70,7 +69,6 @@ type WidgetRegistryEntry = {
 
 export const WIDGET_REGISTRY: WidgetRegistryEntry[] = [
   // ── Above fold: Operational truth ──
-  { id: 'system-status', defaultTier: 'M', allowedTiers: ['S', 'M'] },
   { id: 'agent-status', defaultTier: 'M', allowedTiers: ['M', 'L'] },
   { id: 'cost-tracker', defaultTier: 'M', allowedTiers: ['M', 'L'] },
   { id: 'usage-meter', defaultTier: 'M', allowedTiers: ['M', 'L'] },
@@ -142,21 +140,19 @@ function buildLgLayout(): Layout {
   const c = (_id: WidgetId, tier: WidgetSizeTier) => tierConstraints(tier, 'lg')
   return [
     // ── Above fold: Operational truth ──
-    // Row 0: System Status (6) + Active Agents (6)
-    { i: 'system-status', x: 0, y: 0, ...c('system-status', 'M') },
-    { i: 'agent-status', x: 6, y: 0, ...c('agent-status', 'M') },
-    // Row 1: Cost Tracker (6) + Usage Meter (6)
-    { i: 'cost-tracker', x: 0, y: 5, ...c('cost-tracker', 'M') },
-    { i: 'usage-meter', x: 6, y: 5, ...c('usage-meter', 'M') },
-    // ── Mid: Context ──
-    // Row 2: Recent Sessions (6) + Activity Log (6) — single primary stream
-    { i: 'recent-sessions', x: 0, y: 10, ...c('recent-sessions', 'M') },
-    { i: 'activity-log', x: 6, y: 10, ...c('activity-log', 'M') },
-    // ── Below fold: Secondary ──
-    // Row 3: Notifications (6) + Tasks Demo (6)
-    { i: 'notifications', x: 0, y: 15, ...c('notifications', 'M') },
-    { i: 'tasks', x: 6, y: 15, ...c('tasks', 'M') },
-    // Time + Weather live in header ambient status — not in default grid
+    // Row 0: Active Agents (6) + Cost Tracker (6)
+    { i: 'agent-status', x: 0, y: 0, ...c('agent-status', 'M') },
+    { i: 'cost-tracker', x: 6, y: 0, ...c('cost-tracker', 'M') },
+    // Row 1: Usage Meter (6) + Recent Sessions (6)
+    { i: 'usage-meter', x: 0, y: 5, ...c('usage-meter', 'M') },
+    { i: 'recent-sessions', x: 6, y: 5, ...c('recent-sessions', 'M') },
+    // ── Mid: Streams ──
+    // Row 2: Activity Log (6) + Notifications (6)
+    { i: 'activity-log', x: 0, y: 10, ...c('activity-log', 'M') },
+    { i: 'notifications', x: 6, y: 10, ...c('notifications', 'M') },
+    // ── Below fold ──
+    // Row 3: Tasks Demo (6)
+    { i: 'tasks', x: 0, y: 15, ...c('tasks', 'M') },
   ] as Layout
 }
 
