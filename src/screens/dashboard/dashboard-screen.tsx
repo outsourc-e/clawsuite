@@ -1,9 +1,5 @@
 import {
-  Add01Icon,
-  AiBookIcon,
-  ComputerTerminal02Icon,
   RefreshIcon,
-  Search01Icon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -31,12 +27,10 @@ import { ActivityLogWidget } from './components/activity-log-widget'
 import { CostTrackerWidget } from './components/cost-tracker-widget'
 import { HeroMetricsRow } from './components/hero-metrics-row'
 import { NotificationsWidget } from './components/notifications-widget'
-import { QuickActionsWidget } from './components/quick-actions-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
 import { TasksWidget } from './components/tasks-widget'
 import { UsageMeterWidget } from './components/usage-meter-widget'
 import type {
-  QuickAction,
   RecentSession,
 } from './components/dashboard-types'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -98,36 +92,8 @@ function formatModelName(raw: string): string {
 
 /* Layout config imported from ./constants/grid-config */
 
-const quickActions: Array<QuickAction> = [
-  {
-    id: 'new-chat',
-    label: 'New Chat',
-    description: 'Start a fresh chat session with context reset.',
-    to: '/new',
-    icon: Add01Icon,
-  },
-  {
-    id: 'open-terminal',
-    label: 'Open Terminal',
-    description: 'Jump to the full terminal workspace instantly.',
-    to: '/terminal',
-    icon: ComputerTerminal02Icon,
-  },
-  {
-    id: 'browse-skills',
-    label: 'Browse Skills',
-    description: 'Review available skills and usage details.',
-    to: '/skills',
-    icon: AiBookIcon,
-  },
-  {
-    id: 'view-files',
-    label: 'View Files',
-    description: 'Open the project file explorer and editor.',
-    to: '/files',
-    icon: Search01Icon,
-  },
-]
+// Quick Actions removed — navigation lives in the WorkspaceShell sidebar.
+// Dashboard provides "Workspace →" to cross-link.
 
 // Removed mockSystemStatus - now built entirely from real API data
 
@@ -296,18 +262,13 @@ export function DashboardScreen() {
             {/* RIGHT — Utilities */}
             <div className="flex shrink-0 items-center gap-1.5 ml-auto">
               <HeaderAmbientStatus />
-              {quickActions.map((action) => (
-                <button
-                  key={action.id}
-                  type="button"
-                  onClick={() => navigate({ to: action.to })}
-                  className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
-                  aria-label={action.label}
-                  title={action.label}
-                >
-                  <HugeiconsIcon icon={action.icon} size={15} strokeWidth={1.5} />
-                </button>
-              ))}
+              <button
+                type="button"
+                onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })}
+                className="inline-flex items-center gap-1 rounded-md border border-primary-200 px-2.5 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:border-primary-300 hover:text-ink dark:border-primary-300 dark:hover:text-primary-200"
+              >
+                Workspace →
+              </button>
               <span className="mx-0.5 h-4 w-px bg-primary-200" />
               <ThemeToggle />
               <button
