@@ -208,9 +208,10 @@ function formatUsd(amount: number): string {
 
 type UsageMeterWidgetProps = {
   draggable?: boolean
+  onRemove?: () => void
 }
 
-export function UsageMeterWidget({ draggable = false }: UsageMeterWidgetProps) {
+export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidgetProps) {
   const usageQuery = useQuery({
     queryKey: ['dashboard', 'usage'],
     queryFn: fetchUsage,
@@ -239,6 +240,7 @@ export function UsageMeterWidget({ draggable = false }: UsageMeterWidgetProps) {
       description="All-time token usage totals by provider."
       icon={ChartLineData02Icon}
       draggable={draggable}
+      onRemove={onRemove}
       className="h-full"
     >
       {queryResult?.kind === 'unavailable' ? (

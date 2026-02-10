@@ -27,6 +27,7 @@ const TaskListTodoIcon =
 
 type TasksWidgetProps = {
   draggable?: boolean
+  onRemove?: () => void
 }
 
 const seededColumns: Array<KanbanColumn> = [
@@ -208,7 +209,7 @@ function assigneeClasses(name: string): string {
   return palette[initial % palette.length] || palette[0]
 }
 
-export function TasksWidget({ draggable = false }: TasksWidgetProps) {
+export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
   const [columns] = useState<Array<KanbanColumn>>(loadKanbanColumns)
 
   return (
@@ -218,6 +219,7 @@ export function TasksWidget({ draggable = false }: TasksWidgetProps) {
       icon={TaskListTodoIcon}
       badge="Demo"
       draggable={draggable}
+      onRemove={onRemove}
       className="h-full"
     >
       <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">

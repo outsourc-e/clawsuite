@@ -7,6 +7,7 @@ type RecentSessionsWidgetProps = {
   sessions: Array<RecentSession>
   onOpenSession: (sessionKey: string) => void
   draggable?: boolean
+  onRemove?: () => void
 }
 
 function formatSessionTimestamp(value: number): string {
@@ -25,6 +26,7 @@ export function RecentSessionsWidget({
   sessions,
   onOpenSession,
   draggable = false,
+  onRemove,
 }: RecentSessionsWidgetProps) {
   return (
     <DashboardGlassCard
@@ -32,6 +34,7 @@ export function RecentSessionsWidget({
       description="Resume work from your latest chat conversations."
       icon={Clock01Icon}
       draggable={draggable}
+      onRemove={onRemove}
       className="h-full"
     >
       <div className="space-y-2">

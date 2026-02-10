@@ -34,8 +34,10 @@ import type {
   RecentSession,
 } from './components/dashboard-types'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { AddWidgetPopover } from './components/add-widget-popover'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { SettingsDialog } from './components/settings-dialog'
+import { useVisibleWidgets } from './hooks/use-visible-widgets'
 import type { SessionMeta } from '@/screens/chat/types'
 import { getMessageTimestamp, textFromMessage } from '@/screens/chat/utils'
 import { chatQueryKeys, fetchGatewayStatus, fetchSessions } from '@/screens/chat/chat-queries'
@@ -137,6 +139,7 @@ export function DashboardScreen() {
   const navigate = useNavigate()
   const [gridLayouts, setGridLayouts] = useState<ResponsiveLayouts>(loadLayouts)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const { visibleIds, addWidget, removeWidget, resetVisible } = useVisibleWidgets()
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(1200)
 
@@ -157,7 +160,8 @@ export function DashboardScreen() {
   const handleResetLayout = useCallback(() => {
     const fresh = resetLayouts()
     setGridLayouts(fresh)
-  }, [])
+    resetVisible()
+  }, [resetVisible])
 
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
@@ -271,6 +275,7 @@ export function DashboardScreen() {
               </button>
               <span className="mx-0.5 h-4 w-px bg-primary-200" />
               <ThemeToggle />
+              <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
               <button
                 type="button"
                 onClick={handleResetLayout}
@@ -316,31 +321,46 @@ export function DashboardScreen() {
             compactType="vertical"
             margin={GRID_MARGIN}
           >
-            <div key="usage-meter" className="h-full">
-              <UsageMeterWidget draggable />
-            </div>
-            <div key="tasks" className="h-full">
-              <TasksWidget draggable />
-            </div>
-            <div key="agent-status" className="h-full">
-              <AgentStatusWidget draggable />
-            </div>
-            <div key="cost-tracker" className="h-full">
-              <CostTrackerWidget draggable />
-            </div>
-            <div key="recent-sessions" className="h-full">
-              <RecentSessionsWidget
-                sessions={recentSessions}
-                onOpenSession={(sessionKey) => navigate({ to: '/chat/$sessionKey', params: { sessionKey } })}
-                draggable
-              />
-            </div>
-            <div key="notifications" className="h-full">
-              <NotificationsWidget draggable />
-            </div>
-            <div key="activity-log" className="h-full">
-              <ActivityLogWidget draggable />
-            </div>
+            {visibleIds.includes('usage-meter') ? (
+              <div key="usage-meter" className="h-full">
+                <UsageMeterWidget draggable onRemove={() => removeWidget('usage-meter')} />
+              </div>
+            ) : null}
+            {visibleIds.includes('tasks') ? (
+              <div key="tasks" className="h-full">
+                <TasksWidget draggable onRemove={() => removeWidget('tasks')} />
+              </div>
+            ) : null}
+            {visibleIds.includes('agent-status') ? (
+              <div key="agent-status" className="h-full">
+                <AgentStatusWidget draggable onRemove={() => removeWidget('agent-status')} />
+              </div>
+            ) : null}
+            {visibleIds.includes('cost-tracker') ? (
+              <div key="cost-tracker" className="h-full">
+                <CostTrackerWidget draggable onRemove={() => removeWidget('cost-tracker')} />
+              </div>
+            ) : null}
+            {visibleIds.includes('recent-sessions') ? (
+              <div key="recent-sessions" className="h-full">
+                <RecentSessionsWidget
+                  sessions={recentSessions}
+                  onOpenSession={(sessionKey) => navigate({ to: '/chat/$sessionKey', params: { sessionKey } })}
+                  draggable
+                  onRemove={() => removeWidget('recent-sessions')}
+                />
+              </div>
+            ) : null}
+            {visibleIds.includes('notifications') ? (
+              <div key="notifications" className="h-full">
+                <NotificationsWidget draggable onRemove={() => removeWidget('notifications')} />
+              </div>
+            ) : null}
+            {visibleIds.includes('activity-log') ? (
+              <div key="activity-log" className="h-full">
+                <ActivityLogWidget draggable onRemove={() => removeWidget('activity-log')} />
+              </div>
+            ) : null}
           </ResponsiveGridLayout>
         </div>
       </section>

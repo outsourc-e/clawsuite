@@ -9,9 +9,10 @@ import { cn } from '@/lib/utils'
 
 type ActivityLogWidgetProps = {
   draggable?: boolean
+  onRemove?: () => void
 }
 
-export function ActivityLogWidget({ draggable = false }: ActivityLogWidgetProps) {
+export function ActivityLogWidget({ draggable = false, onRemove }: ActivityLogWidgetProps) {
   const navigate = useNavigate()
   const { events, isConnected, isLoading } = useActivityEvents({
     initialCount: 20,
@@ -57,6 +58,7 @@ export function ActivityLogWidget({ draggable = false }: ActivityLogWidgetProps)
       description="Chronological Gateway and Studio event feed."
       icon={Activity01Icon}
       draggable={draggable}
+      onRemove={onRemove}
       className="h-full"
     >
       <div className="mb-1.5 flex justify-end">

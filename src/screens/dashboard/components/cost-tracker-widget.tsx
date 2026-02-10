@@ -37,6 +37,7 @@ type CostQueryResult =
 
 type CostTrackerWidgetProps = {
   draggable?: boolean
+  onRemove?: () => void
 }
 
 function readNumber(value: unknown): number {
@@ -246,7 +247,7 @@ function getSparklinePoints(points: Array<CostPoint>): {
   }
 }
 
-export function CostTrackerWidget({ draggable = false }: CostTrackerWidgetProps) {
+export function CostTrackerWidget({ draggable = false, onRemove }: CostTrackerWidgetProps) {
   const costQuery = useQuery({
     queryKey: ['dashboard', 'cost'],
     queryFn: fetchCost,
@@ -269,6 +270,7 @@ export function CostTrackerWidget({ draggable = false }: CostTrackerWidgetProps)
       description="Current billing period spend and daily trend."
       icon={MoneyBag02Icon}
       draggable={draggable}
+      onRemove={onRemove}
       className="h-full"
     >
       {queryResult?.kind === 'unavailable' ? (

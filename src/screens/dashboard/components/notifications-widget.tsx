@@ -14,6 +14,7 @@ type SessionsApiResponse = {
 
 type NotificationsWidgetProps = {
   draggable?: boolean
+  onRemove?: () => void
 }
 
 function readString(value: unknown): string {
@@ -97,7 +98,7 @@ function toNotifications(rows: Array<Record<string, unknown>>): Array<DashboardN
     })
 }
 
-export function NotificationsWidget({ draggable = false }: NotificationsWidgetProps) {
+export function NotificationsWidget({ draggable = false, onRemove }: NotificationsWidgetProps) {
   const notificationsQuery = useQuery({
     queryKey: ['dashboard', 'notifications'],
     queryFn: fetchSessionsForNotifications,
@@ -115,6 +116,7 @@ export function NotificationsWidget({ draggable = false }: NotificationsWidgetPr
       description="Session lifecycle events — starts, stops, and errors."
       icon={Notification03Icon}
       draggable={draggable}
+      onRemove={onRemove}
       className="h-full"
     >
       {notifications.length === 0 ? (

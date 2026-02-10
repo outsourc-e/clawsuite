@@ -1,5 +1,6 @@
-import { DragDropIcon } from '@hugeicons/core-free-icons'
+import { DragDropIcon, MoreVerticalIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import type { DashboardIcon } from './dashboard-types'
 import { cn } from '@/lib/utils'
@@ -11,6 +12,7 @@ type DashboardGlassCardProps = {
   badge?: string
   titleAccessory?: React.ReactNode
   draggable?: boolean
+  onRemove?: () => void
   className?: string
   children: React.ReactNode
 }
@@ -21,9 +23,24 @@ export function DashboardGlassCard({
   badge,
   titleAccessory,
   draggable = false,
+  onRemove,
   className,
   children,
 }: DashboardGlassCardProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [menuOpen])
+
   return (
     <article
       role="region"
@@ -48,15 +65,41 @@ export function DashboardGlassCard({
             ) : null}
           </h2>
         </div>
-        {draggable ? (
-          <span
-            className="widget-drag-handle inline-flex shrink-0 cursor-grab items-center justify-center rounded p-0.5 text-primary-400 hover:text-primary-600 active:cursor-grabbing"
-            title="Drag to reorder"
-            aria-label="Drag to reorder"
-          >
-            <HugeiconsIcon icon={DragDropIcon} size={16} strokeWidth={1.5} />
-          </span>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-0.5">
+          {draggable ? (
+            <span
+              className="widget-drag-handle inline-flex cursor-grab items-center justify-center rounded p-0.5 text-primary-400 hover:text-primary-600 active:cursor-grabbing"
+              title="Drag to reorder"
+              aria-label="Drag to reorder"
+            >
+              <HugeiconsIcon icon={DragDropIcon} size={16} strokeWidth={1.5} />
+            </span>
+          ) : null}
+          {onRemove ? (
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="inline-flex items-center justify-center rounded p-0.5 text-primary-400 opacity-0 transition-opacity hover:text-primary-600 group-hover:opacity-100"
+                aria-label="Widget options"
+                title="Widget options"
+              >
+                <HugeiconsIcon icon={MoreVerticalIcon} size={16} strokeWidth={1.5} />
+              </button>
+              {menuOpen ? (
+                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-primary-200 bg-primary-50 py-1 shadow-lg dark:bg-primary-100">
+                  <button
+                    type="button"
+                    onClick={() => { onRemove(); setMenuOpen(false) }}
+                    className="w-full px-3 py-1.5 text-left text-xs text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-200/50"
+                  >
+                    Remove from dashboard
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </header>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
     </article>
