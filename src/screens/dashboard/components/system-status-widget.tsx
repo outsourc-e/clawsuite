@@ -41,10 +41,9 @@ export function SystemStatusWidget({
   return (
     <DashboardGlassCard
       title="System Status"
-      description="Authoritative gateway health and runtime."
       icon={Activity01Icon}
       draggable={draggable}
-      className="h-full border-primary-300 dark:border-primary-300"
+      className="h-full"
     >
       <div className="space-y-2 text-sm">
         <div className="flex items-center justify-between rounded-lg border border-primary-200 bg-primary-100/40 px-2.5 py-1.5">

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 
 type DashboardGlassCardProps = {
   title: string
-  description: string
+  description?: string
   icon: DashboardIcon
   badge?: string
   titleAccessory?: React.ReactNode
@@ -17,7 +17,6 @@ type DashboardGlassCardProps = {
 
 export function DashboardGlassCard({
   title,
-  description,
   icon,
   badge,
   titleAccessory,
@@ -30,29 +29,24 @@ export function DashboardGlassCard({
       role="region"
       aria-label={title}
       className={cn(
-        'group flex h-full flex-col overflow-hidden rounded-2xl border border-primary-200 bg-primary-50/85 px-3.5 py-3 shadow-sm backdrop-blur-xl transition-all duration-200 hover:border-primary-300 dark:bg-primary-50/95 md:px-4 md:py-3.5',
+        'group flex h-full flex-col overflow-hidden rounded-xl border border-primary-200 bg-primary-50/90 px-3.5 py-3 transition-colors hover:border-primary-300 dark:bg-primary-50/95 md:px-4 md:py-3',
         className,
       )}
     >
-      <header className="mb-2.5 flex shrink-0 items-start justify-between gap-2">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-primary-200 bg-primary-100/70 text-primary-600">
-            <HugeiconsIcon icon={icon} size={16} strokeWidth={1.5} />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-[13px] font-medium leading-tight text-ink">
-              {title}
-              {titleAccessory ? (
-                <span className="ml-1.5 inline-flex align-middle">{titleAccessory}</span>
-              ) : null}
-              {badge ? (
-                <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
-                  {badge}
-                </span>
-              ) : null}
-            </h2>
-            <p className="mt-px text-[11px] leading-tight text-primary-500">{description}</p>
-          </div>
+      <header className="mb-2 flex shrink-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <HugeiconsIcon icon={icon} size={15} strokeWidth={1.5} className="shrink-0 text-primary-400" />
+          <h2 className="truncate text-xs font-medium uppercase tracking-wide text-primary-500">
+            {title}
+            {titleAccessory ? (
+              <span className="ml-1.5 inline-flex align-middle normal-case tracking-normal">{titleAccessory}</span>
+            ) : null}
+            {badge ? (
+              <span className="ml-1.5 rounded bg-amber-100 px-1 py-px text-[10px] font-medium normal-case tracking-normal text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
+                {badge}
+              </span>
+            ) : null}
+          </h2>
         </div>
         {draggable ? (
           <span

@@ -271,19 +271,14 @@ export function DashboardScreen() {
   return (
     <main className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <section className="mx-auto w-full max-w-[1600px]">
-        <header className="relative z-20 mb-6 rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl md:mb-7 md:p-5">
+        <header className="relative z-20 mb-4 rounded-xl border border-primary-200 bg-primary-50/90 px-4 py-3 md:mb-5 md:px-5 md:py-3.5">
           {/* Row 1: Brand left, controls right */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <OpenClawStudioIcon className="size-9 shrink-0 rounded-xl shadow-sm md:size-10" />
-              <div className="min-w-0">
-                <h1 className="text-xl font-semibold leading-tight text-ink md:text-2xl">
-                  OpenClaw <span className="font-medium text-primary-500">Studio</span>
-                </h1>
-                <p className="hidden text-xs text-primary-500 sm:block">
-                  Design, orchestrate, and monitor AI agent systems.
-                </p>
-              </div>
+              <h1 className="text-lg font-semibold leading-tight text-ink md:text-xl">
+              OpenClaw <span className="font-medium text-primary-400">Studio</span>
+            </h1>
             </div>
             <div className="flex items-center gap-2">
               <HeaderAmbientStatus />
@@ -318,16 +313,16 @@ export function DashboardScreen() {
             </div>
           </div>
           {/* Row 2: Quick Actions */}
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             {quickActions.map((action) => (
               <button
                 key={action.id}
                 type="button"
                 onClick={() => navigate({ to: action.to })}
-                className="flex items-center gap-2.5 rounded-lg border border-primary-200 bg-white/70 px-3 py-2 text-left text-sm transition-colors hover:border-primary-300 hover:bg-white dark:bg-primary-100/50 dark:hover:bg-primary-200/50"
+                className="inline-flex items-center gap-1.5 rounded-md border border-primary-200 bg-white/60 px-2.5 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:border-primary-300 hover:text-ink dark:bg-primary-100/40 dark:hover:bg-primary-200/40"
               >
-                <HugeiconsIcon icon={action.icon} size={16} strokeWidth={1.5} className="shrink-0 text-primary-600" />
-                <span className="font-medium text-ink">{action.label}</span>
+                <HugeiconsIcon icon={action.icon} size={13} strokeWidth={1.5} className="shrink-0" />
+                {action.label}
               </button>
             ))}
           </div>

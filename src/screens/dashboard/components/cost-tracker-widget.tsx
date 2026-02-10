@@ -272,7 +272,7 @@ export function CostTrackerWidget({ draggable = false }: CostTrackerWidgetProps)
       className="h-full"
     >
       {queryResult?.kind === 'unavailable' ? (
-        <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
+        <div className="rounded-lg border border-primary-200 bg-primary-100/40 p-4 text-sm text-primary-700 text-pretty">
           {queryResult.message}
         </div>
       ) : queryResult?.kind === 'error' ? (
@@ -280,12 +280,12 @@ export function CostTrackerWidget({ draggable = false }: CostTrackerWidgetProps)
           {queryResult.message}
         </div>
       ) : !costData ? (
-        <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
+        <div className="rounded-lg border border-primary-200 bg-primary-100/40 p-4 text-sm text-primary-700 text-pretty">
           Loading cost data...
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-xl border border-primary-200 bg-primary-100/45 px-3 py-2">
+          <div className="rounded-lg border border-primary-200 bg-primary-100/40 px-3 py-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-primary-500">Period Spend</p>
             <p className="text-2xl font-bold text-ink tabular-nums">
               {formatUsd(costData.totalAmount)}
@@ -299,7 +299,7 @@ export function CostTrackerWidget({ draggable = false }: CostTrackerWidgetProps)
               return (
                 <div
                   key={metric.label}
-                  className="rounded-xl border border-primary-200 bg-primary-100/50 px-3 py-2.5"
+                  className="rounded-lg border border-primary-200 bg-primary-100/40 px-3 py-2.5"
                 >
                   <p className="text-[11px] text-primary-600 text-balance">{metric.label}</p>
                   <p className="mt-1 text-lg font-medium text-ink tabular-nums">{metric.amountLabel}</p>
@@ -318,7 +318,7 @@ export function CostTrackerWidget({ draggable = false }: CostTrackerWidgetProps)
             })}
           </div>
 
-          <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-3">
+          <div className="rounded-lg border border-primary-200 bg-primary-100/40 p-3">
             {sparkline.values.length === 0 ? (
               <div className="h-28 rounded-lg border border-primary-200 bg-primary-50/60 p-3 text-sm text-primary-700 text-pretty">
                 No cost history reported by the Gateway yet.

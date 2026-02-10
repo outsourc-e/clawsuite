@@ -272,7 +272,7 @@ export function AgentStatusWidget({ draggable = false }: AgentStatusWidgetProps)
                     aria-valuenow={agent.progress}
                   >
                     <span
-                      className="block h-full rounded-full bg-amber-500 transition-all duration-300"
+                      className="block h-full rounded-full bg-primary-500 transition-all duration-300"
                       style={{ width: `${agent.progress}%` }}
                     />
                   </div>
