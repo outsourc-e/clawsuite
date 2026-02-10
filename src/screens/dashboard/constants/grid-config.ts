@@ -52,8 +52,6 @@ export const SIZE_TIERS: Record<WidgetSizeTier, TierDimensions> = {
 
 /* ── Widget Registry ── */
 export type WidgetId =
-  | 'weather'
-  | 'quick-actions'
   | 'time-date'
   | 'usage-meter'
   | 'tasks'
@@ -63,6 +61,7 @@ export type WidgetId =
   | 'system-status'
   | 'notifications'
   | 'activity-log'
+  | 'weather'
 
 type WidgetRegistryEntry = {
   id: WidgetId
@@ -72,17 +71,20 @@ type WidgetRegistryEntry = {
 }
 
 export const WIDGET_REGISTRY: WidgetRegistryEntry[] = [
-  { id: 'weather', defaultTier: 'S', allowedTiers: ['S'] },
-  { id: 'quick-actions', defaultTier: 'XL', allowedTiers: ['XL', 'L'] },
+  // Row 1: Time + System Status + Activity Log (3 small)
   { id: 'time-date', defaultTier: 'S', allowedTiers: ['S'] },
-  { id: 'usage-meter', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'tasks', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'agent-status', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'cost-tracker', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'recent-sessions', defaultTier: 'L', allowedTiers: ['L', 'M'] },
   { id: 'system-status', defaultTier: 'S', allowedTiers: ['S', 'M'] },
-  { id: 'notifications', defaultTier: 'L', allowedTiers: ['L', 'M'] },
   { id: 'activity-log', defaultTier: 'S', allowedTiers: ['S', 'M'] },
+  // Row 2-3: Main data widgets (medium)
+  { id: 'usage-meter', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  { id: 'cost-tracker', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  { id: 'agent-status', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  { id: 'tasks', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  // Row 4: Sessions + Notifications (large)
+  { id: 'recent-sessions', defaultTier: 'L', allowedTiers: ['L', 'M'] },
+  { id: 'notifications', defaultTier: 'L', allowedTiers: ['L', 'M'] },
+  // Bottom: Weather (nice-to-have)
+  { id: 'weather', defaultTier: 'S', allowedTiers: ['S'] },
 ]
 
 /* ── Layout Constraints ── */

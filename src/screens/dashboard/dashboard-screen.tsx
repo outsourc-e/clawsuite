@@ -28,6 +28,7 @@ import {
 import { AgentStatusWidget } from './components/agent-status-widget'
 import { ActivityLogWidget } from './components/activity-log-widget'
 import { CostTrackerWidget } from './components/cost-tracker-widget'
+import { HeroMetricsRow } from './components/hero-metrics-row'
 import { NotificationsWidget } from './components/notifications-widget'
 import { QuickActionsWidget } from './components/quick-actions-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
@@ -60,6 +61,22 @@ async function fetchSessionStatus(): Promise<SessionStatusPayload> {
   const response = await fetch('/api/session-status')
   if (!response.ok) return {}
   return response.json() as Promise<SessionStatusPayload>
+}
+
+async function fetchHeroCost(): Promise<string> {
+  try {
+    const response = await fetch('/api/cost')
+    if (!response.ok) return '—'
+    const data = (await response.json()) as Record<string, unknown>
+    const cost = data?.cost as Record<string, unknown> | undefined
+    const total = cost?.total as Record<string, unknown> | undefined
+    const amount = total?.amount
+    if (typeof amount === 'number') return `$${amount.toFixed(2)}`
+    if (typeof amount === 'string') return `$${amount}`
+    return '—'
+  } catch {
+    return '—'
+  }
 }
 
 function formatModelName(raw: string): string {
@@ -195,6 +212,13 @@ export function DashboardScreen() {
     refetchInterval: 30_000,
   })
 
+  const heroCostQuery = useQuery({
+    queryKey: ['dashboard', 'hero-cost'],
+    queryFn: fetchHeroCost,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+
   const recentSessions = useMemo(function buildRecentSessions() {
     const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
     if (sessions.length === 0) return fallbackRecentSessions
@@ -278,7 +302,29 @@ export function DashboardScreen() {
           <p className="mt-1 max-w-3xl text-sm text-primary-600 text-pretty md:text-base">
             Design, orchestrate, and monitor AI agent systems from a single command center.
           </p>
+          {/* Quick Actions — persistent in header, not draggable */}
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {quickActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => navigate({ to: action.to })}
+                className="flex items-center gap-2.5 rounded-lg border border-primary-200 bg-white/70 px-3 py-2 text-left text-sm transition-colors hover:border-primary-300 hover:bg-white"
+              >
+                <HugeiconsIcon icon={action.icon} size={16} strokeWidth={1.5} className="shrink-0 text-primary-600" />
+                <span className="font-medium text-ink">{action.label}</span>
+              </button>
+            ))}
+          </div>
         </header>
+
+        <HeroMetricsRow
+          currentModel={systemStatus.currentModel}
+          uptimeSeconds={systemStatus.uptimeSeconds}
+          sessionCount={systemStatus.sessionCount}
+          totalSpend={heroCostQuery.data ?? '—'}
+          gatewayConnected={systemStatus.gateway.connected}
+        />
 
         <div ref={containerRef}>
           <ResponsiveGridLayout
@@ -295,12 +341,6 @@ export function DashboardScreen() {
             compactType="vertical"
             margin={GRID_MARGIN}
           >
-            <div key="weather" className="h-full">
-              <WeatherWidget draggable />
-            </div>
-            <div key="quick-actions" className="h-full">
-              <QuickActionsWidget actions={quickActions} onNavigate={(to) => navigate({ to })} draggable />
-            </div>
             <div key="time-date" className="h-full">
               <TimeDateWidget draggable />
             </div>
@@ -331,6 +371,9 @@ export function DashboardScreen() {
             </div>
             <div key="activity-log" className="h-full">
               <ActivityLogWidget draggable />
+            </div>
+            <div key="weather" className="h-full">
+              <WeatherWidget draggable />
             </div>
           </ResponsiveGridLayout>
         </div>
