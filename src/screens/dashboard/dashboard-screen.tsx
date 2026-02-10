@@ -42,6 +42,7 @@ import type {
 } from './components/dashboard-types'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
+import { SettingsDialog } from './components/settings-dialog'
 import type { SessionMeta } from '@/screens/chat/types'
 import { getMessageTimestamp, textFromMessage } from '@/screens/chat/utils'
 import { chatQueryKeys, fetchGatewayStatus, fetchSessions } from '@/screens/chat/chat-queries'
@@ -170,6 +171,7 @@ function toSessionUpdatedAt(session: SessionMeta): number {
 export function DashboardScreen() {
   const navigate = useNavigate()
   const [gridLayouts, setGridLayouts] = useState<ResponsiveLayouts>(loadLayouts)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(1200)
 
@@ -298,7 +300,7 @@ export function DashboardScreen() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate({ to: '/settings' })}
+                onClick={() => setSettingsOpen(true)}
                 className="inline-flex size-8 items-center justify-center rounded-lg border border-primary-200 bg-white/70 text-primary-500 transition-colors hover:border-primary-300 hover:bg-white hover:text-primary-700 dark:bg-primary-100/50 dark:hover:bg-primary-200/50"
                 aria-label="Settings"
                 title="Settings"
@@ -383,6 +385,8 @@ export function DashboardScreen() {
           </ResponsiveGridLayout>
         </div>
       </section>
+
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </main>
   )
 }
