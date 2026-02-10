@@ -116,7 +116,11 @@ async function fetchWeather(location?: string): Promise<WeatherSnapshot> {
   }
 }
 
-export function WeatherWidget() {
+type WeatherWidgetProps = {
+  draggable?: boolean
+}
+
+export function WeatherWidget({ draggable = false }: WeatherWidgetProps) {
   const { settings, update } = useDashboardSettings()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(settings.weatherLocation)
@@ -141,6 +145,7 @@ export function WeatherWidget() {
         title="Weather"
         description="Local weather snapshot and near-term forecast."
         icon={CloudIcon}
+        draggable={draggable}
         className="h-full"
       >
         <div className="flex h-[130px] items-center justify-center rounded-xl border border-primary-200 bg-primary-100/50 text-sm text-primary-600 text-pretty">
@@ -156,6 +161,7 @@ export function WeatherWidget() {
         title="Weather"
         description="Local weather snapshot and near-term forecast."
         icon={CloudIcon}
+        draggable={draggable}
         className="h-full"
       >
         <div className="flex h-[130px] items-center justify-center rounded-xl border border-primary-200 bg-primary-100/50 text-sm text-primary-600 text-pretty">
@@ -172,6 +178,7 @@ export function WeatherWidget() {
       title="Weather"
       description="Local weather snapshot and near-term forecast."
       icon={CloudIcon}
+      draggable={draggable}
       className="h-full"
     >
       {editing ? (

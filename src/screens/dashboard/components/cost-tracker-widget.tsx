@@ -35,6 +35,10 @@ type CostQueryResult =
   | { kind: 'unavailable'; message: string }
   | { kind: 'error'; message: string }
 
+type CostTrackerWidgetProps = {
+  draggable?: boolean
+}
+
 function readNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string') {
@@ -242,7 +246,7 @@ function getSparklinePoints(points: Array<CostPoint>): {
   }
 }
 
-export function CostTrackerWidget() {
+export function CostTrackerWidget({ draggable = false }: CostTrackerWidgetProps) {
   const costQuery = useQuery({
     queryKey: ['dashboard', 'cost'],
     queryFn: fetchCost,
@@ -264,6 +268,7 @@ export function CostTrackerWidget() {
       title="Cost Tracker"
       description="Current billing period spend and daily trend."
       icon={MoneyBag02Icon}
+      draggable={draggable}
       className="h-full"
     >
       {queryResult?.kind === 'unavailable' ? (

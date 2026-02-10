@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 type RecentSessionsWidgetProps = {
   sessions: Array<RecentSession>
   onOpenSession: (sessionKey: string) => void
+  draggable?: boolean
 }
 
 function formatSessionTimestamp(value: number): string {
@@ -23,12 +24,14 @@ function formatSessionTimestamp(value: number): string {
 export function RecentSessionsWidget({
   sessions,
   onOpenSession,
+  draggable = false,
 }: RecentSessionsWidgetProps) {
   return (
     <DashboardGlassCard
       title="Recent Sessions"
       description="Resume work from your latest chat conversations."
       icon={Clock01Icon}
+      draggable={draggable}
       className="h-full"
     >
       <div className="space-y-2">

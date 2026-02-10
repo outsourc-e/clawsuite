@@ -25,6 +25,10 @@ const TASKS_STORAGE_KEY = 'openclaw-studio-kanban-tasks'
 const TaskListTodoIcon =
   ((HugeIcons as Record<string, DashboardIcon>)['TaskListTodoIcon'] || HugeIcons.Task01Icon) as DashboardIcon
 
+type TasksWidgetProps = {
+  draggable?: boolean
+}
+
 const seededColumns: Array<KanbanColumn> = [
   {
     id: 'backlog',
@@ -204,7 +208,7 @@ function assigneeClasses(name: string): string {
   return palette[initial % palette.length] || palette[0]
 }
 
-export function TasksWidget() {
+export function TasksWidget({ draggable = false }: TasksWidgetProps) {
   const [columns] = useState<Array<KanbanColumn>>(loadKanbanColumns)
 
   return (
@@ -213,6 +217,7 @@ export function TasksWidget() {
       description="Kanban board for active engineering work."
       icon={TaskListTodoIcon}
       badge="Demo"
+      draggable={draggable}
       className="h-full"
     >
       <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">

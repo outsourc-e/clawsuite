@@ -8,7 +8,11 @@ import { ActivityEventRow } from '@/screens/activity/components/activity-event-r
 import { useActivityEvents } from '@/screens/activity/use-activity-events'
 import { cn } from '@/lib/utils'
 
-export function ActivityLogWidget() {
+type ActivityLogWidgetProps = {
+  draggable?: boolean
+}
+
+export function ActivityLogWidget({ draggable = false }: ActivityLogWidgetProps) {
   const navigate = useNavigate()
   const { events, isConnected, isLoading } = useActivityEvents({
     initialCount: 20,
@@ -53,6 +57,7 @@ export function ActivityLogWidget() {
       }
       description="Chronological Gateway and Studio event feed."
       icon={Activity01Icon}
+      draggable={draggable}
       className="h-full"
     >
       <div className="mb-2 flex justify-end">

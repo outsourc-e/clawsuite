@@ -12,6 +12,10 @@ type SessionsApiResponse = {
   sessions?: Array<Record<string, unknown>>
 }
 
+type NotificationsWidgetProps = {
+  draggable?: boolean
+}
+
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -93,7 +97,7 @@ function toNotifications(rows: Array<Record<string, unknown>>): Array<DashboardN
     })
 }
 
-export function NotificationsWidget() {
+export function NotificationsWidget({ draggable = false }: NotificationsWidgetProps) {
   const notificationsQuery = useQuery({
     queryKey: ['dashboard', 'notifications'],
     queryFn: fetchSessionsForNotifications,
@@ -110,6 +114,7 @@ export function NotificationsWidget() {
       title="Notifications"
       description="Session lifecycle events — starts, stops, and errors."
       icon={Notification03Icon}
+      draggable={draggable}
       className="h-full"
     >
       {notifications.length === 0 ? (

@@ -21,6 +21,10 @@ type AgentRow = {
 
 type SessionAgentSource = SessionMeta & Record<string, unknown>
 
+type AgentStatusWidgetProps = {
+  draggable?: boolean
+}
+
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -187,7 +191,7 @@ async function fetchSessions(): Promise<Array<SessionAgentSource>> {
   })
 }
 
-export function AgentStatusWidget() {
+export function AgentStatusWidget({ draggable = false }: AgentStatusWidgetProps) {
   const sessionsQuery = useQuery({
     queryKey: ['dashboard', 'active-agent-sessions'],
     queryFn: fetchSessions,
@@ -209,6 +213,7 @@ export function AgentStatusWidget() {
       title="Active Agents"
       description="Running agent sessions, model, and live progress."
       icon={UserGroupIcon}
+      draggable={draggable}
       className="h-full"
     >
       {agents.length === 0 ? (

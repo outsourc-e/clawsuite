@@ -11,7 +11,11 @@ function formatFullDate(date: Date, formatter: Intl.DateTimeFormat): string {
   return formatter.format(date)
 }
 
-export function TimeDateWidget() {
+type TimeDateWidgetProps = {
+  draggable?: boolean
+}
+
+export function TimeDateWidget({ draggable = false }: TimeDateWidgetProps) {
   const { settings, update } = useDashboardSettings()
   const is12h = settings.clockFormat === '12h'
 
@@ -56,6 +60,7 @@ export function TimeDateWidget() {
       title="Time & Date"
       description="Live local clock and calendar date."
       icon={Clock01Icon}
+      draggable={draggable}
       className="h-full"
     >
       <div className="rounded-xl border border-primary-200 bg-primary-100/55 p-4">

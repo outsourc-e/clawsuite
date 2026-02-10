@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 
 type SystemStatusWidgetProps = {
   status: SystemStatus
+  draggable?: boolean
 }
 
 function formatUptime(seconds: number): string {
@@ -28,7 +29,10 @@ function formatCheckedAt(value: string): string {
   }).format(date)
 }
 
-export function SystemStatusWidget({ status }: SystemStatusWidgetProps) {
+export function SystemStatusWidget({
+  status,
+  draggable = false,
+}: SystemStatusWidgetProps) {
   const navigate = useNavigate()
 
   function handleOpenDebugConsole() {
@@ -40,6 +44,7 @@ export function SystemStatusWidget({ status }: SystemStatusWidgetProps) {
       title="System Status"
       description="Live gateway health and workspace runtime details."
       icon={Activity01Icon}
+      draggable={draggable}
       className="h-full"
     >
       <div className="space-y-2.5 text-sm">

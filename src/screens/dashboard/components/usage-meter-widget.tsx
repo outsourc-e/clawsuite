@@ -206,7 +206,11 @@ function formatUsd(amount: number): string {
   }).format(amount)
 }
 
-export function UsageMeterWidget() {
+type UsageMeterWidgetProps = {
+  draggable?: boolean
+}
+
+export function UsageMeterWidget({ draggable = false }: UsageMeterWidgetProps) {
   const usageQuery = useQuery({
     queryKey: ['dashboard', 'usage'],
     queryFn: fetchUsage,
@@ -234,6 +238,7 @@ export function UsageMeterWidget() {
       title="Usage Meter"
       description="All-time token usage totals by provider."
       icon={ChartLineData02Icon}
+      draggable={draggable}
       className="h-full"
     >
       {queryResult?.kind === 'unavailable' ? (

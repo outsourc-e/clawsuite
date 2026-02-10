@@ -7,17 +7,20 @@ import { Button } from '@/components/ui/button'
 type QuickActionsWidgetProps = {
   actions: Array<QuickAction>
   onNavigate: (to: QuickAction['to']) => void
+  draggable?: boolean
 }
 
 export function QuickActionsWidget({
   actions,
   onNavigate,
+  draggable = false,
 }: QuickActionsWidgetProps) {
   return (
     <DashboardGlassCard
       title="Quick Actions"
       description="Jump into the most common OpenClaw Studio workflows."
       icon={Task01Icon}
+      draggable={draggable}
       className="h-full"
     >
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

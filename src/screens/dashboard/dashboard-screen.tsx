@@ -3,7 +3,6 @@ import {
   AiBookIcon,
   ComputerTerminal02Icon,
   DashboardSquare01Icon,
-  DragDropIcon,
   RefreshIcon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
@@ -106,15 +105,6 @@ function loadLayout(): Layout[] {
 
 function saveLayout(layout: Layout[]) {
   localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout))
-}
-
-/* ── Drag handle component ── */
-function DragHandle() {
-  return (
-    <span className="widget-drag-handle inline-flex cursor-grab items-center justify-center rounded-md border border-primary-200 bg-white/80 p-1 text-primary-400 shadow-sm hover:border-primary-300 hover:text-primary-600 active:cursor-grabbing dark:bg-primary-900/80" title="Drag to reorder">
-      <HugeiconsIcon icon={DragDropIcon} size={14} strokeWidth={1.5} />
-    </span>
-  )
 }
 
 const quickActions: Array<QuickAction> = [
@@ -332,44 +322,41 @@ export function DashboardScreen() {
             margin={[10, 10]}
           >
             <div key="weather" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><WeatherWidget /></div>
+              <WeatherWidget draggable />
             </div>
             <div key="quick-actions" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span>
-                <QuickActionsWidget actions={quickActions} onNavigate={(to) => navigate({ to })} />
-              </div>
+              <QuickActionsWidget actions={quickActions} onNavigate={(to) => navigate({ to })} draggable />
             </div>
             <div key="time-date" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><TimeDateWidget /></div>
+              <TimeDateWidget draggable />
             </div>
             <div key="usage-meter" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><UsageMeterWidget /></div>
+              <UsageMeterWidget draggable />
             </div>
             <div key="tasks" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><TasksWidget /></div>
+              <TasksWidget draggable />
             </div>
             <div key="agent-status" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><AgentStatusWidget /></div>
+              <AgentStatusWidget draggable />
             </div>
             <div key="cost-tracker" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><CostTrackerWidget /></div>
+              <CostTrackerWidget draggable />
             </div>
             <div key="recent-sessions" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span>
-                <RecentSessionsWidget
-                  sessions={recentSessions}
-                  onOpenSession={(sessionKey) => navigate({ to: '/chat/$sessionKey', params: { sessionKey } })}
-                />
-              </div>
+              <RecentSessionsWidget
+                sessions={recentSessions}
+                onOpenSession={(sessionKey) => navigate({ to: '/chat/$sessionKey', params: { sessionKey } })}
+                draggable
+              />
             </div>
             <div key="system-status" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><SystemStatusWidget status={systemStatus} /></div>
+              <SystemStatusWidget status={systemStatus} draggable />
             </div>
             <div key="notifications" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><NotificationsWidget /></div>
+              <NotificationsWidget draggable />
             </div>
             <div key="activity-log" className="h-full">
-              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><ActivityLogWidget /></div>
+              <ActivityLogWidget draggable />
             </div>
           </ResponsiveGridLayout>
         </div>
