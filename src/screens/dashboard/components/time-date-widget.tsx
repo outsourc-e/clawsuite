@@ -1,6 +1,7 @@
 import { Clock01Icon } from '@hugeicons/core-free-icons'
 import { useEffect, useMemo, useState } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
+import { useDashboardSettings } from '../hooks/use-dashboard-settings'
 
 function formatClock(date: Date, formatter: Intl.DateTimeFormat): string {
   return formatter.format(date)
@@ -11,6 +12,9 @@ function formatFullDate(date: Date, formatter: Intl.DateTimeFormat): string {
 }
 
 export function TimeDateWidget() {
+  const { settings, update } = useDashboardSettings()
+  const is12h = settings.clockFormat === '12h'
+
   const [now, setNow] = useState(function initializeNow() {
     return new Date()
   })
@@ -24,9 +28,9 @@ export function TimeDateWidget() {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      hour12: false,
+      hour12: is12h,
     })
-  }, [])
+  }, [is12h])
 
   const dateFormatter = useMemo(function createDateFormatter() {
     return new Intl.DateTimeFormat(undefined, {
@@ -55,7 +59,18 @@ export function TimeDateWidget() {
       className="h-full"
     >
       <div className="rounded-xl border border-primary-200 bg-primary-100/55 p-4">
-        <p className="text-xs text-primary-600 tabular-nums text-pretty">{timezone}</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-primary-600 tabular-nums text-pretty">{timezone}</p>
+          <button
+            type="button"
+            onClick={() => update({ clockFormat: is12h ? '24h' : '12h' })}
+            className="rounded-md border border-primary-200 px-2 py-0.5 text-[11px] font-medium text-primary-600 hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-primary-400"
+            aria-label={`Switch to ${is12h ? '24-hour' : '12-hour'} format`}
+            title={`Switch to ${is12h ? '24h' : '12h'} format`}
+          >
+            {is12h ? '12h' : '24h'}
+          </button>
+        </div>
         <p className="mt-2 text-4xl font-medium font-mono text-ink tabular-nums">
           {formatClock(now, clockFormatter)}
         </p>

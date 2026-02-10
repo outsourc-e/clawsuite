@@ -1,7 +1,10 @@
-import { CloudIcon } from '@hugeicons/core-free-icons'
+import { CloudIcon, Edit02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import type { WeatherSnapshot } from './dashboard-types'
+import { useDashboardSettings } from '../hooks/use-dashboard-settings'
 
 type WttrDescription = {
   value?: string
@@ -64,14 +67,29 @@ function formatWeekday(value: string): string {
   return new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date)
 }
 
-async function fetchWeather(): Promise<WeatherSnapshot> {
-  const response = await fetch('https://wttr.in/?format=j1')
+function deriveLocationFromTimezone(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? ''
+    // "America/New_York" → "New_York" → "New York"
+    const city = tz.split('/').pop()?.replace(/_/g, ' ') ?? ''
+    return city
+  } catch {
+    return ''
+  }
+}
+
+async function fetchWeather(location?: string): Promise<WeatherSnapshot> {
+  const loc = location?.trim() || deriveLocationFromTimezone()
+  const url = loc
+    ? `https://wttr.in/${encodeURIComponent(loc)}?format=j1`
+    : 'https://wttr.in/?format=j1'
+  const response = await fetch(url)
   if (!response.ok) throw new Error('Weather unavailable')
   const payload = (await response.json()) as WttrPayload
 
   const current = payload.current_condition?.[0]
   const condition = current?.weatherDesc?.[0]?.value?.trim() ?? 'Unknown'
-  const location =
+  const weatherLocation =
     payload.nearest_area?.[0]?.areaName?.[0]?.value?.trim() ?? 'Unknown'
   const temperatureC = toNumber(current?.temp_C)
 
@@ -90,7 +108,7 @@ async function fetchWeather(): Promise<WeatherSnapshot> {
   })
 
   return {
-    location,
+    location: weatherLocation,
     temperatureC,
     condition,
     emoji: toWeatherEmoji(condition),
@@ -99,13 +117,23 @@ async function fetchWeather(): Promise<WeatherSnapshot> {
 }
 
 export function WeatherWidget() {
+  const { settings, update } = useDashboardSettings()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(settings.weatherLocation)
+  const inputRef = useRef<HTMLInputElement>(null)
+
   const weatherQuery = useQuery({
-    queryKey: ['dashboard', 'weather'],
-    queryFn: fetchWeather,
+    queryKey: ['dashboard', 'weather', settings.weatherLocation],
+    queryFn: () => fetchWeather(settings.weatherLocation),
     staleTime: 10 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000,
     retry: 1,
   })
+
+  function handleSaveLocation() {
+    update({ weatherLocation: draft.trim() })
+    setEditing(false)
+  }
 
   if (weatherQuery.isError) {
     return (
@@ -146,21 +174,73 @@ export function WeatherWidget() {
       icon={CloudIcon}
       className="h-full"
     >
-      <div className="rounded-xl border border-primary-200 bg-primary-100/55 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="line-clamp-1 text-sm font-medium text-ink text-balance">
-              {weather.location}
-            </p>
-            <p className="mt-0.5 line-clamp-1 text-xs text-primary-600 text-pretty">
-              {weather.condition}
+      {editing ? (
+        <div className="rounded-xl border border-primary-200 bg-primary-100/55 p-3">
+          <label className="text-xs text-primary-600">Location (ZIP code or city)</label>
+          <div className="mt-1 flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLocation() }}
+              placeholder="e.g. 33101 or Miami"
+              className="flex-1 rounded-lg border border-primary-200 bg-white px-2.5 py-1.5 text-sm text-ink placeholder:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={handleSaveLocation}
+              className="rounded-lg bg-primary-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => { setEditing(false); setDraft(settings.weatherLocation) }}
+              className="rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-100"
+            >
+              Cancel
+            </button>
+          </div>
+          {settings.weatherLocation && (
+            <button
+              type="button"
+              onClick={() => { update({ weatherLocation: '' }); setDraft(''); setEditing(false) }}
+              className="mt-2 text-[11px] text-primary-500 underline hover:text-primary-700"
+            >
+              Reset to auto-detect
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-primary-200 bg-primary-100/55 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="line-clamp-1 text-sm font-medium text-ink text-balance">
+                  {weather.location}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setDraft(settings.weatherLocation); setEditing(true) }}
+                  className="shrink-0 rounded p-0.5 text-primary-400 hover:text-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  aria-label="Edit weather location"
+                  title="Change location"
+                >
+                  <HugeiconsIcon icon={Edit02Icon} size={13} strokeWidth={1.5} />
+                </button>
+              </div>
+              <p className="mt-0.5 line-clamp-1 text-xs text-primary-600 text-pretty">
+                {weather.condition}
+              </p>
+            </div>
+            <p className="shrink-0 text-lg font-medium text-ink tabular-nums">
+              {weather.emoji} {cToF(weather.temperatureC)}°F
             </p>
           </div>
-          <p className="shrink-0 text-lg font-medium text-ink tabular-nums">
-            {weather.emoji} {cToF(weather.temperatureC)}°F
-          </p>
         </div>
-      </div>
+      )}
       <div className="mt-2 grid grid-cols-3 gap-2">
         {weather.forecast.map(function mapDay(day) {
           return (
