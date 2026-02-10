@@ -76,21 +76,21 @@ const LAYOUT_STORAGE_KEY = 'openclaw-dashboard-layout'
 
 const DEFAULT_LAYOUT: Layout[] = [
   // Row 1: Weather(3) | Quick Actions(6) | Time(3)
-  { i: 'weather', x: 0, y: 0, w: 3, h: 3, minW: 2, minH: 2 },
-  { i: 'quick-actions', x: 3, y: 0, w: 6, h: 3, minW: 4, minH: 2 },
-  { i: 'time-date', x: 9, y: 0, w: 3, h: 3, minW: 2, minH: 2 },
+  { i: 'weather', x: 0, y: 0, w: 3, h: 3 },
+  { i: 'quick-actions', x: 3, y: 0, w: 6, h: 3 },
+  { i: 'time-date', x: 9, y: 0, w: 3, h: 3 },
   // Row 2: Usage(6) | Tasks(6)
-  { i: 'usage-meter', x: 0, y: 3, w: 6, h: 5, minW: 4, minH: 3 },
-  { i: 'tasks', x: 6, y: 3, w: 6, h: 5, minW: 4, minH: 3 },
+  { i: 'usage-meter', x: 0, y: 3, w: 6, h: 5 },
+  { i: 'tasks', x: 6, y: 3, w: 6, h: 5 },
   // Row 3: Agents(6) | Cost(6)
-  { i: 'agent-status', x: 0, y: 8, w: 6, h: 5, minW: 4, minH: 3 },
-  { i: 'cost-tracker', x: 6, y: 8, w: 6, h: 5, minW: 4, minH: 3 },
+  { i: 'agent-status', x: 0, y: 8, w: 6, h: 5 },
+  { i: 'cost-tracker', x: 6, y: 8, w: 6, h: 5 },
   // Row 4: Sessions(8) | System(4)
-  { i: 'recent-sessions', x: 0, y: 13, w: 8, h: 5, minW: 4, minH: 3 },
-  { i: 'system-status', x: 8, y: 13, w: 4, h: 5, minW: 3, minH: 3 },
+  { i: 'recent-sessions', x: 0, y: 13, w: 8, h: 5 },
+  { i: 'system-status', x: 8, y: 13, w: 4, h: 5 },
   // Row 5: Notifications(8) | Activity(4)
-  { i: 'notifications', x: 0, y: 18, w: 8, h: 4, minW: 4, minH: 3 },
-  { i: 'activity-log', x: 8, y: 18, w: 4, h: 4, minW: 3, minH: 3 },
+  { i: 'notifications', x: 0, y: 18, w: 8, h: 4 },
+  { i: 'activity-log', x: 8, y: 18, w: 4, h: 4 },
 ]
 
 function loadLayout(): Layout[] {
@@ -111,8 +111,9 @@ function saveLayout(layout: Layout[]) {
 /* ── Drag handle component ── */
 function DragHandle() {
   return (
-    <span className="widget-drag-handle cursor-grab rounded p-1 text-primary-300 hover:text-primary-500 active:cursor-grabbing" title="Drag to reorder">
+    <span className="widget-drag-handle inline-flex cursor-grab items-center gap-1 rounded-md border border-primary-200 bg-white/80 px-1.5 py-1 text-primary-400 shadow-sm hover:border-primary-300 hover:text-primary-600 active:cursor-grabbing dark:bg-primary-900/80" title="Drag to reorder">
       <HugeiconsIcon icon={DragDropIcon} size={14} strokeWidth={1.5} />
+      <span className="text-[10px] font-medium">Drag</span>
     </span>
   )
 }
@@ -326,7 +327,7 @@ export function DashboardScreen() {
             width={containerWidth}
             onLayoutChange={handleLayoutChange}
             draggableHandle=".widget-drag-handle"
-            isResizable
+            isResizable={false}
             isDraggable
             compactType="vertical"
             margin={[12, 12]}
