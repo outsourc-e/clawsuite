@@ -250,8 +250,9 @@ export function UsageMeterWidget({ draggable = false }: UsageMeterWidgetProps) {
           {queryResult.message}
         </div>
       ) : !usageData ? (
-        <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
-          Loading usage data...
+        <div className="flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-100/45 p-4">
+          <span className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />
+          <span className="text-sm text-primary-500">Loading usage data…</span>
         </div>
       ) : usageData.providers.length === 0 ? (
         <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">

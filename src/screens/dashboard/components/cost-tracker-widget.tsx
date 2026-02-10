@@ -286,8 +286,8 @@ export function CostTrackerWidget({ draggable = false }: CostTrackerWidgetProps)
       ) : (
         <div className="space-y-4">
           <div className="rounded-xl border border-primary-200 bg-primary-100/45 px-3 py-2">
-            <p className="text-xs text-primary-600 text-pretty">Period Spend</p>
-            <p className="text-lg font-medium text-ink tabular-nums">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-primary-500">Period Spend</p>
+            <p className="text-2xl font-bold text-ink tabular-nums">
               {formatUsd(costData.totalAmount)}
             </p>
           </div>
