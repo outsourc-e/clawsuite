@@ -111,9 +111,8 @@ function saveLayout(layout: Layout[]) {
 /* ── Drag handle component ── */
 function DragHandle() {
   return (
-    <span className="widget-drag-handle inline-flex cursor-grab items-center gap-1 rounded-md border border-primary-200 bg-white/80 px-1.5 py-1 text-primary-400 shadow-sm hover:border-primary-300 hover:text-primary-600 active:cursor-grabbing dark:bg-primary-900/80" title="Drag to reorder">
+    <span className="widget-drag-handle inline-flex cursor-grab items-center justify-center rounded-md border border-primary-200 bg-white/80 p-1 text-primary-400 shadow-sm hover:border-primary-300 hover:text-primary-600 active:cursor-grabbing dark:bg-primary-900/80" title="Drag to reorder">
       <HugeiconsIcon icon={DragDropIcon} size={14} strokeWidth={1.5} />
-      <span className="text-[10px] font-medium">Drag</span>
     </span>
   )
 }
@@ -330,7 +329,7 @@ export function DashboardScreen() {
             isResizable={false}
             isDraggable
             compactType="vertical"
-            margin={[12, 12]}
+            margin={[10, 10]}
           >
             <div key="weather" className="h-full">
               <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><WeatherWidget /></div>

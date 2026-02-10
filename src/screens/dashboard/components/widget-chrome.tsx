@@ -54,9 +54,8 @@ export function WidgetChrome({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <span className="inline-flex cursor-grab items-center gap-1.5 rounded-md px-2 py-1 text-xs text-primary-600 tabular-nums">
-            <HugeiconsIcon icon={DragDropIcon} size={20} strokeWidth={1.5} />
-            <span>Drag</span>
+          <span className="widget-drag-handle inline-flex cursor-grab items-center justify-center rounded-md p-1 text-primary-400 hover:text-primary-600 active:cursor-grabbing" title="Drag to reorder">
+            <HugeiconsIcon icon={DragDropIcon} size={16} strokeWidth={1.5} />
           </span>
           <Button
             variant="ghost"
