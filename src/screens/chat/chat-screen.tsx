@@ -844,7 +844,7 @@ export function ChatScreen({
   }, [gatewayError, handleGatewayRefetch, showGatewayNotice])
 
   return (
-    <div className="relative h-full min-w-0 flex flex-col">
+    <div className="relative h-full min-w-0 flex flex-col overflow-hidden">
       <div
         className={cn(
           'flex-1 min-h-0 overflow-hidden',

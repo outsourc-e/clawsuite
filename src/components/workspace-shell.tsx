@@ -103,7 +103,7 @@ export function WorkspaceShell() {
       <div
         className={cn(
           'h-full overflow-hidden',
-          isOnChatRoute ? 'grid grid-cols-[auto_1fr]' : 'grid grid-cols-[auto_1fr] min-[1200px]:grid-cols-[auto_1fr_auto]',
+          isOnChatRoute ? 'grid grid-cols-[auto_1fr] grid-rows-[1fr]' : 'grid grid-cols-[auto_1fr] grid-rows-[1fr] min-[1200px]:grid-cols-[auto_1fr_auto]',
         )}
       >
         {/* Persistent sidebar */}
