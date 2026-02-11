@@ -7,6 +7,7 @@ export type ChatContainerRootProps = {
   children: React.ReactNode
   overlay?: React.ReactNode
   className?: string
+  stickToBottom?: boolean
   onUserScroll?: (metrics: {
     scrollTop: number
     scrollHeight: number
@@ -24,20 +25,40 @@ export type ChatContainerScrollAnchorProps = {
   ref?: React.Ref<HTMLDivElement>
 } & React.HTMLAttributes<HTMLDivElement>
 
+const NEAR_BOTTOM_THRESHOLD = 200
+
 function ChatContainerRoot({
   children,
   overlay,
   className,
+  stickToBottom = true,
   onUserScroll,
   ...props
 }: ChatContainerRootProps) {
   const scrollRef = React.useRef<HTMLDivElement | null>(null)
+  const stickToBottomRef = React.useRef(stickToBottom)
+  const lastScrollTopRef = React.useRef(0)
+
+  React.useLayoutEffect(() => {
+    stickToBottomRef.current = stickToBottom
+  }, [stickToBottom])
 
   React.useLayoutEffect(() => {
     const element = scrollRef.current
     if (!element) return
 
     const handleScroll = () => {
+      // Track stick-to-bottom internally based on actual scroll position
+      const distFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight
+      const wasScrollingUp = element.scrollTop < lastScrollTopRef.current - 5
+      lastScrollTopRef.current = element.scrollTop
+
+      if (wasScrollingUp && distFromBottom > NEAR_BOTTOM_THRESHOLD) {
+        stickToBottomRef.current = false
+      } else if (distFromBottom <= NEAR_BOTTOM_THRESHOLD) {
+        stickToBottomRef.current = true
+      }
+
       onUserScroll?.({
         scrollTop: element.scrollTop,
         scrollHeight: element.scrollHeight,
@@ -45,31 +66,38 @@ function ChatContainerRoot({
       })
     }
 
-    // Don't fire initial handleScroll() on mount — it reports scrollTop=0
-    // which would set stickToBottomRef=false before the initial scroll-to-bottom.
     element.addEventListener('scroll', handleScroll, { passive: true })
     return () => element.removeEventListener('scroll', handleScroll)
   }, [onUserScroll])
 
-  // Debug: log container dimensions
-  React.useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const log = () => {
-      const parent = el.parentElement
-      // Walk up the DOM tree to find where height breaks
-      const chain: string[] = []
-      let node: HTMLElement | null = el
-      while (node && chain.length < 10) {
-        chain.push(`${node.tagName}.${node.className.split(' ').slice(0,3).join('.')} h=${node.clientHeight}`)
-        node = node.parentElement
+  // ResizeObserver: re-anchor to bottom when content expands
+  React.useLayoutEffect(() => {
+    const viewport = scrollRef.current
+    if (!viewport || typeof ResizeObserver === 'undefined') return
+
+    const content = viewport.firstElementChild
+    if (!(content instanceof HTMLElement)) return
+
+    let previousHeight = content.getBoundingClientRect().height
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      const nextHeight = entry.contentRect.height
+      const heightDelta = nextHeight - previousHeight
+      if (heightDelta === 0) return
+
+      // Re-anchor to bottom when content grows and we're in stick-to-bottom mode.
+      // stickToBottomRef tracks actual scroll position (set false when user scrolls up),
+      // so this won't fight user scroll.
+      if (heightDelta > 0 && stickToBottomRef.current) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'auto' })
       }
-      console.log('[CONTAINER DEBUG] height chain:', chain)
-      console.log('[CONTAINER DEBUG] viewport:', window.innerHeight)
-    }
-    log()
-    const timer = setInterval(log, 2000)
-    return () => clearInterval(timer)
+
+      previousHeight = nextHeight
+    })
+
+    resizeObserver.observe(content)
+    return () => resizeObserver.disconnect()
   }, [])
 
   return (

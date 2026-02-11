@@ -411,6 +411,7 @@ function ChatMessageListComponent({
     // mt-2 is to fix the prompt-input cut off
     <ChatContainerRoot
       className="flex-1 min-h-0"
+      stickToBottom={stickToBottomRef.current}
       onUserScroll={handleUserScroll}
       overlay={scrollToBottomOverlay}
     >
