@@ -298,10 +298,15 @@ export function ChatScreen({
     }
   }, [streamStop])
 
-  const streamFinish = useCallback(() => {
+  const streamFinish = useCallback((hasContent = false) => {
     streamStop()
     setPendingGeneration(false)
-    setWaitingForResponse(false)
+    // Only clear waitingForResponse if we actually have response content
+    // Otherwise keep it true so the typing indicator stays visible during history polling
+    if (hasContent) {
+      setWaitingForResponse(false)
+      setPinToTop(false)
+    }
   }, [streamStop])
 
   const finalizeStreamingPlaceholder = useCallback(
@@ -354,7 +359,7 @@ export function ChatScreen({
         context.streamId,
       )
       clearActiveStream(context.streamId)
-      streamFinish()
+      streamFinish(true) // History resolved — response is now visible
     },
     [clearActiveStream, historyQuery, queryClient, streamFinish],
   )
@@ -419,7 +424,7 @@ export function ChatScreen({
         setStreamingThinking('')
       }
       setError(`Streaming error: ${errorMessage}`)
-      streamFinish()
+      streamFinish(true) // Error = stop waiting
     }, [clearActiveStream, queryClient, streamFinish]),
   })
 
@@ -584,7 +589,7 @@ export function ChatScreen({
           activeContext.streamId,
         )
         clearActiveStream(activeContext.streamId)
-        streamFinish()
+        streamFinish(true)
         return
       }
     }
@@ -596,7 +601,7 @@ export function ChatScreen({
         window.clearTimeout(streamIdleTimer.current)
       }
       streamIdleTimer.current = window.setTimeout(() => {
-        streamFinish()
+        streamFinish(true)
       }, 4000)
     }
   }, [clearActiveStream, historyMessages, queryClient, streamFinish])
