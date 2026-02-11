@@ -642,8 +642,18 @@ export function AgentViewPanel() {
           <ScrollAreaRoot className="h-[calc(100vh-3.25rem)]">
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
+                {/* Main Agent Card */}
+                <OrchestratorCard compact={viewMode === 'compact'} />
+
                 {/* Swarm — agent cards */}
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1.5">
+                  {/* Centered Swarm pill */}
+                  <div className="mb-1.5 flex justify-center">
+                    <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
+                      swarm
+                    </span>
+                  </div>
+
                   <div className="mb-1.5 flex items-center justify-between">
                     <div>
                       <p className="text-[10px] text-primary-600 tabular-nums">
@@ -798,9 +808,6 @@ export function AgentViewPanel() {
                     </motion.div>
                   </LayoutGroup>
                 </section>
-
-                {/* Main Agent — collapsible */}
-                <MainAgentCollapsible viewMode={viewMode} />
 
                 {/* History */}
                 <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
