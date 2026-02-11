@@ -8,7 +8,7 @@ import {
   fetchSessionStatus,
   fetchSessions
 } from '@/lib/gateway-api'
-import { assignPersona, type AgentPersona } from '@/lib/agent-personas'
+import { assignPersona } from '@/lib/agent-personas'
 
 export type AgentModel = string
 
@@ -201,16 +201,26 @@ function readSessionName(session: GatewaySession): string {
 }
 
 function isAgentSession(session: GatewaySession): boolean {
-  const kind = readString(session.kind).toLowerCase()
-  if (kind.length > 0 && kind !== 'isolated') return false
-
   const key = readSessionKey(session).toLowerCase()
-  if (key === 'main') return false
+
+  // Must be a subagent session (spawned by the orchestrator)
+  if (key.includes('subagent:')) return true
+
+  // Also accept sessions explicitly marked as isolated
+  const kind = readString(session.kind).toLowerCase()
+  if (kind === 'isolated') return true
+
+  // Filter out main sessions, cron jobs, etc.
+  if (key === 'main' || key.includes(':main')) return false
 
   const friendlyId = readString(session.friendlyId).toLowerCase()
   if (friendlyId === 'main') return false
 
-  return true
+  // Accept labeled sessions (user-spawned with a label)
+  const label = readString(session.label)
+  if (label.length > 0 && !key.includes('cron')) return true
+
+  return false
 }
 
 function readTaskText(session: GatewaySession): string {
