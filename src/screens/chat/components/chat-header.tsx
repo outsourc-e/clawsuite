@@ -3,12 +3,16 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Folder01Icon, Menu01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { UsageMeter } from '@/components/usage-meter'
+import { ExportMenu } from '@/components/export-menu'
+import { ContextMeter } from '@/screens/chat/components/context-meter'
 import {
   TooltipContent,
   TooltipProvider,
   TooltipRoot,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+
+type ExportFormat = 'markdown' | 'json' | 'text'
 
 type ChatHeaderProps = {
   activeTitle: string
@@ -18,6 +22,10 @@ type ChatHeaderProps = {
   showFileExplorerButton?: boolean
   fileExplorerCollapsed?: boolean
   onToggleFileExplorer?: () => void
+  onExport?: (format: ExportFormat) => void
+  exportDisabled?: boolean
+  usedTokens?: number
+  maxTokens?: number
 }
 
 function ChatHeaderComponent({
@@ -28,6 +36,10 @@ function ChatHeaderComponent({
   showFileExplorerButton = false,
   fileExplorerCollapsed = true,
   onToggleFileExplorer,
+  onExport,
+  exportDisabled = true,
+  usedTokens,
+  maxTokens,
 }: ChatHeaderProps) {
   return (
     <div
@@ -67,8 +79,14 @@ function ChatHeaderComponent({
           </TooltipRoot>
         </TooltipProvider>
       ) : null}
-      <div className="text-sm font-medium truncate">{activeTitle}</div>
-      <UsageMeter />
+      <div className="text-sm font-medium truncate flex-1">{activeTitle}</div>
+      <div className="flex items-center gap-1 ml-auto">
+        <ContextMeter usedTokens={usedTokens} maxTokens={maxTokens} />
+        {onExport ? (
+          <ExportMenu onExport={onExport} disabled={exportDisabled} />
+        ) : null}
+        <UsageMeter />
+      </div>
     </div>
   )
 }

@@ -96,6 +96,8 @@ export type SessionMeta = {
   titleStatus?: SessionTitleStatus
   titleSource?: SessionTitleSource
   titleError?: string | null
+  tokenCount?: number
+  totalTokens?: number
 }
 
 export type PathsPayload = {
