@@ -11,15 +11,12 @@ import {
 import { useNavigate } from '@tanstack/react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { AgentCard } from './agent-card'
-import {
-  SwarmConnectionOverlay,
-} from './swarm-connection-overlay'
+import { SwarmConnectionOverlay } from './swarm-connection-overlay'
 import { useAgentSpawn } from './hooks/use-agent-spawn'
 import type { AgentNode, AgentNodeStatus, AgentStatusBubble } from './agent-card'
-import type { SwarmConnectionPath } from './swarm-connection-overlay'
+import type { SwarmConnectionLine } from './swarm-connection-overlay'
 import type { ActiveAgent } from '@/hooks/use-agent-view'
 import { AgentChatModal } from '@/components/agent-chat/AgentChatModal'
-import { AgentAvatar } from '@/components/agent-avatar'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -46,23 +43,11 @@ import {
 } from '@/hooks/use-agent-view'
 import { cn } from '@/lib/utils'
 
-type Point = {
-  x: number
-  y: number
-}
-
 function getLastUserMessageBubbleElement(): HTMLElement | null {
   const nodes = document.querySelectorAll<HTMLElement>(
     '[data-chat-message-role="user"] [data-chat-message-bubble="true"]',
   )
   return nodes.item(nodes.length - 1)
-}
-
-function buildConnectionPath(start: Point, end: Point): string {
-  const horizontal = Math.max(48, (end.x - start.x) * 0.4)
-  const controlA = { x: start.x + horizontal, y: start.y }
-  const controlB = { x: end.x - horizontal, y: end.y }
-  return `M ${start.x} ${start.y} C ${controlA.x} ${controlA.y}, ${controlB.x} ${controlB.y}, ${end.x} ${end.y}`
 }
 
 function formatRelativeMs(msAgo: number): string {
@@ -148,7 +133,6 @@ export function AgentViewPanel() {
     historyAgents,
     historyOpen,
     isLoading,
-    isDemoMode,
     isLiveConnected,
     errorMessage,
     setOpen,
@@ -263,7 +247,8 @@ export function AgentViewPanel() {
   const mainCardRef = useRef<HTMLElement | null>(null)
   const activeCardRefMap = useRef<Map<string, HTMLElement>>(new Map())
   const [sourceBubbleRect, setSourceBubbleRect] = useState<DOMRect | null>(null)
-  const [connectionPaths, setConnectionPaths] = useState<Array<SwarmConnectionPath>>([])
+  const [connectionLines, setConnectionLines] = useState<Array<SwarmConnectionLine>>([])
+  const [connectionCenterX, setConnectionCenterX] = useState(0)
 
   const visibleActiveNodes = useMemo(function getVisibleActiveNodes() {
     return activeNodes.filter(function keepRenderedNode(node) {
@@ -304,41 +289,43 @@ export function AgentViewPanel() {
     activeCardRefMap.current.delete(agentId)
   }, [])
 
-  const updateConnectionPaths = useCallback(function updateConnectionPaths() {
+  const updateConnectionLines = useCallback(function updateConnectionLines() {
     const networkElement = networkLayerRef.current
     const sourceElement = mainCardRef.current
     if (!networkElement || !sourceElement || visibleActiveNodes.length === 0) {
-      setConnectionPaths([])
+      setConnectionLines([])
       return
     }
 
     const networkRect = networkElement.getBoundingClientRect()
     const sourceRect = sourceElement.getBoundingClientRect()
-    const start = {
-      x: sourceRect.left + sourceRect.width * 0.84 - networkRect.left,
-      y: sourceRect.top + sourceRect.height * 0.54 - networkRect.top,
-    } satisfies Point
 
-    const nextPaths = visibleActiveNodes
-      .map(function mapNodeToPath(node) {
+    // Center X is the horizontal center of the orchestrator card
+    const centerX = sourceRect.left + sourceRect.width / 2 - networkRect.left
+    setConnectionCenterX(centerX)
+
+    // Start Y is the bottom of the orchestrator card
+    const startY = sourceRect.bottom - networkRect.top
+
+    const nextLines = visibleActiveNodes
+      .map(function mapNodeToLine(node) {
         const targetElement = activeCardRefMap.current.get(node.id)
         if (!targetElement) return null
         const targetRect = targetElement.getBoundingClientRect()
-        const end = {
-          x: targetRect.left + targetRect.width * 0.18 - networkRect.left,
-          y: targetRect.top + targetRect.height * 0.5 - networkRect.top,
-        } satisfies Point
+        // End Y is the top of the agent card
+        const endY = targetRect.top - networkRect.top
         return {
           id: node.id,
           status: node.status,
-          d: buildConnectionPath(start, end),
-        } satisfies SwarmConnectionPath
+          startY,
+          endY,
+        } satisfies SwarmConnectionLine
       })
-      .filter(function filterMissingPath(path): path is SwarmConnectionPath {
-        return path !== null
+      .filter(function filterMissingLine(line): line is SwarmConnectionLine {
+        return line !== null
       })
 
-    setConnectionPaths(nextPaths)
+    setConnectionLines(nextLines)
   }, [visibleActiveNodes])
 
   useEffect(
@@ -356,23 +343,23 @@ export function AgentViewPanel() {
   )
 
   useEffect(
-    function syncConnectionPaths() {
+    function syncConnectionLines() {
       if (!panelVisible) return
       let animationFrameId = window.requestAnimationFrame(function tick() {
-        updateConnectionPaths()
+        updateConnectionLines()
         animationFrameId = window.requestAnimationFrame(tick)
       })
 
-      window.addEventListener('resize', updateConnectionPaths)
-      window.addEventListener('scroll', updateConnectionPaths, true)
+      window.addEventListener('resize', updateConnectionLines)
+      window.addEventListener('scroll', updateConnectionLines, true)
 
-      return function cleanupConnectionPaths() {
+      return function cleanupConnectionLines() {
         window.cancelAnimationFrame(animationFrameId)
-        window.removeEventListener('resize', updateConnectionPaths)
-        window.removeEventListener('scroll', updateConnectionPaths, true)
+        window.removeEventListener('resize', updateConnectionLines)
+        window.removeEventListener('scroll', updateConnectionLines, true)
       }
     },
-    [panelVisible, updateConnectionPaths],
+    [panelVisible, updateConnectionLines],
   )
 
   const statusCounts = useMemo(function getStatusCounts() {
@@ -466,56 +453,56 @@ export function AgentViewPanel() {
           )}
         >
           <div className="border-b border-primary-300/70 px-3 py-2">
-            {/* Row 1: Title + live badge + close */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <AgentAvatar size="sm" />
-                <h2 className="text-sm font-semibold text-primary-900 whitespace-nowrap">Agent Swarm</h2>
-                {isDemoMode ? (
-                  <span className="rounded-full border border-orange-500/30 bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-300">
-                    Demo
-                  </span>
+            {/* Row 1: Count left | Title center | Actions right */}
+            <div className="flex items-center justify-between">
+              {/* Left — agent count badge */}
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center justify-center size-7 rounded-full bg-orange-500/15 text-xs font-bold text-orange-500 tabular-nums">
+                  {syncedSessionCount}
+                </span>
+                {isLiveConnected ? (
+                  <motion.span
+                    animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.18, 1] }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                    className="size-2 rounded-full bg-emerald-400"
+                  />
                 ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary-200/60 px-1.5 py-0.5 text-[10px] text-primary-700 tabular-nums">
-                    {isLiveConnected ? (
-                      <motion.span
-                        animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.18, 1] }}
-                        transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                        className="size-1.5 rounded-full bg-emerald-400"
-                      />
-                    ) : (
-                      <span className="size-1.5 rounded-full bg-primary-500/60" />
-                    )}
-                    {isLoading ? 'sync' : syncedSessionCount}
-                  </span>
+                  <span className="size-2 rounded-full bg-primary-400/50" />
                 )}
               </div>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                onClick={function handleMaximize() {
-                  setOpen(false)
-                  navigate({ to: '/agent-swarm' })
-                }}
-                aria-label="Open Agent Swarm fullscreen"
-                title="Open in Studio"
-              >
-                <HugeiconsIcon icon={ArrowExpand01Icon} size={18} strokeWidth={1.5} />
-              </Button>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                onClick={function handleClosePanel() {
-                  setOpen(false)
-                }}
-                aria-label="Hide Agent View"
-              >
-                <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={1.5} />
-              </Button>
+
+              {/* Center — title */}
+              <h2 className="text-sm font-semibold text-primary-900">Agent Swarm</h2>
+
+              {/* Right — expand + close */}
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={function handleMaximize() {
+                    setOpen(false)
+                    navigate({ to: '/agent-swarm' })
+                  }}
+                  aria-label="Open Agent Swarm fullscreen"
+                  title="Open in Studio"
+                >
+                  <HugeiconsIcon icon={ArrowExpand01Icon} size={16} strokeWidth={1.5} />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={function handleClosePanel() {
+                    setOpen(false)
+                  }}
+                  aria-label="Hide Agent View"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.5} />
+                </Button>
+              </div>
             </div>
             {/* Row 2: Stats + view toggle */}
-            <div className="mt-1.5 flex items-center justify-between">
-              <p className="text-[11px] text-primary-600 tabular-nums">
+            <div className="mt-1 flex items-center justify-between">
+              <p className="text-[10px] text-primary-600 tabular-nums">
                 {activeCount} active · {queuedAgents.length} queued · {formatCost(totalCost)}
               </p>
               <div className="inline-flex items-center rounded-full border border-primary-300/70 bg-primary-200/50 p-0.5">
@@ -552,24 +539,23 @@ export function AgentViewPanel() {
           <ScrollAreaRoot className="h-[calc(100vh-3.25rem)]">
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
-                <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2.5">
-                  <div className="mb-2 flex items-center justify-between">
+                <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1.5">
+                  <div className="mb-1.5 flex items-center justify-between">
                     <div>
-                      <h3 className="text-xs font-medium text-balance text-primary-900">Active Network</h3>
-                      <p className="text-[11px] text-primary-700 tabular-nums">
+                      <h3 className="text-[11px] font-medium text-balance text-primary-900">Active Network</h3>
+                      <p className="text-[10px] text-primary-600 tabular-nums">
                         {isLoading
                           ? 'syncing...'
                           : `synced ${formatRelativeMs(nowMs - lastRefreshedMs)}`}
                       </p>
                       {errorMessage ? (
-                        <p className="line-clamp-1 text-[11px] text-red-300 tabular-nums">
+                        <p className="line-clamp-1 text-[10px] text-red-300 tabular-nums">
                           {errorMessage}
                         </p>
                       ) : null}
                     </div>
-                    <div className="text-right text-[11px] text-primary-700 tabular-nums">
-                      <p>{statusCounts.running} running</p>
-                      <p>{statusCounts.thinking} thinking</p>
+                    <div className="text-right text-[10px] text-primary-600 tabular-nums">
+                      <p>{statusCounts.running} running · {statusCounts.thinking} thinking</p>
                     </div>
                   </div>
 
@@ -578,17 +564,17 @@ export function AgentViewPanel() {
                       ref={networkLayerRef}
                       layout
                       transition={{ layout: { type: 'spring', stiffness: 320, damping: 30 } }}
-                      className="relative rounded-2xl border border-primary-300/70 bg-linear-to-b from-primary-100 via-primary-100 to-primary-200/40 p-2"
+                      className="relative rounded-xl border border-primary-300/70 bg-linear-to-b from-primary-100 via-primary-100 to-primary-200/40 p-1.5"
                     >
-                      <SwarmConnectionOverlay paths={connectionPaths} />
+                      <SwarmConnectionOverlay lines={connectionLines} centerX={connectionCenterX} />
 
-                      <motion.div layout className="mb-2">
+                      <motion.div layout className="mb-1.5">
                         <AgentCard
                           node={swarmNode}
                           layoutId={agentSpawn.getSharedLayoutId(swarmNode.id)}
                           cardRef={setMainCardElement}
                           viewMode={viewMode}
-                          className="w-full"
+                          className="w-full opacity-70"
                         />
                       </motion.div>
 
@@ -635,9 +621,9 @@ export function AgentViewPanel() {
                           layout
                           transition={{ layout: { type: 'spring', stiffness: 360, damping: 34 } }}
                           className={cn(
-                            'grid gap-2',
+                            'grid gap-1.5',
                             viewMode === 'compact'
-                              ? 'grid-cols-[repeat(auto-fit,minmax(132px,1fr))]'
+                              ? 'grid-cols-[repeat(auto-fit,minmax(120px,1fr))]'
                               : 'grid-cols-1',
                           )}
                         >
@@ -678,14 +664,14 @@ export function AgentViewPanel() {
                       )}
 
                       {queuedNodes.length > 0 ? (
-                        <motion.div layout className="mt-2 space-y-1.5">
-                          <p className="text-[11px] text-primary-700 tabular-nums">Queue</p>
+                        <motion.div layout className="mt-1.5 space-y-1">
+                          <p className="text-[10px] text-primary-600 tabular-nums">Queue</p>
                           <motion.div
                             layout
                             className={cn(
-                              'grid gap-2',
+                              'grid gap-1.5',
                               viewMode === 'compact'
-                                ? 'grid-cols-[repeat(auto-fit,minmax(132px,1fr))]'
+                                ? 'grid-cols-[repeat(auto-fit,minmax(120px,1fr))]'
                                 : 'grid-cols-1',
                             )}
                           >
