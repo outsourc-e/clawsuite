@@ -1,14 +1,20 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatScreen } from '../../screens/chat/chat-screen'
 import { moveHistoryMessages } from '../../screens/chat/chat-queries'
 
 export const Route = createFileRoute('/chat/$sessionKey')({
   component: ChatRoute,
+  // Disable SSR to prevent hydration mismatches from async data
+  ssr: false,
 })
 
 function ChatRoute() {
+  // Client-only rendering to prevent hydration mismatches
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [forcedSession, setForcedSession] = useState<{
@@ -47,6 +53,10 @@ function ChatRoute() {
     },
     [navigate, queryClient],
   )
+
+  if (!mounted) {
+    return <div className="flex h-full items-center justify-center text-primary-400">Loading chat…</div>
+  }
 
   return (
     <ChatScreen
