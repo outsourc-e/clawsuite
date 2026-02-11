@@ -95,6 +95,41 @@ export function useChatHistory({
     return messages
   }, [historyQuery.data?.messages])
 
+  // Filter messages for display - hide tool calls, system events, etc.
+  const displayMessages = useMemo(() => {
+    return historyMessages.filter((msg) => {
+      // Always show user messages (unless system events)
+      if (msg.role === 'user') {
+        const text = textFromMessage(msg)
+        // Filter out system event forwards (subagent task announcements etc)
+        if (text.startsWith('A subagent task')) return false
+        return true
+      }
+
+      // Show assistant messages only if they have displayable content
+      if (msg.role === 'assistant') {
+        // Keep streaming placeholders (they show typing indicator)
+        if (msg.__streamingStatus === 'streaming') return true
+        // Keep optimistic messages that are pending
+        if (msg.__optimisticId && !msg.content?.length) return true
+
+        const content = msg.content
+        if (!content || !Array.isArray(content)) return false
+        if (content.length === 0) return false
+
+        // Has at least one text block with actual content?
+        const hasText = content.some(
+          (c) => c.type === 'text' && typeof c.text === 'string' && c.text.trim().length > 0
+        )
+        if (!hasText) return false
+        return true
+      }
+
+      // Hide everything else (toolResult, tool, system messages)
+      return false
+    })
+  }, [historyMessages])
+
   const messageCount = useMemo(() => {
     return historyMessages.filter((message) => {
       if (message.role !== 'user' && message.role !== 'assistant') return false
@@ -117,7 +152,7 @@ export function useChatHistory({
   return {
     historyQuery,
     historyMessages,
-    displayMessages: historyMessages,
+    displayMessages,
     messageCount,
     historyError,
     resolvedSessionKey,
