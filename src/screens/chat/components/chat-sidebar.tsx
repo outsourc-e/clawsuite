@@ -2,6 +2,8 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowDown01Icon,
   BrainIcon,
+  ChartLineData01Icon,
+  Chat01Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
@@ -14,7 +16,10 @@ import {
   Search01Icon,
   Settings01Icon,
   SidebarLeft01Icon,
+  SmartPhone01Icon,
   Task01Icon,
+  UserGroupIcon,
+  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useState } from 'react'
@@ -423,7 +428,12 @@ function ChatSidebarComponent({
   const isTasksActive = pathname === '/tasks'
   // Gateway
   const isCronActive = pathname === '/cron'
+  const isChannelsActive = pathname === '/channels'
+  const isSessionsActive = pathname === '/sessions'
+  const isUsageActive = pathname === '/usage'
   // Agent
+  const isAgentsActive = pathname === '/agents'
+  const isNodesActive = pathname === '/nodes'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
   const isMemoryActive = pathname === '/memory'
@@ -435,8 +445,8 @@ function ChatSidebarComponent({
 
   // Track last-visited route per section
   const studioRoutes = ['/dashboard', '/new', '/browser', '/terminal', '/tasks']
-  const gatewayRoutes = ['/cron']
-  const agentRoutes = ['/skills', '/files', '/memory']
+  const gatewayRoutes = ['/channels', '/sessions', '/usage', '/cron']
+  const agentRoutes = ['/agents', '/skills', '/nodes', '/files', '/memory']
   const settingsRoutes = ['/settings', '/settings/providers', '/debug', '/activity', '/logs']
 
   useEffect(() => {
@@ -448,8 +458,8 @@ function ChatSidebarComponent({
 
   // Resolve navigation targets (last visited or default)
   const studioNav = getLastRoute('studio') || '/dashboard'
-  const gatewayNav = getLastRoute('gateway') || '/cron'
-  const agentNav = getLastRoute('agent') || '/skills'
+  const gatewayNav = getLastRoute('gateway') || '/channels'
+  const agentNav = getLastRoute('agent') || '/agents'
   const settingsNav = getLastRoute('settings') || '/settings'
 
   const transition = {
@@ -607,6 +617,27 @@ function ChatSidebarComponent({
   const gatewayItems: NavItemDef[] = [
     {
       kind: 'link',
+      to: '/channels',
+      icon: Chat01Icon,
+      label: 'Channels',
+      active: isChannelsActive,
+    },
+    {
+      kind: 'link',
+      to: '/sessions',
+      icon: UserMultipleIcon,
+      label: 'Sessions',
+      active: isSessionsActive,
+    },
+    {
+      kind: 'link',
+      to: '/usage',
+      icon: ChartLineData01Icon,
+      label: 'Usage',
+      active: isUsageActive,
+    },
+    {
+      kind: 'link',
       to: '/cron',
       icon: Clock01Icon,
       label: 'Cron Jobs',
@@ -617,10 +648,24 @@ function ChatSidebarComponent({
   const agentItems: NavItemDef[] = [
     {
       kind: 'link',
+      to: '/agents',
+      icon: UserGroupIcon,
+      label: 'Agents',
+      active: isAgentsActive,
+    },
+    {
+      kind: 'link',
       to: '/skills',
       icon: PuzzleIcon,
       label: 'Skills',
       active: isSkillsActive,
+    },
+    {
+      kind: 'link',
+      to: '/nodes',
+      icon: SmartPhone01Icon,
+      label: 'Nodes',
+      active: isNodesActive,
     },
     {
       kind: 'link',

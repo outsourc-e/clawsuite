@@ -9,10 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SessionsRouteImport } from './routes/sessions'
+import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as LogsRouteImport } from './routes/logs'
@@ -21,8 +24,10 @@ import { Route as DebugRouteImport } from './routes/debug'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CronRouteImport } from './routes/cron'
 import { Route as ConnectRouteImport } from './routes/connect'
+import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as BrowserRouteImport } from './routes/browser'
 import { Route as AuroraDemoRouteImport } from './routes/aurora-demo'
+import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as AgentSwarmRouteImport } from './routes/agent-swarm'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
@@ -63,6 +68,11 @@ import { Route as ApiBrowserTabsRouteImport } from './routes/api/browser/tabs'
 import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
 
+const UsageRoute = UsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
   path: '/terminal',
@@ -81,6 +91,16 @@ const SkillsRoute = SkillsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionsRoute = SessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NodesRoute = NodesRouteImport.update({
+  id: '/nodes',
+  path: '/nodes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NewRoute = NewRouteImport.update({
@@ -123,6 +143,11 @@ const ConnectRoute = ConnectRouteImport.update({
   path: '/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChannelsRoute = ChannelsRouteImport.update({
+  id: '/channels',
+  path: '/channels',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BrowserRoute = BrowserRouteImport.update({
   id: '/browser',
   path: '/browser',
@@ -131,6 +156,11 @@ const BrowserRoute = BrowserRouteImport.update({
 const AuroraDemoRoute = AuroraDemoRouteImport.update({
   id: '/aurora-demo',
   path: '/aurora-demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsRoute = AgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentSwarmRoute = AgentSwarmRouteImport.update({
@@ -333,8 +363,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
+  '/agents': typeof AgentsRoute
   '/aurora-demo': typeof AuroraDemoRoute
   '/browser': typeof BrowserRoute
+  '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
@@ -343,10 +375,13 @@ export interface FileRoutesByFullPath {
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
+  '/nodes': typeof NodesRoute
+  '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/usage': typeof UsageRoute
   '/api/cost': typeof ApiCostRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
@@ -388,8 +423,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
+  '/agents': typeof AgentsRoute
   '/aurora-demo': typeof AuroraDemoRoute
   '/browser': typeof BrowserRoute
+  '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
@@ -398,9 +435,12 @@ export interface FileRoutesByTo {
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
+  '/nodes': typeof NodesRoute
+  '/sessions': typeof SessionsRoute
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/usage': typeof UsageRoute
   '/api/cost': typeof ApiCostRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
@@ -443,8 +483,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
+  '/agents': typeof AgentsRoute
   '/aurora-demo': typeof AuroraDemoRoute
   '/browser': typeof BrowserRoute
+  '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
@@ -453,10 +495,13 @@ export interface FileRoutesById {
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
+  '/nodes': typeof NodesRoute
+  '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/usage': typeof UsageRoute
   '/api/cost': typeof ApiCostRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
@@ -500,8 +545,10 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/agent-swarm'
+    | '/agents'
     | '/aurora-demo'
     | '/browser'
+    | '/channels'
     | '/connect'
     | '/cron'
     | '/dashboard'
@@ -510,10 +557,13 @@ export interface FileRouteTypes {
     | '/logs'
     | '/memory'
     | '/new'
+    | '/nodes'
+    | '/sessions'
     | '/settings'
     | '/skills'
     | '/tasks'
     | '/terminal'
+    | '/usage'
     | '/api/cost'
     | '/api/events'
     | '/api/files'
@@ -555,8 +605,10 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/agent-swarm'
+    | '/agents'
     | '/aurora-demo'
     | '/browser'
+    | '/channels'
     | '/connect'
     | '/cron'
     | '/dashboard'
@@ -565,9 +617,12 @@ export interface FileRouteTypes {
     | '/logs'
     | '/memory'
     | '/new'
+    | '/nodes'
+    | '/sessions'
     | '/skills'
     | '/tasks'
     | '/terminal'
+    | '/usage'
     | '/api/cost'
     | '/api/events'
     | '/api/files'
@@ -609,8 +664,10 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/agent-swarm'
+    | '/agents'
     | '/aurora-demo'
     | '/browser'
+    | '/channels'
     | '/connect'
     | '/cron'
     | '/dashboard'
@@ -619,10 +676,13 @@ export interface FileRouteTypes {
     | '/logs'
     | '/memory'
     | '/new'
+    | '/nodes'
+    | '/sessions'
     | '/settings'
     | '/skills'
     | '/tasks'
     | '/terminal'
+    | '/usage'
     | '/api/cost'
     | '/api/events'
     | '/api/files'
@@ -665,8 +725,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
   AgentSwarmRoute: typeof AgentSwarmRoute
+  AgentsRoute: typeof AgentsRoute
   AuroraDemoRoute: typeof AuroraDemoRoute
   BrowserRoute: typeof BrowserRoute
+  ChannelsRoute: typeof ChannelsRoute
   ConnectRoute: typeof ConnectRoute
   CronRoute: typeof CronRoute
   DashboardRoute: typeof DashboardRoute
@@ -675,10 +737,13 @@ export interface RootRouteChildren {
   LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
   NewRoute: typeof NewRoute
+  NodesRoute: typeof NodesRoute
+  SessionsRoute: typeof SessionsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
   TasksRoute: typeof TasksRoute
   TerminalRoute: typeof TerminalRoute
+  UsageRoute: typeof UsageRoute
   ApiCostRoute: typeof ApiCostRoute
   ApiEventsRoute: typeof ApiEventsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
@@ -715,6 +780,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/usage': {
+      id: '/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof UsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/terminal': {
       id: '/terminal'
       path: '/terminal'
@@ -741,6 +813,20 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sessions': {
+      id: '/sessions'
+      path: '/sessions'
+      fullPath: '/sessions'
+      preLoaderRoute: typeof SessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nodes': {
+      id: '/nodes'
+      path: '/nodes'
+      fullPath: '/nodes'
+      preLoaderRoute: typeof NodesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/new': {
@@ -799,6 +885,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/channels': {
+      id: '/channels'
+      path: '/channels'
+      fullPath: '/channels'
+      preLoaderRoute: typeof ChannelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/browser': {
       id: '/browser'
       path: '/browser'
@@ -811,6 +904,13 @@ declare module '@tanstack/react-router' {
       path: '/aurora-demo'
       fullPath: '/aurora-demo'
       preLoaderRoute: typeof AuroraDemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents': {
+      id: '/agents'
+      path: '/agents'
+      fullPath: '/agents'
+      preLoaderRoute: typeof AgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agent-swarm': {
@@ -1131,8 +1231,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
   AgentSwarmRoute: AgentSwarmRoute,
+  AgentsRoute: AgentsRoute,
   AuroraDemoRoute: AuroraDemoRoute,
   BrowserRoute: BrowserRoute,
+  ChannelsRoute: ChannelsRoute,
   ConnectRoute: ConnectRoute,
   CronRoute: CronRoute,
   DashboardRoute: DashboardRoute,
@@ -1141,10 +1243,13 @@ const rootRouteChildren: RootRouteChildren = {
   LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
   NewRoute: NewRoute,
+  NodesRoute: NodesRoute,
+  SessionsRoute: SessionsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
   TasksRoute: TasksRoute,
   TerminalRoute: TerminalRoute,
+  UsageRoute: UsageRoute,
   ApiCostRoute: ApiCostRoute,
   ApiEventsRoute: ApiEventsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
