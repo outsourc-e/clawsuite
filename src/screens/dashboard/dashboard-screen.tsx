@@ -309,7 +309,7 @@ export function DashboardScreen() {
   }, [gatewayStatusQuery.data?.ok, sessionsQuery.data, sessionStatusQuery.data])
 
   return (
-    <main className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
+    <main className="h-full overflow-y-auto bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <section className="mx-auto w-full max-w-[1600px]">
         <header className="relative z-20 mb-4 rounded-lg border border-primary-200 bg-primary-50/90 px-4 py-2.5 md:mb-5 md:px-5">
           <div className="flex items-center justify-between gap-4">

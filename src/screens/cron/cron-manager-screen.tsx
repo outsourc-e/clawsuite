@@ -112,7 +112,7 @@ export function CronManagerScreen() {
 
   return (
     <motion.main
-      className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8"
+      className="h-full overflow-y-auto bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}

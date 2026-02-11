@@ -34,7 +34,7 @@ function FilesRoute() {
   [])
 
   return (
-    <div className="h-screen bg-surface text-primary-900">
+    <div className="h-full bg-surface text-primary-900">
       <div className="flex h-full min-h-0">
         <FileExplorerSidebar
           collapsed={fileExplorerCollapsed}

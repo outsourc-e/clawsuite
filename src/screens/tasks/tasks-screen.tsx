@@ -354,7 +354,7 @@ export function TasksScreen() {
   }))
 
   return (
-    <main className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
+    <main className="h-full overflow-y-auto bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <section className="mx-auto w-full max-w-[1600px]">
         {/* Header */}
         <header className="mb-6 flex items-center justify-between">

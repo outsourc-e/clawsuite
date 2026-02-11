@@ -114,7 +114,7 @@ export function ProvidersScreen() {
   }, [modelsQuery.data?.configuredProviders, modelsQuery.data?.models])
 
   return (
-    <div className="min-h-screen bg-surface text-primary-900">
+    <div className="h-full overflow-y-auto bg-surface text-primary-900">
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6 sm:px-6 lg:py-8">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl md:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
