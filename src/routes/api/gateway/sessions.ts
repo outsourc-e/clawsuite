@@ -9,7 +9,6 @@ export const Route = createFileRoute('/api/gateway/sessions')({
         try {
           const result = await gatewayRpc<Record<string, unknown>>('sessions.list', {
             limit: 100,
-            includeContextWeight: true,
           })
           return json({ ok: true, data: result })
         } catch (err) {
