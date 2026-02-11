@@ -37,6 +37,7 @@ import {
 import { useSounds } from '@/hooks/use-sounds'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
+import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { cn } from '@/lib/utils'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
@@ -179,28 +180,6 @@ function OrchestratorCard({ compact = false }: { compact?: boolean }) {
   )
 }
 
-function MainAgentCollapsible({ viewMode }: { viewMode: 'expanded' | 'compact' }) {
-  const [open, setOpen] = useState(true)
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="flex items-center justify-between">
-        <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
-          <HugeiconsIcon
-            icon={open ? ArrowDown01Icon : ArrowRight01Icon}
-            size={20}
-            strokeWidth={1.5}
-          />
-          Main Agent
-        </CollapsibleTrigger>
-      </div>
-      <CollapsiblePanel contentClassName="pt-1">
-        <OrchestratorCard compact={viewMode === 'compact'} />
-      </CollapsiblePanel>
-    </Collapsible>
-  )
-}
-
 function getHistoryPillClassName(status: 'success' | 'failed'): string {
   if (status === 'failed') {
     return 'border-red-500/50 bg-red-500/10 text-red-300'
@@ -251,6 +230,14 @@ function getStatusBubble(status: AgentNodeStatus, progress: number): AgentStatus
 export function AgentViewPanel() {
   // Sound notifications for agent events
   useSounds({ autoPlay: true })
+
+  // Start gateway polling for orchestrator state (detects activity from Telegram/other channels)
+  const startGatewayPoll = useChatActivityStore((s) => s.startGatewayPoll)
+  const stopGatewayPoll = useChatActivityStore((s) => s.stopGatewayPoll)
+  useEffect(() => {
+    startGatewayPoll()
+    return () => stopGatewayPoll()
+  }, [startGatewayPoll, stopGatewayPoll])
 
   const {
     isDesktop,
@@ -650,7 +637,7 @@ export function AgentViewPanel() {
                   {/* Centered Swarm pill */}
                   <div className="mb-1.5 flex justify-center">
                     <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
-                      swarm
+                      Swarm
                     </span>
                   </div>
 
