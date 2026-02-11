@@ -93,73 +93,36 @@ function ChatMessageListComponent({
     clientHeight: 0,
   })
 
-  // Debounced state sync — update React state at most every 200ms
-  const nearBottomSyncTimer = useRef<number | null>(null)
-
+  // Simple scroll handler — only tracks if user is near bottom via refs (no state updates)
   const handleUserScroll = useCallback(function handleUserScroll(metrics: {
     scrollTop: number
     scrollHeight: number
     clientHeight: number
   }) {
-    const isUserScrollingUp = metrics.scrollTop < lastScrollTopRef.current - 2
-    lastScrollTopRef.current = metrics.scrollTop
-
-    // Skip during programmatic scrolls
-    if (programmaticScroll.current) return
-
     const distanceFromBottom =
       metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight
     const nearBottom = distanceFromBottom <= NEAR_BOTTOM_THRESHOLD
+    const wasScrollingUp = metrics.scrollTop < lastScrollTopRef.current - 5
+    lastScrollTopRef.current = metrics.scrollTop
 
-    if (isUserScrollingUp) {
+    if (wasScrollingUp && !nearBottom) {
       stickToBottomRef.current = false
-    } else {
-      stickToBottomRef.current = nearBottom
-    }
-
-    isNearBottomRef.current = nearBottom
-
-    // Debounce React state updates to avoid re-render loops
-    if (nearBottomSyncTimer.current === null) {
-      nearBottomSyncTimer.current = window.setTimeout(() => {
-        nearBottomSyncTimer.current = null
-        setIsNearBottom(isNearBottomRef.current)
-        if (isNearBottomRef.current) {
-          setUnreadCount(0)
-        }
-      }, 200)
+      isNearBottomRef.current = false
+    } else if (nearBottom) {
+      stickToBottomRef.current = true
+      isNearBottomRef.current = true
     }
   }, [])
 
-  const setProgrammaticScroll = useCallback(function setProgrammaticScroll(
-    activeForMs: number,
-  ) {
-    programmaticScroll.current = true
-    if (releaseProgrammaticScrollTimerRef.current !== null) {
-      window.clearTimeout(releaseProgrammaticScrollTimerRef.current)
+  // Simple scroll to bottom — find viewport and scroll
+  const scrollToBottom = useCallback(function scrollToBottom(behavior: ScrollBehavior = 'auto') {
+    const anchor = anchorRef.current
+    if (!anchor) return
+    const viewport = anchor.closest('[data-chat-scroll-viewport]') as HTMLElement | null
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior })
     }
-    releaseProgrammaticScrollTimerRef.current = window.setTimeout(() => {
-      programmaticScroll.current = false
-      releaseProgrammaticScrollTimerRef.current = null
-    }, activeForMs)
   }, [])
-
-  const scrollToAnchor = useCallback(
-    function scrollToAnchor(behavior: ScrollBehavior, activeForMs: number) {
-      const anchor = anchorRef.current
-      if (!anchor) return
-      setProgrammaticScroll(activeForMs)
-      const viewport = anchor.closest(
-        '[data-chat-scroll-viewport]'
-      )
-      if (viewport) {
-        viewport.scrollTo({ top: viewport.scrollHeight, behavior })
-        return
-      }
-      anchor.scrollIntoView({ behavior, block: 'end' })
-    },
-    [setProgrammaticScroll],
-  )
 
   // Filter out toolResult messages - they'll be displayed inside their associated tool calls
   const displayMessages = useMemo(() => {
@@ -368,79 +331,36 @@ function ChatMessageListComponent({
     )
   }
 
-  useLayoutEffect(() => {
+  // Sync near-bottom ref to state every 500ms for button visibility
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setIsNearBottom(prev => {
+        const current = isNearBottomRef.current
+        return prev === current ? prev : current
+      })
+    }, 500)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  // Simple: scroll to bottom when messages change and we should stick
+  useEffect(() => {
     if (loading) return
-    if (pinToTop) {
-      const shouldPin =
-        !prevPinRef.current || prevUserIndexRef.current !== lastUserIndex
-      prevPinRef.current = true
-      prevUserIndexRef.current = lastUserIndex
-      // Keep stickToBottom ready so we scroll down when pinToTop clears
-      stickToBottomRef.current = true
-      if (shouldPin && lastUserRef.current) {
-        setProgrammaticScroll(32)
-        lastUserRef.current.scrollIntoView({ behavior: 'auto', block: 'start' })
-      }
-      return
-    }
-
-    // pinToTop just turned off — force scroll to bottom
-    if (prevPinRef.current) {
-      prevPinRef.current = false
-      prevUserIndexRef.current = lastUserIndex
-      stickToBottomRef.current = true
-      setIsNearBottom(true)
-      if (anchorRef.current) {
-        scrollToAnchor('smooth', 220)
-      }
-      return
-    }
-
-    prevPinRef.current = false
-    prevUserIndexRef.current = lastUserIndex
     const sessionChanged = prevSessionKeyRef.current !== sessionKey
     prevSessionKeyRef.current = sessionKey
-    if (!stickToBottomRef.current && !sessionChanged) return
 
-    if (anchorRef.current) {
-      scrollToAnchor(sessionChanged ? 'auto' : 'smooth', sessionChanged ? 32 : 220)
-    }
-  }, [loading, displayMessages.length, sessionKey, pinToTop, lastUserIndex, scrollToAnchor, setProgrammaticScroll])
-
-  useLayoutEffect(() => {
-    if (loading || pinToTop || !isStreaming) return
-    if (!stickToBottomRef.current) return
-    if (smoothScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(smoothScrollFrameRef.current)
-    }
-    smoothScrollFrameRef.current = window.requestAnimationFrame(() => {
-      smoothScrollFrameRef.current = null
-      scrollToAnchor('auto', 72)
-    })
-  }, [isStreaming, loading, pinToTop, streamingText, streamingThinking])
-
-  useEffect(() => {
-    const sessionChanged = prevUnreadSessionKeyRef.current !== sessionKey
+    // Always scroll on session change
     if (sessionChanged) {
-      prevUnreadSessionKeyRef.current = sessionKey
-      prevDisplayMessageCountRef.current = displayMessages.length
-      setUnreadCount(0)
+      stickToBottomRef.current = true
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => scrollToBottom('auto'))
       return
     }
 
-    const previousCount = prevDisplayMessageCountRef.current
-    const nextCount = displayMessages.length
-    if (previousCount === 0) {
-      prevDisplayMessageCountRef.current = nextCount
-      return
+    // Scroll to bottom if sticking
+    if (stickToBottomRef.current) {
+      requestAnimationFrame(() => scrollToBottom('auto'))
     }
-
-    const addedCount = nextCount - previousCount
-    if (addedCount > 0 && !stickToBottomRef.current && !loading) {
-      setUnreadCount((currentCount) => currentCount + addedCount)
-    }
-    prevDisplayMessageCountRef.current = nextCount
-  }, [displayMessages.length, loading, sessionKey])
+  }, [loading, displayMessages.length, sessionKey, scrollToBottom])
 
   useEffect(() => {
     setExpandAllToolSections(false)
@@ -448,10 +368,11 @@ function ChatMessageListComponent({
 
   const handleScrollToBottom = useCallback(function handleScrollToBottom() {
     stickToBottomRef.current = true
+    isNearBottomRef.current = true
     setIsNearBottom(true)
     setUnreadCount(0)
-    scrollToAnchor('smooth', 220)
-  }, [scrollToAnchor])
+    scrollToBottom('smooth')
+  }, [scrollToBottom])
 
   const scrollToBottomOverlay = useMemo(() => {
     const isVisible = !isNearBottom && displayMessages.length > 0
