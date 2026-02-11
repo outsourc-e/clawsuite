@@ -3,6 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Folder01Icon, Menu01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { UsageMeter } from '@/components/usage-meter'
+import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import {
   TooltipContent,
   TooltipProvider,
@@ -18,6 +19,8 @@ type ChatHeaderProps = {
   showFileExplorerButton?: boolean
   fileExplorerCollapsed?: boolean
   onToggleFileExplorer?: () => void
+  waitingForResponse?: boolean
+  isStreaming?: boolean
 }
 
 function ChatHeaderComponent({
@@ -28,6 +31,8 @@ function ChatHeaderComponent({
   showFileExplorerButton = false,
   fileExplorerCollapsed = true,
   onToggleFileExplorer,
+  waitingForResponse = false,
+  isStreaming = false,
 }: ChatHeaderProps) {
   return (
     <div
@@ -68,6 +73,7 @@ function ChatHeaderComponent({
         </TooltipProvider>
       ) : null}
       <div className="text-sm font-medium truncate flex-1">{activeTitle}</div>
+      <OrchestratorAvatar waitingForResponse={waitingForResponse} isStreaming={isStreaming} />
       <UsageMeter />
     </div>
   )

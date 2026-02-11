@@ -1100,6 +1100,8 @@ export function ChatScreen({
               showFileExplorerButton={!isMobile}
               fileExplorerCollapsed={fileExplorerCollapsed}
               onToggleFileExplorer={handleToggleFileExplorer}
+              waitingForResponse={waitingForResponse}
+              isStreaming={streaming.isStreaming}
             />
           )}
 
