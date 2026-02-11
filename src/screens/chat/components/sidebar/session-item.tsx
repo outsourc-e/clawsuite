@@ -6,6 +6,7 @@ import {
   Delete01Icon,
   MoreHorizontalIcon,
   Pen01Icon,
+  PinIcon,
 } from '@hugeicons/core-free-icons'
 import { memo, useMemo } from 'react'
 import { getMessageTimestamp } from '../../utils'
@@ -21,7 +22,9 @@ import {
 type SessionItemProps = {
   session: SessionMeta
   active: boolean
+  isPinned: boolean
   onSelect?: () => void
+  onTogglePin: (session: SessionMeta) => void
   onRename: (session: SessionMeta) => void
   onDelete: (session: SessionMeta) => void
 }
@@ -93,7 +96,9 @@ function getFriendlyIdLabel(friendlyId: string): string {
 function SessionItemComponent({
   session,
   active,
+  isPinned,
   onSelect,
+  onTogglePin,
   onRename,
   onDelete,
 }: SessionItemProps) {
@@ -176,6 +181,17 @@ function SessionItemComponent({
             onClick={(event) => {
               event.preventDefault()
               event.stopPropagation()
+              onTogglePin(session)
+            }}
+            className="gap-2"
+          >
+            <HugeiconsIcon icon={PinIcon} size={20} strokeWidth={1.5} />{' '}
+            {isPinned ? 'Unpin session' : 'Pin session'}
+          </MenuItem>
+          <MenuItem
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
               onRename(session)
             }}
             className="gap-2"
@@ -202,7 +218,9 @@ function SessionItemComponent({
 
 function areSessionItemsEqual(prev: SessionItemProps, next: SessionItemProps) {
   if (prev.active !== next.active) return false
+  if (prev.isPinned !== next.isPinned) return false
   if (prev.onSelect !== next.onSelect) return false
+  if (prev.onTogglePin !== next.onTogglePin) return false
   if (prev.onRename !== next.onRename) return false
   if (prev.onDelete !== next.onDelete) return false
   if (prev.session === next.session) return true

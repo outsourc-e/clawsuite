@@ -2,7 +2,7 @@
 
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowRight01Icon } from '@hugeicons/core-free-icons'
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { SessionItem } from './session-item'
 import type { SessionMeta } from '../../types'
 import {
@@ -17,6 +17,7 @@ import {
   ScrollAreaViewport,
 } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
+import { usePinnedSessions } from '@/hooks/use-pinned-sessions'
 
 type SidebarSessionsProps = {
   sessions: Array<SessionMeta>
@@ -43,6 +44,26 @@ export const SidebarSessions = memo(function SidebarSessions({
   error,
   onRetry,
 }: SidebarSessionsProps) {
+  const { pinnedSessionKeys, togglePinnedSession } = usePinnedSessions()
+
+  const [pinnedSessions, unpinnedSessions] = useMemo(() => {
+    const pinnedKeys = new Set(pinnedSessionKeys)
+    const pinned: Array<SessionMeta> = []
+    const unpinned: Array<SessionMeta> = []
+    for (const session of sessions) {
+      if (pinnedKeys.has(session.key)) {
+        pinned.push(session)
+      } else {
+        unpinned.push(session)
+      }
+    }
+    return [pinned, unpinned] as const
+  }, [pinnedSessionKeys, sessions])
+
+  function handleTogglePin(session: SessionMeta) {
+    togglePinnedSession(session.key)
+  }
+
   return (
     <Collapsible
       className="flex h-full flex-col flex-1 min-h-0 w-full"
@@ -57,6 +78,25 @@ export const SidebarSessions = memo(function SidebarSessions({
           />
         </span>
       </CollapsibleTrigger>
+
+      {/* Pinned sessions — always visible (outside collapsible panel) */}
+      {pinnedSessions.length > 0 ? (
+        <div className="flex shrink-0 flex-col gap-px pl-2 pr-2 pt-1">
+          {pinnedSessions.map((session) => (
+            <SessionItem
+              key={session.key}
+              session={session}
+              active={session.friendlyId === activeFriendlyId}
+              isPinned
+              onSelect={onSelect}
+              onTogglePin={handleTogglePin}
+              onRename={onRename}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      ) : null}
+
       <CollapsiblePanel
         className="w-full flex-1 min-h-0 h-auto data-starting-style:h-0 data-ending-style:h-0"
         contentClassName="flex flex-1 min-h-0 flex-col overflow-y-auto"
@@ -82,21 +122,28 @@ export const SidebarSessions = memo(function SidebarSessions({
                     Retry
                   </Button>
                 </div>
-              ) : sessions.length === 0 ? (
-                <div className="px-2 py-2 text-xs text-primary-500">
-                  No sessions yet.
-                </div>
+              ) : unpinnedSessions.length > 0 ? (
+                <>
+                  {pinnedSessions.length > 0 ? (
+                    <div className="my-1 border-t border-primary-200/80" />
+                  ) : null}
+                  {unpinnedSessions.map((session) => (
+                    <SessionItem
+                      key={session.key}
+                      session={session}
+                      active={session.friendlyId === activeFriendlyId}
+                      isPinned={false}
+                      onSelect={onSelect}
+                      onTogglePin={handleTogglePin}
+                      onRename={onRename}
+                      onDelete={onDelete}
+                    />
+                  ))}
+                </>
               ) : (
-                sessions.map((session) => (
-                  <SessionItem
-                    key={session.key}
-                    session={session}
-                    active={session.friendlyId === activeFriendlyId}
-                    onSelect={onSelect}
-                    onRename={onRename}
-                    onDelete={onDelete}
-                  />
-                ))
+                <div className="px-2 py-2 text-xs text-primary-500">
+                  {pinnedSessions.length > 0 ? 'All sessions are pinned.' : 'No sessions yet.'}
+                </div>
               )}
               {fetching && !loading && !error && sessions.length > 0 ? (
                 <div className="px-2 py-1 text-[11px] text-primary-400">

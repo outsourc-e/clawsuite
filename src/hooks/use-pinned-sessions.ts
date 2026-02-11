@@ -33,22 +33,12 @@ export const usePinnedSessionsStore = create<PinnedSessionsState>()(
       },
       isSessionPinned: (key) => get().pinnedSessionKeys.includes(key),
     }),
-    {
-      name: 'pinned-sessions',
-    },
+    { name: 'pinned-sessions' },
   ),
 )
 
 export function usePinnedSessions() {
-  const pinnedSessionKeys = usePinnedSessionsStore(
-    (state) => state.pinnedSessionKeys,
-  )
-  const togglePinnedSession = usePinnedSessionsStore(
-    (state) => state.togglePinnedSession,
-  )
-
-  return {
-    pinnedSessionKeys,
-    togglePinnedSession,
-  }
+  const pinnedSessionKeys = usePinnedSessionsStore((s) => s.pinnedSessionKeys)
+  const togglePinnedSession = usePinnedSessionsStore((s) => s.togglePinnedSession)
+  return { pinnedSessionKeys, togglePinnedSession }
 }

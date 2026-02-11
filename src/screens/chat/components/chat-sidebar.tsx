@@ -476,6 +476,10 @@ function ChatSidebarComponent({
   const showDebugErrorDot = Boolean(recentIssuesQuery.data)
 
   // Collapsible section states
+  const [studioMoreExpanded, toggleStudioMore] = usePersistedBool(
+    'openclaw-sidebar-studio-more-expanded',
+    false,
+  )
   const [gatewayExpanded, toggleGateway] = usePersistedBool(
     'openclaw-sidebar-gateway-expanded',
     false,
@@ -564,7 +568,8 @@ function ChatSidebarComponent({
 
   // ── Nav definitions ─────────────────────────────────────────────────
 
-  const studioItems: NavItemDef[] = [
+  // Studio primary items (always visible)
+  const studioPrimaryItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/dashboard',
@@ -608,7 +613,10 @@ function ChatSidebarComponent({
       label: 'Tasks',
       active: isTasksActive,
     },
-    // Studio-enhanced pages (we built rich UI for these)
+  ]
+
+  // Studio secondary items (collapsible "More")
+  const studioSecondaryItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/skills',
@@ -710,6 +718,7 @@ function ChatSidebarComponent({
   ]
 
   // Auto-expand sections if any child route is active
+  const isAnyStudioSecondaryActive = studioSecondaryItems.some((i) => i.active)
   const isAnyGatewayActive = gatewayItems.some((i) => i.active)
   const isAnySettingsActive =
     settingsItems.some((i) => i.active) || isSettingsProvidersActive
@@ -786,7 +795,7 @@ function ChatSidebarComponent({
           transition={transition}
           navigateTo={studioNav}
         />
-        {studioItems.map((item) => (
+        {studioPrimaryItems.map((item) => (
           <motion.div
             key={item.label}
             layout
@@ -801,6 +810,23 @@ function ChatSidebarComponent({
             />
           </motion.div>
         ))}
+
+        {/* STUDIO MORE (collapsible) */}
+        <SectionLabel
+          label="More"
+          isCollapsed={isCollapsed}
+          transition={transition}
+          collapsible
+          expanded={studioMoreExpanded || isAnyStudioSecondaryActive}
+          onToggle={toggleStudioMore}
+        />
+        <CollapsibleSection
+          expanded={studioMoreExpanded || isAnyStudioSecondaryActive || isCollapsed}
+          items={studioSecondaryItems}
+          isCollapsed={isCollapsed}
+          transition={transition}
+          onSelectSession={onSelectSession}
+        />
 
         {/* GATEWAY (collapsible) */}
         <SectionLabel
