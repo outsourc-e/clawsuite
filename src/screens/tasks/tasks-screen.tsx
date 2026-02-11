@@ -1,6 +1,5 @@
-import { Add01Icon, ArrowLeft02Icon, Delete02Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Delete02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import {
   useTaskStore,
@@ -337,7 +336,6 @@ function TaskDetailPanel({
 /* ── Main Screen ── */
 
 export function TasksScreen() {
-  const navigate = useNavigate()
   const { tasks, addTask, moveTask, updateTask, deleteTask } = useTaskStore()
   const [showAdd, setShowAdd] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -359,14 +357,6 @@ export function TasksScreen() {
         {/* Header */}
         <header className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => void navigate({ to: '/dashboard' })}
-              className="inline-flex size-8 items-center justify-center rounded-lg border border-primary-200 text-primary-400 transition-colors hover:text-ink"
-              title="Back to Dashboard"
-            >
-              <HugeiconsIcon icon={ArrowLeft02Icon} size={16} strokeWidth={1.5} />
-            </button>
             <div>
               <h1 className="text-lg font-semibold text-ink">Tasks</h1>
               <p className="text-[11px] text-primary-400">

@@ -1,9 +1,6 @@
-import { Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
@@ -198,12 +195,6 @@ export function SkillsScreen() {
               </p>
             </div>
 
-            <Link to="/chat/$sessionKey" params={{ sessionKey: 'main' }}>
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={1.5} />
-                Back to Chat
-              </Button>
-            </Link>
           </div>
         </header>
 

@@ -20,7 +20,6 @@ import {
   MemoryPreview,
   MemorySearch,
 } from '@/components/memory-viewer'
-import { BackToDashboard } from '@/components/back-to-dashboard'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { resolveTheme, useSettings } from '@/hooks/use-settings'
@@ -371,7 +370,6 @@ function MemoryRoute() {
           <header className="border-b border-primary-200 bg-primary-50/85 px-3 py-3 backdrop-blur-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <BackToDashboard />
                 <div className="flex items-center gap-2">
                   <HugeiconsIcon icon={BrainIcon} size={20} strokeWidth={1.5} />
                   <h1 className="truncate text-base font-medium text-primary-900 text-balance">
