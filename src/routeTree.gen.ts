@@ -19,6 +19,7 @@ import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as LogsRouteImport } from './routes/logs'
+import { Route as InstancesRouteImport } from './routes/instances'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as DebugRouteImport } from './routes/debug'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -58,6 +59,11 @@ import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCostRouteImport } from './routes/api/cost'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiGatewayUsageRouteImport } from './routes/api/gateway/usage'
+import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
+import { Route as ApiGatewayNodesRouteImport } from './routes/api/gateway/nodes'
+import { Route as ApiGatewayChannelsRouteImport } from './routes/api/gateway/channels'
+import { Route as ApiGatewayAgentsRouteImport } from './routes/api/gateway/agents'
 import { Route as ApiEventsRecentRouteImport } from './routes/api/events/recent'
 import { Route as ApiDebugStatusRouteImport } from './routes/api/debug/status'
 import { Route as ApiDebugReconnectRouteImport } from './routes/api/debug/reconnect'
@@ -116,6 +122,11 @@ const MemoryRoute = MemoryRouteImport.update({
 const LogsRoute = LogsRouteImport.update({
   id: '/logs',
   path: '/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstancesRoute = InstancesRouteImport.update({
+  id: '/instances',
+  path: '/instances',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FilesRoute = FilesRouteImport.update({
@@ -313,6 +324,31 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   path: '/send',
   getParentRoute: () => ApiSessionsRoute,
 } as any)
+const ApiGatewayUsageRoute = ApiGatewayUsageRouteImport.update({
+  id: '/api/gateway/usage',
+  path: '/api/gateway/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGatewaySessionsRoute = ApiGatewaySessionsRouteImport.update({
+  id: '/api/gateway/sessions',
+  path: '/api/gateway/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGatewayNodesRoute = ApiGatewayNodesRouteImport.update({
+  id: '/api/gateway/nodes',
+  path: '/api/gateway/nodes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGatewayChannelsRoute = ApiGatewayChannelsRouteImport.update({
+  id: '/api/gateway/channels',
+  path: '/api/gateway/channels',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGatewayAgentsRoute = ApiGatewayAgentsRouteImport.update({
+  id: '/api/gateway/agents',
+  path: '/api/gateway/agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiEventsRecentRoute = ApiEventsRecentRouteImport.update({
   id: '/recent',
   path: '/recent',
@@ -372,6 +408,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
+  '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
@@ -416,6 +453,11 @@ export interface FileRoutesByFullPath {
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
   '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
+  '/api/gateway/agents': typeof ApiGatewayAgentsRoute
+  '/api/gateway/channels': typeof ApiGatewayChannelsRoute
+  '/api/gateway/nodes': typeof ApiGatewayNodesRoute
+  '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
+  '/api/gateway/usage': typeof ApiGatewayUsageRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
 }
@@ -432,6 +474,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
+  '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
@@ -475,6 +518,11 @@ export interface FileRoutesByTo {
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
   '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
+  '/api/gateway/agents': typeof ApiGatewayAgentsRoute
+  '/api/gateway/channels': typeof ApiGatewayChannelsRoute
+  '/api/gateway/nodes': typeof ApiGatewayNodesRoute
+  '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
+  '/api/gateway/usage': typeof ApiGatewayUsageRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
 }
@@ -492,6 +540,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
+  '/instances': typeof InstancesRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
@@ -536,6 +585,11 @@ export interface FileRoutesById {
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
   '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
+  '/api/gateway/agents': typeof ApiGatewayAgentsRoute
+  '/api/gateway/channels': typeof ApiGatewayChannelsRoute
+  '/api/gateway/nodes': typeof ApiGatewayNodesRoute
+  '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
+  '/api/gateway/usage': typeof ApiGatewayUsageRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
 }
@@ -554,6 +608,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/debug'
     | '/files'
+    | '/instances'
     | '/logs'
     | '/memory'
     | '/new'
@@ -598,6 +653,11 @@ export interface FileRouteTypes {
     | '/api/debug/reconnect'
     | '/api/debug/status'
     | '/api/events/recent'
+    | '/api/gateway/agents'
+    | '/api/gateway/channels'
+    | '/api/gateway/nodes'
+    | '/api/gateway/sessions'
+    | '/api/gateway/usage'
     | '/api/sessions/send'
     | '/api/cron/runs/$jobId'
   fileRoutesByTo: FileRoutesByTo
@@ -614,6 +674,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/debug'
     | '/files'
+    | '/instances'
     | '/logs'
     | '/memory'
     | '/new'
@@ -657,6 +718,11 @@ export interface FileRouteTypes {
     | '/api/debug/reconnect'
     | '/api/debug/status'
     | '/api/events/recent'
+    | '/api/gateway/agents'
+    | '/api/gateway/channels'
+    | '/api/gateway/nodes'
+    | '/api/gateway/sessions'
+    | '/api/gateway/usage'
     | '/api/sessions/send'
     | '/api/cron/runs/$jobId'
   id:
@@ -673,6 +739,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/debug'
     | '/files'
+    | '/instances'
     | '/logs'
     | '/memory'
     | '/new'
@@ -717,6 +784,11 @@ export interface FileRouteTypes {
     | '/api/debug/reconnect'
     | '/api/debug/status'
     | '/api/events/recent'
+    | '/api/gateway/agents'
+    | '/api/gateway/channels'
+    | '/api/gateway/nodes'
+    | '/api/gateway/sessions'
+    | '/api/gateway/usage'
     | '/api/sessions/send'
     | '/api/cron/runs/$jobId'
   fileRoutesById: FileRoutesById
@@ -734,6 +806,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   DebugRoute: typeof DebugRoute
   FilesRoute: typeof FilesRoute
+  InstancesRoute: typeof InstancesRoute
   LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
   NewRoute: typeof NewRoute
@@ -775,6 +848,11 @@ export interface RootRouteChildren {
   ApiCronToggleRoute: typeof ApiCronToggleRoute
   ApiDebugReconnectRoute: typeof ApiDebugReconnectRoute
   ApiDebugStatusRoute: typeof ApiDebugStatusRoute
+  ApiGatewayAgentsRoute: typeof ApiGatewayAgentsRoute
+  ApiGatewayChannelsRoute: typeof ApiGatewayChannelsRoute
+  ApiGatewayNodesRoute: typeof ApiGatewayNodesRoute
+  ApiGatewaySessionsRoute: typeof ApiGatewaySessionsRoute
+  ApiGatewayUsageRoute: typeof ApiGatewayUsageRoute
   ApiCronRunsJobIdRoute: typeof ApiCronRunsJobIdRoute
 }
 
@@ -848,6 +926,13 @@ declare module '@tanstack/react-router' {
       path: '/logs'
       fullPath: '/logs'
       preLoaderRoute: typeof LogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/instances': {
+      id: '/instances'
+      path: '/instances'
+      fullPath: '/instances'
+      preLoaderRoute: typeof InstancesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/files': {
@@ -1123,6 +1208,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSendRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/gateway/usage': {
+      id: '/api/gateway/usage'
+      path: '/api/gateway/usage'
+      fullPath: '/api/gateway/usage'
+      preLoaderRoute: typeof ApiGatewayUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway/sessions': {
+      id: '/api/gateway/sessions'
+      path: '/api/gateway/sessions'
+      fullPath: '/api/gateway/sessions'
+      preLoaderRoute: typeof ApiGatewaySessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway/nodes': {
+      id: '/api/gateway/nodes'
+      path: '/api/gateway/nodes'
+      fullPath: '/api/gateway/nodes'
+      preLoaderRoute: typeof ApiGatewayNodesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway/channels': {
+      id: '/api/gateway/channels'
+      path: '/api/gateway/channels'
+      fullPath: '/api/gateway/channels'
+      preLoaderRoute: typeof ApiGatewayChannelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway/agents': {
+      id: '/api/gateway/agents'
+      path: '/api/gateway/agents'
+      fullPath: '/api/gateway/agents'
+      preLoaderRoute: typeof ApiGatewayAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/events/recent': {
       id: '/api/events/recent'
       path: '/recent'
@@ -1240,6 +1360,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   DebugRoute: DebugRoute,
   FilesRoute: FilesRoute,
+  InstancesRoute: InstancesRoute,
   LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
   NewRoute: NewRoute,
@@ -1281,6 +1402,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCronToggleRoute: ApiCronToggleRoute,
   ApiDebugReconnectRoute: ApiDebugReconnectRoute,
   ApiDebugStatusRoute: ApiDebugStatusRoute,
+  ApiGatewayAgentsRoute: ApiGatewayAgentsRoute,
+  ApiGatewayChannelsRoute: ApiGatewayChannelsRoute,
+  ApiGatewayNodesRoute: ApiGatewayNodesRoute,
+  ApiGatewaySessionsRoute: ApiGatewaySessionsRoute,
+  ApiGatewayUsageRoute: ApiGatewayUsageRoute,
   ApiCronRunsJobIdRoute: ApiCronRunsJobIdRoute,
 }
 export const routeTree = rootRouteImport

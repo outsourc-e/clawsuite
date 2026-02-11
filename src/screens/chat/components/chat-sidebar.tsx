@@ -16,6 +16,7 @@ import {
   Search01Icon,
   Settings01Icon,
   SidebarLeft01Icon,
+  ServerStack01Icon,
   SmartPhone01Icon,
   Task01Icon,
   UserGroupIcon,
@@ -431,6 +432,7 @@ function ChatSidebarComponent({
   const isChannelsActive = pathname === '/channels'
   const isSessionsActive = pathname === '/sessions'
   const isUsageActive = pathname === '/usage'
+  const isInstancesActive = pathname === '/instances'
   // Agent
   const isAgentsActive = pathname === '/agents'
   const isNodesActive = pathname === '/nodes'
@@ -445,7 +447,7 @@ function ChatSidebarComponent({
 
   // Track last-visited route per section
   const studioRoutes = ['/dashboard', '/new', '/browser', '/terminal', '/tasks', '/skills', '/cron', '/activity', '/logs', '/debug', '/files', '/memory']
-  const gatewayRoutes = ['/channels', '/sessions', '/usage', '/agents', '/nodes']
+  const gatewayRoutes = ['/channels', '/instances', '/sessions', '/usage', '/agents', '/nodes']
   const settingsRoutes = ['/settings', '/settings/providers']
 
   useEffect(() => {
@@ -658,6 +660,13 @@ function ChatSidebarComponent({
       icon: Chat01Icon,
       label: 'Channels',
       active: isChannelsActive,
+    },
+    {
+      kind: 'link',
+      to: '/instances',
+      icon: ServerStack01Icon,
+      label: 'Instances',
+      active: isInstancesActive,
     },
     {
       kind: 'link',

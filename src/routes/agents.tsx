@@ -1,10 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { GatewayPlaceholder } from '@/screens/gateway/gateway-placeholder'
+import { GatewayDataScreen } from '@/screens/gateway/gateway-data-screen'
 
 export const Route = createFileRoute('/agents')({
   component: function AgentsRoute() {
     usePageTitle('Agents')
-    return <GatewayPlaceholder title="Agents" />
+    return (
+      <GatewayDataScreen
+        title="Agents"
+        endpoint="/api/gateway/agents"
+        queryKey="agents"
+        pollInterval={15_000}
+      />
+    )
   },
 })
