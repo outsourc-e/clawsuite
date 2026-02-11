@@ -323,6 +323,15 @@ function readStatus(
   const sessionStatus = readString(session.status)
   if (sessionStatus.length > 0) return sessionStatus.toLowerCase()
 
+  // Heuristic: detect completion from staleness when gateway has no explicit status
+  const updatedAt = readTimestamp(session.updatedAt)
+  if (updatedAt) {
+    const staleness = Date.now() - updatedAt
+    const tokens = readNumber(session.totalTokens) || readNumber(session.tokenCount)
+    if (tokens > 0 && staleness > 30_000) return 'complete'
+    if (tokens === 0 && staleness > 120_000) return 'idle'
+  }
+
   return 'running'
 }
 

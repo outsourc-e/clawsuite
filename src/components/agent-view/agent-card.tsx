@@ -185,33 +185,36 @@ export function AgentCard({
         </div>
       </div>
 
-      <div className={cn('relative mx-auto', isCompact ? 'mb-1 size-16' : 'mb-2 size-24')}>
-        <AgentProgress
-          value={node.progress}
-          status={node.status}
-          size={isCompact ? 64 : 96}
-          strokeWidth={isCompact ? 4 : 5}
-          className="absolute inset-0"
-        />
-        {shouldPulse(node.status) ? (
-          <motion.span
-            aria-hidden
-            animate={{ scale: [1, 1.12, 1], opacity: [0.3, 0.08, 0.3] }}
-            transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
-            className={cn(
-              'absolute inset-0 rounded-full ring-2',
-              getStatusRingClassName(node.status),
-            )}
-          />
-        ) : null}
-        <div
-          className={cn(
-            'absolute inline-flex items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80',
-            isCompact ? 'inset-1.5' : 'inset-2',
-          )}
-        >
-          <AgentAvatar size={isCompact ? 'sm' : 'lg'} />
-        </div>
+      <div className={cn('relative mx-auto', isCompact ? 'mb-1 size-10' : 'mb-2 size-24')}>
+        {isCompact ? (
+          <div className="flex size-10 items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80">
+            <AgentAvatar size="sm" />
+          </div>
+        ) : (
+          <>
+            <AgentProgress
+              value={node.progress}
+              status={node.status}
+              size={96}
+              strokeWidth={5}
+              className="absolute inset-0"
+            />
+            {shouldPulse(node.status) ? (
+              <motion.span
+                aria-hidden
+                animate={{ scale: [1, 1.12, 1], opacity: [0.3, 0.08, 0.3] }}
+                transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+                className={cn(
+                  'absolute inset-0 rounded-full ring-2',
+                  getStatusRingClassName(node.status),
+                )}
+              />
+            ) : null}
+            <div className="absolute inset-2 inline-flex items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80">
+              <AgentAvatar size="lg" />
+            </div>
+          </>
+        )}
         <AnimatePresence>
           {node.status === 'complete' ? (
             <motion.span
@@ -260,7 +263,7 @@ export function AgentCard({
         </div>
 
         {showActions ? (
-          <div className={cn('space-y-1.5', isCompact ? 'mt-1.5' : 'mt-2')}>
+          <div className={cn('space-y-1.5', isCompact ? 'mt-1.5 max-h-0 overflow-hidden opacity-0 transition-all duration-200 group-hover:max-h-32 group-hover:opacity-100' : 'mt-2')}>
             {onChat ? (
               <Button
                 variant="secondary"

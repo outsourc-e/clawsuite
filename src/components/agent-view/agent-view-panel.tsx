@@ -165,7 +165,7 @@ export function AgentViewPanel() {
     agentName: string
     statusLabel: string
   } | null>(null)
-  const [viewMode, setViewMode] = useState<'expanded' | 'compact'>('expanded')
+  const [viewMode, setViewMode] = useState<'expanded' | 'compact'>('compact')
 
   const syncedSessionCount = useMemo(function getSyncedSessionCount() {
     return activeAgents.length + queuedAgents.length + historyAgents.length
