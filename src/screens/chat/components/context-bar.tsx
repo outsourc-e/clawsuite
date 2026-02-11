@@ -162,12 +162,26 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
       ? 'bg-amber-50'
       : 'bg-primary-100'
 
-  // Provider data for hover tooltip
+  // Provider data
   const primaryProvider = providers.find(p => p.status === 'ok' && p.lines.length > 0)
   const progressLines = useMemo(() =>
     primaryProvider?.lines.filter(l => l.type === 'progress').slice(0, 4) ?? [],
     [primaryProvider],
   )
+  // Use highest provider % for the second bar
+  const providerMaxPct = useMemo(() => {
+    if (!primaryProvider) return 0
+    const percents = primaryProvider.lines
+      .filter(l => l.type === 'progress' && l.format === 'percent' && l.used !== undefined)
+      .map(l => l.used ?? 0)
+    return percents.length > 0 ? Math.max(...percents) : 0
+  }, [primaryProvider])
+
+  const providerBarColor = providerMaxPct >= 75
+    ? 'bg-red-500'
+    : providerMaxPct >= 50
+      ? 'bg-amber-400'
+      : 'bg-orange-400'
 
   const detailProps = useMemo(
     () => ({
@@ -187,15 +201,25 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
     <DialogRoot open={usageOpen} onOpenChange={setUsageOpen}>
       <PreviewCard>
         <PreviewCardTrigger className="block w-full cursor-pointer">
-          {/* Full-width thin bar */}
-          <div className={cn('w-full h-1.5 transition-colors duration-300', barBg)}>
-            <div
-              className={cn(
-                'h-full transition-all duration-700 ease-out',
-                barColor,
-              )}
-              style={{ width: `${Math.min(pct, 100)}%` }}
-            />
+          <div className="flex flex-col">
+            {/* Context bar — top line */}
+            {pct > 0 && (
+              <div className={cn('w-full h-1 transition-colors duration-300', barBg)}>
+                <div
+                  className={cn('h-full transition-all duration-700 ease-out', barColor)}
+                  style={{ width: `${Math.min(pct, 100)}%` }}
+                />
+              </div>
+            )}
+            {/* Provider bar — bottom line (orange brand color) */}
+            {primaryProvider && providerMaxPct > 0 && (
+              <div className="w-full h-1 bg-primary-50">
+                <div
+                  className={cn('h-full transition-all duration-700 ease-out', providerBarColor)}
+                  style={{ width: `${Math.min(providerMaxPct, 100)}%` }}
+                />
+              </div>
+            )}
           </div>
         </PreviewCardTrigger>
 

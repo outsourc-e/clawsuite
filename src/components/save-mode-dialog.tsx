@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, memo } from 'react';
 import { cn } from '@/lib/utils';
 import type { Mode } from '@/hooks/use-modes';
 
@@ -8,7 +8,7 @@ type SaveModeDialogProps = {
   onClose: () => void;
 };
 
-export function SaveModeDialog({
+export const SaveModeDialog = memo(function SaveModeDialog({
   currentModel,
   onSave,
   onClose,
@@ -173,4 +173,4 @@ export function SaveModeDialog({
       </div>
     </>
   );
-}
+})

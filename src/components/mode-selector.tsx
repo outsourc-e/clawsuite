@@ -95,6 +95,18 @@ export function ModeSelector({
     setModeToApply(null);
   }, [modeToApply, applyMode, onModelSwitch]);
 
+  const handleSaveMode = useCallback((name: string, includeModel: boolean) => {
+    const result = saveMode(name, includeModel, currentModel);
+    if (!('error' in result)) {
+      setShowSaveDialog(false);
+    }
+    return result;
+  }, [saveMode, currentModel]);
+
+  const handleCloseSaveDialog = useCallback(() => {
+    setShowSaveDialog(false);
+  }, []);
+
   const showDrift = appliedMode && hasDrift(appliedMode.id);
   const modelUnavailable = appliedMode?.preferredModel && 
     !availableModels.includes(appliedMode.preferredModel);
@@ -208,16 +220,8 @@ export function ModeSelector({
       {showSaveDialog && (
         <SaveModeDialog
           currentModel={currentModel}
-          onSave={(name, includeModel) => {
-            const result = saveMode(name, includeModel, currentModel);
-            if ('error' in result) {
-              // Error handled in dialog
-              return result;
-            }
-            setShowSaveDialog(false);
-            return result;
-          }}
-          onClose={() => setShowSaveDialog(false)}
+          onSave={handleSaveMode}
+          onClose={handleCloseSaveDialog}
         />
       )}
 

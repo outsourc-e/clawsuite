@@ -454,8 +454,10 @@ function ChatComposerComponent({
 
   useLayoutEffect(() => {
     if (disabled) return
+    // Only focus on focusKey change (session switch), not on every disabled toggle
     focusPrompt()
-  }, [disabled, focusKey, focusPrompt])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey])
 
   useEffect(() => {
     if (!isModelMenuOpen) return
