@@ -51,6 +51,22 @@ function ChatContainerRoot({
     return () => element.removeEventListener('scroll', handleScroll)
   }, [onUserScroll])
 
+  // Debug: log container dimensions
+  React.useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const log = () => {
+      const parent = el.parentElement
+      console.log('[CONTAINER DEBUG]', {
+        scrollDiv: { height: el.clientHeight, scrollHeight: el.scrollHeight, scrollTop: el.scrollTop, offsetHeight: el.offsetHeight },
+        parent: parent ? { height: parent.clientHeight, offsetHeight: parent.offsetHeight, className: parent.className.slice(0, 60) } : null,
+      })
+    }
+    log()
+    const timer = setInterval(log, 2000)
+    return () => clearInterval(timer)
+  }, [])
+
   return (
     <div className={cn('relative flex-1 min-h-0', className)}>
       <div
