@@ -1,14 +1,18 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AiChat01Icon,
+  ArrowLeft01Icon,
   Cancel01Icon,
   CheckmarkCircle01Icon,
   Clock01Icon,
   CoinsDollarIcon,
   Delete02Icon,
   EyeIcon,
+  KeyIcon,
+  AiBrain01Icon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
+import { useState } from 'react'
 import { AgentProgress } from './agent-progress'
 import type { AgentProgressStatus } from './agent-progress'
 import {
@@ -25,6 +29,7 @@ import { AgentAvatar } from '@/components/agent-avatar'
 import { PERSONA_COLORS, PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { assignPersona } from '@/lib/agent-personas'
 import { formatCost, formatRuntime } from '@/hooks/use-agent-view'
+import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export type AgentNodeStatus = AgentProgressStatus
@@ -53,6 +58,7 @@ export type AgentNode = {
   isLive?: boolean
   statusBubble?: AgentStatusBubble
   isMain?: boolean
+  sessionKey?: string
 }
 
 type AgentCardProps = {
@@ -60,11 +66,14 @@ type AgentCardProps = {
   layoutId?: string
   cardRef?: React.Ref<HTMLElement>
   viewMode?: 'expanded' | 'compact'
+  /** @deprecated Use inline detail panel instead */
   onView?: (nodeId: string) => void
   onChat?: (nodeId: string) => void
   onKill?: (nodeId: string) => void
   onCancel?: (nodeId: string) => void
   className?: string
+  /** Enable inline detail panel instead of navigation */
+  useInlineDetail?: boolean
 }
 
 function getModelBadgeClassName(model: string): string {
@@ -163,9 +172,192 @@ export function AgentCard({
   onKill,
   onCancel,
   className,
+  useInlineDetail = true,
 }: AgentCardProps) {
   const showActions = !node.isMain
   const isCompact = viewMode === 'compact'
+  const [showDetail, setShowDetail] = useState(false)
+
+  function handleViewClick() {
+    if (useInlineDetail) {
+      setShowDetail(true)
+    } else {
+      onView?.(node.id)
+    }
+  }
+
+  // Detail panel view
+  if (showDetail) {
+    return (
+      <motion.article
+        ref={cardRef}
+        layout
+        layoutId={layoutId}
+        initial={{ opacity: 0.9 }}
+        animate={{ opacity: 1 }}
+        className={cn(
+          'group relative overflow-visible rounded-3xl border border-primary-300/80 bg-primary-100/70 shadow-md backdrop-blur-sm',
+          'w-full p-3',
+          className,
+        )}
+      >
+        {/* Header with back button */}
+        <div className="flex items-center gap-2 mb-3">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-7 rounded-full"
+            onClick={() => setShowDetail(false)}
+          >
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.5} />
+          </Button>
+          <h4 className="flex-1 truncate font-medium text-primary-900 text-sm">
+            {node.name}
+          </h4>
+          <span
+            className={cn(
+              'rounded-full px-2 py-0.5 font-medium tabular-nums ring-1 text-[10px]',
+              getModelBadgeClassName(node.model),
+            )}
+          >
+            {node.model}
+          </span>
+        </div>
+
+        {/* Full task description */}
+        <div className="mb-3 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5">
+          <p className="text-[11px] font-medium text-primary-700 mb-1">Task</p>
+          <p className="text-[12px] text-primary-800 leading-relaxed">{node.task}</p>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
+            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
+              <HugeiconsIcon icon={Clock01Icon} size={14} strokeWidth={1.5} />
+              <span className="text-[9px] font-medium">Runtime</span>
+            </div>
+            <p className="text-[13px] font-mono text-primary-900">{formatRuntime(node.runtimeSeconds)}</p>
+          </div>
+          <div className="rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
+            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
+              <HugeiconsIcon icon={AiChat01Icon} size={14} strokeWidth={1.5} />
+              <span className="text-[9px] font-medium">Tokens</span>
+            </div>
+            <p className="text-[13px] font-mono text-primary-900">{node.tokenCount.toLocaleString()}</p>
+          </div>
+          <div className="rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
+            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
+              <HugeiconsIcon icon={CoinsDollarIcon} size={14} strokeWidth={1.5} />
+              <span className="text-[9px] font-medium">Cost</span>
+            </div>
+            <p className="text-[13px] font-mono text-primary-900">{formatCost(node.cost)}</p>
+          </div>
+          <div className="rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
+            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
+              <HugeiconsIcon icon={AiBrain01Icon} size={14} strokeWidth={1.5} />
+              <span className="text-[9px] font-medium">Model</span>
+            </div>
+            <p className="text-[13px] font-mono text-primary-900 truncate">{node.model}</p>
+          </div>
+        </div>
+
+        {/* Session key */}
+        {node.sessionKey ? (
+          <div className="mb-3 rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
+            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
+              <HugeiconsIcon icon={KeyIcon} size={14} strokeWidth={1.5} />
+              <span className="text-[9px] font-medium">Session Key</span>
+            </div>
+            <p className="text-[11px] font-mono text-primary-700 truncate">{node.sessionKey}</p>
+          </div>
+        ) : null}
+
+        {/* Progress bar */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-primary-600">Progress</span>
+            <span className={cn('text-[10px] font-medium tabular-nums', getStatusTextClassName(node.status))}>
+              {node.progress}% · {getStatusLabel(node.status)}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-primary-300/50 overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${node.progress}%` }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className={cn(
+                'h-full rounded-full',
+                node.status === 'complete' ? 'bg-emerald-500' :
+                node.status === 'failed' ? 'bg-red-500' :
+                node.status === 'thinking' ? 'bg-orange-500' :
+                'bg-emerald-500',
+              )}
+            />
+          </div>
+        </div>
+
+        {/* Actions */}
+        {showActions ? (
+          <div className="flex items-center gap-2">
+            {onChat ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="flex-1 h-8 justify-center"
+                onClick={() => onChat(node.id)}
+              >
+                <HugeiconsIcon icon={AiChat01Icon} size={16} strokeWidth={1.5} />
+                Chat
+              </Button>
+            ) : null}
+            {node.status === 'queued' ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex-1 h-8 justify-center"
+                onClick={() => onCancel?.(node.id)}
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />
+                Cancel
+              </Button>
+            ) : (
+              <AlertDialogRoot>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      variant="destructive"
+                      size="icon-sm"
+                      className="size-8 rounded-full"
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.5} />
+                    </Button>
+                  }
+                />
+                <AlertDialogContent className="w-[min(420px,90vw)]">
+                  <div className="space-y-3 p-4">
+                    <AlertDialogTitle>Kill this agent run?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-pretty">
+                      {node.name} will stop immediately and be moved to history as failed.
+                    </AlertDialogDescription>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <AlertDialogCancel className="h-8">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="h-8"
+                        onClick={() => onKill?.(node.id)}
+                      >
+                        Kill Agent
+                      </AlertDialogAction>
+                    </div>
+                  </div>
+                </AlertDialogContent>
+              </AlertDialogRoot>
+            )}
+          </div>
+        ) : null}
+      </motion.article>
+    )
+  }
 
   return (
     <motion.article
@@ -272,51 +464,56 @@ export function AgentCard({
       ) : (
         /* Expanded mode: horizontal layout for non-main agents */
         <div className="flex items-start gap-2.5">
-          {/* Left: Progress ring + avatar */}
-          <div className="relative flex-shrink-0 size-14">
-            <AgentProgress
-              value={node.progress}
-              status={node.status}
-              size={56}
-              strokeWidth={3}
-              className="absolute inset-0"
-            />
-            {shouldPulse(node.status) ? (
-              <motion.span
-                aria-hidden
-                animate={{ scale: [1, 1.12, 1], opacity: [0.3, 0.08, 0.3] }}
-                transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
-                className={cn(
-                  'absolute inset-0 rounded-full ring-2',
-                  getStatusRingClassName(node.status),
-                )}
+          {/* Left: Progress ring + avatar with tooltip */}
+          <TooltipRoot>
+            <TooltipTrigger className="relative flex-shrink-0 size-14 cursor-default">
+              <AgentProgress
+                value={node.progress}
+                status={node.status}
+                size={56}
+                strokeWidth={3}
+                className="absolute inset-0"
               />
-            ) : null}
-            <div className="absolute inset-1.5 inline-flex items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80">
-              {node.isMain ? (
-                <AgentAvatar size="md" />
-              ) : (
-                <PixelAvatar
-                  color={getPersonaColors(node.name, node.id).body}
-                  accentColor={getPersonaColors(node.name, node.id).accent}
-                  size={28}
-                  status={node.status === 'queued' ? 'idle' : node.status}
-                />
-              )}
-            </div>
-            <AnimatePresence>
-              {node.status === 'complete' ? (
+              {shouldPulse(node.status) ? (
                 <motion.span
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute -right-0.5 -bottom-0.5 inline-flex size-5 items-center justify-center rounded-full bg-emerald-500 text-primary-50"
-                >
-                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} strokeWidth={1.5} />
-                </motion.span>
+                  aria-hidden
+                  animate={{ scale: [1, 1.12, 1], opacity: [0.3, 0.08, 0.3] }}
+                  transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+                  className={cn(
+                    'absolute inset-0 rounded-full ring-2',
+                    getStatusRingClassName(node.status),
+                  )}
+                />
               ) : null}
-            </AnimatePresence>
-          </div>
+              <div className="absolute inset-1.5 inline-flex items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80">
+                {node.isMain ? (
+                  <AgentAvatar size="md" />
+                ) : (
+                  <PixelAvatar
+                    color={getPersonaColors(node.name, node.id).body}
+                    accentColor={getPersonaColors(node.name, node.id).accent}
+                    size={28}
+                    status={node.status === 'queued' ? 'idle' : node.status}
+                  />
+                )}
+              </div>
+              <AnimatePresence>
+                {node.status === 'complete' ? (
+                  <motion.span
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute -right-0.5 -bottom-0.5 inline-flex size-5 items-center justify-center rounded-full bg-emerald-500 text-primary-50"
+                  >
+                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} strokeWidth={1.5} />
+                  </motion.span>
+                ) : null}
+              </AnimatePresence>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              <span className="font-medium tabular-nums">{node.progress}%</span> complete
+            </TooltipContent>
+          </TooltipRoot>
 
           {/* Right: Text content */}
           <div className="flex-1 min-w-0 pt-0.5">
@@ -349,9 +546,6 @@ export function AgentCard({
                 )}
               >
                 {getStatusLabel(node.status)}
-              </span>
-              <span className="text-[10px] text-primary-600 tabular-nums">
-                {node.progress}%
               </span>
             </div>
           </div>
@@ -392,79 +586,79 @@ export function AgentCard({
 
         {showActions ? (
           <div className={cn('space-y-1.5', isCompact ? 'mt-1.5 max-h-0 overflow-hidden opacity-0 transition-all duration-200 group-hover:max-h-32 group-hover:opacity-100' : 'mt-2')}>
-            {onChat ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                className={cn('w-full justify-center', isCompact ? 'h-6 text-[11px]' : 'h-7')}
-                onClick={function handleChatClick() {
-                  onChat(node.id)
-                }}
-              >
-                <HugeiconsIcon icon={AiChat01Icon} size={20} strokeWidth={1.5} />
-                Chat
-              </Button>
-            ) : null}
-            <div className="flex items-center justify-between gap-2">
-              {onView ? (
+            {/* Buttons row: Chat | View | Kill icon */}
+            <div className="flex items-center gap-1.5">
+              {onChat ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={cn('flex-1 justify-center', isCompact ? 'h-6 text-[11px]' : 'h-7')}
+                  onClick={function handleChatClick() {
+                    onChat(node.id)
+                  }}
+                >
+                  <HugeiconsIcon icon={AiChat01Icon} size={16} strokeWidth={1.5} />
+                  Chat
+                </Button>
+              ) : null}
+              {(onView || useInlineDetail) ? (
                 <Button
                   variant="outline"
                   size="sm"
                   className={cn('flex-1 justify-center', isCompact ? 'h-6 text-[11px]' : 'h-7')}
-                  onClick={function handleViewClick() {
-                    onView(node.id)
-                  }}
+                  onClick={handleViewClick}
                 >
-                  <HugeiconsIcon icon={EyeIcon} size={20} strokeWidth={1.5} />
+                  <HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.5} />
                   View
                 </Button>
               ) : null}
-            {node.status === 'queued' ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn('flex-1 justify-center', isCompact ? 'h-6 text-[11px]' : 'h-7')}
-                onClick={function handleCancelClick() {
-                  onCancel?.(node.id)
-                }}
-              >
-                <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={1.5} />
-                Cancel
-              </Button>
-            ) : (
-              <AlertDialogRoot>
-                <AlertDialogTrigger
-                  render={
-                    <Button
-                      variant="destructive"
-                      size="icon-sm"
-                      className={cn('rounded-full', isCompact ? 'size-6' : 'size-7')}
-                    >
-                      <HugeiconsIcon icon={Delete02Icon} size={20} strokeWidth={1.5} />
-                    </Button>
-                  }
-                />
-                <AlertDialogContent className="w-[min(420px,90vw)]">
-                  <div className="space-y-3 p-4">
-                    <AlertDialogTitle>Kill this agent run?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-pretty">
-                      {node.name} will stop immediately and be moved to history as failed.
-                    </AlertDialogDescription>
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <AlertDialogCancel className="h-8">Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="h-8"
-                        onClick={function handleKillConfirm() {
-                          onKill?.(node.id)
-                        }}
+              {node.status === 'queued' ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn('flex-shrink-0 rounded-full', isCompact ? 'size-6' : 'size-7')}
+                  onClick={function handleCancelClick() {
+                    onCancel?.(node.id)
+                  }}
+                  title="Cancel"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />
+                </Button>
+              ) : (
+                <AlertDialogRoot>
+                  <AlertDialogTrigger
+                    render={
+                      <Button
+                        variant="destructive"
+                        size="icon-sm"
+                        className={cn('flex-shrink-0 rounded-full', isCompact ? 'size-6' : 'size-7')}
+                        title="Kill agent"
                       >
-                        Kill Agent
-                      </AlertDialogAction>
+                        <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.5} />
+                      </Button>
+                    }
+                  />
+                  <AlertDialogContent className="w-[min(420px,90vw)]">
+                    <div className="space-y-3 p-4">
+                      <AlertDialogTitle>Kill this agent run?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-pretty">
+                        {node.name} will stop immediately and be moved to history as failed.
+                      </AlertDialogDescription>
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <AlertDialogCancel className="h-8">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="h-8"
+                          onClick={function handleKillConfirm() {
+                            onKill?.(node.id)
+                          }}
+                        >
+                          Kill Agent
+                        </AlertDialogAction>
+                      </div>
                     </div>
-                  </div>
-                </AlertDialogContent>
-              </AlertDialogRoot>
-            )}
+                  </AlertDialogContent>
+                </AlertDialogRoot>
+              )}
             </div>
           </div>
         ) : null}

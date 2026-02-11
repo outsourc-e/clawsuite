@@ -282,12 +282,11 @@ export function AgentChatModal({
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[min(85vh,720px)] w-[min(860px,96vw)] overflow-hidden rounded-3xl border border-primary-300/70 bg-primary-100/55 p-0 backdrop-blur-xl max-md:bottom-0 max-md:left-0 max-md:h-[90dvh] max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-3xl max-md:top-auto">
+      <DialogContent className="h-[min(85vh,720px)] w-[min(860px,96vw)] overflow-hidden rounded-3xl border border-primary-300/70 bg-primary-100/55 p-0 backdrop-blur-xl max-md:bottom-0 max-md:left-0 max-md:h-[90dvh] max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-3xl max-md:top-auto z-50">
         <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.22, ease: 'easeOut' }}
-          className="flex h-full flex-col"
+          initial={false}
+          animate={{ opacity: 1 }}
+          className="flex h-full flex-col overflow-hidden"
         >
           <AgentChatHeader
             agentName={agentName}

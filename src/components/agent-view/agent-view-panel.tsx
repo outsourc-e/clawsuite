@@ -308,6 +308,7 @@ export function AgentViewPanel() {
           status,
           isLive: agent.isLive,
           statusBubble: getStatusBubble(status, agent.progress),
+          sessionKey: agent.id, // Use agent id as session key
         } satisfies AgentNode
       })
       .sort(function sortByProgressDesc(left, right) {
@@ -480,11 +481,7 @@ export function AgentViewPanel() {
     )
   }, [visibleActiveNodes])
 
-  function handleViewByNodeId(_nodeId: string) {
-    // Close sidebar and navigate to the full agent swarm view
-    setOpen(false)
-    navigate({ to: '/agent-swarm' })
-  }
+  // View functionality is now handled inline within AgentCard via useInlineDetail
 
   function handleChatByNodeId(nodeId: string) {
     const activeNode = activeNodes.find(function matchActiveNode(node) {
@@ -734,8 +731,8 @@ export function AgentViewPanel() {
                                       layoutId={agentSpawn.getSharedLayoutId(node.id)}
                                       viewMode={viewMode}
                                       onChat={handleChatByNodeId}
-                                      onView={handleViewByNodeId}
                                       onKill={killAgent}
+                                      useInlineDetail
                                       className={cn(
                                         agentSpawn.isSpawning(node.id) ? 'ring-2 ring-orange-500/35' : '',
                                       )}
@@ -768,6 +765,7 @@ export function AgentViewPanel() {
                                       viewMode={viewMode}
                                       onChat={handleChatByNodeId}
                                       onCancel={cancelQueueTask}
+                                      useInlineDetail
                                     />
                                   </div>
                                 )
@@ -815,7 +813,9 @@ export function AgentViewPanel() {
                                 getHistoryPillClassName(item.status),
                               )}
                               onClick={function handleHistoryView() {
-                                handleViewByNodeId(item.id)
+                                // Navigate to agent swarm for detailed history view
+                                setOpen(false)
+                                navigate({ to: '/agent-swarm' })
                               }}
                             >
                               <HugeiconsIcon icon={Link01Icon} size={20} strokeWidth={1.5} />
