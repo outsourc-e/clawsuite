@@ -170,7 +170,7 @@ function toModelOption(entry: GatewayModelCatalogEntry): ModelOption | null {
 
   const alias = readText(entry.alias)
   const provider = readText(entry.provider)
-  const model = readText(entry.model)
+  const _model = readText(entry.model)
   const id = readText(entry.id)
   
   if (!provider || !id) return null

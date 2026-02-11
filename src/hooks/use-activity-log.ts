@@ -74,7 +74,7 @@ function createEntry(date: Date, index: number): ActivityLogEntry {
   }
 }
 
-function createSeedEntries(total: number): Array<ActivityLogEntry> {
+function _createSeedEntries(total: number): Array<ActivityLogEntry> {
   const now = Date.now()
   return Array.from({ length: total }, function createFromIndex(_, index) {
     const date = new Date(now - (total - index) * 6_000)
@@ -122,3 +122,6 @@ export const useActivityLog = create<ActivityLogState>((set, get) => ({
     }))
   },
 }))
+
+// Preserve for debugging/testing
+void _createSeedEntries

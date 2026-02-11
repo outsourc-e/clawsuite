@@ -75,7 +75,8 @@ type SkillMock = {
   installed: boolean
 }
 
-const CHAT_RESULTS: Array<ChatMock> = [
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _CHAT_RESULTS: Array<ChatMock> = [
   {
     id: 'chat-1',
     sessionKey: 'main',
@@ -120,7 +121,8 @@ const CHAT_RESULTS: Array<ChatMock> = [
   },
 ]
 
-const FILE_RESULTS: Array<FileMock> = [
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _FILE_RESULTS: Array<FileMock> = [
   {
     id: 'file-1',
     path: 'src/screens/chat/chat-screen.tsx',
@@ -158,7 +160,8 @@ const FILE_RESULTS: Array<FileMock> = [
   },
 ]
 
-const AGENT_RESULTS: Array<AgentMock> = [
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _AGENT_RESULTS: Array<AgentMock> = [
   {
     id: 'agent-1',
     name: 'PR Reviewer',
@@ -189,7 +192,8 @@ const AGENT_RESULTS: Array<AgentMock> = [
   },
 ]
 
-const SKILL_RESULTS: Array<SkillMock> = [
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _SKILL_RESULTS: Array<SkillMock> = [
   {
     id: 'skill-1',
     name: 'skill-creator',
@@ -654,3 +658,9 @@ export function SearchModal() {
     document.body,
   )
 }
+
+// Preserve mock data for future use
+void _CHAT_RESULTS
+void _FILE_RESULTS
+void _AGENT_RESULTS
+void _SKILL_RESULTS

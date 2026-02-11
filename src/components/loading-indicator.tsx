@@ -42,13 +42,13 @@ function LoadingIndicator({
       )}
       onClick={(event) => {
         event.stopPropagation()
-        toggleAgentAvatarPreference(preference)
+        toggleAgentAvatarPreference(preference as AgentAvatarPreference)
       }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           event.stopPropagation()
-          toggleAgentAvatarPreference(preference)
+          toggleAgentAvatarPreference(preference as AgentAvatarPreference)
         }
       }}
       title="Click to switch loader"

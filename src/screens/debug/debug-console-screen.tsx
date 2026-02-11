@@ -408,7 +408,7 @@ export function DebugConsoleScreen() {
           timestamp: new Date(event.timestamp).toISOString(),
           level: event.level,
           title: redactSensitiveData(event.title),
-          source: event.source,
+          source: event.source ?? '',
         })),
         debugEntries: troubleshooterSuggestions.map((s) => ({
           timestamp: new Date(s.matchedAt).toISOString(),

@@ -35,7 +35,7 @@ export type SearchActivity = {
   detail?: string
   timestamp: number
   level: string
-  source: string
+  source?: string
 }
 
 // Static skills dataset (as Eric specified - no backend)

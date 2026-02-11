@@ -127,7 +127,7 @@ function AgentAvatar({
           aria-label="Toggle agent avatar"
           onClick={function handleToggleAvatar(event) {
             event.stopPropagation()
-            toggleAgentAvatarPreference(preference)
+            toggleAgentAvatarPreference(preference as AgentAvatarPreference)
           }}
         >
           {preference === 'lobster' ? (

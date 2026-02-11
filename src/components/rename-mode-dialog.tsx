@@ -33,6 +33,7 @@ export function RenameDialog({ mode, onClose }: RenameDialogProps) {
       }
 
       if (event.key === 'Tab') {
+        if (!dialog) return;
         const focusable = dialog.querySelectorAll<HTMLElement>(
           'button, input, [tabindex]:not([tabindex="-1"])'
         );

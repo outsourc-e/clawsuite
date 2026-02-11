@@ -170,6 +170,19 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
   }, [activeTab?.id, height])
 
+  const handleSendInput = useCallback(
+    async (tabId: string, data: string) => {
+      const tab = tabs.find((item) => item.id === tabId)
+      if (!tab?.sessionId) return
+      await fetch('/api/terminal-input', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: tab.sessionId, data }),
+      }).catch(() => undefined)
+    },
+    [tabs],
+  )
+
   const initializeTerminal = useCallback(
     (tabId: string, container: HTMLDivElement | null) => {
       if (!container) return
@@ -307,19 +320,6 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
       }
     },
     [],
-  )
-
-  const handleSendInput = useCallback(
-    async (tabId: string, data: string) => {
-      const tab = tabs.find((item) => item.id === tabId)
-      if (!tab?.sessionId) return
-      await fetch('/api/terminal-input', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: tab.sessionId, data }),
-      }).catch(() => undefined)
-    },
-    [tabs],
   )
 
   const handleSearch = useCallback(

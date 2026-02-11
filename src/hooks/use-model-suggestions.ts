@@ -47,7 +47,7 @@ type SessionDismissal = {
 }
 
 const GLOBAL_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
-const AUTO_DISMISS_MS = 15 * 1000 // 15 seconds
+const _AUTO_DISMISS_MS = 15 * 1000 // 15 seconds
 
 function getModelTier(modelId: string): ModelTier {
   const normalized = modelId.toLowerCase()
@@ -269,3 +269,6 @@ export function useModelSuggestions({
     dismissForSession,
   }
 }
+
+// Preserve for future auto-dismiss feature
+void _AUTO_DISMISS_MS

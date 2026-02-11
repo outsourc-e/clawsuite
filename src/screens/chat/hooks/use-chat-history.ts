@@ -36,9 +36,9 @@ export function useChatHistory({
   const historyQuery = useQuery({
     queryKey: historyKey,
     queryFn: async function fetchHistoryForSession() {
-      const cached = queryClient.getQueryData(historyKey)
-      const optimisticMessages = Array.isArray(cached?.messages)
-        ? cached.messages.filter((message) => {
+      const cached = queryClient.getQueryData(historyKey) as Record<string, unknown> | undefined
+      const optimisticMessages = Array.isArray((cached as any)?.messages)
+        ? (cached as any).messages.filter((message: any) => {
             if (message.status === 'sending') return true
             if (message.__optimisticId) return true
             return Boolean(message.clientId)

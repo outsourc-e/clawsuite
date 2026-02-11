@@ -5,4 +5,5 @@ export type ActivityEvent = {
   title: string
   detail?: string
   level: 'info' | 'warn' | 'error'
+  source?: string
 }

@@ -119,7 +119,7 @@ export function HeaderAmbientStatus() {
     setEditing(false)
   }
 
-  function handleToggleClock() {
+  function _handleToggleClock() {
     update({ clockFormat: is12h ? '24h' : '12h' })
   }
 

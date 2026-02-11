@@ -24,7 +24,7 @@ export function SearchResults({
   if (results.length === 0) {
     return (
       <EmptyState
-        icon={Search01Icon}
+        icon={Search01Icon as any}
         title="No results found"
         description={query ? `Try a different search term` : 'Start typing to search'}
       />

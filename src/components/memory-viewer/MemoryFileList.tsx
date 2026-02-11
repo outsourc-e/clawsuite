@@ -6,7 +6,7 @@ import {
   Folder01Icon,
   RefreshIcon,
 } from '@hugeicons/core-free-icons'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence as _AnimatePresence, motion } from 'motion/react'
 import type { MemoryFileGroup, MemoryViewerFile } from './memory-types'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'

@@ -49,10 +49,11 @@ function textFromNode(node: React.ReactNode): string {
     return String(node)
   }
   if (Array.isArray(node)) {
-    return node.map((item) => textFromNode(item)).join('')
+    return node.map((item: React.ReactNode) => textFromNode(item)).join('')
   }
   if (node && typeof node === 'object' && 'props' in node) {
-    return textFromNode((node as React.ReactElement).props.children)
+    const element = node as { props: { children?: React.ReactNode } }
+    return textFromNode(element.props.children)
   }
   return ''
 }

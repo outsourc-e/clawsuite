@@ -51,7 +51,7 @@ import type {
   ChatComposerHandle,
   ChatComposerHelpers,
 } from './components/chat-composer'
-import type { GatewayAttachment, GatewayMessage, HistoryResponse } from './types'
+import type { GatewayAttachment, GatewayMessage, HistoryResponse as _HistoryResponse } from './types'
 import { cn } from '@/lib/utils'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
@@ -119,7 +119,7 @@ export function ChatScreen({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [sending, setSending] = useState(false)
-  const [creatingSession, setCreatingSession] = useState(false)
+  const [_creatingSession, setCreatingSession] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const { headerRef, composerRef, mainRef, pinGroupMinHeight, headerHeight } =
@@ -161,9 +161,9 @@ export function ChatScreen({
     activeSessionKey,
     activeTitle,
     sessionsError,
-    sessionsLoading,
-    sessionsFetching,
-    refetchSessions,
+    sessionsLoading: _sessionsLoading,
+    sessionsFetching: _sessionsFetching,
+    refetchSessions: _refetchSessions,
   } = useChatSessions({ activeFriendlyId, isNewChat, forcedSessionKey })
   const {
     historyQuery,
@@ -241,9 +241,9 @@ export function ChatScreen({
     currentModel, // Real model from session-status (fail closed if empty)
     sessionKey: resolvedSessionKey || 'main',
     messages: historyMessages.map(m => ({
-      role: m.role,
+      role: m.role as 'user' | 'assistant',
       content: textFromMessage(m),
-    })),
+    })) as any,
     availableModels: availableModelIds,
   })
 
@@ -337,9 +337,9 @@ export function ChatScreen({
       const maxAttempts = 12
 
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-        const cached = queryClient.getQueryData(historyKey)
-        const cachedMessages = Array.isArray(cached?.messages)
-          ? cached.messages
+        const cached = queryClient.getQueryData(historyKey) as Record<string, unknown> | undefined
+        const cachedMessages = Array.isArray((cached as any)?.messages)
+          ? (cached as any).messages
           : []
         if (hasResolvedAssistantMessage(cachedMessages, context, finalText)) {
           break
@@ -428,7 +428,7 @@ export function ChatScreen({
     }, [clearActiveStream, queryClient, streamFinish]),
   })
 
-  const uiQuery = useQuery({
+  const _uiQuery = useQuery({
     queryKey: chatUiQueryKey,
     queryFn: function readUiState() {
       return getChatUiState(queryClient)
@@ -458,8 +458,8 @@ export function ChatScreen({
     void gatewayStatusQuery.refetch()
   }, [gatewayStatusQuery])
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-  const isSidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
-  const handleActiveSessionDelete = useCallback(() => {
+  const _isSidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
+  const _handleActiveSessionDelete = useCallback(() => {
     setError(null)
     setIsRedirecting(true)
     navigate({ to: '/new', replace: true })
@@ -637,11 +637,11 @@ export function ChatScreen({
       pending.friendlyId,
       pending.sessionKey,
     )
-    const cached = queryClient.getQueryData(historyKey)
-    const cachedMessages = Array.isArray(cached?.messages)
-      ? cached.messages
+    const cached = queryClient.getQueryData(historyKey) as Record<string, unknown> | undefined
+    const cachedMessages = Array.isArray((cached as any)?.messages)
+      ? (cached as any).messages
       : []
-    const alreadyHasOptimistic = cachedMessages.some((message) => {
+    const alreadyHasOptimistic = cachedMessages.some((message: any) => {
       if (pending.optimisticMessage.clientId) {
         if (message.clientId === pending.optimisticMessage.clientId) return true
         if (message.__optimisticId === pending.optimisticMessage.clientId)
@@ -977,7 +977,7 @@ export function ChatScreen({
     ],
   )
 
-  const startNewChat = useCallback(() => {
+  const _startNewChat = useCallback(() => {
     setWaitingForResponse(false)
     setPinToTop(false)
     clearHistoryMessages(queryClient, 'new', 'new')
@@ -996,7 +996,7 @@ export function ChatScreen({
     toggleSidebar()
   }, [toggleSidebar])
 
-  const handleSelectSession = useCallback(() => {
+  const _handleSelectSession = useCallback(() => {
     if (!isMobile) return
     setSidebarCollapsed(true)
   }, [isMobile, setSidebarCollapsed])

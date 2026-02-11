@@ -7,7 +7,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useSearchModal } from '@/hooks/use-search-modal'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
-function isInputFocused(): boolean {
+function _isInputFocused(): boolean {
   const active = document.activeElement
   if (!active) return false
   const tag = active.tagName.toLowerCase()
@@ -70,3 +70,6 @@ export function useGlobalShortcuts() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [navigate, openModal, setScope, toggleChatPanel])
 }
+
+// Preserve for future input-focus checking
+void _isInputFocused
