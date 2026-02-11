@@ -71,11 +71,25 @@ export function useAgentBehaviors(sessions: Array<SwarmSession>): Map<string, Ag
     if (!state) {
       let deskIdx = deskAssignments.current.get(key)
       if (deskIdx === undefined) {
-        deskIdx = nextDesk.current % DESK_POSITIONS.length
-        deskAssignments.current.set(key, deskIdx)
-        nextDesk.current++
+        // Find next desk not already taken by another active agent
+        const takenDesks = new Set(deskAssignments.current.values())
+        let found = false
+        for (let i = 0; i < DESK_POSITIONS.length; i++) {
+          const candidate = (nextDesk.current + i) % DESK_POSITIONS.length
+          if (!takenDesks.has(candidate)) {
+            deskIdx = candidate
+            nextDesk.current = candidate + 1
+            found = true
+            break
+          }
+        }
+        if (!found) {
+          deskIdx = nextDesk.current % DESK_POSITIONS.length
+          nextDesk.current++
+        }
+        deskAssignments.current.set(key, deskIdx!)
       }
-      state = createBehaviorState(deskIdx)
+      state = createBehaviorState(deskIdx!)
       statesRef.current.set(key, state)
     }
     return state

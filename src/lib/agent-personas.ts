@@ -84,12 +84,20 @@ export function assignPersona(sessionKey: string, taskText?: string): AgentPerso
   const existing = assignedPersonas.get(sessionKey)
   if (existing) return existing
 
+  // Track which persona names are already taken
+  const takenNames = new Set<string>()
+  for (const p of assignedPersonas.values()) {
+    takenNames.add(p.name)
+  }
+
   let bestMatch: AgentPersona | null = null
   let bestScore = 0
 
   if (taskText) {
     const lower = taskText.toLowerCase()
     for (const persona of AGENT_PERSONAS) {
+      // Skip already-assigned personas
+      if (takenNames.has(persona.name)) continue
       const score = persona.specialties.reduce((sum, keyword) => {
         return sum + (lower.includes(keyword) ? 1 : 0)
       }, 0)
@@ -100,13 +108,24 @@ export function assignPersona(sessionKey: string, taskText?: string): AgentPerso
     }
   }
 
-  // Use matched persona or round-robin
-  const persona = bestMatch && bestScore > 0
-    ? bestMatch
-    : AGENT_PERSONAS[nextRoundRobin % AGENT_PERSONAS.length]
-
-  if (!bestMatch || bestScore === 0) {
-    nextRoundRobin++
+  // Find next available persona via round-robin (skip taken ones)
+  let persona: AgentPersona
+  if (bestMatch && bestScore > 0) {
+    persona = bestMatch
+  } else {
+    // Find next untaken persona
+    let attempts = 0
+    while (attempts < AGENT_PERSONAS.length) {
+      const candidate = AGENT_PERSONAS[nextRoundRobin % AGENT_PERSONAS.length]
+      nextRoundRobin++
+      if (!takenNames.has(candidate.name)) {
+        persona = candidate
+        break
+      }
+      attempts++
+    }
+    // If all 8 are taken, wrap around (allow duplicates beyond 8 agents)
+    persona = persona! ?? AGENT_PERSONAS[nextRoundRobin % AGENT_PERSONAS.length]
   }
 
   assignedPersonas.set(sessionKey, persona)
