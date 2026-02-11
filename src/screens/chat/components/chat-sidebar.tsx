@@ -918,19 +918,31 @@ function ChatSidebarComponent({
                   transition={transition}
                   className="flex-1 truncate text-left text-sm font-medium text-primary-900"
                 >
-                  User
+                  {(() => {
+                    try {
+                      return localStorage.getItem('openclaw-user-name') || 'User'
+                    } catch {
+                      return 'User'
+                    }
+                  })()}
                 </motion.span>
               )}
             </AnimatePresence>
           </MenuTrigger>
-          <MenuContent side="top" align="start" className="min-w-[180px]">
-            <MenuItem onClick={() => navigate({ to: '/settings' })}>
-              <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
-              Config
+          <MenuContent side="top" align="start" className="min-w-[200px]">
+            <MenuItem onClick={() => navigate({ to: '/settings' })} className="justify-between">
+              <span className="flex items-center gap-2">
+                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
+                Config
+              </span>
+              <kbd className="ml-auto text-[10px] text-primary-500 font-mono">⌘,</kbd>
             </MenuItem>
-            <MenuItem onClick={() => navigate({ to: '/settings/providers' })}>
-              <HugeiconsIcon icon={ApiIcon} size={16} strokeWidth={1.5} />
-              Providers
+            <MenuItem onClick={() => navigate({ to: '/settings/providers' })} className="justify-between">
+              <span className="flex items-center gap-2">
+                <HugeiconsIcon icon={ApiIcon} size={16} strokeWidth={1.5} />
+                Providers
+              </span>
+              <kbd className="ml-auto text-[10px] text-primary-500 font-mono">⌘P</kbd>
             </MenuItem>
           </MenuContent>
         </MenuRoot>

@@ -209,10 +209,21 @@ function BrowserPanel() {
         />
 
         {demoMode ? (
-          <div className="rounded-xl border border-blue-500/35 bg-blue-500/10 px-3 py-2 text-xs text-blue-600 text-pretty">
-            <strong>Demo mode:</strong> Gateway doesn't expose browser control API.
-            {errorText ? ` (${errorText})` : ''} 
-            To enable live browser control, configure a browser plugin/tool in your Gateway.
+          <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15">
+              <HugeiconsIcon icon={GlobeIcon} size={16} strokeWidth={1.5} className="text-amber-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                  Demo Mode
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-amber-700 text-pretty">
+                Connect a browser to use live features. Configure the browser plugin in your Gateway settings.
+                {errorText ? <span className="text-amber-600/80"> ({errorText})</span> : null}
+              </p>
+            </div>
           </div>
         ) : null}
 
