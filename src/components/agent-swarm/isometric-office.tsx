@@ -323,7 +323,18 @@ function AmbientParticles() {
 
 /* ── Main Component ── */
 export function IsometricOffice({ sessions, className }: IsometricOfficeProps) {
-  const behaviors = useAgentBehaviors(sessions)
+  // Filter: show running/thinking always, completed/failed for 30s, skip idle old ones
+  const activeSessions = useMemo(() => {
+    return sessions.filter(s => {
+      if (s.swarmStatus === 'running' || s.swarmStatus === 'thinking') return true
+      if (s.swarmStatus === 'complete' || s.swarmStatus === 'failed') {
+        return s.staleness < 30_000 // Show for 30s after completion
+      }
+      return s.staleness < 10_000 // Idle: show briefly
+    }).slice(0, 8) // Max 8 agents in office
+  }, [sessions])
+
+  const behaviors = useAgentBehaviors(activeSessions)
 
   // Find chatting pairs for connection lines
   const chatLines = useMemo(() => {
@@ -393,7 +404,7 @@ export function IsometricOffice({ sessions, className }: IsometricOfficeProps) {
 
       {/* Animated agents */}
       <AnimatePresence mode="popLayout">
-        {sessions.map((session) => {
+        {activeSessions.map((session) => {
           const key = session.key ?? session.friendlyId ?? ''
           const behavior = behaviors.get(key)
           if (!behavior) return null
@@ -408,7 +419,7 @@ export function IsometricOffice({ sessions, className }: IsometricOfficeProps) {
       </AnimatePresence>
 
       {/* Empty state */}
-      {sessions.length === 0 && <EmptyOffice />}
+      {activeSessions.length === 0 && <EmptyOffice />}
 
       {/* Office info */}
       <div className="absolute bottom-3 left-3 rounded bg-slate-900/80 px-2 py-1 backdrop-blur">

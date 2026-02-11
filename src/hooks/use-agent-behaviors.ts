@@ -3,7 +3,7 @@
  * Each agent gets independent activity cycles, break schedules, chat visits, and movement.
  */
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { assignPersona } from '@/lib/agent-personas'
+import { assignPersona, releasePersona } from '@/lib/agent-personas'
 import type { SwarmSession } from '@/stores/agent-swarm-store'
 import {
   type AgentActivity,
@@ -105,11 +105,12 @@ export function useAgentBehaviors(sessions: Array<SwarmSession>): Map<string, Ag
       const now = Date.now()
       const activeKeys = new Set(sessions.map(s => s.key ?? s.friendlyId ?? ''))
 
-      // Clean up stale agents
+      // Clean up stale agents + release their personas
       for (const key of statesRef.current.keys()) {
         if (!activeKeys.has(key)) {
           statesRef.current.delete(key)
           deskAssignments.current.delete(key)
+          releasePersona(key)
         }
       }
 

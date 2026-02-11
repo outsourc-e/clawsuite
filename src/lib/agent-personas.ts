@@ -71,13 +71,26 @@ export const AGENT_PERSONAS: AgentPersona[] = [
   },
 ]
 
-/** Track which personas have been assigned to avoid duplicates in the same session */
+/**
+ * Deterministic hash from session key → stable persona index.
+ * This survives HMR and ensures the same session always gets the same persona.
+ */
+function hashCode(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i)
+    hash = ((hash << 5) - hash + ch) | 0
+  }
+  return Math.abs(hash)
+}
+
+/** Global registry: tracks active session → persona assignments */
 const assignedPersonas = new Map<string, AgentPersona>()
-let nextRoundRobin = 0
 
 /**
- * Match a persona to a task based on keyword matching.
- * Falls back to round-robin if no match found.
+ * Assign a persona to a session. Uses keyword matching first (skipping taken names),
+ * then falls back to a deterministic hash of the session key for stable assignment.
+ * Each active session gets a unique persona (up to 8 agents).
  */
 export function assignPersona(sessionKey: string, taskText?: string): AgentPersona {
   // Return existing assignment
@@ -90,14 +103,15 @@ export function assignPersona(sessionKey: string, taskText?: string): AgentPerso
     takenNames.add(p.name)
   }
 
+  const available = AGENT_PERSONAS.filter(p => !takenNames.has(p.name))
+
+  // Try keyword matching among available personas
   let bestMatch: AgentPersona | null = null
   let bestScore = 0
 
-  if (taskText) {
+  if (taskText && available.length > 0) {
     const lower = taskText.toLowerCase()
-    for (const persona of AGENT_PERSONAS) {
-      // Skip already-assigned personas
-      if (takenNames.has(persona.name)) continue
+    for (const persona of available) {
       const score = persona.specialties.reduce((sum, keyword) => {
         return sum + (lower.includes(keyword) ? 1 : 0)
       }, 0)
@@ -108,39 +122,34 @@ export function assignPersona(sessionKey: string, taskText?: string): AgentPerso
     }
   }
 
-  // Find next available persona via round-robin (skip taken ones)
   let persona: AgentPersona
   if (bestMatch && bestScore > 0) {
     persona = bestMatch
+  } else if (available.length > 0) {
+    // Deterministic pick from available based on session key hash
+    persona = available[hashCode(sessionKey) % available.length]
   } else {
-    // Find next untaken persona
-    let attempts = 0
-    while (attempts < AGENT_PERSONAS.length) {
-      const candidate = AGENT_PERSONAS[nextRoundRobin % AGENT_PERSONAS.length]
-      nextRoundRobin++
-      if (!takenNames.has(candidate.name)) {
-        persona = candidate
-        break
-      }
-      attempts++
-    }
-    // If all 8 are taken, wrap around (allow duplicates beyond 8 agents)
-    persona = persona! ?? AGENT_PERSONAS[nextRoundRobin % AGENT_PERSONAS.length]
+    // All 8 taken — hash into the full pool (allows duplicates beyond 8)
+    persona = AGENT_PERSONAS[hashCode(sessionKey) % AGENT_PERSONAS.length]
   }
 
   assignedPersonas.set(sessionKey, persona)
   return persona
 }
 
+/** Remove a session's persona assignment (call when sessions disappear) */
+export function releasePersona(sessionKey: string): void {
+  assignedPersonas.delete(sessionKey)
+}
+
+/** Clear all assignments */
+export function clearAllPersonas(): void {
+  assignedPersonas.clear()
+}
+
 /** Get persona for a session (without assigning) */
 export function getPersona(sessionKey: string): AgentPersona | undefined {
   return assignedPersonas.get(sessionKey)
-}
-
-/** Clear all assignments (e.g., on session reset) */
-export function clearPersonas(): void {
-  assignedPersonas.clear()
-  nextRoundRobin = 0
 }
 
 /** Get display name for an agent session */
