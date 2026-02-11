@@ -8,6 +8,7 @@ import {
   fetchSessionStatus,
   fetchSessions
 } from '@/lib/gateway-api'
+import { assignPersona, type AgentPersona } from '@/lib/agent-personas'
 
 export type AgentModel = string
 
@@ -66,9 +67,9 @@ function createDemoActiveAgents(): Array<ActiveAgent> {
   return [
     {
       id: 'demo-dashboard-infra',
-      name: 'dashboard-infra',
-      task: 'Building dashboard widget grid',
-      model: 'gpt-5-codex',
+      name: '🎨 Roger — Frontend Developer',
+      task: 'Building dashboard widget grid with responsive layout',
+      model: 'gpt-5.3-codex',
       status: 'running',
       progress: 67,
       startedAtMs: now - 204_000,
@@ -78,9 +79,9 @@ function createDemoActiveAgents(): Array<ActiveAgent> {
     },
     {
       id: 'demo-skills-browser',
-      name: 'skills-browser',
-      task: 'Creating skills marketplace',
-      model: 'gpt-5-codex',
+      name: '🏗️ Sally — Backend Architect',
+      task: 'Creating API routes for skills marketplace',
+      model: 'gpt-5.3-codex',
       status: 'thinking',
       progress: 42,
       startedAtMs: now - 131_000,
@@ -90,9 +91,9 @@ function createDemoActiveAgents(): Array<ActiveAgent> {
     },
     {
       id: 'demo-terminal-integration',
-      name: 'terminal-integration',
-      task: 'Integrating terminal panel',
-      model: 'gpt-5-codex',
+      name: '🔍 Ada — QA Engineer',
+      task: 'Running integration tests on terminal panel',
+      model: 'gpt-5.3-codex',
       status: 'running',
       progress: 85,
       startedAtMs: now - 242_000,
@@ -180,6 +181,14 @@ function readSessionKey(session: GatewaySession): string {
 }
 
 function readSessionName(session: GatewaySession): string {
+  // Assign persona based on session key + task for named agent display
+  const key = readSessionKey(session)
+  const taskText = readString(session.task) || readString(session.initialMessage) || readString(session.label)
+  if (key.length > 0) {
+    const persona = assignPersona(key, taskText)
+    return `${persona.emoji} ${persona.name} — ${persona.role}`
+  }
+
   const label = readString(session.label)
   if (label.length > 0) return label
   const title = readString(session.title)
@@ -188,8 +197,6 @@ function readSessionName(session: GatewaySession): string {
   if (derived.length > 0) return derived
   const friendly = readString(session.friendlyId)
   if (friendly.length > 0) return friendly
-  const key = readString(session.key)
-  if (key.length > 0) return key
   return 'session'
 }
 

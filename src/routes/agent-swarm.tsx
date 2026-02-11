@@ -7,6 +7,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { useSwarmStore, type SwarmSession } from '@/stores/agent-swarm-store'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { assignPersona } from '@/lib/agent-personas'
 
 export const Route = createFileRoute('/agent-swarm')({
   component: AgentSwarmRoute,
@@ -45,8 +46,11 @@ function SessionCard({ session }: { session: SwarmSession }) {
   const config = statusConfig[session.swarmStatus]
   const tokens = session.usage?.totalTokens ?? session.totalTokens ?? session.tokenCount ?? 0
   const cost = session.usage?.cost ?? session.cost ?? 0
-  const name = session.derivedTitle ?? session.title ?? session.label ?? session.key ?? 'Unknown'
   const kind = session.kind ?? 'session'
+  const taskText = session.task ?? session.initialMessage ?? session.label ?? ''
+  const persona = assignPersona(session.key ?? session.friendlyId ?? 'unknown', taskText)
+  const name = `${persona.emoji} ${persona.name}`
+  const role = persona.role
 
   return (
     <motion.div
@@ -67,6 +71,7 @@ function SessionCard({ session }: { session: SwarmSession }) {
             </span>
           </div>
           <h3 className="mt-1 truncate text-sm font-semibold text-primary-900">{name}</h3>
+          <span className={cn('text-xs font-medium', persona.color)}>{role}</span>
         </div>
       </div>
 
