@@ -417,7 +417,7 @@ function MessageItemComponent({
               effectiveIsStreaming && !isUser ? 'chat-streaming-message' : '',
               !isUser
                 ? 'bg-transparent w-full'
-                : 'bg-primary-100 max-w-[85%] border-l-2 border-primary-400 px-4.5 py-3',
+                : 'bg-primary-100 max-w-[75%] rounded-2xl px-4 py-2.5',
             )}
           >
             {hasAttachments && (

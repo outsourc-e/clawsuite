@@ -17,12 +17,50 @@ export function deriveFriendlyIdFromKey(key: string | undefined): string {
   return tailTrimmed.length > 0 ? tailTrimmed : trimmed
 }
 
+/**
+ * Strip OpenClaw system metadata from user messages.
+ * Removes [media attached: ...] blocks, image-send instructions,
+ * and [Telegram/Signal/etc ...] headers, leaving just the user's text.
+ */
+function cleanUserText(raw: string): string {
+  let text = raw
+
+  // Remove [media attached: ...] blocks (may span multiple lines)
+  text = text.replace(/\[media attached:[^\]]*\]\s*/gi, '')
+
+  // Remove "To send an image back..." instruction block
+  text = text.replace(
+    /To send an image back.*?Keep caption in the text body\.\s*/gs,
+    '',
+  )
+
+  // Extract user message after channel header like [Telegram ... EST]
+  const channelHeaderMatch = text.match(
+    /\[(?:Telegram|Signal|Discord|WhatsApp|iMessage|Slack|GoogleChat)\s[^\]]*\]\s*([\s\S]*)/i,
+  )
+  if (channelHeaderMatch) {
+    text = channelHeaderMatch[1]
+  }
+
+  // Remove <media:audio> / <media:image> / <media:video> tags
+  text = text.replace(/<media:\w+>/gi, '')
+
+  return text.trim()
+}
+
 export function textFromMessage(msg: GatewayMessage): string {
   const parts = Array.isArray(msg.content) ? msg.content : []
-  return parts
+  const raw = parts
     .map((part) => (part.type === 'text' ? String(part.text ?? '') : ''))
     .join('')
     .trim()
+
+  // Only clean user messages
+  if (msg.role === 'user') {
+    return cleanUserText(raw)
+  }
+
+  return raw
 }
 
 export function getToolCallsFromMessage(
