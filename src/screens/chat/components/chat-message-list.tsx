@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils'
 
 const VIRTUAL_ROW_HEIGHT = 136
 const VIRTUAL_OVERSCAN = 8
-const NEAR_BOTTOM_THRESHOLD = 120
+const NEAR_BOTTOM_THRESHOLD = 200
 
 type ChatMessageListProps = {
   messages: Array<GatewayMessage>
