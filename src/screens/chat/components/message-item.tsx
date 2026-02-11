@@ -225,8 +225,8 @@ function MessageItemComponent({
   const animationTimeoutRef = useRef<number | null>(null)
   const animationIndexRef = useRef(0)
 
-  const shouldFakeStream =
-    Boolean(simulateStreaming && !remoteStreamingActive && fullText.length > 0)
+  // Disable fake streaming — causes ghost loading indicators on old messages
+  const shouldFakeStream = false
 
   useEffect(() => {
     if (remoteStreamingActive) {
