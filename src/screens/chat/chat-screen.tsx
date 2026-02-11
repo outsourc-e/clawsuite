@@ -848,7 +848,7 @@ export function ChatScreen({
       <div
         className={cn(
           'flex-1 min-h-0 overflow-hidden',
-          compact ? 'w-full' : isMobile ? 'relative' : 'grid grid-cols-[auto_1fr] grid-rows-[1fr]',
+          compact ? 'w-full' : isMobile ? 'relative' : 'grid grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)]',
         )}
       >
         {hideUi || compact ? null : isMobile ? null : (
