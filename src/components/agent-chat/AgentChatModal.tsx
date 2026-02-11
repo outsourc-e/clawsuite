@@ -83,6 +83,12 @@ export function AgentChatModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const typingExpectedAgentCountRef = useRef<number | null>(null)
+  const messagesRef = useRef<Array<AgentChatMessage>>([])
+  const isDemoModeRef = useRef(false)
+
+  // Keep refs in sync with state
+  messagesRef.current = messages
+  isDemoModeRef.current = isDemoMode
 
   const agentMessageCount = useMemo(function getAgentMessageCount() {
     return messages.filter(function onlyAgent(message) {
@@ -91,10 +97,10 @@ export function AgentChatModal({
   }, [messages])
 
   const loadHistory = useCallback(async function loadHistory() {
-    if (!open || isDemoMode) return
+    if (!open || isDemoModeRef.current) return
 
     try {
-      setIsLoadingHistory((current) => (messages.length === 0 ? true : current))
+      setIsLoadingHistory((current) => (messagesRef.current.length === 0 ? true : current))
       const query = new URLSearchParams({ sessionKey, limit: '150' })
       const response = await fetch(`/api/history?${query.toString()}`)
       if (!response.ok) {
@@ -123,7 +129,7 @@ export function AgentChatModal({
       const message =
         error instanceof Error ? error.message : 'Unable to load chat history'
       setErrorMessage(message)
-      if (messages.length === 0) {
+      if (messagesRef.current.length === 0) {
         setIsDemoMode(true)
         setMessages([
           {
@@ -137,7 +143,11 @@ export function AgentChatModal({
     } finally {
       setIsLoadingHistory(false)
     }
-  }, [isDemoMode, messages.length, open, sessionKey])
+  }, [open, sessionKey])
+
+  // Stable ref for loadHistory to avoid effect dependency loops
+  const loadHistoryRef = useRef(loadHistory)
+  loadHistoryRef.current = loadHistory
 
   useEffect(
     function handleEscapeToClose() {
@@ -168,9 +178,9 @@ export function AgentChatModal({
       setIsDemoMode(false)
       setErrorMessage(null)
       typingExpectedAgentCountRef.current = null
-      void loadHistory()
+      void loadHistoryRef.current()
     },
-    [loadHistory, open, sessionKey],
+    [open, sessionKey],
   )
 
   useEffect(
@@ -178,14 +188,14 @@ export function AgentChatModal({
       if (!open || isDemoMode) return
 
       const timer = window.setInterval(function refreshHistory() {
-        void loadHistory()
+        void loadHistoryRef.current()
       }, 2000)
 
       return function cleanupLivePoll() {
         window.clearInterval(timer)
       }
     },
-    [isDemoMode, loadHistory, open],
+    [isDemoMode, open],
   )
 
   function sendDemoReply(text: string) {
