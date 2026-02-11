@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowDown01Icon,
+  ArrowExpand01Icon,
   ArrowRight01Icon,
   BotIcon,
   Cancel01Icon,
   Link01Icon,
 } from '@hugeicons/core-free-icons'
+import { useNavigate } from '@tanstack/react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { AgentCard } from './agent-card'
 import {
@@ -155,6 +157,8 @@ export function AgentViewPanel() {
     cancelQueueTask,
     activeCount,
   } = useAgentView()
+
+  const navigate = useNavigate()
 
   const [selectedTranscript, setSelectedTranscript] = useState<{
     title: string
@@ -486,6 +490,18 @@ export function AgentViewPanel() {
                   </span>
                 )}
               </div>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={function handleMaximize() {
+                  setOpen(false)
+                  navigate({ to: '/agent-swarm' })
+                }}
+                aria-label="Open Agent Swarm fullscreen"
+                title="Open in Studio"
+              >
+                <HugeiconsIcon icon={ArrowExpand01Icon} size={18} strokeWidth={1.5} />
+              </Button>
               <Button
                 size="icon-sm"
                 variant="ghost"
