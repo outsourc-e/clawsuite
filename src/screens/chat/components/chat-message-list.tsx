@@ -412,7 +412,7 @@ function ChatMessageListComponent({
     const isVisible = !isNearBottom && displayMessages.length > 0
     return (
       <div
-        className="pointer-events-none fixed left-1/2 z-40 -translate-x-1/2"
+        className="pointer-events-none absolute left-1/2 z-40 -translate-x-1/2"
         style={{ bottom: `${bottomOffset + 24}px` }}
       >
         <ScrollToBottomButton
