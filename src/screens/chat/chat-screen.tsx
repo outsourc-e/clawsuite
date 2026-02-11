@@ -54,7 +54,6 @@ import type {
   ChatComposerHelpers,
 } from './components/chat-composer'
 import type { GatewayAttachment, GatewayMessage, HistoryResponse as _HistoryResponse } from './types'
-import type { ChatMode } from '@/components/gateway-chat-embed'
 import { cn } from '@/lib/utils'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
@@ -67,7 +66,6 @@ import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
-import { GatewayChatEmbed, getStoredChatMode, setStoredChatMode } from '@/components/gateway-chat-embed'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -131,14 +129,6 @@ export function ChatScreen({
   const [waitingForResponse, setWaitingForResponse] = useState(
     () => hasPendingSend() || hasPendingGeneration(),
   )
-  const [chatMode, setChatMode] = useState<ChatMode>(getStoredChatMode)
-  const handleChatModeToggle = useCallback(() => {
-    setChatMode((prev) => {
-      const next = prev === 'native' ? 'gateway' : 'native'
-      setStoredChatMode(next)
-      return next
-    })
-  }, [])
   const [pinToTop, setPinToTop] = useState(
     () => hasPendingSend() || hasPendingGeneration(),
   )
@@ -502,7 +492,7 @@ export function ChatScreen({
     !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
   const stableContentStyle = useMemo<React.CSSProperties>(() => {
     const composerPadding =
-      'calc(var(--chat-composer-height, 140px) + env(safe-area-inset-bottom, 0px) + 24px)'
+      'calc(var(--chat-composer-height, 160px) + env(safe-area-inset-bottom, 0px) + 48px)'
     return {
       paddingBottom:
         terminalPanelInset > 0
@@ -1127,16 +1117,12 @@ export function ChatScreen({
               showFileExplorerButton={!isMobile}
               fileExplorerCollapsed={fileExplorerCollapsed}
               onToggleFileExplorer={handleToggleFileExplorer}
-              chatMode={chatMode}
-              onToggleChatMode={handleChatModeToggle}
             />
           )}
 
           <ContextBar compact={compact} />
 
-          {chatMode === 'gateway' ? (
-            <GatewayChatEmbed className="flex-1 min-h-0" />
-          ) : hideUi ? null : (
+          {hideUi ? null : (
             <ChatMessageList
               messages={displayMessages}
               loading={historyLoading}
@@ -1157,7 +1143,7 @@ export function ChatScreen({
               streamingThinking={streamingThinking}
             />
           )}
-          {chatMode === 'gateway' ? null : showComposer ? (
+          {showComposer ? (
             <ChatComposer
               onSubmit={send}
               isLoading={sending}

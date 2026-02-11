@@ -83,7 +83,7 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
   return (
     <PreviewCard>
       <PreviewCardTrigger className="block w-full cursor-pointer">
-        <div className={cn('sticky top-12 z-[9] w-full h-1.5 transition-colors duration-300', barBg)}>
+        <div className={cn('shrink-0 w-full h-1.5 transition-colors duration-300', barBg)}>
           <div
             className={cn('h-full transition-all duration-700 ease-out', barColor)}
             style={{ width: `${Math.min(pct, 100)}%` }}
