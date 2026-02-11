@@ -444,22 +444,19 @@ function ChatSidebarComponent({
   const isLogsActive = pathname === '/activity' || pathname === '/logs'
 
   // Track last-visited route per section
-  const studioRoutes = ['/dashboard', '/new', '/browser', '/terminal', '/tasks']
-  const gatewayRoutes = ['/channels', '/sessions', '/usage', '/cron']
-  const agentRoutes = ['/agents', '/skills', '/nodes', '/files', '/memory']
-  const settingsRoutes = ['/settings', '/settings/providers', '/debug', '/activity', '/logs']
+  const studioRoutes = ['/dashboard', '/new', '/browser', '/terminal', '/tasks', '/skills', '/cron', '/activity', '/logs', '/debug', '/files', '/memory']
+  const gatewayRoutes = ['/channels', '/sessions', '/usage', '/agents', '/nodes']
+  const settingsRoutes = ['/settings', '/settings/providers']
 
   useEffect(() => {
     if (studioRoutes.includes(pathname)) setLastRoute('studio', pathname)
     else if (gatewayRoutes.includes(pathname)) setLastRoute('gateway', pathname)
-    else if (agentRoutes.includes(pathname)) setLastRoute('agent', pathname)
     else if (settingsRoutes.includes(pathname)) setLastRoute('settings', pathname)
   }, [pathname])
 
   // Resolve navigation targets (last visited or default)
   const studioNav = getLastRoute('studio') || '/dashboard'
   const gatewayNav = getLastRoute('gateway') || '/channels'
-  const agentNav = getLastRoute('agent') || '/agents'
   const settingsNav = getLastRoute('settings') || '/settings'
 
   const transition = {
@@ -479,10 +476,6 @@ function ChatSidebarComponent({
   const [gatewayExpanded, toggleGateway] = usePersistedBool(
     'openclaw-sidebar-gateway-expanded',
     false,
-  )
-  const [agentExpanded, toggleAgent] = usePersistedBool(
-    'openclaw-sidebar-agent-expanded',
-    true,
   )
   const [settingsExpanded, toggleSettings] = usePersistedBool(
     'openclaw-sidebar-settings-expanded',
@@ -612,6 +605,50 @@ function ChatSidebarComponent({
       label: 'Tasks',
       active: isTasksActive,
     },
+    // Studio-enhanced pages (we built rich UI for these)
+    {
+      kind: 'link',
+      to: '/skills',
+      icon: PuzzleIcon,
+      label: 'Skills+',
+      active: isSkillsActive,
+    },
+    {
+      kind: 'link',
+      to: '/cron',
+      icon: Clock01Icon,
+      label: 'Cron+',
+      active: isCronActive,
+    },
+    {
+      kind: 'link',
+      to: '/activity',
+      icon: ListViewIcon,
+      label: 'Logs+',
+      active: isLogsActive,
+    },
+    {
+      kind: 'link',
+      to: '/debug',
+      icon: Notification03Icon,
+      label: 'Debug+',
+      active: isDebugActive,
+      badge: showDebugErrorDot ? 'error-dot' : undefined,
+    },
+    {
+      kind: 'link',
+      to: '/files',
+      icon: File01Icon,
+      label: 'Files+',
+      active: isFilesActive,
+    },
+    {
+      kind: 'link',
+      to: '/memory',
+      icon: BrainIcon,
+      label: 'Memory+',
+      active: isMemoryActive,
+    },
   ]
 
   const gatewayItems: NavItemDef[] = [
@@ -638,16 +675,6 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/cron',
-      icon: Clock01Icon,
-      label: 'Cron Jobs',
-      active: isCronActive,
-    },
-  ]
-
-  const agentItems: NavItemDef[] = [
-    {
-      kind: 'link',
       to: '/agents',
       icon: UserGroupIcon,
       label: 'Agents',
@@ -655,31 +682,10 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/skills',
-      icon: PuzzleIcon,
-      label: 'Skills',
-      active: isSkillsActive,
-    },
-    {
-      kind: 'link',
       to: '/nodes',
       icon: SmartPhone01Icon,
       label: 'Nodes',
       active: isNodesActive,
-    },
-    {
-      kind: 'link',
-      to: '/files',
-      icon: File01Icon,
-      label: 'Files',
-      active: isFilesActive,
-    },
-    {
-      kind: 'link',
-      to: '/memory',
-      icon: BrainIcon,
-      label: 'Memory',
-      active: isMemoryActive,
     },
   ]
 
@@ -691,26 +697,10 @@ function ChatSidebarComponent({
       label: 'Config',
       active: isSettingsRouteActive && !isSettingsProvidersActive,
     },
-    {
-      kind: 'link',
-      to: '/debug',
-      icon: Notification03Icon,
-      label: 'Debug',
-      active: isDebugActive,
-      badge: showDebugErrorDot ? 'error-dot' : undefined,
-    },
-    {
-      kind: 'link',
-      to: '/activity',
-      icon: ListViewIcon,
-      label: 'Logs',
-      active: isLogsActive,
-    },
   ]
 
   // Auto-expand sections if any child route is active
   const isAnyGatewayActive = gatewayItems.some((i) => i.active)
-  const isAnyAgentActive = agentItems.some((i) => i.active)
   const isAnySettingsActive =
     settingsItems.some((i) => i.active) || isSettingsProvidersActive
 
@@ -815,24 +805,6 @@ function ChatSidebarComponent({
         <CollapsibleSection
           expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
           items={gatewayItems}
-          isCollapsed={isCollapsed}
-          transition={transition}
-          onSelectSession={onSelectSession}
-        />
-
-        {/* AGENT (collapsible) */}
-        <SectionLabel
-          label="Agent"
-          isCollapsed={isCollapsed}
-          transition={transition}
-          collapsible
-          expanded={agentExpanded || isAnyAgentActive}
-          onToggle={toggleAgent}
-          navigateTo={agentNav}
-        />
-        <CollapsibleSection
-          expanded={agentExpanded || isAnyAgentActive || isCollapsed}
-          items={agentItems}
           isCollapsed={isCollapsed}
           transition={transition}
           onSelectSession={onSelectSession}
