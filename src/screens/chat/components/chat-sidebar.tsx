@@ -133,7 +133,8 @@ function NavItem({
 }) {
   const cls = cn(
     buttonVariants({ variant: 'ghost', size: 'sm' }),
-    'w-full h-auto justify-start gap-2.5 px-3 py-2',
+    'w-full h-auto gap-2.5 py-2',
+    isCollapsed ? 'justify-center px-0' : 'justify-start px-3',
     item.active
       ? 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/15'
       : 'text-primary-900 hover:bg-primary-200',
@@ -724,7 +725,7 @@ function ChatSidebarComponent({
       <motion.div
         layout
         transition={{ layout: transition }}
-        className={cn('flex items-center h-12 px-2 justify-between')}
+        className={cn('flex items-center h-12 px-2', isCollapsed ? 'justify-center' : 'justify-between')}
       >
         <AnimatePresence initial={false}>
           {!isCollapsed ? (
@@ -904,7 +905,7 @@ function ChatSidebarComponent({
             size="sm"
             onClick={handleOpenSettings}
             title={isCollapsed ? 'Settings' : undefined}
-            className="w-full h-auto justify-start gap-2.5 px-3 py-2"
+            className={cn('w-full h-auto gap-2.5 py-2', isCollapsed ? 'justify-center px-0' : 'justify-start px-3')}
           >
             <HugeiconsIcon
               icon={Settings01Icon}
