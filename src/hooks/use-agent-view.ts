@@ -527,7 +527,7 @@ export function useAgentView(): AgentViewResult {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now())
-    }, 1000)
+    }, 5000) // Every 5s instead of 1s to reduce re-renders
 
     return function cleanupTimer() {
       window.clearInterval(timer)
@@ -544,19 +544,12 @@ export function useAgentView(): AgentViewResult {
           ? sessionsPayload.sessions
           : []
 
-        const statusEntries = await Promise.all(
-          sessions.map(async function loadStatus(session) {
-            const key = readSessionKey(session)
-            if (!key) return [key, null] as const
-
-            try {
-              const status = await fetchSessionStatus(key)
-              return [key, status] as const
-            } catch {
-              return [key, null] as const
-            }
-          }),
-        )
+        // Skip per-session status fetch — /api/sessions/:key/status route
+        // doesn't exist, causing 404 spam. Use session data directly.
+        const statusEntries = sessions.map(function loadStatus(session) {
+          const key = readSessionKey(session)
+          return [key, null] as const
+        })
 
         const statusMap = new Map<string, GatewaySessionStatusResponse | null>(
           statusEntries,

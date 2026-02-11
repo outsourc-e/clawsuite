@@ -336,11 +336,13 @@ export function AgentViewPanel() {
 
   // Swarm node stats removed — OrchestratorCard now serves as the main agent representation
 
-  const agentSpawn = useAgentSpawn(
-    activeNodes.map(function mapActiveNodeId(node) {
-      return node.id
-    }),
+  const activeNodeIds = useMemo(
+    () => activeNodes.map(node => node.id),
+    // Stabilize: only recompute when the sorted id string changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeNodes.map(n => n.id).join(',')],
   )
+  const agentSpawn = useAgentSpawn(activeNodeIds)
   const shouldReduceMotion = useReducedMotion()
   const networkLayerRef = useRef<HTMLDivElement | null>(null)
   const [sourceBubbleRect, setSourceBubbleRect] = useState<DOMRect | null>(null)
