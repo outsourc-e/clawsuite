@@ -13,6 +13,7 @@ import {
   Search01Icon,
   Settings01Icon,
   SidebarLeft01Icon,
+  Task01Icon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useState } from 'react'
@@ -139,6 +140,7 @@ function ChatSidebarComponent({
   const isLogsActive = pathname === '/activity' || pathname === '/logs'
   const isDebugActive = pathname === '/debug'
   const isCronActive = pathname === '/cron'
+  const isTasksActive = pathname === '/tasks'
   const isBrowserActive = pathname === '/browser'
   const isSettingsRouteActive = pathname.startsWith('/settings')
   const isSettingsProvidersActive = pathname === '/settings/providers'
@@ -591,6 +593,37 @@ function ChatSidebarComponent({
                   className="overflow-hidden whitespace-nowrap"
                 >
                   Cron
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+          </Link>
+        </motion.div>
+        <motion.div
+          layout
+          transition={{ layout: transition }}
+          className="w-full"
+        >
+          <Link
+            to="/tasks"
+            onMouseUp={onSelectSession}
+            className={navItemClass(isTasksActive)}
+          >
+            <HugeiconsIcon
+              icon={Task01Icon}
+              size={20}
+              strokeWidth={1.5}
+              className="size-5 shrink-0"
+            />
+            <AnimatePresence initial={false} mode="wait">
+              {!isCollapsed ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  Tasks
                 </motion.span>
               ) : null}
             </AnimatePresence>
