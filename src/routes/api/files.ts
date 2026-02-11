@@ -76,32 +76,44 @@ function parseGlobPattern(input: string) {
   }
 }
 
-async function readDirectory(dirPath: string): Promise<Array<FileEntry>> {
+const IGNORED_DIRS = new Set([
+  'node_modules', '.git', '.next', '.turbo', '.cache',
+  '__pycache__', '.venv', 'dist', '.DS_Store',
+])
+
+async function readDirectory(dirPath: string, depth = 0): Promise<Array<FileEntry>> {
+  if (depth > 8) return [] // prevent infinite recursion on deep trees
   const entries = await fs.readdir(dirPath, { withFileTypes: true })
   const mapped: Array<FileEntry> = []
 
   for (const entry of entries) {
+    if (IGNORED_DIRS.has(entry.name)) continue
     const fullPath = path.join(dirPath, entry.name)
     const relativePath = toRelative(fullPath)
-    const stats = await fs.stat(fullPath)
-    if (entry.isDirectory()) {
-      const children = await readDirectory(fullPath)
-      mapped.push({
-        name: entry.name,
-        path: relativePath,
-        type: 'folder',
-        size: stats.size,
-        modifiedAt: stats.mtime.toISOString(),
-        children,
-      })
-    } else {
-      mapped.push({
-        name: entry.name,
-        path: relativePath,
-        type: 'file',
-        size: stats.size,
-        modifiedAt: stats.mtime.toISOString(),
-      })
+    try {
+      const stats = await fs.stat(fullPath)
+      if (entry.isDirectory()) {
+        const children = await readDirectory(fullPath, depth + 1)
+        mapped.push({
+          name: entry.name,
+          path: relativePath,
+          type: 'folder',
+          size: stats.size,
+          modifiedAt: stats.mtime.toISOString(),
+          children,
+        })
+      } else {
+        mapped.push({
+          name: entry.name,
+          path: relativePath,
+          type: 'file',
+          size: stats.size,
+          modifiedAt: stats.mtime.toISOString(),
+        })
+      }
+    } catch {
+      // Skip broken symlinks or inaccessible entries
+      continue
     }
   }
 
