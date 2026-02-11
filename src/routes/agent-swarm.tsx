@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { BotIcon, Rocket01Icon } from '@hugeicons/core-free-icons'
@@ -8,6 +8,7 @@ import { useSwarmStore, type SwarmSession } from '@/stores/agent-swarm-store'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { assignPersona } from '@/lib/agent-personas'
+import { IsometricOffice } from '@/components/agent-swarm/isometric-office'
 
 export const Route = createFileRoute('/agent-swarm')({
   component: AgentSwarmRoute,
@@ -95,9 +96,12 @@ function SessionCard({ session }: { session: SwarmSession }) {
   )
 }
 
+type ViewMode = 'office' | 'cards'
+
 function AgentSwarmRoute() {
   usePageTitle('Agent Swarm')
   const { sessions, isConnected, error, startPolling, stopPolling } = useSwarmStore()
+  const [viewMode, setViewMode] = useState<ViewMode>('office')
 
   useEffect(() => {
     startPolling(5000)
@@ -131,7 +135,34 @@ function AgentSwarmRoute() {
               </p>
             </div>
 
-            {/* Connection Status */}
+            {/* View Toggle + Connection Status */}
+            <div className="flex items-center gap-3">
+              <div className="flex rounded-lg border border-primary-200 bg-primary-100/50 p-0.5">
+                <button
+                  onClick={() => setViewMode('office')}
+                  className={cn(
+                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    viewMode === 'office'
+                      ? 'bg-orange-500 text-white'
+                      : 'text-primary-500 hover:text-primary-700'
+                  )}
+                >
+                  🏢 Office
+                </button>
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={cn(
+                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    viewMode === 'cards'
+                      ? 'bg-orange-500 text-white'
+                      : 'text-primary-500 hover:text-primary-700'
+                  )}
+                >
+                  📋 Cards
+                </button>
+              </div>
+            </div>
+
             <div className={cn(
               'flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium',
               isConnected
@@ -164,8 +195,15 @@ function AgentSwarmRoute() {
           )}
         </header>
 
-        {/* Session Lists */}
-        {sessions.length > 0 ? (
+        {/* Office View */}
+        {viewMode === 'office' && (
+          <div className="mb-6 h-[500px] overflow-hidden rounded-2xl border border-primary-200">
+            <IsometricOffice sessions={sessions} />
+          </div>
+        )}
+
+        {/* Card View */}
+        {viewMode === 'cards' && sessions.length > 0 && (
           <div className="space-y-6">
             {/* Active Sessions */}
             {activeSessions.length > 0 && (
@@ -199,7 +237,10 @@ function AgentSwarmRoute() {
               </section>
             )}
           </div>
-        ) : (
+        )}
+
+        {/* Empty state — cards mode only */}
+        {viewMode === 'cards' && sessions.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-primary-200 bg-primary-50/60 px-6 py-16 text-center">
             <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-primary-100 text-primary-500">
               <HugeiconsIcon icon={Rocket01Icon} size={32} strokeWidth={1.5} />
