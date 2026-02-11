@@ -340,7 +340,7 @@ function MarkdownComponent({
   const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children])
 
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    <div className={cn('flex flex-col gap-2 break-words overflow-hidden', className)}>
       {blocks.map((block, index) => (
         <MemoizedMarkdownBlock
           key={`${blockId}-block-${index}`}

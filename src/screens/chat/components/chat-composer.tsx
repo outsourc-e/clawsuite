@@ -664,7 +664,7 @@ function ChatComposerComponent({
 
   return (
     <div
-      className="sticky bottom-0 z-30 mx-auto w-full max-w-full bg-surface/95 px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 backdrop-blur sm:max-w-[768px] sm:min-w-[400px]"
+      className="sticky bottom-0 z-30 mx-auto w-full max-w-full bg-surface/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 backdrop-blur sm:px-5 sm:max-w-[768px]"
       ref={wrapperRef}
     >
       <input
