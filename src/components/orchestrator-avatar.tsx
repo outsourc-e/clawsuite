@@ -11,9 +11,10 @@ import { cn } from '@/lib/utils'
 
 /* ── Avatar types ─────────────────────────────────────── */
 
-export type AvatarStyle = 'claw-cat' | 'robot' | 'ghost' | 'fox' | 'owl' | 'octopus'
+export type AvatarStyle = 'lobster' | 'claw-cat' | 'robot' | 'ghost' | 'fox' | 'owl' | 'octopus'
 
 const AVATAR_OPTIONS: Array<{ id: AvatarStyle; label: string; emoji: string }> = [
+  { id: 'lobster', label: 'Lobster', emoji: '🦞' },
   { id: 'claw-cat', label: 'ClawBot', emoji: '🐱' },
   { id: 'robot', label: 'Robot', emoji: '🤖' },
   { id: 'fox', label: 'Fox', emoji: '🦊' },
@@ -29,7 +30,7 @@ function getStoredAvatar(): AvatarStyle {
     const v = localStorage.getItem(STORAGE_KEY)
     if (v && AVATAR_OPTIONS.some((o) => o.id === v)) return v as AvatarStyle
   } catch { /* noop */ }
-  return 'claw-cat'
+  return 'lobster'
 }
 
 /* ── CSS keyframes ────────────────────────────────────── */
@@ -66,6 +67,90 @@ function stateAnim(state: OrchestratorState): string {
   if (state === 'idle') return 'oa-breathe 3s ease-in-out infinite'
   if (state === 'responding') return 'oa-bob 0.8s ease-in-out infinite'
   return 'none'
+}
+
+function LobsterSVG({ state, size }: { state: OrchestratorState; size: number }) {
+  ensureStyles()
+  const ey = state === 'thinking' ? 8 : 9.5
+  const clawAnim = state !== 'idle' ? 'oa-type 0.6s ease-in-out infinite' : 'none'
+  const mouth = state === 'orchestrating' ? 'M14,14 Q16,16.5 18,14'
+    : state === 'responding' ? 'M14.5,14 Q16,15.5 17.5,14'
+    : state === 'thinking' ? 'M15,14.5 Q16,14.5 17,14.5'
+    : 'M14.5,14 Q16,15 17.5,14'
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" style={{ animation: stateAnim(state) }}>
+      {state === 'thinking' && (
+        <circle cx="16" cy="16" r="14.5" fill="none" stroke="#eab308" strokeWidth="1.5"
+          strokeDasharray="6 4" opacity="0.6" style={{ animation: 'oa-think-ring 2s linear infinite' }} />
+      )}
+      {state === 'orchestrating' && (
+        <circle cx="16" cy="16" r="15" fill="none" stroke="#dc2626" strokeWidth="1.5" opacity="0.4">
+          <animate attributeName="opacity" values="0.3;0.6;0.3" dur="1.5s" repeatCount="indefinite" />
+        </circle>
+      )}
+
+      {/* Antennae */}
+      <line x1="12" y1="6" x2="8" y2="1" stroke="#dc2626" strokeWidth="1" strokeLinecap="round" />
+      <line x1="20" y1="6" x2="24" y2="1" stroke="#dc2626" strokeWidth="1" strokeLinecap="round" />
+      <circle cx="8" cy="1" r="1.2" fill="#ef4444" />
+      <circle cx="24" cy="1" r="1.2" fill="#ef4444" />
+
+      {/* Eye stalks */}
+      <line x1="12" y1="9" x2="10" y2="6" stroke="#dc2626" strokeWidth="1.5" />
+      <line x1="20" y1="9" x2="22" y2="6" stroke="#dc2626" strokeWidth="1.5" />
+      <circle cx="10" cy={ey - 3} r="2" fill="white" />
+      <circle cx="22" cy={ey - 3} r="2" fill="white" />
+      <circle cx="10" cy={ey - 3} r="1" fill={D} />
+      <circle cx="22" cy={ey - 3} r="1" fill={D} />
+      <circle cx="10.3" cy={ey - 3.4} r="0.35" fill="white" opacity="0.9" />
+      <circle cx="22.3" cy={ey - 3.4} r="0.35" fill="white" opacity="0.9" />
+
+      {/* Head/body */}
+      <ellipse cx="16" cy="13" rx="7" ry="6" fill="#dc2626" />
+      <ellipse cx="16" cy="13" rx="5" ry="4" fill="#ef4444" opacity="0.4" />
+
+      {/* Tail segments */}
+      <ellipse cx="16" cy="20" rx="5.5" ry="3" fill="#dc2626" />
+      <ellipse cx="16" cy="24" rx="4.5" ry="2.5" fill="#b91c1c" />
+      <ellipse cx="16" cy="27.5" rx="3.5" ry="2" fill="#991b1b" />
+      {/* Tail fan */}
+      <ellipse cx="13" cy="30" rx="2.5" ry="1.2" fill="#dc2626" transform="rotate(-15 13 30)" />
+      <ellipse cx="16" cy="30.5" rx="2" ry="1" fill="#dc2626" />
+      <ellipse cx="19" cy="30" rx="2.5" ry="1.2" fill="#dc2626" transform="rotate(15 19 30)" />
+
+      {/* Claws — left */}
+      <g style={{ transformOrigin: '5px 14px', animation: clawAnim }}>
+        <path d="M9,13 Q6,11 4,13" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" />
+        <ellipse cx="3.5" cy="11.5" rx="2.5" ry="2" fill="#dc2626" transform="rotate(-20 3.5 11.5)" />
+        <path d="M2.5,10.5 Q3.5,9 4.5,10.5" fill="none" stroke="#b91c1c" strokeWidth="0.8" />
+      </g>
+
+      {/* Claws — right */}
+      <g style={{ transformOrigin: '27px 14px', animation: clawAnim.replace('0.6s', '0.65s') }}>
+        <path d="M23,13 Q26,11 28,13" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" />
+        <ellipse cx="28.5" cy="11.5" rx="2.5" ry="2" fill="#dc2626" transform="rotate(20 28.5 11.5)" />
+        <path d="M27.5,10.5 Q28.5,9 29.5,10.5" fill="none" stroke="#b91c1c" strokeWidth="0.8" />
+      </g>
+
+      {/* Mouth */}
+      <path d={mouth} fill="none" stroke={D} strokeWidth="0.8" strokeLinecap="round" />
+
+      {/* Segment lines on tail */}
+      <line x1="12" y1="19" x2="20" y2="19" stroke="#b91c1c" strokeWidth="0.5" opacity="0.5" />
+      <line x1="12.5" y1="22" x2="19.5" y2="22" stroke="#991b1b" strokeWidth="0.5" opacity="0.5" />
+      <line x1="13.5" y1="25" x2="18.5" y2="25" stroke="#7f1d1d" strokeWidth="0.5" opacity="0.5" />
+
+      {/* Responding dots */}
+      {state === 'responding' && (
+        <g>
+          <circle cx="10" cy="30.5" r="1" fill="#ef4444" style={{ animation: 'oa-dot1 1.2s ease-in-out infinite' }} />
+          <circle cx="16" cy="31" r="1" fill="#ef4444" style={{ animation: 'oa-dot2 1.2s ease-in-out infinite' }} />
+          <circle cx="22" cy="30.5" r="1" fill="#ef4444" style={{ animation: 'oa-dot3 1.2s ease-in-out infinite' }} />
+        </g>
+      )}
+    </svg>
+  )
 }
 
 function ClawCatSVG({ state, size }: { state: OrchestratorState; size: number }) {
@@ -240,6 +325,7 @@ function OctopusSVG({ state, size }: { state: OrchestratorState; size: number })
 }
 
 const AVATAR_RENDERERS: Record<AvatarStyle, React.FC<{ state: OrchestratorState; size: number }>> = {
+  lobster: LobsterSVG,
   'claw-cat': ClawCatSVG,
   robot: RobotSVG,
   fox: FoxSVG,
