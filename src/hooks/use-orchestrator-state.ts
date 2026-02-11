@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { useSwarmStore } from '@/stores/agent-swarm-store'
 
 export type OrchestratorState = 'idle' | 'thinking' | 'working' | 'orchestrating' | 'listening'
@@ -9,11 +10,16 @@ type OrchestratorInfo = {
   activeAgentCount: number
 }
 
-export function useOrchestratorState(opts: {
+export function useOrchestratorState(opts?: {
   waitingForResponse?: boolean
   isStreaming?: boolean
 }): OrchestratorInfo {
   const sessions = useSwarmStore((s) => s.sessions)
+  const storeWaiting = useChatActivityStore((s) => s.waitingForResponse)
+  const storeStreaming = useChatActivityStore((s) => s.isStreaming)
+
+  const waiting = opts?.waitingForResponse ?? storeWaiting
+  const streaming = opts?.isStreaming ?? storeStreaming
 
   return useMemo(() => {
     const activeAgents = sessions.filter(
@@ -29,14 +35,14 @@ export function useOrchestratorState(opts: {
       }
     }
 
-    if (opts.isStreaming) {
+    if (streaming) {
       return { state: 'working', label: 'Working...', activeAgentCount: 0 }
     }
 
-    if (opts.waitingForResponse) {
+    if (waiting) {
       return { state: 'thinking', label: 'Thinking...', activeAgentCount: 0 }
     }
 
     return { state: 'idle', label: 'Idle', activeAgentCount: 0 }
-  }, [sessions, opts.isStreaming, opts.waitingForResponse])
+  }, [sessions, streaming, waiting])
 }

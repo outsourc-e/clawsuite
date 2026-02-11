@@ -64,6 +64,7 @@ import { useAgentViewStore } from '@/hooks/use-agent-view'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
+import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { ContextBar } from './components/context-bar'
 
 type ChatScreenProps = {
@@ -428,6 +429,12 @@ export function ChatScreen({
       streamFinish(true) // Error = stop waiting
     }, [clearActiveStream, queryClient, streamFinish]),
   })
+
+  // Sync chat activity to global store for sidebar orchestrator avatar
+  const setActivityWaiting = useChatActivityStore((s) => s.setWaiting)
+  const setActivityStreaming = useChatActivityStore((s) => s.setStreaming)
+  useEffect(() => { setActivityWaiting(waitingForResponse) }, [waitingForResponse, setActivityWaiting])
+  useEffect(() => { setActivityStreaming(streaming.isStreaming) }, [streaming.isStreaming, setActivityStreaming])
 
   const _uiQuery = useQuery({
     queryKey: chatUiQueryKey,

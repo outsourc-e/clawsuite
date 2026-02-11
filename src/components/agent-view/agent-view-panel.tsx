@@ -35,6 +35,7 @@ import {
   useAgentView,
 } from '@/hooks/use-agent-view'
 import { useSounds } from '@/hooks/use-sounds'
+import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { cn } from '@/lib/utils'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
@@ -492,6 +493,11 @@ export function AgentViewPanel() {
           <ScrollAreaRoot className="h-[calc(100vh-3.25rem)]">
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
+                {/* Orchestrator Avatar */}
+                <div className="flex items-center justify-center rounded-2xl border border-primary-300/70 bg-primary-200/35 py-3">
+                  <OrchestratorAvatar size={44} />
+                </div>
+
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1.5">
                   <div className="mb-1.5 flex items-center justify-between">
                     <div>
