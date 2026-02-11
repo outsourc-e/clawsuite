@@ -69,7 +69,7 @@ export const SidebarSessions = memo(function SidebarSessions({
       className="flex h-full flex-col flex-1 min-h-0 w-full"
       defaultOpen={defaultOpen}
     >
-      <CollapsibleTrigger className="w-fit pl-1.5 shrink-0">
+      <CollapsibleTrigger className="w-fit pl-3 shrink-0 mt-2">
         Sessions
         <span className="opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           <HugeiconsIcon

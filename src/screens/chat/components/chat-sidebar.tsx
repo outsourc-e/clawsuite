@@ -14,6 +14,7 @@ import {
   PencilEdit02Icon,
   PuzzleIcon,
   Search01Icon,
+  ApiIcon,
   Settings01Icon,
   SidebarLeft01Icon,
   ServerStack01Icon,
@@ -476,10 +477,6 @@ function ChatSidebarComponent({
   const showDebugErrorDot = Boolean(recentIssuesQuery.data)
 
   // Collapsible section states
-  const [studioMoreExpanded, toggleStudioMore] = usePersistedBool(
-    'openclaw-sidebar-studio-more-expanded',
-    false,
-  )
   const [gatewayExpanded, toggleGateway] = usePersistedBool(
     'openclaw-sidebar-gateway-expanded',
     false,
@@ -568,8 +565,7 @@ function ChatSidebarComponent({
 
   // ── Nav definitions ─────────────────────────────────────────────────
 
-  // Studio primary items (always visible)
-  const studioPrimaryItems: NavItemDef[] = [
+  const studioItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/dashboard',
@@ -613,10 +609,6 @@ function ChatSidebarComponent({
       label: 'Tasks',
       active: isTasksActive,
     },
-  ]
-
-  // Studio secondary items (collapsible "More")
-  const studioSecondaryItems: NavItemDef[] = [
     {
       kind: 'link',
       to: '/skills',
@@ -715,13 +707,18 @@ function ChatSidebarComponent({
       label: 'Config',
       active: isSettingsRouteActive && !isSettingsProvidersActive,
     },
+    {
+      kind: 'link',
+      to: '/settings/providers',
+      icon: ApiIcon,
+      label: 'Providers',
+      active: isSettingsProvidersActive,
+    },
   ]
 
   // Auto-expand sections if any child route is active
-  const isAnyStudioSecondaryActive = studioSecondaryItems.some((i) => i.active)
   const isAnyGatewayActive = gatewayItems.some((i) => i.active)
-  const isAnySettingsActive =
-    settingsItems.some((i) => i.active) || isSettingsProvidersActive
+  const isAnySettingsActive = settingsItems.some((i) => i.active)
 
   return (
     <motion.aside
@@ -795,7 +792,7 @@ function ChatSidebarComponent({
           transition={transition}
           navigateTo={studioNav}
         />
-        {studioPrimaryItems.map((item) => (
+        {studioItems.map((item) => (
           <motion.div
             key={item.label}
             layout
@@ -810,23 +807,6 @@ function ChatSidebarComponent({
             />
           </motion.div>
         ))}
-
-        {/* STUDIO MORE (collapsible) */}
-        <SectionLabel
-          label="More"
-          isCollapsed={isCollapsed}
-          transition={transition}
-          collapsible
-          expanded={studioMoreExpanded || isAnyStudioSecondaryActive}
-          onToggle={toggleStudioMore}
-        />
-        <CollapsibleSection
-          expanded={studioMoreExpanded || isAnyStudioSecondaryActive || isCollapsed}
-          items={studioSecondaryItems}
-          isCollapsed={isCollapsed}
-          transition={transition}
-          onSelectSession={onSelectSession}
-        />
 
         {/* GATEWAY (collapsible) */}
         <SectionLabel
@@ -863,37 +843,11 @@ function ChatSidebarComponent({
           transition={transition}
           onSelectSession={onSelectSession}
         />
-        {/* Providers sub-item under Config */}
-        <AnimatePresence initial={false}>
-          {(settingsExpanded || isAnySettingsActive || isCollapsed) &&
-            !isCollapsed && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="overflow-hidden"
-              >
-                <Link
-                  to="/settings/providers"
-                  onMouseUp={onSelectSession}
-                  className={cn(
-                    buttonVariants({ variant: 'ghost', size: 'sm' }),
-                    'ml-6 h-auto w-[calc(100%-1.5rem)] justify-start px-2 py-1.5 text-xs text-primary-700',
-                    isSettingsProvidersActive
-                      ? 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/15'
-                      : 'hover:bg-primary-200',
-                  )}
-                >
-                  <span className="truncate">Providers</span>
-                </Link>
-              </motion.div>
-            )}
-        </AnimatePresence>
+        {/* (Providers is now a regular nav item in settingsItems) */}
       </div>
 
       {/* ── Sessions list ───────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden border-t border-primary-200/60">
         <AnimatePresence initial={false}>
           {!isCollapsed && (
             <motion.div
@@ -902,7 +856,7 @@ function ChatSidebarComponent({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={transition}
-              className="pt-0 flex flex-col w-full min-h-0 h-full"
+              className="flex flex-col w-full min-h-0 h-full"
             >
               <div className="flex-1 min-h-0">
                 <SidebarSessions
@@ -925,35 +879,6 @@ function ChatSidebarComponent({
       {/* ── Footer ──────────────────────────────────────────────────── */}
       <div className="px-2 py-3 border-t border-primary-200 bg-surface shrink-0">
         <GatewayStatusIndicator collapsed={isCollapsed} />
-        <div className="w-full">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleOpenSettings}
-            title={isCollapsed ? 'Settings' : undefined}
-            className={cn('w-full h-auto gap-2.5 py-2', isCollapsed ? 'justify-center px-0' : 'justify-start px-3')}
-          >
-            <HugeiconsIcon
-              icon={Settings01Icon}
-              size={20}
-              strokeWidth={1.5}
-              className="size-5 shrink-0"
-            />
-            <AnimatePresence initial={false} mode="wait">
-              {!isCollapsed && (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={transition}
-                  className="overflow-hidden whitespace-nowrap"
-                >
-                  Settings
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </Button>
-        </div>
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
