@@ -72,7 +72,7 @@ const STATE_GLOW: Record<string, string> = {
   orchestrating: 'border-orange-400/50 shadow-[0_0_8px_rgba(249,115,22,0.2)]',
 }
 
-function OrchestratorCard() {
+function OrchestratorCard({ compact = false }: { compact?: boolean }) {
   const { state, label } = useOrchestratorState()
   const glowClass = STATE_GLOW[state] ?? STATE_GLOW.idle
 
@@ -118,7 +118,8 @@ function OrchestratorCard() {
   return (
     <div
       className={cn(
-        'relative rounded-2xl border bg-gradient-to-br from-primary-100/80 via-primary-100/60 to-primary-200/40 p-3 transition-all duration-500',
+        'relative rounded-2xl border bg-gradient-to-br from-primary-100/80 via-primary-100/60 to-primary-200/40 transition-all duration-500',
+        compact ? 'p-2' : 'p-3',
         glowClass,
       )}
     >
@@ -126,8 +127,8 @@ function OrchestratorCard() {
         <div className="pointer-events-none absolute inset-0 animate-pulse rounded-2xl bg-gradient-to-br from-orange-500/[0.03] to-transparent" />
       )}
 
-      <div className="relative flex items-center gap-3">
-        <OrchestratorAvatar size={52} />
+      <div className={cn('relative flex items-center', compact ? 'gap-2' : 'gap-3')}>
+        <OrchestratorAvatar size={compact ? 32 : 52} />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -149,20 +150,25 @@ function OrchestratorCard() {
               <button
                 type="button"
                 onClick={startEdit}
-                className="text-xs font-semibold text-primary-900 hover:text-orange-600 transition-colors"
+                className={cn(
+                  'font-semibold text-primary-900 hover:text-orange-600 transition-colors',
+                  compact ? 'text-[11px]' : 'text-xs',
+                )}
                 title="Click to rename"
               >
                 {displayName}
               </button>
             )}
-            <span className="rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-medium text-orange-600">
-              Main Agent
-            </span>
+            {!compact && (
+              <span className="rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-medium text-orange-600">
+                Main Agent
+              </span>
+            )}
           </div>
-          <p className="mt-0.5 text-[10px] text-primary-600">
+          <p className={cn('text-primary-600', compact ? 'text-[9px]' : 'mt-0.5 text-[10px]')}>
             {label}
           </p>
-          {model && (
+          {!compact && model && (
             <p className="mt-0.5 truncate text-[9px] font-mono text-primary-500">
               {model}
             </p>
@@ -549,20 +555,8 @@ export function AgentViewPanel() {
               {/* Center — title */}
               <h2 className="text-sm font-semibold text-primary-900">Agent Hub</h2>
 
-              {/* Right — expand + close */}
+              {/* Right — close */}
               <div className="flex items-center gap-1">
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={function handleMaximize() {
-                    setOpen(false)
-                    navigate({ to: '/agent-swarm' })
-                  }}
-                  aria-label="Open Agent Swarm studio"
-                  title="Open Studio View"
-                >
-                  <HugeiconsIcon icon={ArrowExpand01Icon} size={16} strokeWidth={1.5} />
-                </Button>
                 <Button
                   size="icon-sm"
                   variant="ghost"
@@ -615,12 +609,12 @@ export function AgentViewPanel() {
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
                 {/* Main Agent Card */}
-                <OrchestratorCard />
+                <OrchestratorCard compact={viewMode === 'compact'} />
 
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1.5">
                   <div className="mb-1.5 flex items-center justify-between">
                     <div>
-                      <h3 className="text-[11px] font-medium text-balance text-primary-900">Active Network</h3>
+                      <h3 className="text-[11px] font-medium text-balance text-primary-900">Swarm</h3>
                       <p className="text-[10px] text-primary-600 tabular-nums">
                         {isLoading
                           ? 'syncing...'
@@ -632,8 +626,22 @@ export function AgentViewPanel() {
                         </p>
                       ) : null}
                     </div>
-                    <div className="text-right text-[10px] text-primary-600 tabular-nums">
-                      <p>{statusCounts.running} running · {statusCounts.thinking} thinking</p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right text-[10px] text-primary-600 tabular-nums">
+                        <p>{statusCounts.running} running · {statusCounts.thinking} thinking</p>
+                      </div>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        onClick={function handleExpandHub() {
+                          setOpen(false)
+                          navigate({ to: '/agent-swarm' })
+                        }}
+                        aria-label="Open Agent Hub"
+                        title="Open Agent Hub"
+                      >
+                        <HugeiconsIcon icon={ArrowExpand01Icon} size={14} strokeWidth={1.5} />
+                      </Button>
                     </div>
                   </div>
 

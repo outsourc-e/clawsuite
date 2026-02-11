@@ -102,7 +102,7 @@ function SessionCard({ session }: { session: SwarmSession }) {
 type ViewMode = 'office' | 'cards'
 
 function AgentSwarmRoute() {
-  usePageTitle('Agent Swarm')
+  usePageTitle('Agent Hub')
   const { sessions, isConnected, error, startPolling, stopPolling } = useSwarmStore()
   const [viewMode, setViewMode] = useState<ViewMode>('office')
 
@@ -136,7 +136,7 @@ function AgentSwarmRoute() {
                   <span>Orchestration</span>
                 </div>
                 <h1 className="mt-2 text-xl font-semibold text-balance text-primary-900 sm:text-2xl">
-                  Agent Swarm
+                  Agent Hub
                 </h1>
                 <p className="mt-1 text-sm text-pretty text-primary-600">
                   Real-time monitoring of all active agent sessions.
