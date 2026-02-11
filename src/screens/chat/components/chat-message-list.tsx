@@ -126,7 +126,42 @@ function ChatMessageListComponent({
 
   // Filter out toolResult messages - they'll be displayed inside their associated tool calls
   const displayMessages = useMemo(() => {
-    return messages.filter((msg) => msg.role !== 'toolResult')
+    return messages.filter((msg) => {
+      if (msg.role === 'toolResult') return false
+
+      const cleanedText = textFromMessage(msg).trim()
+
+      if (msg.role === 'assistant') {
+        return cleanedText !== 'HEARTBEAT_OK'
+      }
+
+      if (msg.role === 'user') {
+        const rawText = (Array.isArray(msg.content) ? msg.content : [])
+          .map((part) => (part.type === 'text' ? String(part.text ?? '') : ''))
+          .join('')
+          .trim()
+
+        // Hide metadata-only user messages after cleanup.
+        if (cleanedText.length === 0) return false
+
+        const isSystemPrefixed = /^System:/i.test(rawText)
+        if (!isSystemPrefixed) return true
+
+        const normalizedText = cleanedText.toLowerCase()
+        const containsSystemFailure =
+          normalizedText.includes('exec failed') ||
+          normalizedText.includes('gatewayrestart') ||
+          normalizedText.includes('signal sigkill')
+        const matchesHeartbeatPrompt =
+          /read heartbeat\.md if it exists.*?reply heartbeat_ok\./is.test(
+            cleanedText,
+          )
+
+        if (containsSystemFailure || matchesHeartbeatPrompt) return false
+      }
+
+      return true
+    })
   }, [messages])
 
   const toolResultsByCallId = useMemo(() => {
