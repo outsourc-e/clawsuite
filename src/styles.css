@@ -157,28 +157,34 @@ code {
 }
 
 .chat-streaming-message {
-  /* Streaming updates replace the full text payload; keep paints local to the bubble. */
   contain: paint;
 }
 
 .chat-streaming-message .chat-streaming-content > :last-child {
-  animation: stream-reveal 0.4s ease-out;
-  will-change: opacity, filter, text-shadow;
+  animation: stream-reveal 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, filter, transform;
 }
 
 .chat-streaming-message .chat-streaming-content > :last-child :where(pre, code, table) {
-  text-shadow: none;
+  text-shadow: none !important;
 }
 
 @keyframes stream-reveal {
-  from {
-    opacity: 0.45;
-    filter: blur(0.8px);
-    text-shadow: 0 0 14px color-mix(in oklab, var(--color-primary-500) 30%, transparent);
+  0% {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(4px);
   }
-  to {
+  40% {
+    opacity: 0.7;
+    filter: blur(0.5px);
+    transform: translateY(1px);
+    text-shadow: 0 0 20px rgba(234, 88, 12, 0.4);
+  }
+  100% {
     opacity: 1;
     filter: blur(0);
+    transform: translateY(0);
     text-shadow: none;
   }
 }
@@ -278,24 +284,24 @@ code {
 /* ChatGPT-style streaming glow */
 .chat-streaming-glow {
   position: relative;
-  text-shadow: 0 0 8px color-mix(in oklab, var(--color-primary-500) 18%, transparent);
+  text-shadow: 0 0 12px rgba(234, 88, 12, 0.15);
   transition: text-shadow 0.5s ease-out;
 }
 .chat-streaming-glow::before {
-  content: '';
+  content: "";
   position: absolute;
-  inset: -1px;
+  inset: -2px;
   border-radius: 12px;
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in oklab, var(--color-primary-500) 16%, transparent),
+    rgba(234, 88, 12, 0.12),
     transparent
   );
   background-size: 200% 100%;
-  animation: streaming-shimmer 2s ease-in-out infinite;
+  animation: streaming-shimmer 1.8s ease-in-out infinite;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
 }
 @keyframes streaming-shimmer {
   0% { background-position: 200% 0; }
