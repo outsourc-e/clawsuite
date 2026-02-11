@@ -178,11 +178,51 @@ function NavItem({
   )
 
   if (item.kind === 'link') {
+    if (isCollapsed) {
+      return (
+        <TooltipProvider>
+          <TooltipRoot>
+            <TooltipTrigger
+              render={
+                <Link to={item.to!} onMouseUp={onSelectSession} className={cls}>
+                  {iconEl}
+                </Link>
+              }
+            />
+            <TooltipContent side="right">{item.label}</TooltipContent>
+          </TooltipRoot>
+        </TooltipProvider>
+      )
+    }
     return (
       <Link to={item.to!} onMouseUp={onSelectSession} className={cls}>
         {iconEl}
         {labelEl}
       </Link>
+    )
+  }
+
+  if (isCollapsed) {
+    return (
+      <TooltipProvider>
+        <TooltipRoot>
+          <TooltipTrigger
+            render={
+              <Button
+                disabled={item.disabled}
+                variant="ghost"
+                size="sm"
+                onClick={item.onClick}
+                onMouseUp={onSelectSession}
+                className={cls}
+              >
+                {iconEl}
+              </Button>
+            }
+          />
+          <TooltipContent side="right">{item.label}</TooltipContent>
+        </TooltipRoot>
+      </TooltipProvider>
     )
   }
 
