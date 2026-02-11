@@ -407,20 +407,22 @@ function ChatComposerComponent({
     [handleModelSelect, retryModel],
   )
 
-  const gatewayDisconnected = modelsQuery.isError
+  const modelsUnavailable = modelsQuery.isError
   const noModelsAvailable = modelsQuery.isSuccess && modelOptions.length === 0
   const isModelSwitcherDisabled =
     disabled ||
     modelsQuery.isLoading ||
-    gatewayDisconnected ||
+    modelsUnavailable ||
     noModelsAvailable ||
     modelSwitchMutation.isPending
   const currentModel = currentModelQuery.data ?? ''
   const modelButtonLabel =
     currentModel ||
     (currentModelQuery.isLoading ? 'Loading model…' : 'Select model')
-  const modelAvailabilityLabel = gatewayDisconnected
-    ? 'Gateway disconnected'
+  // Don't show "Gateway disconnected" for models query failures - it's confusing
+  // since the main gateway connection might be fine. Show a subtler message instead.
+  const modelAvailabilityLabel = modelsUnavailable
+    ? 'Models unavailable'
     : noModelsAvailable
       ? 'No models available'
       : null

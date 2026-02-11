@@ -53,7 +53,7 @@ import type {
   ChatComposerHandle,
   ChatComposerHelpers,
 } from './components/chat-composer'
-import type { GatewayAttachment } from './types'
+import type { GatewayAttachment, GatewayMessage } from './types'
 import { cn } from '@/lib/utils'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
@@ -100,6 +100,7 @@ export function ChatScreen({
   const [pinToTop, setPinToTop] = useState(
     () => hasPendingSend() || hasPendingGeneration(),
   )
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
 
   const pendingStartRef = useRef(false)
   const composerHandleRef = useRef<ChatComposerHandle | null>(null)
@@ -165,11 +166,46 @@ export function ChatScreen({
   // Clear waitingForResponse when SSE delivers a completed response
   useEffect(() => {
     if (lastCompletedRunAt && waitingForResponse) {
+      if (streamingMessageId) {
+        removeHistoryMessageByClientId(
+          queryClient,
+          activeFriendlyId,
+          resolvedSessionKey || activeSessionKey,
+          streamingMessageId,
+        )
+        setStreamingMessageId(null)
+      }
       setPendingGeneration(false)
       setWaitingForResponse(false)
       setPinToTop(false)
     }
-  }, [lastCompletedRunAt, waitingForResponse])
+  }, [lastCompletedRunAt, waitingForResponse, streamingMessageId, queryClient, activeFriendlyId, resolvedSessionKey, activeSessionKey])
+
+  // Fallback: Clear waiting state when a real assistant message arrives via polling
+  // (in case SSE final event doesn't fire)
+  useEffect(() => {
+    if (!waitingForResponse) return
+    const lastMsg = historyMessages[historyMessages.length - 1]
+    if (
+      lastMsg?.role === 'assistant' &&
+      !lastMsg.__optimisticId &&
+      !lastMsg.__streamingStatus
+    ) {
+      // A real assistant message arrived via polling — clear waiting state
+      if (streamingMessageId) {
+        removeHistoryMessageByClientId(
+          queryClient,
+          activeFriendlyId,
+          resolvedSessionKey || activeSessionKey,
+          streamingMessageId,
+        )
+        setStreamingMessageId(null)
+      }
+      setPendingGeneration(false)
+      setWaitingForResponse(false)
+      setPinToTop(false)
+    }
+  }, [historyMessages, waitingForResponse, streamingMessageId, queryClient, activeFriendlyId, resolvedSessionKey, activeSessionKey])
 
   useAutoSessionTitle({
     friendlyId: activeFriendlyId,
@@ -417,6 +453,7 @@ export function ChatScreen({
     }
     setWaitingForResponse(false)
     setPinToTop(false)
+    setStreamingMessageId(null)
   }, [activeFriendlyId, isNewChat])
 
   useLayoutEffect(() => {
@@ -511,6 +548,20 @@ export function ChatScreen({
       )
     }
 
+    // Create streaming placeholder message for real-time streaming display
+    const streamId = `streaming-${Date.now()}`
+    setStreamingMessageId(streamId)
+    const streamingPlaceholder: GatewayMessage = {
+      role: 'assistant',
+      content: [],
+      __optimisticId: streamId,
+      __streamingStatus: 'streaming' as const,
+      __streamingText: '',
+      __streamingThinking: '',
+      timestamp: Date.now(),
+    }
+    appendHistoryMessage(queryClient, friendlyId, sessionKey, streamingPlaceholder)
+
     setPendingGeneration(true)
     setSending(true)
     setError(null)
@@ -559,6 +610,9 @@ export function ChatScreen({
             },
           )
         }
+        // Clean up streaming placeholder on error
+        removeHistoryMessageByClientId(queryClient, friendlyId, sessionKey, streamId)
+        setStreamingMessageId(null)
         setError(`Failed to send message. ${messageText}`)
         setPendingGeneration(false)
         setWaitingForResponse(false)
@@ -833,7 +887,7 @@ export function ChatScreen({
               contentStyle={stableContentStyle}
               bottomOffset={terminalPanelInset}
               isStreaming={isRealtimeStreaming}
-              streamingMessageId={null}
+              streamingMessageId={streamingMessageId}
               streamingText={realtimeStreamingText}
               streamingThinking={realtimeStreamingThinking}
             />
