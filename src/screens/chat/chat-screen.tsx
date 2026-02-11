@@ -27,7 +27,6 @@ import {
   updateSessionLastMessage,
 } from './chat-queries'
 import { chatUiQueryKey, getChatUiState, setChatUiState } from './chat-ui'
-import { ChatSidebar } from './components/chat-sidebar'
 import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatComposer } from './components/chat-composer'
@@ -57,6 +56,7 @@ import { cn } from '@/lib/utils'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
 import { useAgentViewStore } from '@/hooks/use-agent-view'
@@ -447,7 +447,7 @@ export function ChatScreen({
     void gatewayStatusQuery.refetch()
   }, [gatewayStatusQuery])
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-  const isSidebarCollapsed = uiQuery.data?.isSidebarCollapsed ?? false
+  const isSidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const handleActiveSessionDelete = useCallback(() => {
     setError(null)
     setIsRedirecting(true)
@@ -978,24 +978,21 @@ export function ChatScreen({
     }
   }, [isMobile, navigate, queryClient])
 
+  const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
+  const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
+
   const handleToggleSidebarCollapse = useCallback(() => {
-    setChatUiState(queryClient, function toggle(state) {
-      return { ...state, isSidebarCollapsed: !state.isSidebarCollapsed }
-    })
-  }, [queryClient])
+    toggleSidebar()
+  }, [toggleSidebar])
 
   const handleSelectSession = useCallback(() => {
     if (!isMobile) return
-    setChatUiState(queryClient, function collapse(state) {
-      return { ...state, isSidebarCollapsed: true }
-    })
-  }, [isMobile, queryClient])
+    setSidebarCollapsed(true)
+  }, [isMobile, setSidebarCollapsed])
 
   const handleOpenSidebar = useCallback(() => {
-    setChatUiState(queryClient, function open(state) {
-      return { ...state, isSidebarCollapsed: false }
-    })
-  }, [queryClient])
+    setSidebarCollapsed(false)
+  }, [setSidebarCollapsed])
 
   const handleToggleFileExplorer = useCallback(() => {
     setFileExplorerCollapsed((prev) => {
@@ -1056,30 +1053,14 @@ export function ChatScreen({
     )
   }, [gatewayError, handleGatewayRefetch, showGatewayNotice])
 
-  const sidebar = (
-    <ChatSidebar
-      sessions={sessions}
-      activeFriendlyId={activeFriendlyId}
-      creatingSession={creatingSession}
-      onCreateSession={startNewChat}
-      isCollapsed={isMobile ? false : isSidebarCollapsed}
-      onToggleCollapse={handleToggleSidebarCollapse}
-      onSelectSession={handleSelectSession}
-      onActiveSessionDelete={handleActiveSessionDelete}
-      sessionsLoading={sessionsLoading}
-      sessionsFetching={sessionsFetching}
-      sessionsError={sessionsError}
-      onRetrySessions={refetchSessions}
-    />
-  )
   const hasActiveStreamPlaceholder = streamingMessageId !== null
 
   return (
-    <div className="relative h-dvh bg-surface text-primary-900">
+    <div className="relative h-full flex flex-col">
       <div
         className={cn(
-          'h-full overflow-hidden',
-          isMobile ? 'relative' : 'grid grid-cols-[auto_auto_1fr]',
+          'flex-1 min-h-0 overflow-hidden',
+          isMobile ? 'relative' : 'grid grid-cols-[auto_1fr]',
         )}
       >
         {hideUi ? null : isMobile ? null : (
@@ -1088,21 +1069,6 @@ export function ChatScreen({
             onToggle={handleToggleFileExplorer}
             onInsertReference={handleInsertFileReference}
           />
-        )}
-
-        {hideUi ? null : isMobile ? (
-          <>
-            <div
-              className={cn(
-                'fixed inset-y-0 left-0 z-50 w-[300px] transition-transform duration-200',
-                isSidebarCollapsed ? '-translate-x-full' : 'translate-x-0',
-              )}
-            >
-              {sidebar}
-            </div>
-          </>
-        ) : (
-          sidebar
         )}
 
         <main
@@ -1163,7 +1129,7 @@ export function ChatScreen({
         <AgentViewPanel />
       </div>
       {hideUi || isMobile ? null : <TerminalPanel />}
-      
+
       {suggestion && (
         <ModelSuggestionToast
           suggestedModel={suggestion.suggestedModel}

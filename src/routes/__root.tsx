@@ -1,6 +1,5 @@
 import {
   HeadContent,
-  Outlet,
   Scripts,
   createRootRoute,
 } from '@tanstack/react-router'
@@ -9,6 +8,7 @@ import appCss from '../styles.css?url'
 import { SearchModal } from '@/components/search/search-modal'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
+import { WorkspaceShell } from '@/components/workspace-shell'
 
 const themeScript = `
 (() => {
@@ -104,7 +104,7 @@ function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <GlobalShortcutListener />
       <TerminalShortcutListener />
-      <Outlet />
+      <WorkspaceShell />
       <SearchModal />
     </QueryClientProvider>
   )
