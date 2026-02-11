@@ -11,16 +11,18 @@ import { cn } from '@/lib/utils'
 
 /* ── Avatar types ─────────────────────────────────────── */
 
-export type AvatarStyle = 'lobster' | 'claw-cat' | 'robot' | 'ghost' | 'fox' | 'owl' | 'octopus'
+export type AvatarStyle = 'lobster' | 'claw-cat' | 'robot' | 'ghost' | 'fox' | 'owl' | 'octopus' | 'dragon' | 'panda'
 
 const AVATAR_OPTIONS: Array<{ id: AvatarStyle; label: string; emoji: string }> = [
   { id: 'lobster', label: 'Lobster', emoji: '🦞' },
-  { id: 'claw-cat', label: 'ClawBot', emoji: '🐱' },
+  { id: 'claw-cat', label: 'Cat', emoji: '🐱' },
   { id: 'robot', label: 'Robot', emoji: '🤖' },
   { id: 'fox', label: 'Fox', emoji: '🦊' },
   { id: 'owl', label: 'Owl', emoji: '🦉' },
   { id: 'ghost', label: 'Ghost', emoji: '👻' },
   { id: 'octopus', label: 'Octopus', emoji: '🐙' },
+  { id: 'dragon', label: 'Dragon', emoji: '🐉' },
+  { id: 'panda', label: 'Panda', emoji: '🐼' },
 ]
 
 const STORAGE_KEY = 'clawsuite-orchestrator-avatar'
@@ -324,6 +326,94 @@ function OctopusSVG({ state, size }: { state: OrchestratorState; size: number })
   )
 }
 
+function DragonSVG({ state, size }: { state: OrchestratorState; size: number }) {
+  ensureStyles()
+  const ey = state === 'thinking' ? 11 : 12.5
+  const mouth = state === 'orchestrating' ? 'M13,17 Q16,20 19,17' : state === 'responding' ? 'M14,17 Q16,18.5 18,17' : 'M14.5,17 Q16,18 17.5,17'
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" style={{ animation: stateAnim(state) }}>
+      {state === 'thinking' && <circle cx="16" cy="16" r="14.5" fill="none" stroke="#eab308" strokeWidth="1.5" strokeDasharray="6 4" opacity="0.6" style={{ animation: 'oa-think-ring 2s linear infinite' }} />}
+      {state === 'orchestrating' && <circle cx="16" cy="16" r="15" fill="none" stroke="#16a34a" strokeWidth="1.5" opacity="0.4"><animate attributeName="opacity" values="0.3;0.6;0.3" dur="1.5s" repeatCount="indefinite" /></circle>}
+      {/* Horns */}
+      <polygon points="9,7 6,1 12,5" fill="#15803d" />
+      <polygon points="23,7 20,5 26,1" fill="#15803d" />
+      {/* Head */}
+      <ellipse cx="16" cy="12" rx="8" ry="7" fill="#16a34a" />
+      <ellipse cx="16" cy="13" rx="5.5" ry="4" fill="#22c55e" opacity="0.3" />
+      {/* Snout */}
+      <ellipse cx="16" cy="15.5" rx="4" ry="2.5" fill="#15803d" />
+      {/* Nostrils — smoke when thinking */}
+      <circle cx="14" cy="15" r="0.8" fill="#0f172a" opacity="0.5" />
+      <circle cx="18" cy="15" r="0.8" fill="#0f172a" opacity="0.5" />
+      {state === 'thinking' && <>
+        <circle cx="12" cy="13" r="1" fill="#94a3b8" opacity="0.3"><animate attributeName="cy" values="13;10;7" dur="1.5s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.4;0.1;0" dur="1.5s" repeatCount="indefinite" /></circle>
+        <circle cx="20" cy="13" r="0.8" fill="#94a3b8" opacity="0.3"><animate attributeName="cy" values="13;9;6" dur="1.8s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.4;0.1;0" dur="1.8s" repeatCount="indefinite" /></circle>
+      </>}
+      {/* Eyes */}
+      <ellipse cx="12" cy={ey} rx="1.5" ry={state === 'responding' ? 0.7 : 1.4} fill="#0f172a" />
+      <ellipse cx="20" cy={ey} rx="1.5" ry={state === 'responding' ? 0.7 : 1.4} fill="#0f172a" />
+      <circle cx="12.4" cy={ey - 0.4} r="0.5" fill="#fbbf24" opacity="0.9" />
+      <circle cx="20.4" cy={ey - 0.4} r="0.5" fill="#fbbf24" opacity="0.9" />
+      <path d={mouth} fill="none" stroke="#0f172a" strokeWidth="0.8" strokeLinecap="round" />
+      {/* Spine ridges */}
+      <polygon points="16,5 14.5,7 17.5,7" fill="#15803d" />
+      <polygon points="16,3 15,5 17,5" fill="#166534" />
+      {/* Body */}
+      <ellipse cx="16" cy="23" rx="6" ry="5" fill="#16a34a" />
+      <ellipse cx="16" cy="23" rx="4" ry="3.5" fill="#bbf7d0" opacity="0.15" />
+      {/* Tail */}
+      <path d="M22,25 Q26,22 28,25 Q29,27 27,28" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"
+        style={{ transformOrigin: '22px 25px', animation: state !== 'idle' ? 'oa-tail-wag 0.7s ease-in-out infinite' : 'none' }} />
+      <polygon points="27,28 29,26 29,30" fill="#15803d" />
+      {/* Wings (small) */}
+      <path d="M8,18 Q4,14 6,10" fill="none" stroke="#16a34a" strokeWidth="1.5" opacity="0.6" />
+      <path d="M24,18 Q28,14 26,10" fill="none" stroke="#16a34a" strokeWidth="1.5" opacity="0.6" />
+      {state === 'responding' && <g><circle cx="12" cy="30.5" r="1" fill="#16a34a" style={{ animation: 'oa-dot1 1.2s ease-in-out infinite' }} /><circle cx="16" cy="30.5" r="1" fill="#16a34a" style={{ animation: 'oa-dot2 1.2s ease-in-out infinite' }} /><circle cx="20" cy="30.5" r="1" fill="#16a34a" style={{ animation: 'oa-dot3 1.2s ease-in-out infinite' }} /></g>}
+    </svg>
+  )
+}
+
+function PandaSVG({ state, size }: { state: OrchestratorState; size: number }) {
+  ensureStyles()
+  const ey = state === 'thinking' ? 12.5 : 14
+  const mouth = state === 'orchestrating' ? 'M14,19 Q16,21.5 18,19' : state === 'responding' ? 'M14.5,19 Q16,20 17.5,19' : 'M14.5,19 Q16,19.5 17.5,19'
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" style={{ animation: stateAnim(state) }}>
+      {state === 'thinking' && <circle cx="16" cy="16" r="14.5" fill="none" stroke="#eab308" strokeWidth="1.5" strokeDasharray="6 4" opacity="0.6" style={{ animation: 'oa-think-ring 2s linear infinite' }} />}
+      {/* Ears */}
+      <circle cx="8" cy="6" r="4" fill="#1a1a2e" />
+      <circle cx="24" cy="6" r="4" fill="#1a1a2e" />
+      <circle cx="8" cy="6" r="2" fill="#374151" opacity="0.4" />
+      <circle cx="24" cy="6" r="2" fill="#374151" opacity="0.4" />
+      {/* Head */}
+      <circle cx="16" cy="14" r="10" fill="white" />
+      {/* Eye patches */}
+      <ellipse cx="11.5" cy={ey - 0.5} rx="3.5" ry="3" fill="#1a1a2e" transform="rotate(-10 11.5 13.5)" />
+      <ellipse cx="20.5" cy={ey - 0.5} rx="3.5" ry="3" fill="#1a1a2e" transform="rotate(10 20.5 13.5)" />
+      {/* Eyes */}
+      <ellipse cx="11.5" cy={ey} rx="1.4" ry={state === 'responding' ? 0.7 : 1.4} fill="white" />
+      <ellipse cx="20.5" cy={ey} rx="1.4" ry={state === 'responding' ? 0.7 : 1.4} fill="white" />
+      <circle cx="11.5" cy={ey} r="0.7" fill="#1a1a2e" />
+      <circle cx="20.5" cy={ey} r="0.7" fill="#1a1a2e" />
+      <circle cx="11.8" cy={ey - 0.3} r="0.3" fill="white" opacity="0.9" />
+      <circle cx="20.8" cy={ey - 0.3} r="0.3" fill="white" opacity="0.9" />
+      {/* Nose */}
+      <ellipse cx="16" cy="17.5" rx="2" ry="1.2" fill="#1a1a2e" />
+      <path d={mouth} fill="none" stroke="#1a1a2e" strokeWidth="0.8" strokeLinecap="round" />
+      {/* Body */}
+      <ellipse cx="16" cy="26" rx="7" ry="5" fill="white" />
+      <ellipse cx="16" cy="26" rx="5" ry="3.5" fill="#1a1a2e" opacity="0.08" />
+      {/* Arms */}
+      <ellipse cx="8" cy="24" rx="3" ry="2" fill="#1a1a2e" transform="rotate(-20 8 24)" />
+      <ellipse cx="24" cy="24" rx="3" ry="2" fill="#1a1a2e" transform="rotate(20 24 24)" />
+      {/* Blush */}
+      <circle cx="9" cy="17" r="1.5" fill="#fca5a5" opacity="0.35" />
+      <circle cx="23" cy="17" r="1.5" fill="#fca5a5" opacity="0.35" />
+      {state === 'responding' && <g><circle cx="12" cy="30.5" r="1" fill="#374151" style={{ animation: 'oa-dot1 1.2s ease-in-out infinite' }} /><circle cx="16" cy="30.5" r="1" fill="#374151" style={{ animation: 'oa-dot2 1.2s ease-in-out infinite' }} /><circle cx="20" cy="30.5" r="1" fill="#374151" style={{ animation: 'oa-dot3 1.2s ease-in-out infinite' }} /></g>}
+    </svg>
+  )
+}
+
 const AVATAR_RENDERERS: Record<AvatarStyle, React.FC<{ state: OrchestratorState; size: number }>> = {
   lobster: LobsterSVG,
   'claw-cat': ClawCatSVG,
@@ -332,6 +422,8 @@ const AVATAR_RENDERERS: Record<AvatarStyle, React.FC<{ state: OrchestratorState;
   owl: OwlSVG,
   ghost: GhostSVG,
   octopus: OctopusSVG,
+  dragon: DragonSVG,
+  panda: PandaSVG,
 }
 
 /* ── Dot colour per state ─────────────────────────────── */
