@@ -51,7 +51,8 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
   }, [refresh])
 
   const pct = ctx.contextPercent
-  if (pct <= 0) return null
+  // Always show the bar — even at 0% show a minimal indicator so users know it exists
+  if (pct <= 0 && ctx.model === '') return null
 
   const isDanger = pct >= 75
   const isWarning = pct >= 50
@@ -82,7 +83,7 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
   return (
     <PreviewCard>
       <PreviewCardTrigger className="block w-full cursor-pointer">
-        <div className={cn('w-full h-1 transition-colors duration-300', barBg)}>
+        <div className={cn('sticky top-12 z-[9] w-full h-1.5 transition-colors duration-300', barBg)}>
           <div
             className={cn('h-full transition-all duration-700 ease-out', barColor)}
             style={{ width: `${Math.min(pct, 100)}%` }}
