@@ -1,48 +1,28 @@
 import { useMemo } from 'react'
+import type { AgentActivity } from '@/stores/chat-activity-store'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
-import { useSwarmStore } from '@/stores/agent-swarm-store'
 
-export type OrchestratorState = 'idle' | 'thinking' | 'working' | 'orchestrating' | 'listening'
+export type OrchestratorState = AgentActivity
 
 type OrchestratorInfo = {
   state: OrchestratorState
   label: string
-  activeAgentCount: number
 }
 
-export function useOrchestratorState(opts?: {
-  waitingForResponse?: boolean
-  isStreaming?: boolean
-}): OrchestratorInfo {
-  const sessions = useSwarmStore((s) => s.sessions)
-  const storeWaiting = useChatActivityStore((s) => s.waitingForResponse)
-  const storeStreaming = useChatActivityStore((s) => s.isStreaming)
+const LABELS: Record<AgentActivity, string> = {
+  idle: 'Idle',
+  reading: 'Reading...',
+  thinking: 'Thinking...',
+  responding: 'Responding...',
+  'tool-use': 'Using tools...',
+  orchestrating: 'Orchestrating agents...',
+}
 
-  const waiting = opts?.waitingForResponse ?? storeWaiting
-  const streaming = opts?.isStreaming ?? storeStreaming
+export function useOrchestratorState(): OrchestratorInfo {
+  const activity = useChatActivityStore((s) => s.activity)
 
-  return useMemo(() => {
-    const activeAgents = sessions.filter(
-      (s) => s.swarmStatus === 'running' || s.swarmStatus === 'thinking',
-    )
-    const count = activeAgents.length
-
-    if (count > 0) {
-      return {
-        state: 'orchestrating',
-        label: `Orchestrating ${count} agent${count > 1 ? 's' : ''}`,
-        activeAgentCount: count,
-      }
-    }
-
-    if (streaming) {
-      return { state: 'working', label: 'Working...', activeAgentCount: 0 }
-    }
-
-    if (waiting) {
-      return { state: 'thinking', label: 'Thinking...', activeAgentCount: 0 }
-    }
-
-    return { state: 'idle', label: 'Idle', activeAgentCount: 0 }
-  }, [sessions, streaming, waiting])
+  return useMemo(() => ({
+    state: activity,
+    label: LABELS[activity],
+  }), [activity])
 }

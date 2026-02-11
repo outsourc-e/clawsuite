@@ -431,10 +431,16 @@ export function ChatScreen({
   })
 
   // Sync chat activity to global store for sidebar orchestrator avatar
-  const setActivityWaiting = useChatActivityStore((s) => s.setWaiting)
-  const setActivityStreaming = useChatActivityStore((s) => s.setStreaming)
-  useEffect(() => { setActivityWaiting(waitingForResponse) }, [waitingForResponse, setActivityWaiting])
-  useEffect(() => { setActivityStreaming(streaming.isStreaming) }, [streaming.isStreaming, setActivityStreaming])
+  const setOrchestratorActivity = useChatActivityStore((s) => s.setActivity)
+  useEffect(() => {
+    if (streaming.isStreaming) {
+      setOrchestratorActivity('responding')
+    } else if (waitingForResponse) {
+      setOrchestratorActivity('thinking')
+    } else {
+      setOrchestratorActivity('idle')
+    }
+  }, [streaming.isStreaming, waitingForResponse, setOrchestratorActivity])
 
   const _uiQuery = useQuery({
     queryKey: chatUiQueryKey,
