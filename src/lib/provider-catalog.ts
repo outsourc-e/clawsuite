@@ -1,4 +1,4 @@
-export type ProviderAuthType = 'api-key' | 'oauth' | 'local'
+export type ProviderAuthType = 'api-key' | 'oauth' | 'local' | 'cli-token'
 
 export type ProviderInfo = {
   id: string
@@ -16,7 +16,7 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
     id: 'anthropic',
     name: 'Anthropic',
     description: 'Claude models — Haiku, Sonnet, and Opus.',
-    authTypes: ['api-key'],
+    authTypes: ['api-key', 'cli-token'],
     docsUrl: 'https://console.anthropic.com/settings/keys',
     configExample: JSON.stringify(
       {
@@ -170,6 +170,7 @@ export function getProviderDisplayName(providerId: string): string {
 export function getAuthTypeLabel(authType: ProviderAuthType): string {
   if (authType === 'api-key') return 'API Key'
   if (authType === 'oauth') return 'OAuth'
+  if (authType === 'cli-token') return 'CLI Token'
   return 'Local'
 }
 

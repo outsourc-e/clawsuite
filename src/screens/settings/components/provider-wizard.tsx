@@ -51,20 +51,27 @@ const WIZARD_STEPS: Array<StepItem> = [
   { id: 'verify', label: 'Verify' },
 ]
 
-const AUTH_TYPE_ORDER: Array<ProviderAuthType> = ['api-key', 'oauth', 'local']
+const AUTH_TYPE_ORDER: Array<ProviderAuthType> = ['api-key', 'cli-token', 'oauth', 'local']
 
 function getAuthTypeMeta(authType: ProviderAuthType): AuthTypeMeta {
   if (authType === 'api-key') {
     return {
       title: 'API Key',
-      description: 'Paste your API key in the OpenClaw config file',
+      description: 'Paste your API key — saved directly to local config',
+    }
+  }
+
+  if (authType === 'cli-token') {
+    return {
+      title: 'CLI Token',
+      description: 'Use your existing Claude CLI auth token (from Claude Code / claude.ai)',
     }
   }
 
   if (authType === 'oauth') {
     return {
       title: 'OAuth',
-      description: 'Authenticate via browser (Google only)',
+      description: 'Sign in via browser — launches OAuth flow automatically',
     }
   }
 
@@ -195,7 +202,8 @@ export function ProviderWizard({ open, onOpenChange }: ProviderWizardProps) {
     }
   }
 
-  function handleStartVerification() {
+  // Keep for potential future use with manual config verification
+  void function _handleStartVerification() {
     setVerificationMessage(
       'Verification not yet implemented — restart Gateway to apply changes.',
     )
@@ -402,7 +410,81 @@ export function ProviderWizard({ open, onOpenChange }: ProviderWizardProps) {
                 Step 3: Add API Key
               </h3>
 
-              {selectedAuthType === 'api-key' ? (
+              {selectedAuthType === 'oauth' ? (
+                <>
+                  <p className="mt-1 text-sm text-primary-600 text-pretty">
+                    This will run <code className="font-mono text-primary-800">openclaw configure</code> in the terminal to start the OAuth flow.
+                    A browser window will open for you to sign in with Google.
+                  </p>
+
+                  <div className="mt-4 flex flex-col gap-3">
+                    <Button
+                      size="sm"
+                      onClick={function onLaunchOAuth() {
+                        // Open the terminal route and trigger the command
+                        window.open('/terminal', '_blank')
+                        setVerificationMessage(
+                          'Run "openclaw configure" in the terminal and select Google OAuth when prompted. ' +
+                          'A browser window will open for sign-in. Once complete, the gateway will restart automatically.'
+                        )
+                        setStep('verify')
+                      }}
+                    >
+                      Open Terminal
+                    </Button>
+
+                    <div className="rounded-xl border border-primary-200 bg-primary-100/70 px-3 py-2">
+                      <p className="text-xs text-primary-700 text-pretty">
+                        In the terminal, run:
+                      </p>
+                      <pre className="mt-1 rounded-lg bg-primary-200/60 px-2 py-1.5 text-xs font-mono text-primary-900">openclaw configure</pre>
+                      <p className="mt-1.5 text-xs text-primary-600 text-pretty">
+                        Select <strong>Google Antigravity</strong> → <strong>OAuth</strong>. A browser tab will open for Google sign-in.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : selectedAuthType === 'cli-token' ? (
+                <>
+                  <p className="mt-1 text-sm text-primary-600 text-pretty">
+                    If you have Claude Code or the Claude CLI installed, OpenClaw can use the same auth token.
+                    Run the configure command to detect and import it automatically.
+                  </p>
+
+                  <div className="mt-4 flex flex-col gap-3">
+                    <Button
+                      size="sm"
+                      onClick={function onLaunchCLI() {
+                        window.open('/terminal', '_blank')
+                        setVerificationMessage(
+                          'Run "openclaw configure" in the terminal and select Anthropic → CLI Token. ' +
+                          'It will detect your Claude CLI credentials and import them automatically.'
+                        )
+                        setStep('verify')
+                      }}
+                    >
+                      Open Terminal
+                    </Button>
+
+                    <div className="rounded-xl border border-primary-200 bg-primary-100/70 px-3 py-2">
+                      <p className="text-xs text-primary-700 text-pretty">
+                        In the terminal, run:
+                      </p>
+                      <pre className="mt-1 rounded-lg bg-primary-200/60 px-2 py-1.5 text-xs font-mono text-primary-900">openclaw configure</pre>
+                      <p className="mt-1.5 text-xs text-primary-600 text-pretty">
+                        Select <strong>Anthropic</strong> → <strong>Setup Token (Claude CLI)</strong>. It will detect your existing Claude credentials from <code className="font-mono">~/.claude/</code>.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2">
+                      <p className="text-xs text-amber-800 text-pretty">
+                        <strong>Requires:</strong> Claude Code or Claude CLI must be installed and authenticated first.
+                        Run <code className="font-mono">claude</code> in terminal to verify.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : selectedAuthType === 'api-key' ? (
                 <>
                   <p className="mt-1 text-sm text-primary-600 text-pretty">
                     Paste your {selectedProvider.name} API key below. It will be saved directly to your local config file.
@@ -491,39 +573,8 @@ export function ProviderWizard({ open, onOpenChange }: ProviderWizardProps) {
               ) : (
                 <>
                   <p className="mt-1 text-sm text-primary-600 text-pretty">
-                    Add the snippet below to <code className="font-mono">{OPENCLAW_CONFIG_PATH}</code>.
+                    No additional configuration needed. Just ensure the service is running locally.
                   </p>
-
-                  <div className="mt-3 flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={function onCopyConfig() { void handleCopyConfig() }}
-                    >
-                      <HugeiconsIcon icon={Copy01Icon} size={20} strokeWidth={1.5} />
-                      Copy snippet
-                    </Button>
-                    {copyState === 'copied' ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-green-600">
-                        <HugeiconsIcon icon={Tick02Icon} size={20} strokeWidth={1.5} />
-                        Copied
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <pre className="mt-3 overflow-x-auto rounded-2xl border border-primary-200 bg-primary-100/80 p-3 text-xs text-primary-900">
-                    <code className="font-mono tabular-nums">{configExample}</code>
-                  </pre>
-
-                  <a
-                    href={selectedProvider.docsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-1 text-sm text-primary-700 underline decoration-primary-400 hover:text-primary-900"
-                  >
-                    <HugeiconsIcon icon={Link01Icon} size={20} strokeWidth={1.5} />
-                    Open {selectedProvider.name} docs
-                  </a>
                 </>
               )}
 
@@ -542,14 +593,14 @@ export function ProviderWizard({ open, onOpenChange }: ProviderWizardProps) {
                   />
                   Back
                 </Button>
-                {selectedAuthType !== 'api-key' ? (
+                {selectedAuthType === 'local' ? (
                   <Button
                     size="sm"
-                    onClick={function onUpdatedConfig() {
-                      handleStartVerification()
+                    onClick={function onDone() {
+                      handleDone()
                     }}
                   >
-                    I've updated my config
+                    Done
                   </Button>
                 ) : null}
               </div>
