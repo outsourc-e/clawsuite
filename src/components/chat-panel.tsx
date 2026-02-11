@@ -122,7 +122,7 @@ export function ChatPanel() {
           animate={{ width: 420, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}
-          className="h-full min-w-0 border-l border-primary-200 bg-surface overflow-hidden flex flex-col relative z-10"
+          className="absolute right-0 top-0 h-full min-w-0 border-l border-primary-200 bg-surface overflow-hidden flex flex-col z-20 shadow-xl min-[1200px]:relative min-[1200px]:shadow-none"
           style={{ maxWidth: 420 }}
         >
           {/* Panel header */}
