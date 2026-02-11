@@ -1,7 +1,7 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   BrainIcon,
-  Code02Icon,
+  CodeIcon,
   Edit02Icon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
@@ -18,7 +18,7 @@ const SUGGESTIONS: SuggestionChip[] = [
   {
     label: 'Write code',
     prompt: 'Help me write a function that',
-    icon: Code02Icon,
+    icon: CodeIcon,
   },
   {
     label: 'Research',
