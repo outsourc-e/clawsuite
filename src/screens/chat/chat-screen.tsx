@@ -63,6 +63,7 @@ import { useAgentViewStore } from '@/hooks/use-agent-view'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
+import { ContextBar } from './components/context-bar'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -1093,6 +1094,8 @@ export function ChatScreen({
               onToggleFileExplorer={handleToggleFileExplorer}
             />
           )}
+
+          <ContextBar compact={compact} />
 
           {hideUi ? null : (
             <ChatMessageList
