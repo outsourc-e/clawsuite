@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowDown01Icon,
+  BotIcon,
   BrainIcon,
   ChartLineData01Icon,
   Chat01Icon,
@@ -473,6 +474,7 @@ function ChatSidebarComponent({
 
   // Route active states
   const isDashboardActive = pathname === '/dashboard'
+  const isAgentSwarmActive = pathname === '/agent-swarm'
   const isNewSessionActive = pathname === '/new'
   const isBrowserActive = pathname === '/browser'
   const isTerminalActive = pathname === '/terminal'
@@ -493,7 +495,7 @@ function ChatSidebarComponent({
   const isLogsActive = pathname === '/activity' || pathname === '/logs'
 
   // Track last-visited route per section
-  const studioRoutes = ['/dashboard', '/new', '/browser', '/terminal', '/tasks', '/skills', '/cron', '/activity', '/logs', '/debug', '/files', '/memory']
+  const studioRoutes = ['/dashboard', '/agent-swarm', '/new', '/browser', '/terminal', '/tasks', '/skills', '/cron', '/activity', '/logs', '/debug', '/files', '/memory']
   const gatewayRoutes = ['/channels', '/instances', '/sessions', '/usage', '/agents', '/nodes']
 
   useEffect(() => {
@@ -619,6 +621,13 @@ function ChatSidebarComponent({
       icon: Home01Icon,
       label: 'Dashboard',
       active: isDashboardActive,
+    },
+    {
+      kind: 'link',
+      to: '/agent-swarm',
+      icon: BotIcon,
+      label: 'Agent Swarm',
+      active: isAgentSwarmActive,
     },
     {
       kind: 'button',
