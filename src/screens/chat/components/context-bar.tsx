@@ -52,7 +52,7 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
 
   const pct = ctx.contextPercent
   // Always show the bar — even at 0% show a minimal indicator so users know it exists
-  if (pct <= 0 && ctx.model === '') return null
+  if (pct <= 0 && ctx.model === '') return <div className="shrink-0 h-6" />
 
   const isDanger = pct >= 75
   const isWarning = pct >= 50
