@@ -13,7 +13,6 @@ import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/r
 import { AgentCard } from './agent-card'
 import { useAgentSpawn } from './hooks/use-agent-spawn'
 import type { AgentNode, AgentNodeStatus, AgentStatusBubble } from './agent-card'
-import type { SwarmConnectionLine } from './swarm-connection-overlay'
 import type { ActiveAgent } from '@/hooks/use-agent-view'
 import { AgentChatModal } from '@/components/agent-chat/AgentChatModal'
 import { Button } from '@/components/ui/button'
@@ -344,11 +343,7 @@ export function AgentViewPanel() {
   )
   const shouldReduceMotion = useReducedMotion()
   const networkLayerRef = useRef<HTMLDivElement | null>(null)
-  const mainCardRef = useRef<HTMLElement | null>(null)
-  const activeCardRefMap = useRef<Map<string, HTMLElement>>(new Map())
   const [sourceBubbleRect, setSourceBubbleRect] = useState<DOMRect | null>(null)
-  const [connectionLines, setConnectionLines] = useState<Array<SwarmConnectionLine>>([])
-  const [connectionCenterX, setConnectionCenterX] = useState(0)
 
   const visibleActiveNodes = useMemo(function getVisibleActiveNodes() {
     return activeNodes.filter(function keepRenderedNode(node) {
@@ -372,62 +367,6 @@ export function AgentViewPanel() {
     setSourceBubbleRect(element.getBoundingClientRect())
   }, [])
 
-  const setMainCardElement = useCallback(function setMainCardElement(
-    element: HTMLElement | null,
-  ) {
-    mainCardRef.current = element
-  }, [])
-
-  const setActiveCardElement = useCallback(function setActiveCardElement(
-    agentId: string,
-    element: HTMLElement | null,
-  ) {
-    if (element) {
-      activeCardRefMap.current.set(agentId, element)
-      return
-    }
-    activeCardRefMap.current.delete(agentId)
-  }, [])
-
-  const updateConnectionLines = useCallback(function updateConnectionLines() {
-    const networkElement = networkLayerRef.current
-    const sourceElement = mainCardRef.current
-    if (!networkElement || !sourceElement || visibleActiveNodes.length === 0) {
-      setConnectionLines([])
-      return
-    }
-
-    const networkRect = networkElement.getBoundingClientRect()
-    const sourceRect = sourceElement.getBoundingClientRect()
-
-    // Center X is the horizontal center of the orchestrator card
-    const centerX = sourceRect.left + sourceRect.width / 2 - networkRect.left
-    setConnectionCenterX(centerX)
-
-    // Start Y is the bottom of the orchestrator card
-    const startY = sourceRect.bottom - networkRect.top
-
-    const nextLines = visibleActiveNodes
-      .map(function mapNodeToLine(node) {
-        const targetElement = activeCardRefMap.current.get(node.id)
-        if (!targetElement) return null
-        const targetRect = targetElement.getBoundingClientRect()
-        // End Y is the top of the agent card
-        const endY = targetRect.top - networkRect.top
-        return {
-          id: node.id,
-          status: node.status,
-          startY,
-          endY,
-        } satisfies SwarmConnectionLine
-      })
-      .filter(function filterMissingLine(line): line is SwarmConnectionLine {
-        return line !== null
-      })
-
-    setConnectionLines(nextLines)
-  }, [visibleActiveNodes])
-
   useEffect(
     function syncSourceBubbleRect() {
       if (!panelVisible) return
@@ -440,26 +379,6 @@ export function AgentViewPanel() {
       }
     },
     [panelVisible, updateSourceBubbleRect],
-  )
-
-  useEffect(
-    function syncConnectionLines() {
-      if (!panelVisible) return
-      let animationFrameId = window.requestAnimationFrame(function tick() {
-        updateConnectionLines()
-        animationFrameId = window.requestAnimationFrame(tick)
-      })
-
-      window.addEventListener('resize', updateConnectionLines)
-      window.addEventListener('scroll', updateConnectionLines, true)
-
-      return function cleanupConnectionLines() {
-        window.cancelAnimationFrame(animationFrameId)
-        window.removeEventListener('resize', updateConnectionLines)
-        window.removeEventListener('scroll', updateConnectionLines, true)
-      }
-    },
-    [panelVisible, updateConnectionLines],
   )
 
   const statusCounts = useMemo(function getStatusCounts() {
@@ -615,7 +534,7 @@ export function AgentViewPanel() {
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
                 {/* Main Agent Card */}
-                <OrchestratorCard compact={viewMode === 'compact'} cardRef={setMainCardElement} />
+                <OrchestratorCard compact={viewMode === 'compact'} />
 
                 {/* Swarm — agent cards */}
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
@@ -659,7 +578,6 @@ export function AgentViewPanel() {
                         transition={{ layout: { type: 'spring', stiffness: 320, damping: 30 } }}
                         className="relative rounded-xl border border-primary-300/70 bg-linear-to-b from-primary-100 via-primary-100 to-primary-200/40 p-1"
                       >
-                        <SwarmConnectionOverlay lines={connectionLines} centerX={connectionCenterX} />
 
                         <AnimatePresence initial={false}>
                           {spawningNodes.map(function renderSpawningGhost(node, index) {
@@ -724,9 +642,6 @@ export function AgentViewPanel() {
                                   >
                                     <AgentCard
                                       node={node}
-                                      cardRef={function setNodeCardRef(element) {
-                                        setActiveCardElement(node.id, element)
-                                      }}
                                       layoutId={agentSpawn.getSharedLayoutId(node.id)}
                                       viewMode={viewMode}
                                       onChat={handleChatByNodeId}

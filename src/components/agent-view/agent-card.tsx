@@ -113,20 +113,6 @@ function shouldPulse(status: AgentNodeStatus): boolean {
   return status === 'running' || status === 'thinking'
 }
 
-function getBubbleIcon(type: AgentStatusBubbleType): string {
-  if (type === 'thinking') return '💭'
-  if (type === 'checkpoint') return '✅'
-  if (type === 'question') return '❓'
-  return '⚠️'
-}
-
-function getBubbleClassName(type: AgentStatusBubbleType): string {
-  if (type === 'thinking') return 'border-orange-500/45 bg-orange-500/15 text-orange-200'
-  if (type === 'checkpoint') return 'border-emerald-500/45 bg-emerald-500/15 text-emerald-200'
-  if (type === 'question') return 'border-primary-500/45 bg-primary-200/65 text-primary-900'
-  return 'border-red-500/45 bg-red-500/15 text-red-200'
-}
-
 /**
  * Extract persona name from agent name format "emoji Name — Role".
  * Returns the name portion or the full string if format doesn't match.
