@@ -3,14 +3,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { UsageDetailsModal } from './usage-details-modal'
 import { ContextAlertModal } from './context-alert-modal'
-import { DialogContent, DialogRoot, DialogTrigger } from '@/components/ui/dialog'
+import { DialogContent, DialogRoot } from '@/components/ui/dialog'
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
 import { cn } from '@/lib/utils'
 import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
 
 const POLL_INTERVAL_MS = 10_000
 const PROVIDER_POLL_INTERVAL_MS = 30_000
 const STORAGE_KEY = 'clawsuite-usage-meter-alerts'
+const STATS_VIEW_STORAGE_KEY = 'clawsuite-stats-view'
 const THRESHOLDS = [50, 75, 90]
+
+type StatsView = 'session' | 'provider' | 'cost' | 'agents'
+
+const STATS_VIEW_LABELS: Record<StatsView, string> = {
+  session: 'Session Stats',
+  provider: 'Provider Usage',
+  cost: 'Cost Breakdown',
+  agents: 'Agent Activity',
+}
+
+function getStoredStatsView(): StatsView {
+  if (typeof window === 'undefined') return 'session'
+  try {
+    const stored = window.localStorage.getItem(STATS_VIEW_STORAGE_KEY)
+    if (stored && ['session', 'provider', 'cost', 'agents'].includes(stored)) {
+      return stored as StatsView
+    }
+  } catch { /* ignore */ }
+  return 'session'
+}
+
+function saveStatsView(view: StatsView) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(STATS_VIEW_STORAGE_KEY, view)
+  } catch { /* ignore */ }
+}
 
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   'gpt-4o': { input: 5, output: 15 },
@@ -75,7 +104,7 @@ type ProviderUsageEntry = {
   status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
   message?: string
   plan?: string
-  lines: UsageLine[]
+  lines: Array<UsageLine>
   updatedAt: number
 }
 
@@ -375,6 +404,12 @@ function saveAlertState(state: { date: string; sent: Record<number, boolean> }) 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
+type AgentActivity = {
+  activeAgents: number
+  totalSpawned: number
+  totalAgentCost: number
+}
+
 export function UsageMeter() {
   const [usage, setUsage] = useState<UsageSummary>(() =>
     parseSessionStatus(null),
@@ -384,7 +419,8 @@ export function UsageMeter() {
   const [providerError, setProviderError] = useState<string | null>(null)
   const [providerUpdatedAt, setProviderUpdatedAt] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
-  const [pillMode, setPillMode] = useState<'auto' | 'session' | 'providers'>('auto')
+  const [statsView, setStatsView] = useState<StatsView>(getStoredStatsView)
+  const [agentActivity, setAgentActivity] = useState<AgentActivity>({ activeAgents: 0, totalSpawned: 0, totalAgentCost: 0 })
   const [contextAlert, setContextAlert] = useState<{ open: boolean; threshold: number }>({ open: false, threshold: 0 })
   const alertStateRef = useRef(getAlertState())
 
@@ -429,6 +465,26 @@ export function UsageMeter() {
     }
   }, [])
 
+  const refreshAgentActivity = useCallback(async () => {
+    try {
+      const res = await fetch('/api/agent-activity')
+      if (!res.ok) return
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean
+        activeAgents?: number
+        totalSpawned?: number
+        totalAgentCost?: number
+      } | null
+      if (data?.ok !== false) {
+        setAgentActivity({
+          activeAgents: readNumber(data?.activeAgents),
+          totalSpawned: readNumber(data?.totalSpawned),
+          totalAgentCost: readNumber(data?.totalAgentCost),
+        })
+      }
+    } catch { /* ignore - agent activity API may not exist */ }
+  }, [])
+
   useEffect(() => {
     let active = true
     void refresh()
@@ -454,6 +510,19 @@ export function UsageMeter() {
       window.clearInterval(interval)
     }
   }, [refreshProviders])
+
+  useEffect(() => {
+    let active = true
+    void refreshAgentActivity()
+    const interval = window.setInterval(() => {
+      if (!active) return
+      void refreshAgentActivity()
+    }, POLL_INTERVAL_MS)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
+  }, [refreshAgentActivity])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -493,18 +562,32 @@ export function UsageMeter() {
     }
   }, [])
 
-  const sessionHasData = usage.inputTokens > 0 || usage.outputTokens > 0 || usage.contextPercent > 0 || usage.dailyCost > 0
-
-  // Determine what to show in the pill
-  const showProviders = pillMode === 'providers' || (pillMode === 'auto' && !sessionHasData && providerUsage.length > 0)
-
   // Find the most relevant provider line for the pill (first progress line from first ok provider)
   const primaryProvider = providerUsage.find(p => p.status === 'ok' && p.lines.length > 0)
   const providerProgressLines = primaryProvider?.lines.filter(l => l.type === 'progress') ?? []
 
-  // Compute pill color based on what's displayed
+  // Aggregate provider tokens
+  const providerTokens = useMemo(() => {
+    const byProvider: Record<string, { input: number; output: number }> = {}
+    providerUsage.forEach(p => {
+      if (p.status !== 'ok') return
+      const tokenLines = p.lines.filter(l => l.format === 'tokens' && l.used !== undefined)
+      const total = tokenLines.reduce((sum, l) => sum + (l.used ?? 0), 0)
+      if (total > 0) {
+        byProvider[p.displayName.split(' ')[0]] = { input: total, output: 0 }
+      }
+    })
+    return byProvider
+  }, [providerUsage])
+
+  // Compute pill color based on context percent or agent activity
   const alertTone = (() => {
-    if (showProviders && primaryProvider) {
+    if (statsView === 'agents') {
+      if (agentActivity.activeAgents > 5) return 'text-amber-600 bg-amber-100 border-amber-200'
+      if (agentActivity.activeAgents > 0) return 'text-emerald-600 bg-emerald-100 border-emerald-200'
+      return 'text-primary-600 bg-primary-50 border-primary-200'
+    }
+    if (statsView === 'provider' && primaryProvider) {
       const allProgress = primaryProvider.lines.filter(l => l.type === 'progress' && l.format === 'percent' && l.used !== undefined)
       const maxPct = allProgress.reduce((max, l) => Math.max(max, l.used ?? 0), 0)
       if (maxPct >= 75) return 'text-red-600 bg-red-100 border-red-200'
@@ -514,7 +597,7 @@ export function UsageMeter() {
     const value = usage.contextPercent
     if (value >= 75) return 'text-red-600 bg-red-100 border-red-200'
     if (value >= 50) return 'text-amber-600 bg-amber-100 border-amber-200'
-    return 'text-emerald-600 bg-emerald-100 border-emerald-200'
+    return 'text-amber-600 bg-amber-100 border-amber-200'
   })()
 
   const detailProps = useMemo(
@@ -528,78 +611,169 @@ export function UsageMeter() {
     [error, providerError, providerUpdatedAt, providerUsage, usage],
   )
 
-  const handlePillRightClick = (e: React.MouseEvent) => {
-    e.preventDefault()
-    setPillMode(prev => {
-      if (prev === 'auto') return 'session'
-      if (prev === 'session') return 'providers'
-      return 'auto'
-    })
+  const handleStatsViewChange = (view: StatsView) => {
+    setStatsView(view)
+    saveStatsView(view)
+  }
+
+  // Render pill content based on stats view
+  const renderPillContent = () => {
+    switch (statsView) {
+      case 'session':
+        return (
+          <>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">In</span>
+              <span>{formatTokens(usage.inputTokens)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">Out</span>
+              <span>{formatTokens(usage.outputTokens)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">Ctx</span>
+              <span>{Math.round(usage.contextPercent)}%</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">Cost</span>
+              <span>{formatCurrency(usage.dailyCost)}</span>
+            </div>
+          </>
+        )
+
+      case 'provider': {
+        if (primaryProvider) {
+          return (
+            <>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                  {primaryProvider.displayName.split(' ')[0]}
+                </span>
+                {primaryProvider.plan && (
+                  <span className="text-[9px] uppercase text-primary-500">{primaryProvider.plan}</span>
+                )}
+              </div>
+              {providerProgressLines.slice(0, 3).map((line, i) => (
+                <div key={`${line.label}-${i}`} className="flex items-center gap-1">
+                  <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                    {line.label.replace('Session (5h)', 'Sess').replace('Weekly', 'Wk').replace('Sonnet', 'Son')}
+                  </span>
+                  <span>
+                    {line.format === 'dollars' && line.used !== undefined
+                      ? `$${line.used >= 1000 ? `${(line.used / 1000).toFixed(1)}k` : line.used.toFixed(0)}`
+                      : line.used !== undefined ? `${Math.round(line.used)}%` : '—'}
+                  </span>
+                </div>
+              ))}
+            </>
+          )
+        }
+        // Fallback: show aggregated tokens by provider
+        const providers = Object.entries(providerTokens)
+        if (providers.length > 0) {
+          return (
+            <>
+              {providers.slice(0, 3).map(([name, tokens]) => (
+                <div key={name} className="flex items-center gap-1">
+                  <span className="text-[10px] uppercase tracking-wide text-primary-600">{name}</span>
+                  <span>{formatTokens(tokens.input)}</span>
+                </div>
+              ))}
+            </>
+          )
+        }
+        return <span className="text-[10px] text-primary-500">No provider data</span>
+      }
+
+      case 'cost': {
+        if (usage.models.length > 0) {
+          const sortedModels = [...usage.models].sort((a, b) => b.costUsd - a.costUsd)
+          return (
+            <>
+              {sortedModels.slice(0, 3).map((model) => (
+                <div key={model.model} className="flex items-center gap-1">
+                  <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                    {model.model.replace('claude-', '').replace('gpt-', '').slice(0, 8)}
+                  </span>
+                  <span>{formatCurrency(model.costUsd)}</span>
+                </div>
+              ))}
+              {usage.models.length > 3 && (
+                <span className="text-[10px] text-primary-500">+{usage.models.length - 3}</span>
+              )}
+            </>
+          )
+        }
+        return (
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] uppercase tracking-wide text-primary-600">Total</span>
+            <span>{formatCurrency(usage.dailyCost)}</span>
+          </div>
+        )
+      }
+
+      case 'agents':
+        return (
+          <>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">Active</span>
+              <span>{agentActivity.activeAgents}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">Spawned</span>
+              <span>{agentActivity.totalSpawned}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">Cost</span>
+              <span>{formatCurrency(agentActivity.totalAgentCost)}</span>
+            </div>
+          </>
+        )
+
+      default:
+        return null
+    }
   }
 
   return (
     <>
-    <DialogRoot open={open} onOpenChange={setOpen}>
-      <DialogTrigger
+    <MenuRoot>
+      <MenuTrigger
         className={cn(
           'ml-auto rounded-full border px-3 py-1 text-xs font-medium',
-          'flex items-center gap-3 transition hover:bg-primary-100',
+          'flex items-center gap-3 transition hover:bg-primary-100 cursor-pointer',
           alertTone,
         )}
-        onContextMenu={handlePillRightClick}
       >
-        {showProviders && primaryProvider ? (
-          <>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                {primaryProvider.displayName.split(' ')[0]}
-              </span>
-              {primaryProvider.plan && (
-                <span className="text-[9px] uppercase text-primary-500">{primaryProvider.plan}</span>
-              )}
-            </div>
-            {providerProgressLines.slice(0, 3).map((line, i) => (
-              <div key={`${line.label}-${i}`} className="flex items-center gap-1">
-                <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                  {line.label.replace('Session (5h)', 'Sess').replace('Weekly', 'Wk').replace('Sonnet', 'Son')}
-                </span>
-                <span>
-                  {line.format === 'dollars' && line.used !== undefined
-                    ? `$${line.used >= 1000 ? `${(line.used / 1000).toFixed(1)}k` : line.used.toFixed(0)}`
-                    : line.used !== undefined ? `${Math.round(line.used)}%` : '—'}
-                </span>
-              </div>
-            ))}
-          </>
-        ) : (
-          <>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                In
-              </span>
-              <span>{formatTokens(usage.inputTokens)}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                Out
-              </span>
-              <span>{formatTokens(usage.outputTokens)}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                Ctx
-              </span>
-              <span>{Math.round(usage.contextPercent)}%</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                Cost
-              </span>
-              <span>{formatCurrency(usage.dailyCost)}</span>
-            </div>
-          </>
-        )}
-      </DialogTrigger>
+        <span className="text-[9px] uppercase tracking-widest text-primary-500 opacity-75">
+          {STATS_VIEW_LABELS[statsView].split(' ')[0]}
+        </span>
+        <span className="text-primary-300">|</span>
+        {renderPillContent()}
+      </MenuTrigger>
+      <MenuContent align="end" className="min-w-[180px]">
+        {(['session', 'provider', 'cost', 'agents'] as const).map((view) => (
+          <MenuItem
+            key={view}
+            onClick={() => handleStatsViewChange(view)}
+            className={cn(
+              statsView === view && 'bg-amber-100 text-amber-800',
+            )}
+          >
+            <span className="flex-1">{STATS_VIEW_LABELS[view]}</span>
+            {statsView === view && (
+              <span className="text-amber-600">✓</span>
+            )}
+          </MenuItem>
+        ))}
+        <div className="my-1 h-px bg-primary-100" />
+        <MenuItem onClick={() => setOpen(true)}>
+          View Details…
+        </MenuItem>
+      </MenuContent>
+    </MenuRoot>
+
+    <DialogRoot open={open} onOpenChange={setOpen}>
       <DialogContent className="w-[min(720px,94vw)]">
         <UsageDetailsModal {...detailProps} />
       </DialogContent>
