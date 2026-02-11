@@ -6,30 +6,59 @@ type AvatarProps = {
   className?: string
 }
 
-/** User avatar — person silhouette on neutral background */
+/**
+ * User avatar — same logo family as assistant.
+ * Dark slate rounded square with orange person silhouette + subtle claw accent.
+ */
 function UserAvatarComponent({ size = 28, className }: AvatarProps) {
   return (
-    <div
-      className={cn(
-        'rounded-full bg-primary-200 flex items-center justify-center shrink-0',
-        className,
-      )}
+    <svg
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={cn('shrink-0', className)}
       style={{ width: size, height: size }}
     >
-      <svg
-        viewBox="0 0 24 24"
+      <defs>
+        <linearGradient id="avu-slate" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1e293b" />
+          <stop offset="100%" stopColor="#334155" />
+        </linearGradient>
+        <linearGradient id="avu-orange" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ea580c" />
+          <stop offset="50%" stopColor="#f97316" />
+          <stop offset="100%" stopColor="#fb923c" />
+        </linearGradient>
+      </defs>
+      {/* Dark background */}
+      <rect x="5" y="5" width="90" height="90" rx="20" fill="url(#avu-slate)" />
+      {/* Person head */}
+      <circle cx="50" cy="38" r="12" fill="url(#avu-orange)" />
+      {/* Person body/shoulders */}
+      <path
+        d="M 28 78 C 28 62 38 55 50 55 C 62 55 72 62 72 78"
+        fill="url(#avu-orange)"
+      />
+      {/* Subtle claw accent — small brackets at bottom corners */}
+      <path
+        d="M 18 72 L 14 78 L 18 84"
+        stroke="#fb923c"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         fill="none"
-        className="text-primary-600"
-        style={{ width: size * 0.6, height: size * 0.6 }}
-      >
-        {/* Person icon */}
-        <circle cx="12" cy="8" r="4" fill="currentColor" />
-        <path
-          d="M4 21c0-3.866 3.582-7 8-7s8 3.134 8 7"
-          fill="currentColor"
-        />
-      </svg>
-    </div>
+        opacity="0.4"
+      />
+      <path
+        d="M 82 72 L 86 78 L 82 84"
+        stroke="#fb923c"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="0.4"
+      />
+    </svg>
   )
 }
 
