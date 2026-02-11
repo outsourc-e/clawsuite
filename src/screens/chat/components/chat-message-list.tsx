@@ -252,28 +252,30 @@ function ChatMessageListComponent({
     .map(({ index }) => index)
     .pop()
   // Show typing indicator when waiting for response and no streaming text visible
-  // Show typing indicator when waiting and no visible streaming content
-  const hasVisibleStreamContent = isStreaming && streamingText && streamingText.length > 0
-  // Check if the last assistant message has actual content (not just a streaming placeholder)
-  const lastAssistantHasContent = (() => {
-    if (typeof lastAssistantIndex !== 'number') return false
-    const msg = displayMessages[lastAssistantIndex]
-    if (!msg) return false
-    // Streaming placeholders have __streamingStatus but no real content
-    if (msg.__streamingStatus === 'streaming' && !msg.__streamingText) return false
-    if (msg.__optimisticId?.startsWith('streaming-')) return false
-    const text = msg.content
-      ? (Array.isArray(msg.content) ? msg.content : [msg.content])
-          .filter((c: any) => c.type === 'text' || typeof c === 'string')
-          .map((c: any) => typeof c === 'string' ? c : c.text ?? '')
-          .join('')
-      : ''
-    return text.length > 0
+  // Show typing indicator when waiting for response and no real assistant text visible yet
+  const showTypingIndicator = (() => {
+    if (!waitingForResponse) return false
+    // If streaming has visible text, don't show dots
+    if (isStreaming && streamingText && streamingText.length > 0) return false
+    // Check if any recent assistant message (after last user message) has real content
+    if (typeof lastUserIndex === 'number' && typeof lastAssistantIndex === 'number' && lastAssistantIndex > lastUserIndex) {
+      const msg = displayMessages[lastAssistantIndex]
+      if (msg && !msg.__optimisticId?.startsWith('streaming-') && !msg.__streamingStatus) {
+        // Real assistant message with content exists
+        const text = typeof msg.content === 'string' ? msg.content : ''
+        if (text.length > 0) return false
+        // Check array content
+        if (Array.isArray(msg.content)) {
+          const hasContent = msg.content.some((c: any) =>
+            (typeof c === 'string' && c.length > 0) ||
+            (c && typeof c === 'object' && c.type === 'text' && c.text?.length > 0)
+          )
+          if (hasContent) return false
+        }
+      }
+    }
+    return true
   })()
-  const showTypingIndicator =
-    !hasVisibleStreamContent &&
-    waitingForResponse &&
-    !lastAssistantHasContent
 
   // Pin the last user+assistant group without adding bottom padding.
   const groupStartIndex = typeof lastUserIndex === 'number' ? lastUserIndex : -1
@@ -564,11 +566,6 @@ function ChatMessageListComponent({
                     />
                   )
                 })}
-              {showTypingIndicator ? (
-                <div className="py-2">
-                  <TypingIndicator />
-                </div>
-              ) : null}
             </div>
           </>
         ) : (
@@ -592,6 +589,11 @@ function ChatMessageListComponent({
             ) : null}
           </>
         )}
+        {showTypingIndicator ? (
+          <div className="py-2 px-1">
+            <TypingIndicator />
+          </div>
+        ) : null}
         {notice && noticePosition === 'end' ? notice : null}
         <ChatContainerScrollAnchor ref={anchorRef} />
       </ChatContainerContent>
