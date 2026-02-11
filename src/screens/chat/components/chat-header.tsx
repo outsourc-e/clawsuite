@@ -67,7 +67,7 @@ function ChatHeaderComponent({
           </TooltipRoot>
         </TooltipProvider>
       ) : null}
-      <div className="text-sm font-medium truncate flex-1">{activeTitle}</div>
+      <div className="text-sm font-medium truncate flex-1" suppressHydrationWarning>{activeTitle}</div>
       <UsageMeter />
     </div>
   )

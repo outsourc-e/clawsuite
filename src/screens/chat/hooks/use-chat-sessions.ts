@@ -80,7 +80,7 @@ export function useChatSessions({
       if (activeSession.titleStatus === 'error') return 'New Session'
       return 'New Session'
     }
-    return activeFriendlyId
+    return activeFriendlyId === 'main' ? 'ClawSuite' : activeFriendlyId
   }, [activeFriendlyId, activeSession])
 
   const sessionsError =

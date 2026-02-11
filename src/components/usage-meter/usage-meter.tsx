@@ -465,25 +465,8 @@ export function UsageMeter() {
     }
   }, [])
 
-  const refreshAgentActivity = useCallback(async () => {
-    try {
-      const res = await fetch('/api/agent-activity')
-      if (!res.ok) return
-      const data = (await res.json().catch(() => null)) as {
-        ok?: boolean
-        activeAgents?: number
-        totalSpawned?: number
-        totalAgentCost?: number
-      } | null
-      if (data?.ok !== false) {
-        setAgentActivity({
-          activeAgents: readNumber(data?.activeAgents),
-          totalSpawned: readNumber(data?.totalSpawned),
-          totalAgentCost: readNumber(data?.totalAgentCost),
-        })
-      }
-    } catch { /* ignore - agent activity API may not exist */ }
-  }, [])
+  // Agent activity API doesn't exist yet — disabled to prevent 404 spam
+  const refreshAgentActivity = useCallback(async () => {}, [])
 
   useEffect(() => {
     let active = true
