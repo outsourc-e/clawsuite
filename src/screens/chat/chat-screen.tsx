@@ -432,18 +432,18 @@ export function ChatScreen({
 
   // Sync chat activity to global store for sidebar orchestrator avatar
   // Sync chat activity to global store for sidebar orchestrator avatar
-  const setOrchestratorActivity = useChatActivityStore((s) => s.setActivity)
+  const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity)
   const isCurrentlyStreaming = streaming.isStreaming
   const hasStreamId = streamingMessageId !== null
   useEffect(() => {
     if (isCurrentlyStreaming || (hasStreamId && waitingForResponse)) {
-      setOrchestratorActivity('responding')
+      setLocalActivity('responding')
     } else if (waitingForResponse) {
-      setOrchestratorActivity('thinking')
+      setLocalActivity('thinking')
     } else {
-      setOrchestratorActivity('idle')
+      setLocalActivity('idle')
     }
-  }, [isCurrentlyStreaming, hasStreamId, waitingForResponse, setOrchestratorActivity])
+  }, [isCurrentlyStreaming, hasStreamId, waitingForResponse, setLocalActivity])
 
   const _uiQuery = useQuery({
     queryKey: chatUiQueryKey,
@@ -703,7 +703,7 @@ export function ChatScreen({
     attachments: Array<GatewayAttachment> = [],
     skipOptimistic = false,
   ) {
-    setOrchestratorActivity('reading')
+    setLocalActivity('reading')
     const normalizedAttachments = attachments.map((attachment) => ({
       ...attachment,
       id: attachment.id ?? crypto.randomUUID(),
