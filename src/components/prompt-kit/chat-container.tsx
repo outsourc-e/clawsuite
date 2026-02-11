@@ -57,10 +57,15 @@ function ChatContainerRoot({
     if (!el) return
     const log = () => {
       const parent = el.parentElement
-      console.log('[CONTAINER DEBUG]', {
-        scrollDiv: { height: el.clientHeight, scrollHeight: el.scrollHeight, scrollTop: el.scrollTop, offsetHeight: el.offsetHeight },
-        parent: parent ? { height: parent.clientHeight, offsetHeight: parent.offsetHeight, className: parent.className.slice(0, 60) } : null,
-      })
+      // Walk up the DOM tree to find where height breaks
+      const chain: string[] = []
+      let node: HTMLElement | null = el
+      while (node && chain.length < 10) {
+        chain.push(`${node.tagName}.${node.className.split(' ').slice(0,3).join('.')} h=${node.clientHeight}`)
+        node = node.parentElement
+      }
+      console.log('[CONTAINER DEBUG] height chain:', chain)
+      console.log('[CONTAINER DEBUG] viewport:', window.innerHeight)
     }
     log()
     const timer = setInterval(log, 2000)
