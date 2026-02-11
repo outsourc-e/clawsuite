@@ -6,10 +6,13 @@ import {
   Delete01Icon,
   MoreHorizontalIcon,
   Pen01Icon,
+  PinIcon,
+  PinOffIcon,
 } from '@hugeicons/core-free-icons'
 import { memo, useMemo } from 'react'
 import { getMessageTimestamp } from '../../utils'
 import type { SessionMeta } from '../../types'
+import { usePinnedSessionsStore } from '@/hooks/use-pinned-sessions'
 import { cn } from '@/lib/utils'
 import {
   MenuContent,
@@ -97,6 +100,8 @@ function SessionItemComponent({
   onRename,
   onDelete,
 }: SessionItemProps) {
+  const isPinned = usePinnedSessionsStore((s) => s.isSessionPinned(session.key))
+  const togglePin = usePinnedSessionsStore((s) => s.togglePinnedSession)
   const isGenerating = session.titleStatus === 'generating'
   const isError = session.titleStatus === 'error'
   const baseTitle = getSessionDisplayTitle(session, isGenerating)
@@ -172,6 +177,17 @@ function SessionItemComponent({
           />
         </MenuTrigger>
         <MenuContent side="bottom" align="end">
+          <MenuItem
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              togglePin(session.key)
+            }}
+            className="gap-2"
+          >
+            <HugeiconsIcon icon={isPinned ? PinOffIcon : PinIcon} size={20} strokeWidth={1.5} />{' '}
+            {isPinned ? 'Unpin' : 'Pin'}
+          </MenuItem>
           <MenuItem
             onClick={(event) => {
               event.preventDefault()

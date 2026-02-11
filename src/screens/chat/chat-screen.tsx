@@ -63,6 +63,9 @@ import { useAgentViewStore } from '@/hooks/use-agent-view'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
+import { useExport } from '@/hooks/use-export'
+import { useSessionShortcuts } from './hooks/use-session-shortcuts'
+import { CommandSessionDialog } from './components/command-session'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -129,6 +132,7 @@ export function ChatScreen({
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
     null,
   )
+  const [commandOpen, setCommandOpen] = useState(false)
   const [streamingText, setStreamingText] = useState<string>('')
   const [streamingThinking, setStreamingThinking] = useState<string>('')
   const [useStreamingApi, setUseStreamingApi] = useState(true)
@@ -189,6 +193,33 @@ export function ChatScreen({
     messageCount,
     enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
   })
+
+  const { exportConversation } = useExport({
+    currentFriendlyId: activeFriendlyId,
+    currentSessionKey: activeCanonicalKey ?? activeFriendlyId,
+    sessionTitle: activeTitle,
+  })
+
+  const handleNewSession = useCallback(() => {
+    navigate({ to: '/' })
+  }, [navigate])
+
+  const handleSearchSessions = useCallback(() => {
+    setCommandOpen(true)
+  }, [])
+
+  useSessionShortcuts({
+    onNewSession: handleNewSession,
+    onSearchSessions: handleSearchSessions,
+  })
+
+  const handleCommandSelect = useCallback(
+    (session: { key: string; friendlyId: string }) => {
+      setCommandOpen(false)
+      navigate({ to: '/chat/$sessionKey', params: { sessionKey: session.friendlyId } })
+    },
+    [navigate],
+  )
 
   // Phase 4.1: Smart Model Suggestions
   const modelsQuery = useQuery({
@@ -1087,6 +1118,10 @@ export function ChatScreen({
             showFileExplorerButton={!isMobile}
             fileExplorerCollapsed={fileExplorerCollapsed}
             onToggleFileExplorer={handleToggleFileExplorer}
+            onExport={exportConversation}
+            exportDisabled={isNewChat || messageCount === 0}
+            usedTokens={activeSession?.tokenCount}
+            maxTokens={activeSession?.totalTokens}
           />
 
           {hideUi ? null : (
@@ -1140,6 +1175,13 @@ export function ChatScreen({
           onDismissForSession={dismissForSession}
         />
       )}
+
+      <CommandSessionDialog
+        sessions={sessions}
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        onSelect={handleCommandSelect}
+      />
     </div>
   )
 }

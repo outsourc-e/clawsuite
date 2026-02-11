@@ -2,9 +2,10 @@
 
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowRight01Icon } from '@hugeicons/core-free-icons'
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { SessionItem } from './session-item'
 import type { SessionMeta } from '../../types'
+import { usePinnedSessionsStore } from '@/hooks/use-pinned-sessions'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -43,6 +44,19 @@ export const SidebarSessions = memo(function SidebarSessions({
   error,
   onRetry,
 }: SidebarSessionsProps) {
+  const pinnedKeys = usePinnedSessionsStore((s) => s.pinnedSessionKeys)
+
+  const { pinned, unpinned } = useMemo(() => {
+    const pinnedSet = new Set(pinnedKeys)
+    const p: SessionMeta[] = []
+    const u: SessionMeta[] = []
+    for (const s of sessions) {
+      if (pinnedSet.has(s.key)) p.push(s)
+      else u.push(s)
+    }
+    return { pinned: p, unpinned: u }
+  }, [sessions, pinnedKeys])
+
   return (
     <Collapsible
       className="flex h-full flex-col flex-1 min-h-0 w-full"
@@ -87,16 +101,36 @@ export const SidebarSessions = memo(function SidebarSessions({
                   No sessions yet.
                 </div>
               ) : (
-                sessions.map((session) => (
-                  <SessionItem
-                    key={session.key}
-                    session={session}
-                    active={session.friendlyId === activeFriendlyId}
-                    onSelect={onSelect}
-                    onRename={onRename}
-                    onDelete={onDelete}
-                  />
-                ))
+                <>
+                  {pinned.length > 0 && (
+                    <>
+                      <div className="px-2 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-400">
+                        Pinned
+                      </div>
+                      {pinned.map((session) => (
+                        <SessionItem
+                          key={session.key}
+                          session={session}
+                          active={session.friendlyId === activeFriendlyId}
+                          onSelect={onSelect}
+                          onRename={onRename}
+                          onDelete={onDelete}
+                        />
+                      ))}
+                      <div className="mx-2 my-1 border-t border-primary-200" />
+                    </>
+                  )}
+                  {unpinned.map((session) => (
+                    <SessionItem
+                      key={session.key}
+                      session={session}
+                      active={session.friendlyId === activeFriendlyId}
+                      onSelect={onSelect}
+                      onRename={onRename}
+                      onDelete={onDelete}
+                    />
+                  ))}
+                </>
               )}
               {fetching && !loading && !error && sessions.length > 0 ? (
                 <div className="px-2 py-1 text-[11px] text-primary-400">
