@@ -55,12 +55,13 @@ export function textFromMessage(msg: GatewayMessage): string {
     .join('')
     .trim()
 
-  // Only clean user messages
+  // Clean user messages (strip system metadata)
   if (msg.role === 'user') {
     return cleanUserText(raw)
   }
 
-  return raw
+  // Clean assistant messages (strip reply tags)
+  return raw.replace(/\[\[reply_to(?:_current|:\d+)\]\]/g, '').trim()
 }
 
 export function getToolCallsFromMessage(

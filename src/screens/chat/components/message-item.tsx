@@ -455,7 +455,7 @@ function MessageItemComponent({
               ))}
             {effectiveIsStreaming && !hasText && (
               <div className="flex items-center gap-1.5 text-primary-500">
-                <span className="animate-pulse">Lobster is thinking</span>
+                <span className="animate-pulse">Thinking</span>
                 <StreamingCursor />
               </div>
             )}

@@ -22,7 +22,7 @@ function TypingIndicator({ className }: TypingIndicatorProps) {
       </div>
       <LoadingIndicator ariaLabel="Toggle loading indicator" />
       <TextShimmer className="text-sm text-pretty" duration={2}>
-        Lobster is cooking your answer...
+        Generating response...
       </TextShimmer>
     </div>
   )
