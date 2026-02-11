@@ -225,8 +225,18 @@ function MessageItemComponent({
   const animationTimeoutRef = useRef<number | null>(null)
   const animationIndexRef = useRef(0)
 
-  // Disable fake streaming — causes ghost loading indicators on old messages
+  // Disable fake streaming — using CSS fade-in + shimmer instead
   const shouldFakeStream = false
+  
+  // Track if this is a newly appeared message (for fade-in animation)
+  const isNewRef = useRef(true)
+  const [isNew, setIsNew] = useState(true)
+  useEffect(() => {
+    if (!isNewRef.current) return
+    isNewRef.current = false
+    const timer = window.setTimeout(() => setIsNew(false), 600)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (remoteStreamingActive) {
@@ -378,6 +388,7 @@ function MessageItemComponent({
         hasText || hasAttachments ? 'gap-1' : 'gap-0',
         wrapperClassName,
         isUser ? 'items-end' : 'items-start',
+        !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',
       )}
     >
       {thinking && (
@@ -422,7 +433,7 @@ function MessageItemComponent({
             data-chat-message-bubble={isUser ? 'true' : undefined}
             className={cn(
               'rounded-[12px] break-words whitespace-normal min-w-0 text-primary-900 flex flex-col gap-2',
-              effectiveIsStreaming && !isUser ? 'chat-streaming-message' : '',
+              effectiveIsStreaming && !isUser ? 'chat-streaming-message chat-streaming-glow' : '',
               !isUser
                 ? 'bg-transparent w-full'
                 : 'bg-primary-100 max-w-[75%] rounded-2xl px-4 py-2.5',

@@ -239,6 +239,38 @@ code {
   }
 }
 
+/* Message fade-in animation */
+@keyframes message-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ChatGPT-style streaming glow */
+.chat-streaming-glow {
+  position: relative;
+}
+.chat-streaming-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.08), transparent);
+  background-size: 200% 100%;
+  animation: streaming-shimmer 2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+@keyframes streaming-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* iMessage-style typing dots */
 @keyframes typing-bounce {
   0%, 60%, 100% {
