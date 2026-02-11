@@ -6,7 +6,6 @@ import { useMemo, useState } from 'react'
 import { BrowserControls } from './BrowserControls'
 import { BrowserScreenshot } from './BrowserScreenshot'
 import { BrowserTabs } from './BrowserTabs'
-import { BackToDashboard } from '@/components/back-to-dashboard'
 
 type BrowserTab = {
   id: string
@@ -191,7 +190,6 @@ function BrowserPanel() {
     >
       <div className="mx-auto flex h-full w-full max-w-[1700px] min-w-0 flex-col gap-3">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl">
-          <BackToDashboard />
           <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-100/70 px-3 py-1 text-xs text-primary-600 tabular-nums">
             <HugeiconsIcon icon={GlobeIcon} size={20} strokeWidth={1.5} />
             <span>Live Browser Monitor</span>

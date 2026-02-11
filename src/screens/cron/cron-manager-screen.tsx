@@ -11,7 +11,6 @@ import type {
 } from '@/components/cron-manager/cron-types'
 import { CronJobForm } from '@/components/cron-manager/CronJobForm'
 import { CronJobList } from '@/components/cron-manager/CronJobList'
-import { BackToDashboard } from '@/components/back-to-dashboard'
 import { Button } from '@/components/ui/button'
 import {
   fetchCronJobs,
@@ -119,7 +118,6 @@ export function CronManagerScreen() {
     >
       <section className="mx-auto w-full max-w-[1600px]">
         <header className="mb-4 rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl md:p-5">
-          <BackToDashboard />
           <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-100/60 px-3 py-1 text-xs text-primary-600 tabular-nums">
             <HugeiconsIcon icon={Clock01Icon} size={20} strokeWidth={1.5} />
             <span>Cron Manager</span>

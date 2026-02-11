@@ -15,7 +15,6 @@ import { useState, useEffect } from 'react'
 import type * as React from 'react'
 import type {AccentColor, SettingsThemeMode} from '@/hooks/use-settings';
 import { usePageTitle } from '@/hooks/use-page-title'
-import { BackToDashboard } from '@/components/back-to-dashboard'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
@@ -143,7 +142,6 @@ function SettingsRoute() {
 
       <main className="relative mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6 sm:px-6 lg:py-8">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl md:p-5">
-          <BackToDashboard />
           <h1 className="text-xl font-medium text-primary-900 text-balance">Settings</h1>
           <p className="text-sm text-primary-600 text-pretty">
             Configure gateway connection, theme, editor behavior, and notifications.

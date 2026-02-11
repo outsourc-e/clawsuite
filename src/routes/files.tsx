@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react'
 import { Editor } from '@monaco-editor/react'
 import { createFileRoute } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { BackToDashboard } from '@/components/back-to-dashboard'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { resolveTheme, useSettings } from '@/hooks/use-settings'
 
@@ -45,7 +44,6 @@ function FilesRoute() {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="border-b border-primary-200 px-4 py-3">
-            <BackToDashboard />
             <h1 className="text-lg font-medium text-balance">Files</h1>
             <p className="text-sm text-primary-600 text-pretty">
               Explore your workspace and draft notes in the editor.

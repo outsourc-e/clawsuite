@@ -1,7 +1,6 @@
 import {
   RefreshIcon,
   Settings01Icon,
-  ArrowDown01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { OpenClawStudioIcon } from '@/components/icons/openclaw-studio'
@@ -157,55 +156,6 @@ function toSessionUpdatedAt(session: SessionMeta): number {
   return 0
 }
 
-/* ── Mode Selector (Studio / Dashboard) ── */
-function ModeSelector({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1 rounded-md border border-primary-200 bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-600 transition-colors hover:border-primary-300 hover:text-ink dark:border-primary-300 dark:bg-transparent dark:hover:text-primary-200"
-      >
-        Dashboard
-        <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={1.5} />
-      </button>
-      {open ? (
-        <div className="absolute left-0 top-full z-[9999] mt-1 w-36 rounded-lg border border-primary-200 bg-primary-50 py-1 shadow-lg dark:bg-primary-100">
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs font-medium text-ink"
-            onClick={() => setOpen(false)}
-          >
-            Dashboard
-          </button>
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-primary-600 hover:text-ink"
-            onClick={() => {
-              setOpen(false)
-              navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })
-            }}
-          >
-            Studio
-          </button>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 export function DashboardScreen() {
   const navigate = useNavigate()
   const [gridLayouts, setGridLayouts] = useState<ResponsiveLayouts>(loadLayouts)
@@ -329,7 +279,7 @@ export function DashboardScreen() {
                   <span className="text-primary-500">{systemStatus.currentModel || '—'}</span>
                 </p>
               </div>
-              <ModeSelector navigate={navigate} />
+              {/* Mode selector removed — sidebar provides navigation */}
             </div>
 
             {/* RIGHT — time/weather … notifications/theme/settings */}

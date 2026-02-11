@@ -2,7 +2,6 @@ import { Add01Icon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { BackToDashboard } from '@/components/back-to-dashboard'
 import { Button } from '@/components/ui/button'
 import { fetchModels } from '@/lib/gateway-api'
 import type { GatewayModelCatalogEntry } from '@/lib/gateway-api'
@@ -119,7 +118,6 @@ export function ProvidersScreen() {
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl md:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1.5">
-              <BackToDashboard />
               <h1 className="text-2xl font-medium text-primary-900 text-balance">
                 Provider Setup
               </h1>
