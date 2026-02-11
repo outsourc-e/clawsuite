@@ -848,7 +848,7 @@ export function ChatScreen({
 
         <main
           className={cn(
-            'flex h-full min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
+            'flex h-full min-h-0 min-w-0 flex-col transition-[margin-right,margin-bottom] duration-200',
             !compact && isAgentViewOpen ? 'min-[1024px]:mr-80' : 'mr-0',
           )}
           style={{ marginBottom: terminalPanelInset > 0 ? `${terminalPanelInset}px` : undefined }}

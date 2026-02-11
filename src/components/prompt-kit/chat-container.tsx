@@ -51,10 +51,10 @@ function ChatContainerRoot({
   }, [onUserScroll])
 
   return (
-    <div className={cn('relative flex flex-1 min-h-0 flex-col', className)}>
+    <div className={cn('relative flex-1 min-h-0', className)}>
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto"
+        className="absolute inset-0 overflow-y-auto"
         data-chat-scroll-viewport
         {...props}
       >
