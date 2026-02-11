@@ -8,6 +8,33 @@ import { useEffect, useMemo, useState } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import { cn } from '@/lib/utils'
 
+type ProviderUsageLine = {
+  type: 'progress' | 'text' | 'badge'
+  label: string
+  used?: number
+  limit?: number
+  format?: 'percent' | 'dollars' | 'tokens'
+  value?: string
+  color?: string
+  resetsAt?: string
+}
+
+type ProviderUsageResult = {
+  provider: string
+  displayName: string
+  status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
+  message?: string
+  plan?: string
+  lines: ProviderUsageLine[]
+  updatedAt: number
+}
+
+type ProviderUsageApiResponse = {
+  ok: boolean
+  updatedAt: number
+  providers: ProviderUsageResult[]
+}
+
 type ProviderUsage = {
   provider: string
   total: number
@@ -212,12 +239,31 @@ type UsageMeterWidgetProps = {
 }
 
 export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidgetProps) {
+  const [view, setView] = useState<'gateway' | 'providers'>('gateway')
+
   const usageQuery = useQuery({
     queryKey: ['dashboard', 'usage'],
     queryFn: fetchUsage,
     retry: false,
     refetchInterval: 30_000,
   })
+
+  const providerQuery = useQuery({
+    queryKey: ['dashboard', 'provider-usage'],
+    queryFn: async (): Promise<ProviderUsageApiResponse | null> => {
+      try {
+        const res = await fetch('/api/provider-usage')
+        if (!res.ok) return null
+        return (await res.json()) as ProviderUsageApiResponse
+      } catch {
+        return null
+      }
+    },
+    retry: false,
+    refetchInterval: 30_000,
+  })
+
+  const activeProviders = providerQuery.data?.providers ?? []
 
   const [loadingTimedOut, setLoadingTimedOut] = useState(false)
   useEffect(() => {
@@ -249,8 +295,116 @@ export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidg
       draggable={draggable}
       onRemove={onRemove}
       className="h-full"
+      titleAccessory={
+        <div className="flex items-center gap-0.5 rounded-full border border-primary-100 bg-primary-50 p-0.5 text-[10px]">
+          {(['gateway', 'providers'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setView(tab) }}
+              className={cn(
+                'rounded-full px-2 py-0.5 font-medium transition',
+                view === tab
+                  ? 'bg-white text-primary-900 shadow-sm'
+                  : 'text-primary-500 hover:text-primary-700',
+              )}
+            >
+              {tab === 'gateway' ? 'Gateway' : 'Providers'}
+            </button>
+          ))}
+        </div>
+      }
     >
-      {queryResult?.kind === 'unavailable' ? (
+      {view === 'providers' ? (
+        <div className="space-y-3">
+          {activeProviders.length === 0 ? (
+            <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-center">
+              <p className="text-[13px] font-medium text-primary-700">No providers connected</p>
+              <p className="mt-1 text-[11px] text-primary-500">Run `claude` to authenticate or set API keys.</p>
+            </div>
+          ) : (
+            activeProviders.map((provider) => (
+              <div key={provider.provider} className="rounded-xl border border-primary-200 bg-primary-100/45 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[13px] font-medium text-ink">{provider.displayName}</span>
+                    {provider.plan && (
+                      <span className="rounded-full bg-primary-200/60 px-1.5 py-0.5 text-[10px] font-medium text-primary-700">
+                        {provider.plan}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+                      provider.status === 'ok'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : provider.status === 'auth_expired'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-red-100 text-red-700',
+                    )}
+                  >
+                    {provider.status === 'ok' ? 'Connected' : provider.status === 'auth_expired' ? 'Expired' : 'Error'}
+                  </span>
+                </div>
+                {provider.status === 'ok' && provider.lines.length > 0 && (
+                  <div className="mt-2.5 space-y-2">
+                    {provider.lines.map((line, i) => {
+                      if (line.type === 'progress' && line.used !== undefined && line.limit !== undefined) {
+                        const pct = Math.min((line.used / line.limit) * 100, 100)
+                        const barColor =
+                          pct >= 90 ? 'bg-red-500' : pct >= 75 ? 'bg-amber-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-emerald-500'
+                        return (
+                          <div key={`${line.label}-${i}`}>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-primary-600">{line.label}</span>
+                              <span className="font-medium text-ink tabular-nums">
+                                {line.format === 'dollars'
+                                  ? `$${line.used.toFixed(2)} / $${line.limit.toFixed(2)}`
+                                  : `${Math.round(line.used)}%`}
+                              </span>
+                            </div>
+                            <div className="mt-1 h-1.5 w-full rounded-full bg-primary-200/60">
+                              <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                            </div>
+                            {line.resetsAt && (
+                              <div className="mt-0.5 text-[10px] text-primary-400">
+                                resets {new Date(line.resetsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      }
+                      if (line.type === 'badge') {
+                        return (
+                          <div key={`${line.label}-${i}`} className="flex items-center gap-1.5 text-[11px]">
+                            <span className="text-primary-600">{line.label}</span>
+                            <span
+                              className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                              style={{ backgroundColor: line.color ? `${line.color}20` : '#f3f4f6', color: line.color ?? '#6b7280' }}
+                            >
+                              {line.value ?? '—'}
+                            </span>
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key={`${line.label}-${i}`} className="flex items-center justify-between text-[11px]">
+                          <span className="text-primary-600">{line.label}</span>
+                          <span className="font-medium text-ink">{line.value ?? '—'}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {provider.status !== 'ok' && provider.message && (
+                  <p className="mt-2 text-[11px] text-primary-500">{provider.message}</p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      ) : queryResult?.kind === 'unavailable' ? (
         <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
           {queryResult.message}
         </div>

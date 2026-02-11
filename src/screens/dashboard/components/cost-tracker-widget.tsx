@@ -1,11 +1,36 @@
 // Data source: GET /api/cost — billing period spend with daily timeseries
-// Note: This shows BILLING PERIOD totals. Usage Meter (usage-meter-widget.tsx) uses
-// GET /api/usage which shows ALL-TIME totals across all providers.
-// The two totals will differ — this is expected, not a bug.
+// Provider usage: GET /api/provider-usage — real-time usage from connected providers
 import { MoneyBag02Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import { cn } from '@/lib/utils'
+
+type UsageLine = {
+  type: 'progress' | 'text' | 'badge'
+  label: string
+  used?: number
+  limit?: number
+  format?: 'percent' | 'dollars' | 'tokens'
+  value?: string
+  color?: string
+  resetsAt?: string
+}
+
+type ProviderUsageResult = {
+  provider: string
+  displayName: string
+  status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
+  message?: string
+  plan?: string
+  lines: UsageLine[]
+  updatedAt: number
+}
+
+type ProviderUsageResponse = {
+  ok: boolean
+  updatedAt: number
+  providers: ProviderUsageResult[]
+}
 
 type CostMetric = {
   label: string
@@ -255,6 +280,23 @@ export function CostTrackerWidget({ draggable = false, onRemove }: CostTrackerWi
     refetchInterval: 30_000,
   })
 
+  const providerQuery = useQuery({
+    queryKey: ['dashboard', 'provider-usage'],
+    queryFn: async (): Promise<ProviderUsageResponse | null> => {
+      try {
+        const res = await fetch('/api/provider-usage')
+        if (!res.ok) return null
+        return (await res.json()) as ProviderUsageResponse
+      } catch {
+        return null
+      }
+    },
+    retry: false,
+    refetchInterval: 30_000,
+  })
+
+  const providers = providerQuery.data?.providers ?? []
+
   const queryResult = costQuery.data
   const costData = queryResult?.kind === 'ok' ? queryResult.data : null
   const metrics = getMetricsFromPoints(costData?.points ?? [])
@@ -351,6 +393,89 @@ export function CostTrackerWidget({ draggable = false, onRemove }: CostTrackerWi
               </>
             )}
           </div>
+
+          {/* Provider Usage */}
+          {providers.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-primary-500">
+                Providers
+              </p>
+              {providers.map((provider) => (
+                <div
+                  key={provider.provider}
+                  className="rounded-lg border border-primary-200 bg-primary-100/40 px-3 py-2.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[13px] font-medium text-ink">{provider.displayName}</span>
+                      {provider.plan && (
+                        <span className="rounded-full bg-primary-200/60 px-1.5 py-0.5 text-[10px] font-medium text-primary-700">
+                          {provider.plan}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+                        provider.status === 'ok'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : provider.status === 'auth_expired'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-red-100 text-red-700',
+                      )}
+                    >
+                      {provider.status === 'ok' ? 'Connected' : provider.status === 'auth_expired' ? 'Expired' : 'Error'}
+                    </span>
+                  </div>
+                  {provider.status === 'ok' && provider.lines.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {provider.lines.map((line, i) => {
+                        if (line.type === 'progress' && line.used !== undefined && line.limit !== undefined) {
+                          const pct = Math.min((line.used / line.limit) * 100, 100)
+                          const barColor =
+                            pct >= 90 ? 'bg-red-500' : pct >= 75 ? 'bg-amber-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-emerald-500'
+                          return (
+                            <div key={`${line.label}-${i}`}>
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-primary-600">{line.label}</span>
+                                <span className="font-medium text-ink tabular-nums">
+                                  {line.format === 'dollars'
+                                    ? `$${line.used.toFixed(2)} / $${line.limit.toFixed(2)}`
+                                    : `${Math.round(line.used)}%`}
+                                </span>
+                              </div>
+                              <div className="mt-1 h-1.5 w-full rounded-full bg-primary-200/60">
+                                <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          )
+                        }
+                        if (line.type === 'badge') {
+                          return (
+                            <div key={`${line.label}-${i}`} className="flex items-center gap-1.5 text-[11px]">
+                              <span className="text-primary-600">{line.label}</span>
+                              <span
+                                className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                                style={{ backgroundColor: line.color ? `${line.color}20` : '#f3f4f6', color: line.color ?? '#6b7280' }}
+                              >
+                                {line.value ?? '—'}
+                              </span>
+                            </div>
+                          )
+                        }
+                        return (
+                          <div key={`${line.label}-${i}`} className="flex items-center justify-between text-[11px]">
+                            <span className="text-primary-600">{line.label}</span>
+                            <span className="font-medium text-ink">{line.value ?? '—'}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </DashboardGlassCard>

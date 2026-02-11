@@ -57,23 +57,25 @@ type SessionStatusResponse = {
   error?: string
 }
 
-type ProviderUsageEntry = {
-  provider: string
-  status: 'ok' | 'error'
-  message?: string
-  inputTokens?: number
-  outputTokens?: number
-  totalTokens?: number
-  costUsd?: number
-  percentUsed?: number
-  updatedAt?: number
+type UsageLine = {
+  type: 'progress' | 'text' | 'badge'
+  label: string
+  used?: number
+  limit?: number
+  format?: 'percent' | 'dollars' | 'tokens'
+  value?: string
+  color?: string
+  resetsAt?: string
 }
 
-type UsageApiResponse = {
-  ok?: boolean
-  usage?: unknown
-  unavailable?: boolean
-  error?: string
+type ProviderUsageEntry = {
+  provider: string
+  displayName: string
+  status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
+  message?: string
+  plan?: string
+  lines: UsageLine[]
+  updatedAt: number
 }
 
 function getTodayKey() {
@@ -90,46 +92,10 @@ function readNumber(value: unknown): number {
   return 0
 }
 
-function readString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-function toRecord(value: unknown): Record<string, unknown> {
-  if (value && typeof value === 'object') return value as Record<string, unknown>
-  return {}
-}
-
 function readPercent(value: unknown): number {
   const num = readNumber(value)
   if (num <= 1 && num > 0) return num * 100
   return num
-}
-
-function parseProviderUsageEntries(
-  usagePayload: unknown,
-): Array<ProviderUsageEntry> {
-  const usage = toRecord(usagePayload)
-  const byProvider = toRecord(usage.byProvider)
-
-  return Object.entries(byProvider)
-    .map(function mapProvider([provider, value]) {
-      const source = toRecord(value)
-      const status = readString(source.status) === 'error' ? 'error' : 'ok'
-      return {
-        provider,
-        status,
-        message: readString(source.message) || undefined,
-        inputTokens: readNumber(source.input) || undefined,
-        outputTokens: readNumber(source.output) || undefined,
-        totalTokens: readNumber(source.total) || undefined,
-        costUsd: readNumber(source.cost) || undefined,
-        percentUsed: readNumber(source.percentUsed) || undefined,
-        updatedAt: readNumber(source.updatedAt) || undefined,
-      }
-    })
-    .sort(function sortByMostUsage(left, right) {
-      return (right.totalTokens ?? 0) - (left.totalTokens ?? 0)
-    })
 }
 
 function resolvePricing(model: string): { input: number; output: number } | null {
@@ -417,6 +383,7 @@ export function UsageMeter() {
   const [providerError, setProviderError] = useState<string | null>(null)
   const [providerUpdatedAt, setProviderUpdatedAt] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
+  const [pillMode, setPillMode] = useState<'auto' | 'session' | 'providers'>('auto')
   const alertStateRef = useRef(getAlertState())
 
   const refresh = useCallback(async () => {
@@ -440,28 +407,20 @@ export function UsageMeter() {
 
   const refreshProviders = useCallback(async () => {
     try {
-      const res = await fetch('/api/usage')
-      const data = (await res.json().catch(() => null)) as UsageApiResponse | null
-
-      if (res.status === 501 || data?.unavailable) {
-        setProviderUsage([])
-        setProviderUpdatedAt(Date.now())
-        setProviderError('Unavailable on this Gateway version')
-        return
-      }
+      const res = await fetch('/api/provider-usage')
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean
+        providers?: Array<ProviderUsageEntry>
+        updatedAt?: number
+        error?: string
+      } | null
 
       if (!res.ok || data?.ok === false) {
-        throw new Error(
-          data?.error || res.statusText || 'Request failed',
-        )
+        throw new Error(data?.error || res.statusText || 'Request failed')
       }
 
-      const usagePayload = data?.usage
-      const providerEntries = parseProviderUsageEntries(usagePayload)
-      const usageRecord = toRecord(usagePayload)
-
-      setProviderUsage(providerEntries)
-      setProviderUpdatedAt(readNumber(usageRecord.updatedAt) || Date.now())
+      setProviderUsage(data?.providers ?? [])
+      setProviderUpdatedAt(data?.updatedAt ?? Date.now())
       setProviderError(null)
     } catch (err) {
       setProviderError(err instanceof Error ? err.message : String(err))
@@ -541,13 +500,29 @@ export function UsageMeter() {
     }
   }, [])
 
-  const alertTone = useMemo(() => {
+  const sessionHasData = usage.inputTokens > 0 || usage.outputTokens > 0 || usage.contextPercent > 0 || usage.dailyCost > 0
+
+  // Determine what to show in the pill
+  const showProviders = pillMode === 'providers' || (pillMode === 'auto' && !sessionHasData && providerUsage.length > 0)
+
+  // Find the most relevant provider line for the pill (first progress line from first ok provider)
+  const primaryProvider = providerUsage.find(p => p.status === 'ok' && p.lines.length > 0)
+  const providerProgressLines = primaryProvider?.lines.filter(l => l.type === 'progress') ?? []
+
+  // Compute pill color based on what's displayed
+  const alertTone = (() => {
+    if (showProviders && primaryProvider) {
+      const allProgress = primaryProvider.lines.filter(l => l.type === 'progress' && l.format === 'percent' && l.used !== undefined)
+      const maxPct = allProgress.reduce((max, l) => Math.max(max, l.used ?? 0), 0)
+      if (maxPct >= 75) return 'text-red-600 bg-red-100 border-red-200'
+      if (maxPct >= 50) return 'text-amber-600 bg-amber-100 border-amber-200'
+      return 'text-emerald-600 bg-emerald-100 border-emerald-200'
+    }
     const value = usage.contextPercent
-    if (value >= 90) return 'text-red-600 bg-red-100 border-red-200'
-    if (value >= 75) return 'text-orange-600 bg-orange-100 border-orange-200'
-    if (value >= 50) return 'text-yellow-600 bg-yellow-100 border-yellow-200'
+    if (value >= 75) return 'text-red-600 bg-red-100 border-red-200'
+    if (value >= 50) return 'text-amber-600 bg-amber-100 border-amber-200'
     return 'text-emerald-600 bg-emerald-100 border-emerald-200'
-  }, [usage.contextPercent])
+  })()
 
   const detailProps = useMemo(
     () => ({
@@ -560,6 +535,15 @@ export function UsageMeter() {
     [error, providerError, providerUpdatedAt, providerUsage, usage],
   )
 
+  const handlePillRightClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setPillMode(prev => {
+      if (prev === 'auto') return 'session'
+      if (prev === 'session') return 'providers'
+      return 'auto'
+    })
+  }
+
   return (
     <DialogRoot open={open} onOpenChange={setOpen}>
       <DialogTrigger
@@ -568,31 +552,59 @@ export function UsageMeter() {
           'flex items-center gap-3 transition hover:bg-primary-100',
           alertTone,
         )}
+        onContextMenu={handlePillRightClick}
       >
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] uppercase tracking-wide text-primary-600">
-            In
-          </span>
-          <span>{formatTokens(usage.inputTokens)}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] uppercase tracking-wide text-primary-600">
-            Out
-          </span>
-          <span>{formatTokens(usage.outputTokens)}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] uppercase tracking-wide text-primary-600">
-            Ctx
-          </span>
-          <span>{Math.round(usage.contextPercent)}%</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] uppercase tracking-wide text-primary-600">
-            Cost
-          </span>
-          <span>{formatCurrency(usage.dailyCost)}</span>
-        </div>
+        {showProviders && primaryProvider ? (
+          <>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                {primaryProvider.displayName.split(' ')[0]}
+              </span>
+              {primaryProvider.plan && (
+                <span className="text-[9px] uppercase text-primary-500">{primaryProvider.plan}</span>
+              )}
+            </div>
+            {providerProgressLines.slice(0, 3).map((line, i) => (
+              <div key={`${line.label}-${i}`} className="flex items-center gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                  {line.label.replace('Session (5h)', 'Sess').replace('Weekly', 'Wk').replace('Sonnet', 'Son')}
+                </span>
+                <span>
+                  {line.format === 'dollars' && line.used !== undefined
+                    ? `$${line.used >= 1000 ? `${(line.used / 1000).toFixed(1)}k` : line.used.toFixed(0)}`
+                    : line.used !== undefined ? `${Math.round(line.used)}%` : '—'}
+                </span>
+              </div>
+            ))}
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                In
+              </span>
+              <span>{formatTokens(usage.inputTokens)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                Out
+              </span>
+              <span>{formatTokens(usage.outputTokens)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                Ctx
+              </span>
+              <span>{Math.round(usage.contextPercent)}%</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                Cost
+              </span>
+              <span>{formatCurrency(usage.dailyCost)}</span>
+            </div>
+          </>
+        )}
       </DialogTrigger>
       <DialogContent className="w-[min(720px,94vw)]">
         <UsageDetailsModal {...detailProps} />

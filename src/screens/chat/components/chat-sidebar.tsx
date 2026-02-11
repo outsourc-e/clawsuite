@@ -193,6 +193,32 @@ function NavItem({
   )
 }
 
+// ── Last-visited route tracking ─────────────────────────────────────────
+
+const LAST_ROUTE_KEY = 'openclaw-sidebar-last-route'
+
+function getLastRoute(section: string): string | null {
+  try {
+    const stored = localStorage.getItem(LAST_ROUTE_KEY)
+    if (!stored) return null
+    const map = JSON.parse(stored) as Record<string, string>
+    return map[section] || null
+  } catch {
+    return null
+  }
+}
+
+function setLastRoute(section: string, route: string) {
+  try {
+    const stored = localStorage.getItem(LAST_ROUTE_KEY)
+    const map = stored ? (JSON.parse(stored) as Record<string, string>) : {}
+    map[section] = route
+    localStorage.setItem(LAST_ROUTE_KEY, JSON.stringify(map))
+  } catch {
+    // ignore
+  }
+}
+
 // ── Section header ──────────────────────────────────────────────────────
 
 function SectionLabel({
@@ -202,6 +228,7 @@ function SectionLabel({
   collapsible,
   expanded,
   onToggle,
+  navigateTo,
 }: {
   label: string
   isCollapsed: boolean
@@ -209,30 +236,50 @@ function SectionLabel({
   collapsible?: boolean
   expanded?: boolean
   onToggle?: () => void
+  navigateTo?: string
 }) {
   if (isCollapsed) return null
 
+  const labelContent = (
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 select-none">
+      {label}
+    </span>
+  )
+
   if (collapsible) {
     return (
-      <motion.button
+      <motion.div
         layout
         transition={{ layout: transition }}
-        onClick={onToggle}
-        className="flex items-center gap-1.5 px-3 pt-3 pb-1 w-full text-left"
+        className="flex items-center gap-1.5 px-3 pt-3 pb-1 w-full"
       >
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 select-none">
-          {label}
-        </span>
-        <HugeiconsIcon
-          icon={ArrowDown01Icon}
-          size={12}
-          strokeWidth={2}
-          className={cn(
-            'text-primary-500 transition-transform duration-150',
-            expanded ? 'rotate-0' : '-rotate-90',
-          )}
-        />
-      </motion.button>
+        {navigateTo ? (
+          <Link
+            to={navigateTo}
+            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 hover:text-primary-700 select-none transition-colors"
+          >
+            {label}
+          </Link>
+        ) : (
+          labelContent
+        )}
+        <button
+          type="button"
+          onClick={onToggle}
+          className="ml-auto p-0.5 rounded hover:bg-primary-200 transition-colors"
+          aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
+        >
+          <HugeiconsIcon
+            icon={ArrowDown01Icon}
+            size={12}
+            strokeWidth={2}
+            className={cn(
+              'text-primary-500 transition-transform duration-150',
+              expanded ? 'rotate-0' : '-rotate-90',
+            )}
+          />
+        </button>
+      </motion.div>
     )
   }
 
@@ -242,9 +289,16 @@ function SectionLabel({
       transition={{ layout: transition }}
       className="px-3 pt-3 pb-1"
     >
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 select-none">
-        {label}
-      </span>
+      {navigateTo ? (
+        <Link
+          to={navigateTo}
+          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 hover:text-primary-700 select-none transition-colors"
+        >
+          {label}
+        </Link>
+      ) : (
+        labelContent
+      )}
     </motion.div>
   )
 }
@@ -378,6 +432,25 @@ function ChatSidebarComponent({
   const isSettingsProvidersActive = pathname === '/settings/providers'
   const isDebugActive = pathname === '/debug'
   const isLogsActive = pathname === '/activity' || pathname === '/logs'
+
+  // Track last-visited route per section
+  const studioRoutes = ['/dashboard', '/new', '/browser', '/terminal', '/tasks']
+  const gatewayRoutes = ['/cron']
+  const agentRoutes = ['/skills', '/files', '/memory']
+  const settingsRoutes = ['/settings', '/settings/providers', '/debug', '/activity', '/logs']
+
+  useEffect(() => {
+    if (studioRoutes.includes(pathname)) setLastRoute('studio', pathname)
+    else if (gatewayRoutes.includes(pathname)) setLastRoute('gateway', pathname)
+    else if (agentRoutes.includes(pathname)) setLastRoute('agent', pathname)
+    else if (settingsRoutes.includes(pathname)) setLastRoute('settings', pathname)
+  }, [pathname])
+
+  // Resolve navigation targets (last visited or default)
+  const studioNav = getLastRoute('studio') || '/dashboard'
+  const gatewayNav = getLastRoute('gateway') || '/cron'
+  const agentNav = getLastRoute('agent') || '/skills'
+  const settingsNav = getLastRoute('settings') || '/settings'
 
   const transition = {
     duration: 0.15,
@@ -666,6 +739,7 @@ function ChatSidebarComponent({
           label="Studio"
           isCollapsed={isCollapsed}
           transition={transition}
+          navigateTo={studioNav}
         />
         {studioItems.map((item) => (
           <motion.div
@@ -691,6 +765,7 @@ function ChatSidebarComponent({
           collapsible
           expanded={gatewayExpanded || isAnyGatewayActive}
           onToggle={toggleGateway}
+          navigateTo={gatewayNav}
         />
         <CollapsibleSection
           expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
@@ -708,6 +783,7 @@ function ChatSidebarComponent({
           collapsible
           expanded={agentExpanded || isAnyAgentActive}
           onToggle={toggleAgent}
+          navigateTo={agentNav}
         />
         <CollapsibleSection
           expanded={agentExpanded || isAnyAgentActive || isCollapsed}
@@ -725,6 +801,7 @@ function ChatSidebarComponent({
           collapsible
           expanded={settingsExpanded || isAnySettingsActive}
           onToggle={toggleSettings}
+          navigateTo={settingsNav}
         />
         <CollapsibleSection
           expanded={settingsExpanded || isAnySettingsActive || isCollapsed}
