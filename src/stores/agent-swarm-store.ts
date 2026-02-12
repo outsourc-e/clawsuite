@@ -7,7 +7,7 @@ import { BASE_URL, type GatewaySession } from '@/lib/gateway-api'
 
 export type SwarmSession = GatewaySession & {
   /** Derived status for UI rendering */
-  swarmStatus: 'running' | 'thinking' | 'complete' | 'failed' | 'idle'
+  swarmStatus: 'running' | 'thinking' | 'complete' | 'failed' | 'error' | 'idle'
   /** Time since last update in ms */
   staleness: number
 }
@@ -29,7 +29,8 @@ type SwarmState = {
 function deriveSwarmStatus(session: GatewaySession): SwarmSession['swarmStatus'] {
   const status = (session.status ?? '').toLowerCase()
   if (['thinking', 'reasoning'].includes(status)) return 'thinking'
-  if (['failed', 'error', 'cancelled', 'canceled', 'killed'].includes(status)) return 'failed'
+  if (['error', 'errored'].includes(status)) return 'error'
+  if (['failed', 'cancelled', 'canceled', 'killed'].includes(status)) return 'failed'
   if (['complete', 'completed', 'success', 'succeeded', 'done'].includes(status)) return 'complete'
   if (['idle', 'waiting', 'sleeping'].includes(status)) return 'idle'
 
@@ -49,16 +50,38 @@ function deriveSwarmStatus(session: GatewaySession): SwarmSession['swarmStatus']
   return 'running'
 }
 
+function readStringField(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  return normalized.length > 0 ? normalized : null
+}
+
+function getStopReason(session: GatewaySession): string | null {
+  const stopReason = readStringField(session.stopReason)
+  return stopReason ? stopReason.toLowerCase() : null
+}
+
+function getSessionErrorMessage(session: GatewaySession): string | null {
+  return (
+    readStringField(session.errorMessage) ??
+    readStringField(session.error) ??
+    readStringField(session.failureReason) ??
+    readStringField(session.lastError)
+  )
+}
+
 function toSwarmSession(session: GatewaySession): SwarmSession {
   const updatedAt = typeof session.updatedAt === 'number'
     ? session.updatedAt
     : typeof session.updatedAt === 'string'
       ? new Date(session.updatedAt).getTime()
       : Date.now()
+  const hasExplicitError = getStopReason(session) === 'error' || getSessionErrorMessage(session) !== null
+  const derivedStatus = deriveSwarmStatus(session)
 
   return {
     ...session,
-    swarmStatus: deriveSwarmStatus(session),
+    swarmStatus: hasExplicitError ? 'error' : derivedStatus,
     staleness: Date.now() - updatedAt,
   }
 }
@@ -85,7 +108,8 @@ export const useSwarmStore = create<SwarmState>((set, get) => ({
         if (!key.includes('subagent:')) return false
         // Skip sessions with zero tokens and very old (never ran)
         const tokens = s.totalTokens ?? s.tokenCount ?? 0
-        if (tokens === 0) {
+        const hasExplicitError = getStopReason(s) === 'error' || getSessionErrorMessage(s) !== null
+        if (tokens === 0 && !hasExplicitError) {
           const updatedAt = typeof s.updatedAt === 'number'
             ? s.updatedAt
             : typeof s.updatedAt === 'string'
@@ -100,7 +124,7 @@ export const useSwarmStore = create<SwarmState>((set, get) => ({
 
       // Sort: running/thinking first, then by updatedAt desc
       swarmSessions.sort((a, b) => {
-        const priority = { thinking: 0, running: 1, idle: 2, complete: 3, failed: 4 }
+        const priority = { thinking: 0, running: 1, idle: 2, complete: 3, failed: 4, error: 5 }
         const pa = priority[a.swarmStatus] ?? 2
         const pb = priority[b.swarmStatus] ?? 2
         if (pa !== pb) return pa - pb

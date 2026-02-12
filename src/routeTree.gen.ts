@@ -27,7 +27,6 @@ import { Route as CronRouteImport } from './routes/cron'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as BrowserRouteImport } from './routes/browser'
-import { Route as AuroraDemoRouteImport } from './routes/aurora-demo'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as AgentSwarmRouteImport } from './routes/agent-swarm'
 import { Route as ActivityRouteImport } from './routes/activity'
@@ -166,11 +165,6 @@ const ChannelsRoute = ChannelsRouteImport.update({
 const BrowserRoute = BrowserRouteImport.update({
   id: '/browser',
   path: '/browser',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuroraDemoRoute = AuroraDemoRouteImport.update({
-  id: '/aurora-demo',
-  path: '/aurora-demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsRoute = AgentsRouteImport.update({
@@ -424,7 +418,6 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
   '/agents': typeof AgentsRoute
-  '/aurora-demo': typeof AuroraDemoRoute
   '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
@@ -494,7 +487,6 @@ export interface FileRoutesByTo {
   '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
   '/agents': typeof AgentsRoute
-  '/aurora-demo': typeof AuroraDemoRoute
   '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
@@ -564,7 +556,6 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/agent-swarm': typeof AgentSwarmRoute
   '/agents': typeof AgentsRoute
-  '/aurora-demo': typeof AuroraDemoRoute
   '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
@@ -636,7 +627,6 @@ export interface FileRouteTypes {
     | '/activity'
     | '/agent-swarm'
     | '/agents'
-    | '/aurora-demo'
     | '/browser'
     | '/channels'
     | '/connect'
@@ -706,7 +696,6 @@ export interface FileRouteTypes {
     | '/activity'
     | '/agent-swarm'
     | '/agents'
-    | '/aurora-demo'
     | '/browser'
     | '/channels'
     | '/connect'
@@ -775,7 +764,6 @@ export interface FileRouteTypes {
     | '/activity'
     | '/agent-swarm'
     | '/agents'
-    | '/aurora-demo'
     | '/browser'
     | '/channels'
     | '/connect'
@@ -846,7 +834,6 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   AgentSwarmRoute: typeof AgentSwarmRoute
   AgentsRoute: typeof AgentsRoute
-  AuroraDemoRoute: typeof AuroraDemoRoute
   BrowserRoute: typeof BrowserRoute
   ChannelsRoute: typeof ChannelsRoute
   ConnectRoute: typeof ConnectRoute
@@ -1034,13 +1021,6 @@ declare module '@tanstack/react-router' {
       path: '/browser'
       fullPath: '/browser'
       preLoaderRoute: typeof BrowserRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/aurora-demo': {
-      id: '/aurora-demo'
-      path: '/aurora-demo'
-      fullPath: '/aurora-demo'
-      preLoaderRoute: typeof AuroraDemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents': {
@@ -1432,7 +1412,6 @@ const rootRouteChildren: RootRouteChildren = {
   ActivityRoute: ActivityRoute,
   AgentSwarmRoute: AgentSwarmRoute,
   AgentsRoute: AgentsRoute,
-  AuroraDemoRoute: AuroraDemoRoute,
   BrowserRoute: BrowserRoute,
   ChannelsRoute: ChannelsRoute,
   ConnectRoute: ConnectRoute,

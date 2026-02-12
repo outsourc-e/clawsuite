@@ -23,6 +23,7 @@ const statusConfig = {
   idle: { color: 'bg-gray-400', pulse: false, label: 'Idle' },
   complete: { color: 'bg-emerald-400', pulse: false, label: 'Complete' },
   failed: { color: 'bg-red-400', pulse: false, label: 'Failed' },
+  error: { color: 'bg-red-500', pulse: false, label: 'Error' },
 } as const
 
 function formatTokens(n?: number): string {

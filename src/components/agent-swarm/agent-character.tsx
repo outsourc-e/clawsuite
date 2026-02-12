@@ -6,7 +6,7 @@ import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import type { AgentPersona } from '@/lib/agent-personas'
 
-type AgentStatus = 'running' | 'thinking' | 'complete' | 'failed' | 'idle'
+type AgentStatus = 'running' | 'thinking' | 'complete' | 'failed' | 'error' | 'idle'
 
 type AgentCharacterProps = {
   persona: AgentPersona
@@ -20,6 +20,7 @@ const statusGlow: Record<AgentStatus, string> = {
   running: 'shadow-[0_0_20px_rgba(96,165,250,0.5)]',
   complete: 'shadow-[0_0_20px_rgba(52,211,153,0.4)]',
   failed: 'shadow-[0_0_20px_rgba(248,113,113,0.4)]',
+  error: 'shadow-[0_0_20px_rgba(239,68,68,0.5)]',
   idle: 'shadow-[0_0_10px_rgba(148,163,184,0.2)]',
 }
 

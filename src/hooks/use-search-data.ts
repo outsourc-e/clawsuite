@@ -3,8 +3,8 @@
  * Fetches sessions, files, and activity from existing sources
  */
 import { useQuery } from '@tanstack/react-query'
-import { useActivityEvents } from '@/screens/activity/use-activity-events'
 import type { ActivityEvent } from '@/types/activity-event'
+import { useActivityEvents } from '@/screens/activity/use-activity-events'
 
 export type SearchSession = {
   id: string
@@ -38,7 +38,7 @@ export type SearchActivity = {
   source?: string
 }
 
-async function fetchSessions(): Promise<SearchSession[]> {
+async function fetchSessions(): Promise<Array<SearchSession>> {
   const res = await fetch('/api/sessions')
   if (!res.ok) return []
   const data = await res.json()
@@ -54,16 +54,16 @@ async function fetchSessions(): Promise<SearchSession[]> {
   }))
 }
 
-async function fetchFiles(): Promise<SearchFile[]> {
+async function fetchFiles(): Promise<Array<SearchFile>> {
   const res = await fetch('/api/files?action=list')
   if (!res.ok) return []
   const data = await res.json()
   const entries = Array.isArray(data.entries) ? data.entries : []
   
   // Flatten tree into list
-  function flatten(entries: Record<string, unknown>[]): SearchFile[] {
-    const result: SearchFile[] = []
-    for (const entry of entries) {
+  function flatten(fileEntries: Array<Record<string, unknown>>): Array<SearchFile> {
+    const result: Array<SearchFile> = []
+    for (const entry of fileEntries) {
       const path = String(entry.path || '')
       const name = String(entry.name || '')
       const type = String(entry.type || 'file') as 'file' | 'folder'
@@ -76,7 +76,7 @@ async function fetchFiles(): Promise<SearchFile[]> {
       })
       
       if (Array.isArray(entry.children)) {
-        result.push(...flatten(entry.children as Record<string, unknown>[]))
+        result.push(...flatten(entry.children as Array<Record<string, unknown>>))
       }
     }
     return result
@@ -85,7 +85,7 @@ async function fetchFiles(): Promise<SearchFile[]> {
   return flatten(entries)
 }
 
-async function fetchSkills(): Promise<SearchSkill[]> {
+async function fetchSkills(): Promise<Array<SearchSkill>> {
   const res = await fetch('/api/skills')
   if (!res.ok) return []
   const data = await res.json()
@@ -134,7 +134,7 @@ export function useSearchData(scope: 'all' | 'chats' | 'files' | 'agents' | 'ski
     maxEvents: 200,
   })
 
-  const activityResults: SearchActivity[] = events.map((event: ActivityEvent) => ({
+  const activityResults: Array<SearchActivity> = events.map((event: ActivityEvent) => ({
     id: event.id,
     title: event.title,
     detail: event.detail,
@@ -154,10 +154,10 @@ export function useSearchData(scope: 'all' | 'chats' | 'files' | 'agents' | 'ski
 
 // Client-side filtering
 export function filterResults<T extends Record<string, unknown>>(
-  items: T[],
+  items: Array<T>,
   query: string,
-  fields: (keyof T)[],
-): T[] {
+  fields: Array<keyof T>,
+): Array<T> {
   if (!query.trim()) return items
   
   const lower = query.toLowerCase()

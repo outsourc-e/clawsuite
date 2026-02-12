@@ -10,7 +10,7 @@ type PixelAvatarProps = {
   color: string
   accentColor: string
   size?: number
-  status?: 'running' | 'thinking' | 'complete' | 'failed' | 'idle'
+  status?: 'running' | 'thinking' | 'complete' | 'failed' | 'error' | 'idle'
   expression?: Expression
   isWalking?: boolean
   direction?: 'left' | 'right'

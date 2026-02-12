@@ -25,7 +25,7 @@ import {
   emitSearchModalEvent,
   useSearchModal
 } from '@/hooks/use-search-modal'
-import { useSearchData, filterResults } from '@/hooks/use-search-data'
+import { filterResults, useSearchData } from '@/hooks/use-search-data'
 import { cn } from '@/lib/utils'
 
 const SCOPE_TABS: Array<{ value: SearchScope; label: string }> = [
