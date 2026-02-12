@@ -19,11 +19,8 @@ import {
 } from './constants/grid-config'
 import { AgentStatusWidget } from './components/agent-status-widget'
 import { ActivityLogWidget } from './components/activity-log-widget'
-import { CostTrackerWidget } from './components/cost-tracker-widget'
 import { HeroMetricsRow } from './components/hero-metrics-row'
-import { ModelUsageChartWidget } from './components/model-usage-chart-widget'
 import { NotificationsWidget } from './components/notifications-widget'
-import { QuickActionsWidget } from './components/quick-actions-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
 import { SkillsWidget } from './components/skills-widget'
 import { SystemInfoWidget } from './components/system-info-widget'
@@ -32,7 +29,6 @@ import { UsageMeterWidget } from './components/usage-meter-widget'
 import { AddWidgetPopover } from './components/add-widget-popover'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
-import { SettingsDialog } from './components/settings-dialog'
 import { useVisibleWidgets } from './hooks/use-visible-widgets'
 import type { ResponsiveLayouts } from 'react-grid-layout'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
@@ -105,7 +101,6 @@ export function DashboardScreen() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [gridLayouts, setGridLayouts] = useState<ResponsiveLayouts>(loadLayouts)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const { visibleIds, addWidget, removeWidget, resetVisible } =
     useVisibleWidgets()
@@ -298,7 +293,7 @@ export function DashboardScreen() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSettingsOpen(true)}
+                  onClick={() => void navigate({ to: '/settings' })}
                   className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 hover:text-orange-600"
                   aria-label="Settings"
                   title="Settings"
@@ -351,14 +346,6 @@ export function DashboardScreen() {
             compactType="vertical"
             margin={GRID_MARGIN}
           >
-            {visibleIds.includes('quick-actions') ? (
-              <div key="quick-actions" className="h-full">
-                <QuickActionsWidget
-                  draggable
-                  onRemove={() => removeWidget('quick-actions')}
-                />
-              </div>
-            ) : null}
             {visibleIds.includes('system-info') ? (
               <div key="system-info" className="h-full">
                 <SystemInfoWidget
@@ -370,14 +357,6 @@ export function DashboardScreen() {
             {visibleIds.includes('skills') ? (
               <div key="skills" className="h-full">
                 <SkillsWidget draggable onRemove={() => removeWidget('skills')} />
-              </div>
-            ) : null}
-            {visibleIds.includes('model-usage-chart') ? (
-              <div key="model-usage-chart" className="h-full">
-                <ModelUsageChartWidget
-                  draggable
-                  onRemove={() => removeWidget('model-usage-chart')}
-                />
               </div>
             ) : null}
             {visibleIds.includes('usage-meter') ? (
@@ -398,14 +377,6 @@ export function DashboardScreen() {
                 <AgentStatusWidget
                   draggable
                   onRemove={() => removeWidget('agent-status')}
-                />
-              </div>
-            ) : null}
-            {visibleIds.includes('cost-tracker') ? (
-              <div key="cost-tracker" className="h-full">
-                <CostTrackerWidget
-                  draggable
-                  onRemove={() => removeWidget('cost-tracker')}
                 />
               </div>
             ) : null}
@@ -442,8 +413,6 @@ export function DashboardScreen() {
           </ResponsiveGridLayout>
         </div>
       </section>
-
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </main>
   )
 }
