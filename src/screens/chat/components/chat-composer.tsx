@@ -190,6 +190,16 @@ function toModelOption(entry: GatewayModelCatalogEntry): ModelOption | null {
   return { value, label: display || value, provider }
 }
 
+function normalizeDraftSessionKey(sessionKey?: string): string {
+  if (typeof sessionKey !== 'string') return 'new'
+  const normalized = sessionKey.trim()
+  return normalized.length > 0 ? normalized : 'new'
+}
+
+function toDraftStorageKey(sessionKey?: string): string {
+  return `clawsuite-draft-${normalizeDraftSessionKey(sessionKey)}`
+}
+
 function isSameModel(option: ModelOption, currentModel: string): boolean {
   const normalizedCurrent = currentModel.trim().toLowerCase()
   if (!normalizedCurrent) return false
@@ -416,6 +426,10 @@ function ChatComposerComponent({
     noModelsAvailable ||
     modelSwitchMutation.isPending
   const currentModel = currentModelQuery.data ?? ''
+  const draftStorageKey = useMemo(
+    () => toDraftStorageKey(sessionKey),
+    [sessionKey],
+  )
   const modelButtonLabel =
     currentModel ||
     (currentModelQuery.isLoading ? 'Loading model…' : 'Select model')
@@ -489,6 +503,12 @@ function ChatComposerComponent({
   }, [focusKey])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const savedDraft = window.sessionStorage.getItem(draftStorageKey)
+    setValue(savedDraft ?? '')
+  }, [draftStorageKey])
+
+  useEffect(() => {
     if (!isModelMenuOpen) return
     function handleOutsideClick(event: MouseEvent) {
       if (!modelSelectorRef.current) return
@@ -502,19 +522,49 @@ function ChatComposerComponent({
     }
   }, [isModelMenuOpen])
 
+  const persistDraft = useCallback(
+    function persistDraft(nextValue: string) {
+      if (typeof window === 'undefined') return
+      if (nextValue.length === 0) {
+        window.sessionStorage.removeItem(draftStorageKey)
+        return
+      }
+      window.sessionStorage.setItem(draftStorageKey, nextValue)
+    },
+    [draftStorageKey],
+  )
+
+  const clearDraft = useCallback(
+    function clearDraft() {
+      if (typeof window === 'undefined') return
+      window.sessionStorage.removeItem(draftStorageKey)
+    },
+    [draftStorageKey],
+  )
+
+  const handleValueChange = useCallback(
+    function handleValueChange(nextValue: string) {
+      setValue(nextValue)
+      persistDraft(nextValue)
+    },
+    [persistDraft],
+  )
+
   const reset = useCallback(() => {
     setValue('')
+    clearDraft()
     setAttachments([])
     resetDragState()
     focusPrompt()
-  }, [focusPrompt, resetDragState])
+  }, [clearDraft, focusPrompt, resetDragState])
 
   const setComposerValue = useCallback(
     (nextValue: string) => {
       setValue(nextValue)
+      persistDraft(nextValue)
       focusPrompt()
     },
-    [focusPrompt],
+    [focusPrompt, persistDraft],
   )
 
   const setComposerAttachments = useCallback(
@@ -527,10 +577,14 @@ function ChatComposerComponent({
 
   const insertText = useCallback(
     (text: string) => {
-      setValue((prev) => (prev.trim().length > 0 ? `${prev}\n${text}` : text))
+      setValue((prev) => {
+        const nextValue = prev.trim().length > 0 ? `${prev}\n${text}` : text
+        persistDraft(nextValue)
+        return nextValue
+      })
       focusPrompt()
     },
-    [focusPrompt],
+    [focusPrompt, persistDraft],
   )
 
   useImperativeHandle(
@@ -662,10 +716,11 @@ function ChatComposerComponent({
       setValue: setComposerValue,
       setAttachments: setComposerAttachments,
     })
+    clearDraft()
     shouldRefocusAfterSendRef.current = true
     setFocusAfterSubmitTick((prev) => prev + 1)
     focusPrompt()
-  }, [attachments, disabled, focusPrompt, onSubmit, reset, setComposerAttachments, setComposerValue, value])
+  }, [attachments, clearDraft, disabled, focusPrompt, onSubmit, reset, setComposerAttachments, setComposerValue, value])
 
   const submitDisabled =
     disabled || (value.trim().length === 0 && attachments.length === 0)
@@ -734,7 +789,7 @@ function ChatComposerComponent({
       />
       <PromptInput
         value={value}
-        onValueChange={setValue}
+        onValueChange={handleValueChange}
         onSubmit={handleSubmit}
         isLoading={isLoading}
         disabled={disabled}
