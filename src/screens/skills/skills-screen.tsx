@@ -22,6 +22,12 @@ import { cn } from '@/lib/utils'
 type SkillsTab = 'installed' | 'marketplace' | 'featured'
 type SkillsSort = 'name' | 'category'
 
+type SecurityRisk = {
+  level: 'safe' | 'low' | 'medium' | 'high'
+  flags: Array<string>
+  score: number
+}
+
 type SkillSummary = {
   id: string
   slug: string
@@ -39,6 +45,7 @@ type SkillSummary = {
   installed: boolean
   enabled: boolean
   featuredGroup?: string
+  security?: SecurityRisk
 }
 
 type SkillsApiResponse = {
@@ -416,6 +423,9 @@ export function SkillsScreen() {
                 <DialogDescription className="mt-1 text-pretty">
                   by {selectedSkill.author} • {selectedSkill.category} • {selectedSkill.fileCount.toLocaleString()} files
                 </DialogDescription>
+                <div className="mt-2">
+                  <SecurityBadge security={selectedSkill.security} />
+                </div>
               </div>
 
               <ScrollAreaRoot className="h-[56vh]">
@@ -517,6 +527,55 @@ type SkillsGridProps = {
   onToggle: (skillId: string, enabled: boolean) => void
 }
 
+const SECURITY_CONFIG: Record<string, { label: string; icon: string; className: string }> = {
+  safe: { label: 'Verified Safe', icon: '🛡️', className: 'border-green-300 bg-green-50 text-green-700' },
+  low: { label: 'Low Risk', icon: '✅', className: 'border-blue-300 bg-blue-50 text-blue-700' },
+  medium: { label: 'Medium Risk', icon: '⚠️', className: 'border-amber-300 bg-amber-50 text-amber-700' },
+  high: { label: 'High Risk', icon: '🔴', className: 'border-red-300 bg-red-50 text-red-700' },
+}
+
+function SecurityBadge({ security }: { security?: SecurityRisk }) {
+  if (!security) return null
+  const config = SECURITY_CONFIG[security.level]
+  if (!config) return null
+
+  const [showTooltip, setShowTooltip] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className={cn(
+          'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors',
+          config.className,
+        )}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        onClick={(e) => { e.stopPropagation(); setShowTooltip((v) => !v) }}
+      >
+        <span className="text-[10px]">{config.icon}</span>
+        {config.label}
+      </button>
+      {showTooltip && security.flags.length > 0 && (
+        <div className="absolute left-0 bottom-[calc(100%+4px)] z-50 w-56 rounded-lg border border-primary-200 bg-surface p-3 shadow-xl text-xs">
+          <p className="font-semibold text-ink mb-1.5">Security Scan</p>
+          <ul className="space-y-1">
+            {security.flags.map((flag) => (
+              <li key={flag} className="flex items-start gap-1.5 text-primary-600">
+                <span className="mt-0.5 text-[10px]">•</span>
+                {flag}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[10px] text-primary-400">
+            Risk score: {security.score} · Scanned SKILL.md + scripts
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SkillsGrid({
   skills,
   loading,
@@ -590,7 +649,8 @@ function SkillsGrid({
                 {skill.description}
               </p>
 
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <SecurityBadge security={skill.security} />
                 <span className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500">
                   {skill.category}
                 </span>

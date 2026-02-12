@@ -7,6 +7,12 @@ import { json } from '@tanstack/react-start'
 type SkillsTab = 'installed' | 'marketplace' | 'featured'
 type SkillsSort = 'name' | 'category'
 
+type SecurityRisk = {
+  level: 'safe' | 'low' | 'medium' | 'high'
+  flags: Array<string>
+  score: number
+}
+
 type SkillSummary = {
   id: string
   slug: string
@@ -24,6 +30,7 @@ type SkillSummary = {
   installed: boolean
   enabled: boolean
   featuredGroup?: string
+  security: SecurityRisk
 }
 
 type SkillIndexRecord = {
@@ -741,6 +748,92 @@ function sortSkills(items: Array<SkillIndexRecord>, sort: SkillsSort): Array<Ski
   return cloned
 }
 
+// ── Security Scanner ──────────────────────────────────────────────────────
+
+const SECURITY_PATTERNS: Array<{ pattern: RegExp; flag: string; weight: number }> = [
+  // High risk
+  { pattern: /\bsudo\b/i, flag: 'Uses sudo/root access', weight: 30 },
+  { pattern: /\brm\s+-rf?\b/i, flag: 'Deletes files (rm)', weight: 25 },
+  { pattern: /\beval\b.*\(/i, flag: 'Uses eval()', weight: 25 },
+  { pattern: /\bexec\b.*\(/i, flag: 'Executes shell commands', weight: 20 },
+  { pattern: /\bchild_process\b/i, flag: 'Spawns child processes', weight: 20 },
+  { pattern: /\bProcess\.Start\b/i, flag: 'Starts system processes', weight: 20 },
+  { pattern: /\bos\.system\b/i, flag: 'Runs OS commands', weight: 20 },
+  { pattern: /\bsubprocess\b/i, flag: 'Runs subprocesses', weight: 20 },
+  // Medium risk
+  { pattern: /\bcurl\b.*https?:/i, flag: 'Makes HTTP requests (curl)', weight: 15 },
+  { pattern: /\bwget\b/i, flag: 'Downloads files (wget)', weight: 15 },
+  { pattern: /\bfetch\s*\(/i, flag: 'Makes network requests', weight: 10 },
+  { pattern: /\brequests?\.(get|post|put|delete)\b/i, flag: 'Makes HTTP requests', weight: 10 },
+  { pattern: /\bapi[_-]?key\b/i, flag: 'Handles API keys', weight: 10 },
+  { pattern: /\b(secret|token|password|credential)\b/i, flag: 'Handles secrets/credentials', weight: 10 },
+  { pattern: /\bfs\.(write|unlink|rm|rmdir)\b/i, flag: 'Writes/deletes files', weight: 10 },
+  { pattern: /\bchmod\b/i, flag: 'Changes file permissions', weight: 10 },
+  // Low risk
+  { pattern: /\bfs\.(read|readFile|readdir)\b/i, flag: 'Reads files', weight: 3 },
+  { pattern: /\benv\b.*\b(HOME|PATH|USER)\b/i, flag: 'Reads environment variables', weight: 3 },
+  { pattern: /\binstall\b/i, flag: 'Installs packages', weight: 5 },
+  { pattern: /\bnpm\b.*\binstall\b/i, flag: 'Runs npm install', weight: 5 },
+  { pattern: /\bpip\b.*\binstall\b/i, flag: 'Runs pip install', weight: 5 },
+]
+
+function scanSkillSecurity(content: string, allFileContents?: string): SecurityRisk {
+  const textToScan = allFileContents ? `${content}\n${allFileContents}` : content
+  const flags: Array<string> = []
+  let score = 0
+  const seen = new Set<string>()
+
+  for (const rule of SECURITY_PATTERNS) {
+    if (rule.pattern.test(textToScan) && !seen.has(rule.flag)) {
+      seen.add(rule.flag)
+      flags.push(rule.flag)
+      score += rule.weight
+    }
+  }
+
+  let level: SecurityRisk['level'] = 'safe'
+  if (score >= 40) level = 'high'
+  else if (score >= 20) level = 'medium'
+  else if (score > 0) level = 'low'
+
+  return { level, flags, score }
+}
+
+async function scanSkillFolder(folderPath: string, skillContent: string): Promise<SecurityRisk> {
+  // Scan SKILL.md content + all script files in the folder
+  let allContent = ''
+  try {
+    const stack = [folderPath]
+    const scriptExtensions = new Set(['.sh', '.py', '.js', '.ts', '.mjs', '.ps1', '.bat', '.cmd', '.rb'])
+    while (stack.length > 0) {
+      const dir = stack.pop()
+      if (!dir) break
+      const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+      for (const entry of entries) {
+        if (entry.name.startsWith('.')) continue
+        const fullPath = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          stack.push(fullPath)
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name).toLowerCase()
+          if (scriptExtensions.has(ext) || entry.name === 'Makefile' || entry.name === 'Dockerfile') {
+            const fileContent = await fs.readFile(fullPath, 'utf8').catch(() => '')
+            if (fileContent.length < 50_000) { // Skip huge files
+              allContent += `\n${fileContent}`
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore scan errors
+  }
+
+  return scanSkillSecurity(skillContent, allContent)
+}
+
+// ── Inflate ───────────────────────────────────────────────────────────────
+
 async function inflateSkillSummaries(
   items: Array<SkillIndexRecord>,
   installedLookup: Set<string>,
@@ -756,6 +849,8 @@ async function inflateSkillSummaries(
       || installedLookup.has(item.slug.toLowerCase())
       || installedLookup.has(item.id.toLowerCase())
       || installedLookup.has(path.basename(item.id).toLowerCase())
+
+    const security = await scanSkillFolder(item.folderPath, item.content)
 
     output.push({
       id: item.id,
@@ -773,6 +868,7 @@ async function inflateSkillSummaries(
       sourcePath: item.sourcePath,
       installed,
       enabled: item.enabled,
+      security,
     })
   }
 
