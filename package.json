@@ -38,7 +38,6 @@
     "marked": "^17.0.1",
     "motion": "^12.29.2",
     "nitro": "npm:nitro-nightly@latest",
-    "node-pty": "^1.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
