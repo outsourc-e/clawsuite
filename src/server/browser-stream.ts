@@ -295,6 +295,8 @@ export async function startBrowserStream(): Promise<{ port: number }> {
 
     const wss = new WebSocketServer({ server })
 
+    wss.on('error', () => {}) // Prevent unhandled error crash
+
     wss.on('connection', (ws: any) => {
       clients.add(ws)
 
@@ -320,7 +322,13 @@ export async function startBrowserStream(): Promise<{ port: number }> {
     })
 
     server.on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE') resolve({ port: WS_PORT })
+      if (err.code === 'EADDRINUSE') {
+        // Port already in use — likely stale from a previous session. Reuse it.
+        console.warn(`[browser-stream] Port ${WS_PORT} already in use, reusing existing server`)
+        resolve({ port: WS_PORT })
+      } else {
+        console.error('[browser-stream] Server error:', err)
+      }
     })
   })
 }
