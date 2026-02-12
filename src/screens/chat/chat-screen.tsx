@@ -713,7 +713,7 @@ export function ChatScreen({
       }
 
       const sessionKeyForSend =
-        forcedSessionKey || resolvedSessionKey || activeSessionKey
+        forcedSessionKey || resolvedSessionKey || activeSessionKey || 'main'
       sendMessage(
         sessionKeyForSend,
         activeFriendlyId,
