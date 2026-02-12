@@ -190,6 +190,22 @@ async function captureScreenshot(): Promise<void> {
   }
 }
 
+export async function getPageContent(): Promise<{ url: string; title: string; text: string }> {
+  if (!pageInstance) return { url: '', title: '', text: '' }
+  const url = pageInstance.url()
+  const title = await pageInstance.title().catch(() => '')
+  const text = await pageInstance.evaluate(() => {
+    // Extract readable text content
+    const body = document.body
+    if (!body) return ''
+    // Remove scripts and styles
+    const clone = body.cloneNode(true) as HTMLElement
+    clone.querySelectorAll('script, style, noscript, svg').forEach((el) => el.remove())
+    return (clone.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 8000)
+  }).catch(() => '')
+  return { url, title, text }
+}
+
 function getState(): BrowserState {
   return {
     running: !!pageInstance,

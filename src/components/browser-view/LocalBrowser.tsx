@@ -8,9 +8,12 @@ import {
   GlobeIcon,
   ArrowDown01Icon,
   ArrowUp01Icon,
+  SentIcon,
+  AiChat02Icon,
 } from '@hugeicons/core-free-icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useRef, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -34,8 +37,11 @@ async function browserAction(action: string, params?: Record<string, unknown>): 
 
 export function LocalBrowser() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [urlInput, setUrlInput] = useState('')
   const [isLaunched, setIsLaunched] = useState(false)
+  const [agentPrompt, setAgentPrompt] = useState('')
+  const [handingOff, setHandingOff] = useState(false)
   const screenshotRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
 
@@ -283,40 +289,131 @@ export function LocalBrowser() {
 
       {/* Keyboard input bar */}
       <div className="border-t border-primary-200 bg-primary-50/80 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              const input = e.currentTarget.querySelector('input') as HTMLInputElement
+              if (input.value) {
+                actionMutation.mutate({ action: 'type', text: input.value, submit: false })
+                input.value = ''
+              }
+            }}
+            className="flex flex-1 items-center gap-2"
+          >
+            <input
+              type="text"
+              placeholder="Type text into focused element..."
+              className="flex-1 rounded-lg border border-primary-200 bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-primary-400 focus:border-accent-500 focus:outline-none"
+            />
+            <Button type="submit" variant="outline" size="sm">
+              Type
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => actionMutation.mutate({ action: 'press', key: 'Enter' })}
+            >
+              Enter ↵
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => actionMutation.mutate({ action: 'press', key: 'Tab' })}
+            >
+              Tab ⇥
+            </Button>
+          </form>
+        </div>
+      </div>
+
+      {/* Agent handoff bar */}
+      <div className="border-t border-accent-200/50 bg-accent-50/30 px-3 py-2">
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault()
-            const input = e.currentTarget.querySelector('input') as HTMLInputElement
-            if (input.value) {
-              actionMutation.mutate({ action: 'type', text: input.value, submit: false })
-              input.value = ''
+            if (!agentPrompt.trim() && !currentUrl) return
+            setHandingOff(true)
+
+            try {
+              // Get page content for context
+              const contentRes = await fetch('/api/browser', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'content' }),
+              })
+              const content = await contentRes.json() as { url: string; title: string; text: string }
+
+              // Build the message with browser context
+              const instruction = agentPrompt.trim() || 'Take over this browser session and help me with this page.'
+              const contextMsg = [
+                `🌐 **Browser Handoff**`,
+                `**URL:** ${content.url || currentUrl}`,
+                `**Page:** ${content.title || currentTitle}`,
+                '',
+                `**Task:** ${instruction}`,
+                '',
+                `<page_content>`,
+                (content.text || '').slice(0, 4000),
+                `</page_content>`,
+                '',
+                `The browser is running at \`/api/browser\`. You can control it with POST actions: navigate, click (x,y), type (text), press (key), scroll (direction), back, forward, refresh, content, screenshot.`,
+              ].join('\n')
+
+              // Send to chat via the send API
+              const sendRes = await fetch('/api/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sessionKey: '',
+                  friendlyId: 'new',
+                  message: contextMsg,
+                }),
+              })
+              const sendResult = await sendRes.json() as { ok?: boolean; friendlyId?: string }
+
+              setAgentPrompt('')
+
+              // Navigate to the chat session
+              if (sendResult.friendlyId) {
+                void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sendResult.friendlyId } })
+              } else {
+                void navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })
+              }
+            } catch {
+              // Fallback: just navigate to chat
+              void navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })
+            } finally {
+              setHandingOff(false)
             }
           }}
           className="flex items-center gap-2"
         >
+          <div className="flex items-center gap-1.5 shrink-0">
+            <HugeiconsIcon icon={AiChat02Icon} size={16} className="text-accent-500" />
+            <span className="text-xs font-medium text-accent-600">Agent</span>
+          </div>
           <input
             type="text"
-            placeholder="Type text into the focused element..."
-            className="flex-1 rounded-lg border border-primary-200 bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-primary-400 focus:border-accent-500 focus:outline-none"
+            value={agentPrompt}
+            onChange={(e) => setAgentPrompt(e.target.value)}
+            placeholder="Tell the agent what to do on this page..."
+            className="flex-1 rounded-lg border border-accent-200 bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-primary-400 focus:border-accent-500 focus:outline-none"
           />
-          <Button type="submit" variant="outline" size="sm">
-            Type
-          </Button>
           <Button
-            type="button"
-            variant="outline"
+            type="submit"
+            disabled={handingOff}
+            className="gap-1.5 bg-accent-500 hover:bg-accent-400"
             size="sm"
-            onClick={() => actionMutation.mutate({ action: 'press', key: 'Enter' })}
           >
-            Enter
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => actionMutation.mutate({ action: 'press', key: 'Tab' })}
-          >
-            Tab
+            {handingOff ? (
+              <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
+            ) : (
+              <HugeiconsIcon icon={SentIcon} size={14} />
+            )}
+            Hand to Agent
           </Button>
         </form>
       </div>

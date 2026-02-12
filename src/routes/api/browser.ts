@@ -12,6 +12,7 @@ import {
   refresh,
   scrollPage,
   getScreenshot,
+  getPageContent,
 } from '../../server/browser-session'
 
 export const Route = createFileRoute('/api/browser')({
@@ -86,6 +87,11 @@ export const Route = createFileRoute('/api/browser')({
             case 'screenshot': {
               const state = await getScreenshot()
               return json({ ok: true, ...state })
+            }
+
+            case 'content': {
+              const content = await getPageContent()
+              return json({ ok: true, ...content })
             }
 
             default:
