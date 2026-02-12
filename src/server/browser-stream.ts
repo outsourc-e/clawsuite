@@ -272,6 +272,17 @@ export async function startBrowserStream(): Promise<{ port: number }> {
 
   return new Promise((resolve) => {
     server = http.createServer((req, res) => {
+      // CORS preflight
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        })
+        res.end()
+        return
+      }
+
       // Simple HTTP endpoint for status/actions (agent handoff uses this)
       if (req.method === 'POST') {
         let body = ''
@@ -283,7 +294,7 @@ export async function startBrowserStream(): Promise<{ port: number }> {
             res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
             res.end(JSON.stringify(result))
           } catch (err) {
-            res.writeHead(500, { 'Content-Type': 'application/json' })
+            res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
             res.end(JSON.stringify({ error: String(err) }))
           }
         })
