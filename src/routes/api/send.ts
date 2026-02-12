@@ -1,7 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { z } from 'zod'
 import { gatewayRpc } from '../../server/gateway'
+import { getClientIp, rateLimit, rateLimitResponse, safeErrorMessage } from '../../server/rate-limit'
+
+const SendSchema = z.object({
+  sessionKey: z.string().trim().max(200).default(''),
+  friendlyId: z.string().trim().max(200).default(''),
+  message: z.string().max(100_000).default(''),
+  thinking: z.string().max(50).optional(),
+  attachments: z.array(z.unknown()).optional(),
+  clientId: z.string().trim().max(100).optional(),
+  idempotencyKey: z.string().max(100).optional(),
+})
 
 type SessionsResolveResponse = {
   ok?: boolean
@@ -12,26 +24,26 @@ export const Route = createFileRoute('/api/send')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        try {
-          const body = (await request.json().catch(() => ({}))) as Record<
-            string,
-            unknown
-          >
+        // Rate limit: 30 requests per minute per IP
+        const ip = getClientIp(request)
+        if (!rateLimit(`send:${ip}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
 
-          const rawSessionKey =
-            typeof body.sessionKey === 'string' ? body.sessionKey.trim() : ''
-          const friendlyId =
-            typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
-          const message = String(body.message ?? '')
-          const thinking =
-            typeof body.thinking === 'string' ? body.thinking : undefined
-          const attachments = Array.isArray(body.attachments)
-            ? body.attachments
-            : undefined
-          const clientId =
-            typeof body.clientId === 'string' && body.clientId.trim().length > 0
-              ? body.clientId.trim()
-              : undefined
+        try {
+          const raw = await request.json().catch(() => ({}))
+          const parsed = SendSchema.safeParse(raw)
+          if (!parsed.success) {
+            return json({ ok: false, error: 'Invalid request body' }, { status: 400 })
+          }
+          const body = parsed.data
+
+          const rawSessionKey = body.sessionKey
+          const friendlyId = body.friendlyId
+          const message = body.message
+          const thinking = body.thinking
+          const attachments = body.attachments
+          const clientId = body.clientId
 
           if (!message.trim() && (!attachments || attachments.length === 0)) {
             return json(
@@ -99,13 +111,9 @@ export const Route = createFileRoute('/api/send')({
 
           return json({ ok: true, ...res, sessionKey, clientId: clientId ?? null })
         } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : String(err)
-          console.error('[/api/send] Error:', errorMessage)
+          console.error('[/api/send] Error:', err instanceof Error ? err.message : String(err))
           return json(
-            {
-              ok: false,
-              error: errorMessage,
-            },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

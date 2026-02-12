@@ -55,7 +55,8 @@
     "xterm-addon-fit": "^0.8.0",
     "xterm-addon-search": "^0.13.0",
     "xterm-addon-web-links": "^0.9.0",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.11",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.3.0",

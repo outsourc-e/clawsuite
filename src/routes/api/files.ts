@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { getClientIp, rateLimit, rateLimitResponse, safeErrorMessage } from '../../server/rate-limit'
 
 const execFileAsync = promisify(execFile)
 
@@ -274,12 +275,17 @@ export const Route = createFileRoute('/api/files')({
           })
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : String(err) },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }
       },
       POST: async ({ request }) => {
+        const ip = getClientIp(request)
+        if (!rateLimit(`files:${ip}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
+
         try {
           const contentType = request.headers.get('content-type') || ''
           if (contentType.includes('multipart/form-data')) {
@@ -343,7 +349,7 @@ export const Route = createFileRoute('/api/files')({
           return json({ ok: true, path: toRelative(filePath) })
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : String(err) },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }
