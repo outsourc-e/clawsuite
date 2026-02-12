@@ -37,8 +37,9 @@ function CollapsiblePanel({
 }: CollapsiblePanelProps) {
   return (
     <BaseCollapsible.Panel
+      keepMounted
       className={cn(
-        'flex h-(--collapsible-panel-height) flex-col overflow-hidden text-sm transition-all duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden="until-found"])]:hidden',
+        'flex h-(--collapsible-panel-height) flex-col overflow-hidden text-sm transition-all duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0',
         className,
       )}
       {...props}
