@@ -28,16 +28,9 @@ import { UserAvatar } from '@/components/avatars'
 
 const PROFILE_IMAGE_MAX_DIMENSION = 128
 const PROFILE_IMAGE_MAX_FILE_SIZE = 10 * 1024 * 1024
-const PROFILE_IMAGE_ACCEPTED_TYPES = [
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-]
-const PROFILE_IMAGE_ACCEPTED_EXTENSIONS = '.png,.jpg,.jpeg,.gif,.webp'
 
 function isAcceptedProfileImage(file: File): boolean {
-  return PROFILE_IMAGE_ACCEPTED_TYPES.includes(file.type)
+  return file.type.startsWith('image/')
 }
 
 function loadImage(source: string): Promise<HTMLImageElement> {
@@ -191,7 +184,7 @@ export function SettingsDialog({
     if (!file) return
 
     if (!isAcceptedProfileImage(file)) {
-      setProfileError('Unsupported file type. Use PNG, JPG, GIF, or WebP.')
+      setProfileError('Unsupported file type. Please choose an image file.')
       return
     }
 
@@ -250,15 +243,6 @@ export function SettingsDialog({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-            <SettingsSection title="Connection">
-              <SettingsRow label="Status">
-                <span className="flex items-center gap-1.5 text-sm text-green-600">
-                  <span className="size-2 rounded-full bg-green-500" />
-                  Connected
-                </span>
-              </SettingsRow>
-            </SettingsSection>
-
             <SettingsSection title="Profile">
               <div className="flex items-center gap-3">
                 <UserAvatar
@@ -301,7 +285,7 @@ export function SettingsDialog({
                 <input
                   id="profile-avatar-upload"
                   type="file"
-                  accept={PROFILE_IMAGE_ACCEPTED_EXTENSIONS}
+                  accept="image/*"
                   onChange={handleAvatarUpload}
                   className="block w-full cursor-pointer text-xs text-primary-700 file:mr-3 file:rounded-md file:border file:border-primary-200 file:bg-primary-100 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-primary-800 hover:file:bg-primary-200"
                 />
@@ -330,6 +314,15 @@ export function SettingsDialog({
                   </p>
                 )}
               </div>
+            </SettingsSection>
+
+            <SettingsSection title="Connection">
+              <SettingsRow label="Status">
+                <span className="flex items-center gap-1.5 text-sm text-green-600">
+                  <span className="size-2 rounded-full bg-green-500" />
+                  Connected
+                </span>
+              </SettingsRow>
             </SettingsSection>
 
             <SettingsSection title="Appearance">
