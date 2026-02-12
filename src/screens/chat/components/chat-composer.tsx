@@ -36,6 +36,7 @@ import { usePinnedModels } from '@/hooks/use-pinned-models'
 // import { ModeSelector } from '@/components/mode-selector'
 import { cn } from '@/lib/utils'
 import { useVoiceInput } from '@/hooks/use-voice-input'
+import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
 
 type ChatComposerAttachment = {
   id: string
@@ -762,7 +763,7 @@ function ChatComposerComponent({
   const submitDisabled =
     disabled || (value.trim().length === 0 && attachments.length === 0)
 
-  // Voice input
+  // Voice input (tap = speech-to-text)
   const voiceInput = useVoiceInput({
     onResult: useCallback((text: string) => {
       if (!text.trim()) return
@@ -773,6 +774,65 @@ function ChatComposerComponent({
       })
     }, [persistDraft]),
   })
+
+  // Voice recorder (long-press = voice note)
+  const voiceRecorder = useVoiceRecorder({
+    onRecorded: useCallback((blob: Blob, durationMs: number) => {
+      const ext = blob.type.includes('webm') ? 'webm' : 'mp4'
+      const name = `voice-note-${Date.now()}.${ext}`
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = typeof reader.result === 'string' ? reader.result : ''
+        if (!dataUrl) return
+        const secs = Math.round(durationMs / 1000)
+        setAttachments(prev => [...prev, {
+          id: crypto.randomUUID(),
+          name,
+          contentType: blob.type || 'audio/webm',
+          size: blob.size,
+          dataUrl,
+          previewUrl: '',
+        }])
+        // Auto-add duration caption to message
+        setValue(prev => {
+          const caption = `🎤 Voice note (${secs}s)`
+          const next = prev.trim().length > 0 ? `${prev}\n${caption}` : caption
+          persistDraft(next)
+          return next
+        })
+      }
+      reader.readAsDataURL(blob)
+    }, [persistDraft]),
+  })
+
+  // Long-press detection for mic button
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isLongPressRef = useRef(false)
+  const handleMicPointerDown = useCallback(() => {
+    isLongPressRef.current = false
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true
+      voiceRecorder.start()
+    }, 500) // 500ms = long press threshold
+  }, [voiceRecorder])
+  const handleMicPointerUp = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+    if (isLongPressRef.current) {
+      // Was a long press — stop recording
+      voiceRecorder.stop()
+      isLongPressRef.current = false
+    } else {
+      // Was a tap — toggle voice-to-text
+      if (voiceRecorder.isRecording) {
+        voiceRecorder.stop()
+      } else {
+        voiceInput.toggle()
+      }
+    }
+  }, [voiceInput, voiceRecorder])
 
   const handleAbort = useCallback(async function handleAbort() {
     try {
@@ -1123,22 +1183,46 @@ function ChatComposerComponent({
             */}
           </div>
           <div className="flex items-center gap-1">
-            {voiceInput.isSupported ? (
-              <PromptInputAction tooltip={voiceInput.isListening ? 'Stop listening' : 'Voice input'}>
+            {voiceInput.isSupported || voiceRecorder.isSupported ? (
+              <PromptInputAction
+                tooltip={
+                  voiceRecorder.isRecording
+                    ? `Recording… ${Math.round(voiceRecorder.durationMs / 1000)}s`
+                    : voiceInput.isListening
+                      ? 'Listening — tap to stop'
+                      : 'Tap: dictate · Hold: voice note'
+                }
+              >
                 <Button
-                  onClick={voiceInput.toggle}
+                  onPointerDown={handleMicPointerDown}
+                  onPointerUp={handleMicPointerUp}
+                  onPointerLeave={handleMicPointerUp}
                   size="icon-sm"
                   variant="ghost"
                   className={cn(
-                    'rounded-lg transition-colors',
-                    voiceInput.isListening
-                      ? 'text-red-500 bg-red-50 hover:bg-red-100 animate-pulse'
-                      : 'text-primary-500 hover:bg-primary-100 hover:text-primary-700',
+                    'rounded-lg transition-colors select-none',
+                    voiceRecorder.isRecording
+                      ? 'text-red-600 bg-red-100 hover:bg-red-200 animate-pulse'
+                      : voiceInput.isListening
+                        ? 'text-red-500 bg-red-50 hover:bg-red-100 animate-pulse'
+                        : 'text-primary-500 hover:bg-primary-100 hover:text-primary-700',
                   )}
-                  aria-label={voiceInput.isListening ? 'Stop listening' : 'Voice input'}
+                  aria-label={
+                    voiceRecorder.isRecording
+                      ? 'Recording voice note'
+                      : voiceInput.isListening
+                        ? 'Stop listening'
+                        : 'Voice input'
+                  }
                   disabled={disabled}
                 >
                   <HugeiconsIcon icon={Mic01Icon} size={18} strokeWidth={1.5} />
+                  {voiceRecorder.isRecording ? (
+                    <span className="absolute -top-1 -right-1 flex size-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex size-3 rounded-full bg-red-500" />
+                    </span>
+                  ) : null}
                 </Button>
               </PromptInputAction>
             ) : null}
