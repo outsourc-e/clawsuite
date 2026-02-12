@@ -205,6 +205,27 @@ function isSameModel(option: ModelOption, currentModel: string): boolean {
   )
 }
 
+/** Shorten "anthropic/claude-opus-4-6" → "Claude Opus 4.6" */
+function shortenModelName(raw: string): string {
+  if (!raw) return ''
+  let name = raw
+  const prefixes = [
+    'openrouter/anthropic/', 'openrouter/google/', 'openrouter/openai/', 'openrouter/',
+    'anthropic/', 'openai/', 'google-antigravity/', 'minimax/', 'moonshot/',
+  ]
+  for (const prefix of prefixes) {
+    if (name.toLowerCase().startsWith(prefix)) {
+      name = name.slice(prefix.length)
+      break
+    }
+  }
+  return name
+    .replace(/-(\d)/g, ' $1')
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/\bGpt\b/g, 'GPT')
+}
+
 function isTimeoutErrorMessage(message: string): boolean {
   const normalized = message.toLowerCase()
   return (
@@ -426,8 +447,8 @@ function ChatComposerComponent({
     [sessionKey],
   )
   const modelButtonLabel =
-    currentModel ||
-    (currentModelQuery.isLoading ? 'Loading model…' : 'Select model')
+    shortenModelName(currentModel) ||
+    (currentModelQuery.isLoading ? '…' : 'Model')
   // Don't show "Gateway disconnected" for models query failures - it's confusing
   // since the main gateway connection might be fine. Show a subtler message instead.
   const modelAvailabilityLabel = modelsUnavailable
@@ -891,7 +912,7 @@ function ChatComposerComponent({
                   setIsModelMenuOpen((prev) => !prev)
                 }}
                 className={cn(
-                  'inline-flex h-8 items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-3 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100',
+                  'inline-flex h-7 items-center gap-1 rounded-full bg-primary-100/70 px-2.5 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 hover:text-primary-800',
                   isModelSwitcherDisabled && 'cursor-not-allowed opacity-50',
                 )}
                 aria-haspopup="listbox"
@@ -900,8 +921,8 @@ function ChatComposerComponent({
                 disabled={isModelSwitcherDisabled}
                 title={modelAvailabilityLabel ?? undefined}
               >
-                <span className="max-w-[10rem] truncate">{modelButtonLabel}</span>
-                <HugeiconsIcon icon={ArrowDown01Icon} size={20} strokeWidth={1.5} />
+                <span className="max-w-[12rem] truncate">{modelButtonLabel}</span>
+                <HugeiconsIcon icon={ArrowDown01Icon} size={14} strokeWidth={1.5} className="opacity-60" />
               </button>
               {modelAvailabilityLabel ? (
                 <span className="text-xs text-primary-500 text-pretty">
