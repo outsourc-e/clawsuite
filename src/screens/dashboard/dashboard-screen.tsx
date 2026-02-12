@@ -225,7 +225,7 @@ export function DashboardScreen() {
               <OpenClawStudioIcon className="mt-0.5 size-7 shrink-0 rounded-lg" />
               <div className="flex flex-col leading-tight">
                 <h1 className="text-sm font-semibold text-ink">
-                  OpenClaw <span className="font-medium text-primary-400">Studio</span>
+                  ClawSuite
                 </h1>
                 <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-primary-400">
                   <span className="inline-flex items-center gap-1">
