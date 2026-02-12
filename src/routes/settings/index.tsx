@@ -157,7 +157,7 @@ function SettingsRoute() {
   }
 
   function getAccentBadgeClass(color: AccentColor): string {
-    if (color === 'orange') return 'bg-accent-500'
+    if (color === 'orange') return 'bg-orange-500'
     if (color === 'purple') return 'bg-purple-500'
     if (color === 'blue') return 'bg-blue-500'
     return 'bg-green-500'
