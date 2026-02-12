@@ -827,7 +827,9 @@ export function ChatScreen({
               messages={finalDisplayMessages}
               loading={historyLoading}
               empty={historyEmpty}
-              emptyState={<ChatEmptyState compact={compact} />}
+              emptyState={<ChatEmptyState compact={compact} onSuggestionClick={(prompt) => {
+                composerHandleRef.current?.setValue(prompt + ' ')
+              }} />}
               notice={gatewayNotice}
               noticePosition="end"
               waitingForResponse={waitingForResponse}
