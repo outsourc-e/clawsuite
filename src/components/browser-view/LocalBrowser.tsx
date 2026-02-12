@@ -119,19 +119,31 @@ export function LocalBrowser() {
     try {
       const content = await sendAction('content') as { url?: string; title?: string; text?: string } | null
       const instruction = agentPrompt.trim() || 'Help me with this page.'
+      const pageUrl = content?.url || status.url
+      const pageTitle = content?.title || status.title
+      const pageText = (content?.text || '').slice(0, 3000)
+      // Clean summary for display — short and readable
       const contextMsg = [
         `🌐 **Browser Handoff**`,
-        `**URL:** ${content?.url || status.url}`,
-        `**Page:** ${content?.title || status.title}`,
-        '', `**Task:** ${instruction}`, '',
-        `<page_content>`, (content?.text || '').slice(0, 4000), `</page_content>`, '',
-        `Control the browser: POST http://localhost:9223 with JSON body { action, ...params }. Actions: navigate(url), click(x,y), type(text), press(key), scroll(direction), back, forward, refresh, content, screenshot.`,
+        `**${pageTitle || 'Untitled'}** — [${pageUrl}](${pageUrl})`,
+        `**Task:** ${instruction}`,
       ].join('\n')
+      // Full context goes as system-level detail (not shown as chat text)
+      const systemContext = JSON.stringify({
+        _browserHandoff: true,
+        url: pageUrl,
+        title: pageTitle,
+        task: instruction,
+        pageContent: pageText,
+        browserApi: 'POST http://localhost:9223 — actions: navigate(url), click(x,y), type(text), press(key), scroll(direction), back, forward, refresh, content, screenshot',
+      })
 
+      // Send clean message + hidden context
+      const fullMessage = `${contextMsg}\n\n<details><summary>Page context</summary>\n\n${pageText.slice(0, 1500)}\n\n</details>\n\nBrowser API: \`POST http://localhost:9223\` with \`{ action, ...params }\``
       const sendRes = await fetch('/api/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionKey: '', friendlyId: 'new', message: contextMsg }),
+        body: JSON.stringify({ sessionKey: '', friendlyId: 'new', message: fullMessage }),
       })
       const result = await sendRes.json() as { friendlyId?: string }
       setAgentPrompt('')
