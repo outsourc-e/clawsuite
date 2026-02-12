@@ -29,6 +29,7 @@ const statusDot: Record<AgentStatus, string> = {
   running: 'bg-blue-400',
   complete: 'bg-emerald-400',
   failed: 'bg-red-400',
+  error: 'bg-red-500',
   idle: 'bg-slate-400',
 }
 

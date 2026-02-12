@@ -134,13 +134,10 @@ export function createTerminalSession(params: {
       }
     },
 
-    resize(newCols: number, newRows: number) {
+    resize(_newCols: number, _newRows: number) {
       // Send SIGWINCH to the Python helper, which propagates to the PTY
       if (proc.pid) {
-        try {
-          // Update env so the signal handler reads new size
-          proc.env = { ...proc.env, COLUMNS: String(newCols), LINES: String(newRows) } as Record<string, string>
-        } catch { /* */ }
+        // Note: can't update env on running ChildProcess, SIGWINCH alone is sent
         try {
           process.kill(proc.pid, 'SIGWINCH')
         } catch { /* */ }

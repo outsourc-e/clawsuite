@@ -79,11 +79,12 @@ function resolveChatSessionParam(session: GatewaySession): string | null {
 }
 
 function kindTone(kindValue: string): string {
-  if (kindValue === 'main')
+  const normalizedKind = kindValue.toLowerCase()
+  if (normalizedKind === 'main')
     return 'border-primary-300 bg-primary-100 text-primary-800'
-  if (kindValue === 'direct')
+  if (normalizedKind === 'direct')
     return 'border-primary-200 bg-primary-100 text-primary-700'
-  if (kindValue === 'isolated')
+  if (normalizedKind === 'isolated')
     return 'border-primary-200 bg-primary-50 text-primary-700'
   return 'border-primary-200 bg-primary-50 text-primary-600'
 }
@@ -227,7 +228,7 @@ function InstancesRoute() {
                   {sessions.map(function renderRow(session, index) {
                     const sessionKey = readString(session.key)
                     const friendlyId = readString(session.friendlyId)
-                    const kind = readString(session.kind) || 'unknown'
+                    const kind = readString(session.kind).toLowerCase() || 'unknown'
                     const model = readString(session.model) || 'N/A'
                     const createdAt = readTimestamp(session.createdAt)
                     const updatedAt = readTimestamp(session.updatedAt)
@@ -309,7 +310,7 @@ function InstancesRoute() {
               {sessions.map(function renderCard(session, index) {
                 const sessionKey = readString(session.key)
                 const friendlyId = readString(session.friendlyId)
-                const kind = readString(session.kind) || 'unknown'
+                const kind = readString(session.kind).toLowerCase() || 'unknown'
                 const model = readString(session.model) || 'N/A'
                 const createdAt = readTimestamp(session.createdAt)
                 const updatedAt = readTimestamp(session.updatedAt)
