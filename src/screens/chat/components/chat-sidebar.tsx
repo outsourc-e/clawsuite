@@ -861,48 +861,49 @@ function ChatSidebarComponent({
         </div>
       )}
 
-      {/* ── Navigation sections ─────────────────────────────────────── */}
-      <div className="shrink-0 space-y-0.5 px-2 overflow-y-auto scrollbar-thin">
-        {/* SUITE */}
-        <SectionLabel
-          label="Suite"
-          isCollapsed={isCollapsed}
-          transition={transition}
-          collapsible
-          expanded={suiteExpanded || isAnySuiteActive}
-          onToggle={toggleSuite}
-          navigateTo={suiteNav}
-        />
-        <CollapsibleSection
-          expanded={suiteExpanded || isAnySuiteActive || isCollapsed}
-          items={suiteItems}
-          isCollapsed={isCollapsed}
-          transition={transition}
-          onSelectSession={onSelectSession}
-        />
+      {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
+        {/* Navigation sections */}
+        <div className="shrink-0 space-y-0.5 px-2">
+          {/* SUITE */}
+          <SectionLabel
+            label="Suite"
+            isCollapsed={isCollapsed}
+            transition={transition}
+            collapsible
+            expanded={suiteExpanded || isAnySuiteActive}
+            onToggle={toggleSuite}
+            navigateTo={suiteNav}
+          />
+          <CollapsibleSection
+            expanded={suiteExpanded || isAnySuiteActive || isCollapsed}
+            items={suiteItems}
+            isCollapsed={isCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
 
-        {/* GATEWAY (collapsible) */}
-        <SectionLabel
-          label="Gateway"
-          isCollapsed={isCollapsed}
-          transition={transition}
-          collapsible
-          expanded={gatewayExpanded || isAnyGatewayActive}
-          onToggle={toggleGateway}
-          navigateTo={gatewayNav}
-        />
-        <CollapsibleSection
-          expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
-          items={gatewayItems}
-          isCollapsed={isCollapsed}
-          transition={transition}
-          onSelectSession={onSelectSession}
-        />
+          {/* GATEWAY (collapsible) */}
+          <SectionLabel
+            label="Gateway"
+            isCollapsed={isCollapsed}
+            transition={transition}
+            collapsible
+            expanded={gatewayExpanded || isAnyGatewayActive}
+            onToggle={toggleGateway}
+            navigateTo={gatewayNav}
+          />
+          <CollapsibleSection
+            expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
+            items={gatewayItems}
+            isCollapsed={isCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
+        </div>
 
-      </div>
-
-      {/* ── Sessions list ───────────────────────────────────────────── */}
-      <div className="shrink min-h-0 max-h-[30%] overflow-hidden border-t border-primary-200/60">
+        {/* Sessions list */}
+        <div className="shrink-0 border-t border-primary-200/60 mt-1">
         <AnimatePresence initial={false}>
           {!isCollapsed && (
             <motion.div
@@ -930,6 +931,7 @@ function ChatSidebarComponent({
           )}
         </AnimatePresence>
       </div>
+      </div>{/* end scrollable body */}
 
       {/* ── Footer with User Menu ─────────────────────────────────── */}
       <div className="px-2 py-2 border-t border-primary-200 bg-primary-50 dark:bg-primary-100 shrink-0 space-y-2">
