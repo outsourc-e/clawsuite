@@ -12,7 +12,6 @@ import {
   ArrowRight01Icon,
   Cancel01Icon,
   ComputerTerminal01Icon,
-  Settings01Icon,
   SidebarLeft01Icon,
 } from '@hugeicons/core-free-icons'
 import type { Terminal } from 'xterm'
@@ -104,24 +103,27 @@ export function TerminalWorkspace({
     [activeTabId, tabs],
   )
 
-  const sendInput = useCallback(async function sendInput(tab: TerminalTab, data: string) {
-    if (!tab.sessionId) return
+  const sendInput = useCallback(async function sendInput(tabId: string, data: string) {
+    // Look up session ID from store at call time (not stale closure)
+    const currentTab = useTerminalPanelStore.getState().tabs.find((t) => t.id === tabId)
+    if (!currentTab?.sessionId) return
     await fetch('/api/terminal-input', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: tab.sessionId, data }),
+      body: JSON.stringify({ sessionId: currentTab.sessionId, data }),
     }).catch(function ignore() {
       return undefined
     })
   }, [])
 
-  const resizeSession = useCallback(async function resizeSession(tab: TerminalTab, terminal: Terminal) {
-    if (!tab.sessionId) return
+  const resizeSession = useCallback(async function resizeSession(tabId: string, terminal: Terminal) {
+    const currentTab = useTerminalPanelStore.getState().tabs.find((t) => t.id === tabId)
+    if (!currentTab?.sessionId) return
     await fetch('/api/terminal-resize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        sessionId: tab.sessionId,
+        sessionId: currentTab.sessionId,
         cols: terminal.cols,
         rows: terminal.rows,
       }),
@@ -338,12 +340,12 @@ export function TerminalWorkspace({
       fitAddon.fit()
 
       terminal.onData(function onData(data) {
-        void sendInput(tab, data)
+        void sendInput(tab.id, data)
       })
 
       terminalMapRef.current.set(tab.id, terminal)
       fitMapRef.current.set(tab.id, fitAddon)
-      void resizeSession(tab, terminal)
+      void resizeSession(tab.id, terminal)
       void connectTab(tab)
     },
     [connectTab, resizeSession, sendInput],
@@ -425,7 +427,7 @@ export function TerminalWorkspace({
         for (const tab of snapshot) {
           const terminal = terminalMapRef.current.get(tab.id)
           if (!terminal) continue
-          void resizeSession(tab, terminal)
+          void resizeSession(tab.id, terminal)
         }
       }
 
@@ -471,14 +473,6 @@ export function TerminalWorkspace({
             <Button size="sm" variant="ghost" onClick={handleCreateTab}>
               <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.5} />
               New Tab
-            </Button>
-            <Button size="sm" variant="ghost" disabled>
-              <HugeiconsIcon icon={SidebarLeft01Icon} size={20} strokeWidth={1.5} />
-              Split View
-            </Button>
-            <Button size="sm" variant="ghost" disabled>
-              <HugeiconsIcon icon={Settings01Icon} size={20} strokeWidth={1.5} />
-              Settings
             </Button>
           </div>
         </div>
