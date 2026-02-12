@@ -1,7 +1,6 @@
 // Data source: GET /api/usage — all-time token counts + cost breakdown by provider
-// Note: This shows ALL-TIME totals. Cost Tracker (cost-tracker-widget.tsx) uses
-// GET /api/cost which shows BILLING PERIOD spend with daily timeseries.
-// The two totals will differ — this is expected, not a bug.
+// Note: This shows ALL-TIME totals. The hero cost metric uses GET /api/cost
+// for billing-period spend, so the totals can differ by design.
 import { ChartLineData02Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'

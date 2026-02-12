@@ -52,14 +52,11 @@ export const SIZE_TIERS: Record<WidgetSizeTier, TierDimensions> = {
 
 /* ── Widget Registry ── */
 export type WidgetId =
-  | 'quick-actions'
   | 'system-info'
   | 'skills'
-  | 'model-usage-chart'
   | 'usage-meter'
   | 'tasks'
   | 'agent-status'
-  | 'cost-tracker'
   | 'recent-sessions'
   | 'notifications'
   | 'activity-log'
@@ -72,21 +69,17 @@ type WidgetRegistryEntry = {
 }
 
 export const WIDGET_REGISTRY: Array<WidgetRegistryEntry> = [
-  // ── Quick controls ──
-  { id: 'quick-actions', defaultTier: 'S', allowedTiers: ['S', 'M'] },
-  { id: 'system-info', defaultTier: 'S', allowedTiers: ['S', 'M'] },
-  { id: 'skills', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'model-usage-chart', defaultTier: 'M', allowedTiers: ['M', 'L'] },
   // ── Above fold: Operational truth ──
-  { id: 'agent-status', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'cost-tracker', defaultTier: 'M', allowedTiers: ['M', 'L'] },
   { id: 'usage-meter', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  // ── Mid: Context ──
+  { id: 'agent-status', defaultTier: 'M', allowedTiers: ['M', 'L'] },
   { id: 'recent-sessions', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  { id: 'tasks', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  // ── Mid: Context ──
+  { id: 'skills', defaultTier: 'M', allowedTiers: ['M', 'L'] },
   { id: 'activity-log', defaultTier: 'M', allowedTiers: ['S', 'M'] },
   // ── Below fold: Secondary ──
   { id: 'notifications', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'tasks', defaultTier: 'L', allowedTiers: ['M', 'L'] },
+  { id: 'system-info', defaultTier: 'M', allowedTiers: ['S', 'M'] },
   // Time + Weather moved to header ambient status (no longer grid widgets)
 ]
 
@@ -148,20 +141,15 @@ function buildFlowLayout(breakpoint: keyof typeof GRID_COLS): Layout {
 function buildLgLayout(): Layout {
   const c = (_id: WidgetId, tier: WidgetSizeTier) => tierConstraints(tier, 'lg')
   return [
-    // ── Top: Launch + telemetry ──
-    { i: 'quick-actions', x: 0, y: 0, ...c('quick-actions', 'S') },
-    { i: 'system-info', x: 3, y: 0, ...c('system-info', 'S') },
-    { i: 'model-usage-chart', x: 6, y: 0, ...c('model-usage-chart', 'M') },
-    { i: 'skills', x: 0, y: 3, ...c('skills', 'M') },
-    // ── Operational truth ──
-    { i: 'agent-status', x: 6, y: 5, ...c('agent-status', 'M') },
-    { i: 'cost-tracker', x: 0, y: 8, ...c('cost-tracker', 'M') },
-    { i: 'usage-meter', x: 6, y: 10, ...c('usage-meter', 'M') },
-    { i: 'recent-sessions', x: 0, y: 13, ...c('recent-sessions', 'M') },
-    // ── Stream + backlog ──
-    { i: 'activity-log', x: 6, y: 15, ...c('activity-log', 'M') },
-    { i: 'notifications', x: 0, y: 18, ...c('notifications', 'M') },
-    { i: 'tasks', x: 6, y: 20, ...c('tasks', 'M') },
+    // ── Two-column default layout ──
+    { i: 'usage-meter', x: 0, y: 0, ...c('usage-meter', 'M') },
+    { i: 'agent-status', x: 6, y: 0, ...c('agent-status', 'M') },
+    { i: 'recent-sessions', x: 0, y: 5, ...c('recent-sessions', 'M') },
+    { i: 'tasks', x: 6, y: 5, ...c('tasks', 'M') },
+    { i: 'skills', x: 0, y: 10, ...c('skills', 'M') },
+    { i: 'activity-log', x: 6, y: 10, ...c('activity-log', 'M') },
+    { i: 'notifications', x: 0, y: 15, ...c('notifications', 'M') },
+    { i: 'system-info', x: 6, y: 15, ...c('system-info', 'M') },
   ] as Layout
 }
 
