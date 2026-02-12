@@ -441,8 +441,6 @@ function ChatComposerComponent({
   const isModelSwitcherDisabled =
     disabled ||
     modelsQuery.isLoading ||
-    modelsUnavailable ||
-    noModelsAvailable ||
     modelSwitchMutation.isPending
   const currentModel = currentModelQuery.data ?? ''
   const draftStorageKey = useMemo(
@@ -455,10 +453,8 @@ function ChatComposerComponent({
   // Don't show "Gateway disconnected" for models query failures - it's confusing
   // since the main gateway connection might be fine. Show a subtler message instead.
   const modelAvailabilityLabel = modelsUnavailable
-    ? 'Models unavailable'
-    : noModelsAvailable
-      ? 'No models available'
-      : null
+    ? 'Click to configure'
+    : null
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {
@@ -1033,16 +1029,22 @@ function ChatComposerComponent({
               ) : null}
               {!isModelSwitcherDisabled && isModelMenuOpen ? (
                 <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-40 min-w-[16rem] max-w-[24rem] rounded-xl border border-primary-200 bg-surface shadow-lg">
-                  {groupedModels.length === 0 ? (
+                  {groupedModels.length === 0 && modelsUnavailable ? (
                     <div className="p-4 text-center text-sm text-primary-500">
-                      No models available.{' '}
+                      <p className="font-medium text-primary-700 mb-1">Gateway not connected</p>
+                      <p className="text-xs">Make sure OpenClaw is running and the gateway URL is configured.</p>
+                    </div>
+                  ) : groupedModels.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-primary-500">
+                      <p className="font-medium text-primary-700 mb-1">No models configured</p>
+                      <p className="text-xs mb-2">Add API keys for providers in your OpenClaw config to unlock more models.</p>
                       <a
                         href="https://docs.openclaw.ai/configuration"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary-700 underline hover:text-primary-900"
+                        className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600 hover:bg-accent-500/20 transition-colors"
                       >
-                        Configure providers
+                        Setup Guide →
                       </a>
                     </div>
                   ) : (
