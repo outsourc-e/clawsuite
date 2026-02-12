@@ -23,7 +23,7 @@ import {
   ChatContainerRoot,
   ChatContainerScrollAnchor,
 } from '@/components/prompt-kit/chat-container'
-import { TypingIndicator } from '@/components/prompt-kit/typing-indicator'
+import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import { cn } from '@/lib/utils'
 
 const VIRTUAL_ROW_HEIGHT = 136
@@ -861,8 +861,9 @@ function ChatMessageListComponent({
           </>
         )}
         {showTypingIndicator ? (
-          <div className="py-2 px-1">
-            <TypingIndicator />
+          <div className="flex items-center gap-2 py-2 px-1">
+            <BrailleSpinner preset="claw" size={20} speed={120} className="text-primary-500" />
+            <span className="text-xs text-primary-400 animate-pulse">Thinking…</span>
           </div>
         ) : null}
         {notice && noticePosition === 'end' ? notice : null}
