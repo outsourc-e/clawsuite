@@ -122,7 +122,7 @@ export function useChatHistory({
 
   // Filter messages for display - hide tool calls, system events, etc.
   const displayMessages = useMemo(() => {
-    return historyMessages.filter((msg) => {
+    const filtered = historyMessages.filter((msg: GatewayMessage) => {
       // Always show user messages (unless system events)
       if (msg.role === 'user') {
         const text = textFromMessage(msg)
@@ -148,32 +148,37 @@ export function useChatHistory({
         )
         if (!hasText) return false
 
-        // Messages with tool calls are activity narration
-        const hasToolCall = content.some(
-          (c) => c.type === 'toolCall' || (c as any).type === 'tool_use' || (c as any).type === 'toolUse'
-        )
-        if (hasToolCall) {
-          // Check if this is the LAST assistant message — always show it
-          const idx = historyMessages.indexOf(msg)
-          const hasLaterAssistant = historyMessages.slice(idx + 1).some(
-            (m) => m.role === 'assistant' && Array.isArray(m.content) && m.content.some(
-              (c) => c.type === 'text' && typeof c.text === 'string' && c.text.trim().length > 0
-            )
-          )
-          if (hasLaterAssistant) {
-            // Not the last — treat as narration
-            if (!showToolMessages) return false
-            ;(msg as any).__isNarration = true
-          }
-          // Last assistant message with tool calls — show normally (not narration)
-        }
-        
         return true
       }
 
       // Hide everything else (toolResult, tool, system messages)
       return false
     })
+
+    // Second pass: mark intermediate assistant messages as narration
+    // (messages with tool calls that have a LATER assistant message after them)
+    // Mark intermediate assistant messages as narration (compact ⚡ rows)
+    for (let i = 0; i < filtered.length; i++) {
+      const msg = filtered[i]
+      if (msg.role !== 'assistant') continue
+      const content = Array.isArray(msg.content) ? msg.content : []
+      const hasToolCall = content.some(
+        (c: any) => c.type === 'toolCall' || c.type === 'tool_use' || c.type === 'toolUse'
+      )
+      if (!hasToolCall) continue
+      const hasLater = filtered.slice(i + 1).some((m: GatewayMessage) => m.role === 'assistant')
+      if (hasLater) {
+        if (!showToolMessages) {
+          // Hide intermediate narration entirely
+          filtered.splice(i, 1)
+          i--
+        } else {
+          ;(msg as any).__isNarration = true
+        }
+      }
+    }
+
+    return filtered
   }, [historyMessages, showToolMessages])
 
   const messageCount = useMemo(() => {
