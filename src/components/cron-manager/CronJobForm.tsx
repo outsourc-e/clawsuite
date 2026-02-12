@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import type { CronJob, CronJobUpsertInput } from './cron-types'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'

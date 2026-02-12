@@ -142,6 +142,27 @@ export function SkillsScreen() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ['skills-browser'] })
+      setSelectedSkill(function updateSelectedSkill(current) {
+        if (!current || current.id !== payload.skillId) return current
+        if (action === 'install') {
+          return {
+            ...current,
+            installed: true,
+            enabled: true,
+          }
+        }
+        if (action === 'uninstall') {
+          return {
+            ...current,
+            installed: false,
+            enabled: false,
+          }
+        }
+        return {
+          ...current,
+          enabled: payload.enabled ?? current.enabled,
+        }
+      })
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -295,6 +316,7 @@ export function SkillsScreen() {
                 actionSkillId={actionSkillId}
                 onOpenDetails={setSelectedSkill}
                 onInstall={(skillId) => runSkillAction('install', { skillId })}
+                onUninstall={(skillId) => runSkillAction('uninstall', { skillId })}
               />
             </TabsPanel>
           </Tabs>
@@ -401,14 +423,13 @@ export function SkillsScreen() {
                   Source: <code className="inline-code">{selectedSkill.sourcePath}</code>
                 </p>
                 <div className="flex items-center gap-2">
-                  {selectedSkill.sourcePath.includes('/.openclaw/workspace/skills/') ? (
+                  {selectedSkill.installed ? (
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={actionSkillId === selectedSkill.id}
-                      onClick={async () => {
-                        await runSkillAction('uninstall', { skillId: selectedSkill.id })
-                        setSelectedSkill(null)
+                      onClick={() => {
+                        runSkillAction('uninstall', { skillId: selectedSkill.id })
                       }}
                     >
                       Uninstall
@@ -416,12 +437,10 @@ export function SkillsScreen() {
                   ) : (
                     <Button
                       size="sm"
-                      disabled={
-                        actionSkillId === selectedSkill.id || selectedSkill.installed
-                      }
+                      disabled={actionSkillId === selectedSkill.id}
                       onClick={() => runSkillAction('install', { skillId: selectedSkill.id })}
                     >
-                      {selectedSkill.installed ? 'Installed' : 'Install'}
+                      Install
                     </Button>
                   )}
                   <Button
@@ -559,13 +578,24 @@ function SkillsGrid({
                     </Button>
                   </div>
                 ) : (
-                  <Button
-                    size="sm"
-                    disabled={isActing || skill.installed}
-                    onClick={() => onInstall(skill.id)}
-                  >
-                    {skill.installed ? 'Installed' : 'Install'}
-                  </Button>
+                  skill.installed ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isActing}
+                      onClick={() => onUninstall(skill.id)}
+                    >
+                      Uninstall
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      disabled={isActing}
+                      onClick={() => onInstall(skill.id)}
+                    >
+                      Install
+                    </Button>
+                  )
                 )}
               </div>
             </motion.article>
@@ -582,6 +612,7 @@ type FeaturedGridProps = {
   actionSkillId: string | null
   onOpenDetails: (skill: SkillSummary) => void
   onInstall: (skillId: string) => void
+  onUninstall: (skillId: string) => void
 }
 
 function FeaturedGrid({
@@ -590,6 +621,7 @@ function FeaturedGrid({
   actionSkillId,
   onOpenDetails,
   onInstall,
+  onUninstall,
 }: FeaturedGridProps) {
   if (loading) {
     return <SkillsSkeleton count={6} large />
@@ -647,13 +679,24 @@ function FeaturedGrid({
               <Button variant="outline" size="sm" onClick={() => onOpenDetails(skill)}>
                 Details
               </Button>
-              <Button
-                size="sm"
-                disabled={isActing || skill.installed}
-                onClick={() => onInstall(skill.id)}
-              >
-                {skill.installed ? 'Installed' : 'Install'}
-              </Button>
+              {skill.installed ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isActing}
+                  onClick={() => onUninstall(skill.id)}
+                >
+                  Uninstall
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={isActing}
+                  onClick={() => onInstall(skill.id)}
+                >
+                  Install
+                </Button>
+              )}
             </div>
           </article>
         )

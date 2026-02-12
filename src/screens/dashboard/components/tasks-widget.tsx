@@ -1,12 +1,13 @@
-import { Task01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
+import { ArrowRight01Icon, Task01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import type { CronJob } from '@/components/cron-manager/cron-types'
+import type { TaskPriority, TaskStatus } from '@/stores/task-store'
 import { fetchCronJobs } from '@/lib/cron-api'
-import { STATUS_ORDER, STATUS_LABELS, type TaskPriority, type TaskStatus } from '@/stores/task-store'
+import { STATUS_LABELS, STATUS_ORDER } from '@/stores/task-store'
 import { cn } from '@/lib/utils'
 
 type TasksWidgetProps = {

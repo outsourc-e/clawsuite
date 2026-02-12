@@ -803,13 +803,55 @@ async function installMarketplaceSkill(skillId: string) {
   await fs.cp(sourcePath, destinationPath, { recursive: true })
 }
 
+async function resolveInstalledSkillPath(skillId: string): Promise<string | null> {
+  const normalizedSkillId = skillId.trim().toLowerCase()
+  if (!normalizedSkillId) return null
+
+  const directPath = ensureInside(INSTALLED_ROOT, skillId)
+  if (await pathExists(directPath)) {
+    return directPath
+  }
+
+  const installedItems = await getCachedSkills('installed')
+  const directMatch = installedItems.find((item) => {
+    const candidates = [
+      item.id.toLowerCase(),
+      item.slug.toLowerCase(),
+      item.name.toLowerCase(),
+      path.basename(item.id).toLowerCase(),
+      path.basename(item.folderPath).toLowerCase(),
+    ]
+    return candidates.includes(normalizedSkillId)
+  })
+  if (directMatch) {
+    return directMatch.folderPath
+  }
+
+  const marketplaceMatchId = skillId.trim().toLowerCase()
+  if (!marketplaceMatchId.includes('/')) return null
+
+  const marketplaceItems = await getCachedSkills('marketplace')
+  const marketplaceSkill = marketplaceItems.find(
+    (item) => item.id.toLowerCase() === marketplaceMatchId,
+  )
+  if (!marketplaceSkill) return null
+
+  const byMarketplaceFingerprint = installedItems.find((item) => {
+    return (
+      item.name.toLowerCase() === marketplaceSkill.name.toLowerCase() ||
+      item.slug.toLowerCase() === marketplaceSkill.slug.toLowerCase()
+    )
+  })
+  return byMarketplaceFingerprint?.folderPath || null
+}
+
 async function uninstallInstalledSkill(skillId: string) {
   if (skillId.trim().length === 0) {
     throw new Error('skill id is required')
   }
 
-  const targetPath = ensureInside(INSTALLED_ROOT, skillId)
-  if (!(await pathExists(targetPath))) {
+  const targetPath = await resolveInstalledSkillPath(skillId)
+  if (!targetPath) {
     throw new Error('installed skill was not found')
   }
 
@@ -821,12 +863,11 @@ async function toggleInstalledSkill(skillId: string, enabled: boolean) {
     throw new Error('skill id is required')
   }
 
-  const targetPath = ensureInside(INSTALLED_ROOT, skillId)
-  const markerPath = path.join(targetPath, '.disabled')
-
-  if (!(await pathExists(targetPath))) {
+  const targetPath = await resolveInstalledSkillPath(skillId)
+  if (!targetPath) {
     throw new Error('installed skill was not found')
   }
+  const markerPath = path.join(targetPath, '.disabled')
 
   if (enabled) {
     await fs.rm(markerPath, { force: true })
