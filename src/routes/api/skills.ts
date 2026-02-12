@@ -537,11 +537,33 @@ async function collectInstalledSkillEntries(): Promise<
   return entries
 }
 
+const REGISTRY_REPO = 'https://github.com/openclaw/skills.git'
+const REGISTRY_PARENT = path.dirname(MARKETPLACE_ROOT)
+let registryCloneAttempted = false
+
+async function ensureMarketplaceRegistry(): Promise<boolean> {
+  if (await pathExists(MARKETPLACE_ROOT)) return true
+  if (registryCloneAttempted) return false
+  registryCloneAttempted = true
+
+  try {
+    const cp = await import('node:child_process')
+    await fs.mkdir(REGISTRY_PARENT, { recursive: true })
+    cp.execSync(
+      `git clone --depth 1 --single-branch ${REGISTRY_REPO} "${path.dirname(MARKETPLACE_ROOT)}"`,
+      { timeout: 60_000, stdio: 'ignore' },
+    )
+    return await pathExists(MARKETPLACE_ROOT)
+  } catch {
+    return false
+  }
+}
+
 async function collectMarketplaceSkillEntries(): Promise<
   Array<{ id: string; owner: string; folderPath: string }>
 > {
   const entries: Array<{ id: string; owner: string; folderPath: string }> = []
-  if (!(await pathExists(MARKETPLACE_ROOT))) {
+  if (!(await ensureMarketplaceRegistry())) {
     return entries
   }
 
