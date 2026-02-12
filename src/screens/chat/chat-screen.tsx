@@ -505,6 +505,9 @@ export function ChatScreen({
       pending.message,
       pending.attachments,
       true,
+      typeof pending.optimisticMessage.clientId === 'string'
+        ? pending.optimisticMessage.clientId
+        : '',
     )
   }, [
     activeFriendlyId,
@@ -525,6 +528,7 @@ export function ChatScreen({
     body: string,
     attachments: Array<GatewayAttachment> = [],
     skipOptimistic = false,
+    existingClientId = '',
   ) {
     setLocalActivity('reading')
     const normalizedAttachments = attachments.map((attachment) => ({
@@ -532,7 +536,7 @@ export function ChatScreen({
       id: attachment.id ?? crypto.randomUUID(),
     }))
 
-    let optimisticClientId = ''
+    let optimisticClientId = existingClientId
     if (!skipOptimistic) {
       const { clientId, optimisticMessage } = createOptimisticMessage(
         body,
@@ -575,7 +579,8 @@ export function ChatScreen({
         message: body,
         attachments: payloadAttachments.length > 0 ? payloadAttachments : undefined,
         thinking: 'low',
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: optimisticClientId || crypto.randomUUID(),
+        clientId: optimisticClientId || undefined,
       }),
     })
       .then(async (res) => {

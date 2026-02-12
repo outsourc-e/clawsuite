@@ -51,7 +51,8 @@ import {
   useSearchModal,
 } from '@/hooks/use-search-modal'
 import {
-  getChatProfileDisplayName,
+  selectChatProfileAvatarDataUrl,
+  selectChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { GatewayStatusIndicator } from '@/components/gateway-status-indicator'
@@ -466,15 +467,9 @@ function ChatSidebarComponent({
     copySessionsDir,
     copyStorePath,
   } = useSidebarSettings()
-  const profileDisplayName = useChatSettingsStore(
-    function selectProfileDisplayName(state) {
-      return getChatProfileDisplayName(state.settings.displayName)
-    },
-  )
+  const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const profileAvatarDataUrl = useChatSettingsStore(
-    function selectProfileAvatarDataUrl(state) {
-      return state.settings.avatarDataUrl
-    },
+    selectChatProfileAvatarDataUrl,
   )
   const { deleteSession } = useDeleteSession()
   const { renameSession } = useRenameSession()

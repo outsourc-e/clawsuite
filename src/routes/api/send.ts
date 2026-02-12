@@ -28,6 +28,10 @@ export const Route = createFileRoute('/api/send')({
           const attachments = Array.isArray(body.attachments)
             ? body.attachments
             : undefined
+          const clientId =
+            typeof body.clientId === 'string' && body.clientId.trim().length > 0
+              ? body.clientId.trim()
+              : undefined
 
           if (!message.trim() && (!attachments || attachments.length === 0)) {
             return json(
@@ -67,6 +71,7 @@ export const Route = createFileRoute('/api/send')({
             message,
             thinking,
             attachments,
+            clientId,
             deliver: false,
             timeoutMs: 120_000,
             idempotencyKey:

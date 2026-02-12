@@ -79,6 +79,16 @@ export function getChatProfileDisplayName(displayName: string): string {
   return trimmed.length > 0 ? trimmed : DEFAULT_CHAT_DISPLAY_NAME
 }
 
+export function selectChatProfileDisplayName(state: ChatSettingsState): string {
+  return getChatProfileDisplayName(state.settings.displayName)
+}
+
+export function selectChatProfileAvatarDataUrl(
+  state: ChatSettingsState,
+): string | null {
+  return state.settings.avatarDataUrl
+}
+
 export function useChatSettings() {
   const settings = useChatSettingsStore((state) => state.settings)
   const updateSettings = useChatSettingsStore((state) => state.updateSettings)

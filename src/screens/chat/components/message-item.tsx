@@ -27,7 +27,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import {
-  getChatProfileDisplayName,
+  selectChatProfileAvatarDataUrl,
+  selectChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
@@ -261,15 +262,9 @@ function MessageItemComponent({
   expandAllToolSections = false,
 }: MessageItemProps) {
   const role = message.role || 'assistant'
-  const profileDisplayName = useChatSettingsStore(
-    function selectProfileDisplayName(state) {
-      return getChatProfileDisplayName(state.settings.displayName)
-    },
-  )
+  const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const profileAvatarDataUrl = useChatSettingsStore(
-    function selectProfileAvatarDataUrl(state) {
-      return state.settings.avatarDataUrl
-    },
+    selectChatProfileAvatarDataUrl,
   )
 
   const messageStreamingText =

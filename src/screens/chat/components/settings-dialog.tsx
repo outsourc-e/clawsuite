@@ -9,8 +9,9 @@ import {
 import type { PathsPayload } from '../types'
 import {
   getChatProfileDisplayName,
-  type ThemeMode,
+  useChatSettings,
 } from '@/hooks/use-chat-settings'
+import type { ThemeMode } from '@/hooks/use-chat-settings'
 import {
   DialogClose,
   DialogContent,
@@ -20,7 +21,6 @@ import {
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
-import { useChatSettings } from '@/hooks/use-chat-settings'
 import { useSettings } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -222,8 +222,8 @@ export function SettingsDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(480px,92vw)] max-h-[80dvh] overflow-hidden">
-        <div className="flex max-h-[80dvh] flex-col">
+      <DialogContent className="h-[min(80dvh,760px)] w-[min(480px,92vw)] max-h-[calc(100dvh-2rem)] overflow-hidden">
+        <div className="flex h-full min-h-0 flex-col">
           <div className="flex items-start justify-between border-b border-primary-200 p-4 pb-3">
             <div>
               <DialogTitle className="mb-1 text-balance">Settings</DialogTitle>
