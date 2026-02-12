@@ -193,9 +193,19 @@ function normalizeAgentEvent(payload: unknown): ActivityEvent {
     })
   }
 
+  // Try to extract a meaningful title from the payload
+  const agentPayload = toRecord(sanitizedPayload)
+  const agentData = toRecord(agentPayload?.data)
+  const agentTitle = firstString([
+    agentPayload?.sessionKey,
+    agentPayload?.label,
+    agentData?.sessionKey,
+    agentData?.label,
+  ])
+
   return createActivityEvent({
     type: 'session',
-    title: 'Agent activity',
+    title: agentTitle ? `Agent: ${agentTitle}` : 'Agent activity',
     detail: formatDetail(sanitizedPayload),
     level: 'info',
   })
@@ -232,13 +242,24 @@ function normalizeChatEvent(payload: unknown): ActivityEvent {
         ? 'error'
         : 'info'
 
+  // Build a more informative title from state and payload
+  const chatPayload = toRecord(sanitizedPayload)
+  const chatData = toRecord(chatPayload?.data)
+  const sessionLabel = firstString([
+    chatPayload?.sessionKey,
+    chatPayload?.label,
+    chatData?.sessionKey,
+    chatData?.label,
+  ])
+  let sessionTitle = sessionLabel ? `Session: ${sessionLabel}` : 'Session activity'
+  if (state.length > 0) {
+    sessionTitle = sessionLabel ? `${sessionLabel} → ${state}` : `Session ${state}`
+  }
+
   return createActivityEvent({
     type: 'session',
-    title: 'Session activity',
-    detail:
-      state.length > 0
-        ? `State: ${state}`
-        : formatDetail(sanitizedPayload),
+    title: sessionTitle,
+    detail: formatDetail(sanitizedPayload),
     level,
   })
 }

@@ -27,6 +27,7 @@ import { SystemInfoWidget } from './components/system-info-widget'
 import { TasksWidget } from './components/tasks-widget'
 import { UsageMeterWidget } from './components/usage-meter-widget'
 import { AddWidgetPopover } from './components/add-widget-popover'
+import { ActivityTicker } from '@/components/activity-ticker'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
 import { useVisibleWidgets } from './hooks/use-visible-widgets'
@@ -308,6 +309,9 @@ export function DashboardScreen() {
             </div>
           </div>
         </header>
+
+        {/* Activity ticker — real-time event stream */}
+        <ActivityTicker />
 
         <HeroMetricsRow
           totalSessions={systemStatus.totalSessions}
