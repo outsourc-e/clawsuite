@@ -38,15 +38,6 @@ export type SearchActivity = {
   source?: string
 }
 
-// Static skills dataset (as Eric specified - no backend)
-const SKILLS_DATA: SearchSkill[] = [
-  { id: 'weather', name: 'Weather', description: 'Get current weather and forecasts', installed: true },
-  { id: 'browser-use', name: 'Browser Use', description: 'Automate browser interactions', installed: true },
-  { id: 'codex-cli', name: 'Codex CLI', description: 'Use OpenAI Codex for coding tasks', installed: true },
-  { id: 'video-frames', name: 'Video Frames', description: 'Extract frames from videos', installed: false },
-  { id: 'openai-whisper', name: 'OpenAI Whisper', description: 'Transcribe audio files', installed: false },
-]
-
 async function fetchSessions(): Promise<SearchSession[]> {
   const res = await fetch('/api/sessions')
   if (!res.ok) return []
@@ -90,8 +81,26 @@ async function fetchFiles(): Promise<SearchFile[]> {
     }
     return result
   }
-  
+
   return flatten(entries)
+}
+
+async function fetchSkills(): Promise<SearchSkill[]> {
+  const res = await fetch('/api/skills')
+  if (!res.ok) return []
+  const data = await res.json()
+  if (typeof data.ok === 'boolean' && !data.ok) return []
+  const skills = Array.isArray(data.skills) ? data.skills : []
+
+  return skills.map((skill: Record<string, unknown>) => {
+    const name = String(skill.name || 'Unknown Skill')
+    return {
+      id: String(skill.id || name.toLowerCase().replaceAll(' ', '-')),
+      name,
+      description: String(skill.description || ''),
+      installed: Boolean(skill.installed),
+    }
+  })
 }
 
 export function useSearchData(scope: 'all' | 'chats' | 'files' | 'agents' | 'skills' | 'actions') {
@@ -111,6 +120,14 @@ export function useSearchData(scope: 'all' | 'chats' | 'files' | 'agents' | 'ski
     staleTime: 60_000,
   })
 
+  // Skills
+  const skillsQuery = useQuery({
+    queryKey: ['search', 'skills'],
+    queryFn: fetchSkills,
+    enabled: scope === 'all' || scope === 'skills',
+    staleTime: 60_000,
+  })
+
   // Activity events (from existing hook)
   const { events } = useActivityEvents({
     initialCount: 100,
@@ -126,15 +143,12 @@ export function useSearchData(scope: 'all' | 'chats' | 'files' | 'agents' | 'ski
     source: event.source,
   }))
 
-  // Skills (static)
-  const skillsResults: SearchSkill[] = SKILLS_DATA
-
   return {
     sessions: sessionsQuery.data || [],
     files: filesQuery.data || [],
-    skills: skillsResults,
+    skills: skillsQuery.data || [],
     activity: activityResults,
-    isLoading: sessionsQuery.isLoading || filesQuery.isLoading,
+    isLoading: sessionsQuery.isLoading || filesQuery.isLoading || skillsQuery.isLoading,
   }
 }
 
