@@ -765,26 +765,44 @@ export function AgentViewPanel() {
                           </p>
                         ) : null}
                         {cliAgents.map(function renderCliAgent(agent) {
+                          const progressPct = agent.status === 'finished' ? 100
+                            : Math.min(95, Math.round((agent.runtimeSeconds / 600) * 100))
                           return (
                             <div
                               key={agent.pid}
-                              className="flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-primary-200/50"
+                              className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
                               title={agent.task}
                             >
-                              <span
-                                className={cn(
-                                  'size-1.5 shrink-0 rounded-full',
-                                  agent.status === 'running'
-                                    ? 'bg-emerald-500'
-                                    : 'bg-gray-400',
-                                )}
-                              />
-                              <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800">
-                                {agent.name}
-                              </span>
-                              <span className="shrink-0 text-[10px] text-primary-500 tabular-nums">
-                                {formatRuntimeLabel(agent.runtimeSeconds)}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={cn(
+                                    'size-1.5 shrink-0 rounded-full',
+                                    agent.status === 'running'
+                                      ? 'bg-emerald-500'
+                                      : 'bg-gray-400',
+                                  )}
+                                />
+                                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800">
+                                  {agent.name}
+                                </span>
+                                <span className="shrink-0 text-[10px] text-primary-500 tabular-nums">
+                                  {formatRuntimeLabel(agent.runtimeSeconds)}
+                                </span>
+                              </div>
+                              {agent.task ? (
+                                <p className="mt-0.5 truncate pl-3 text-[10px] text-primary-500">
+                                  {agent.task.split('\n')[0].slice(0, 80)}
+                                </p>
+                              ) : null}
+                              <div className="mt-1 ml-3 h-1 overflow-hidden rounded-full bg-primary-200">
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full transition-all duration-500',
+                                    agent.status === 'finished' ? 'bg-primary-400' : 'bg-emerald-400',
+                                  )}
+                                  style={{ width: `${progressPct}%` }}
+                                />
+                              </div>
                             </div>
                           )
                         })}
