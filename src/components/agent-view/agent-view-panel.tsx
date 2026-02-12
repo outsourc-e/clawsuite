@@ -306,12 +306,14 @@ export function AgentViewPanel() {
   // Auto: expanded avatar when idle, compact when agents are working
   const viewMode = activeCount > 0 || cliAgents.length > 0 ? 'compact' : 'expanded'
 
-  // Auto-expand history when there are entries
+  // Auto-expand history only when first entry arrives
+  const prevHistoryCount = useRef(0)
   useEffect(() => {
-    if (historyAgents.length > 0 && !historyOpen) {
+    if (historyAgents.length > 0 && prevHistoryCount.current === 0) {
       setHistoryOpen(true)
     }
-  }, [historyAgents.length, historyOpen, setHistoryOpen])
+    prevHistoryCount.current = historyAgents.length
+  }, [historyAgents.length, setHistoryOpen])
 
   const totalCost = useMemo(function getTotalCost() {
     return activeAgents.reduce(function sumCost(total, agent) {
