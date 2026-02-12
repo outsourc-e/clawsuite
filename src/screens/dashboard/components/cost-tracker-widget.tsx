@@ -22,14 +22,14 @@ type ProviderUsageResult = {
   status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
   message?: string
   plan?: string
-  lines: UsageLine[]
+  lines: Array<UsageLine>
   updatedAt: number
 }
 
 type ProviderUsageResponse = {
   ok: boolean
   updatedAt: number
-  providers: ProviderUsageResult[]
+  providers: Array<ProviderUsageResult>
 }
 
 type CostMetric = {

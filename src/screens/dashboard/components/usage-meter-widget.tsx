@@ -25,14 +25,14 @@ type ProviderUsageResult = {
   status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
   message?: string
   plan?: string
-  lines: ProviderUsageLine[]
+  lines: Array<ProviderUsageLine>
   updatedAt: number
 }
 
 type ProviderUsageApiResponse = {
   ok: boolean
   updatedAt: number
-  providers: ProviderUsageResult[]
+  providers: Array<ProviderUsageResult>
 }
 
 type ProviderUsage = {

@@ -31,7 +31,8 @@ function cToF(c: number): number {
 
 function deriveLocationFromTimezone(): string {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone?.split('/').pop()?.replace(/_/g, ' ') ?? ''
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    return timezone.split('/').pop()?.replace(/_/g, ' ') ?? ''
   } catch {
     return ''
   }

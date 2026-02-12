@@ -21,9 +21,12 @@ type CronJobListProps = {
   onStatusFilterChange: (value: CronStatusFilter) => void
   onToggleEnabled: (job: CronJob, enabled: boolean) => void
   onRunNow: (job: CronJob) => void
+  onEdit: (job: CronJob) => void
+  onDelete: (job: CronJob) => void
   onToggleExpanded: (jobId: string) => void
   togglePendingJobId: string | null
   runPendingJobId: string | null
+  deletePendingJobId: string | null
 }
 
 function matchesSearch(job: CronJob, searchText: string): boolean {
@@ -56,9 +59,12 @@ export function CronJobList({
   onStatusFilterChange,
   onToggleEnabled,
   onRunNow,
+  onEdit,
+  onDelete,
   onToggleExpanded,
   togglePendingJobId,
   runPendingJobId,
+  deletePendingJobId,
 }: CronJobListProps) {
   const filtered = sortCronJobs(
     jobs.filter(function filterJob(job) {
@@ -147,8 +153,11 @@ export function CronJobList({
                 expanded={isExpanded}
                 togglePending={togglePendingJobId === job.id}
                 runPending={runPendingJobId === job.id}
+                deletePending={deletePendingJobId === job.id}
                 onToggleEnabled={onToggleEnabled}
                 onRunNow={onRunNow}
+                onEdit={onEdit}
+                onDelete={onDelete}
                 onToggleExpanded={onToggleExpanded}
               >
                 <CronJobDetail

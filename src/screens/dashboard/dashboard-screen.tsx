@@ -3,12 +3,10 @@ import {
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Responsive as ResponsiveGridLayout } from 'react-grid-layout/legacy'
-import type { ResponsiveLayouts } from 'react-grid-layout'
 
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
@@ -16,11 +14,11 @@ import 'react-resizable/css/styles.css'
 import {
   GRID_BREAKPOINTS,
   GRID_COLS,
-  GRID_ROW_HEIGHT,
   GRID_MARGIN,
+  GRID_ROW_HEIGHT,
   loadLayouts,
-  saveLayouts,
   resetLayouts,
+  saveLayouts,
 } from './constants/grid-config'
 import { AgentStatusWidget } from './components/agent-status-widget'
 import { ActivityLogWidget } from './components/activity-log-widget'
@@ -30,12 +28,14 @@ import { NotificationsWidget } from './components/notifications-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
 import { TasksWidget } from './components/tasks-widget'
 import { UsageMeterWidget } from './components/usage-meter-widget'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { AddWidgetPopover } from './components/add-widget-popover'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
 import { SettingsDialog } from './components/settings-dialog'
 import { useVisibleWidgets } from './hooks/use-visible-widgets'
+import type { ResponsiveLayouts } from 'react-grid-layout'
+import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { chatQueryKeys, fetchGatewayStatus, fetchSessions } from '@/screens/chat/chat-queries'
 
 type SessionStatusPayload = {
@@ -63,7 +63,7 @@ async function fetchHeroCost(): Promise<string> {
     const response = await fetch('/api/cost')
     if (!response.ok) return '—'
     const data = (await response.json()) as Record<string, unknown>
-    const cost = data?.cost as Record<string, unknown> | undefined
+    const cost = data.cost as Record<string, unknown> | undefined
     const total = cost?.total as Record<string, unknown> | undefined
     const amount = total?.amount
     if (typeof amount === 'number') return `$${amount.toFixed(2)}`

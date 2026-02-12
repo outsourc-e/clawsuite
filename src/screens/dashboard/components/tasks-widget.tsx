@@ -1,8 +1,12 @@
 import { Task01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
-import { useTaskStore, STATUS_ORDER, STATUS_LABELS, type Task, type TaskStatus } from '@/stores/task-store'
+import type { CronJob } from '@/components/cron-manager/cron-types'
+import { fetchCronJobs } from '@/lib/cron-api'
+import { STATUS_ORDER, STATUS_LABELS, type TaskPriority, type TaskStatus } from '@/stores/task-store'
 import { cn } from '@/lib/utils'
 
 type TasksWidgetProps = {
@@ -10,7 +14,16 @@ type TasksWidgetProps = {
   onRemove?: () => void
 }
 
-function priorityColor(p: string): string {
+type DashboardTask = {
+  id: string
+  title: string
+  status: TaskStatus
+  priority: TaskPriority
+}
+
+const PRIORITY_ORDER: Array<TaskPriority> = ['P0', 'P1', 'P2', 'P3']
+
+function priorityColor(p: TaskPriority): string {
   if (p === 'P0') return 'bg-red-500/15 text-red-600 dark:text-red-400'
   if (p === 'P1') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
   if (p === 'P2') return 'bg-primary-200/60 text-primary-600'
@@ -24,7 +37,33 @@ function statusDotColor(s: TaskStatus): string {
   return 'bg-primary-300'
 }
 
-function MiniColumn({ status, tasks }: { status: TaskStatus; tasks: Task[] }) {
+function toTaskStatus(job: CronJob): TaskStatus {
+  if (!job.enabled) return 'backlog'
+  const lastRunStatus = job.lastRun?.status
+  if (lastRunStatus === 'running' || lastRunStatus === 'queued') return 'in_progress'
+  if (lastRunStatus === 'error') return 'review'
+  if (lastRunStatus === 'success') return 'done'
+  return 'backlog'
+}
+
+function toTaskPriority(job: CronJob): TaskPriority {
+  const lastRunStatus = job.lastRun?.status
+  if (lastRunStatus === 'error') return 'P0'
+  if (lastRunStatus === 'running' || lastRunStatus === 'queued') return 'P1'
+  if (!job.enabled) return 'P3'
+  return 'P2'
+}
+
+function toDashboardTask(job: CronJob): DashboardTask {
+  return {
+    id: job.id,
+    title: job.name,
+    status: toTaskStatus(job),
+    priority: toTaskPriority(job),
+  }
+}
+
+function MiniColumn({ status, tasks }: { status: TaskStatus; tasks: Array<DashboardTask> }) {
   const visible = tasks.slice(0, 3)
   const remaining = tasks.length - visible.length
 
@@ -63,23 +102,36 @@ function MiniColumn({ status, tasks }: { status: TaskStatus; tasks: Task[] }) {
 
 export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
   const navigate = useNavigate()
-  const tasks = useTaskStore((s) => s.tasks)
+  const cronJobsQuery = useQuery({
+    queryKey: ['cron', 'jobs'],
+    queryFn: fetchCronJobs,
+    retry: false,
+    refetchInterval: 30_000,
+  })
+
+  const tasks = useMemo(function mapCronJobsToTasks() {
+    const jobs = Array.isArray(cronJobsQuery.data) ? cronJobsQuery.data : []
+    return jobs.map(function mapJob(job) {
+      return toDashboardTask(job)
+    })
+  }, [cronJobsQuery.data])
 
   const byStatus = STATUS_ORDER.reduce(
     (acc, status) => {
       acc[status] = tasks
         .filter((t) => t.status === status)
         .sort((a, b) => {
-          const p = ['P0', 'P1', 'P2', 'P3']
-          return p.indexOf(a.priority) - p.indexOf(b.priority)
+          return PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
         })
       return acc
     },
-    {} as Record<TaskStatus, Task[]>,
+    {} as Record<TaskStatus, Array<DashboardTask>>,
   )
 
   const activeCount = tasks.filter((t) => t.status !== 'done').length
   const doneCount = tasks.filter((t) => t.status === 'done').length
+  const errorMessage =
+    cronJobsQuery.error instanceof Error ? cronJobsQuery.error.message : null
 
   return (
     <DashboardGlassCard
@@ -96,6 +148,22 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
       onRemove={onRemove}
       className="h-full"
     >
+      {cronJobsQuery.isLoading && tasks.length === 0 ? (
+        <div className="mb-2 rounded-lg border border-primary-200 bg-primary-100/40 px-3 py-2.5 text-xs text-primary-600 text-pretty">
+          Loading tasks...
+        </div>
+      ) : null}
+      {cronJobsQuery.isError ? (
+        <div className="mb-2 rounded-lg border border-orange-500/40 bg-orange-500/10 px-3 py-2.5 text-xs text-orange-500 text-pretty">
+          {errorMessage ?? 'Unable to load gateway tasks.'}
+        </div>
+      ) : null}
+      {!cronJobsQuery.isLoading && !cronJobsQuery.isError && tasks.length === 0 ? (
+        <div className="mb-2 rounded-lg border border-primary-200 bg-primary-100/40 px-3 py-2.5 text-xs text-primary-600 text-pretty">
+          No tasks reported by the Gateway.
+        </div>
+      ) : null}
+
       {/* Mini kanban — 4 columns */}
       <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
         {STATUS_ORDER.map((status) => (
@@ -107,7 +175,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
       <div className="mt-3 flex justify-end">
         <button
           type="button"
-          onClick={() => void navigate({ to: '/tasks' })}
+          onClick={() => void navigate({ to: '/cron' })}
           className="inline-flex items-center gap-1 text-[11px] font-medium text-primary-400 transition-colors hover:text-primary-600"
         >
           View all

@@ -64,10 +64,10 @@ type WidgetRegistryEntry = {
   id: WidgetId
   defaultTier: WidgetSizeTier
   /** Tiers this widget is allowed to use */
-  allowedTiers: WidgetSizeTier[]
+  allowedTiers: Array<WidgetSizeTier>
 }
 
-export const WIDGET_REGISTRY: WidgetRegistryEntry[] = [
+export const WIDGET_REGISTRY: Array<WidgetRegistryEntry> = [
   // ── Above fold: Operational truth ──
   { id: 'agent-status', defaultTier: 'M', allowedTiers: ['M', 'L'] },
   { id: 'cost-tracker', defaultTier: 'M', allowedTiers: ['M', 'L'] },
@@ -103,7 +103,7 @@ function tierConstraints(tier: WidgetSizeTier, breakpoint: keyof typeof GRID_COL
  */
 function buildFlowLayout(breakpoint: keyof typeof GRID_COLS): Layout {
   const cols = GRID_COLS[breakpoint]
-  const layouts: LayoutItem[] = []
+  const layouts: Array<LayoutItem> = []
   let x = 0
   let y = 0
   let rowMaxH = 0

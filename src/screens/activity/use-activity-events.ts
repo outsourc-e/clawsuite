@@ -202,8 +202,9 @@ export function useActivityEvents(options: UseActivityEventsOptions) {
           if (!active) return
           setIsConnected(false)
         } finally {
-          if (!active) return
-          setIsLoading(false)
+          if (active) {
+            setIsLoading(false)
+          }
         }
       }
 

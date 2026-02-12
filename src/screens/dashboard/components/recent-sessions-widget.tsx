@@ -1,12 +1,12 @@
-import { Clock01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
+import { ArrowRight01Icon, Clock01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import type { RecentSession } from './dashboard-types'
+import type { SessionMeta } from '@/screens/chat/types'
 import { Button } from '@/components/ui/button'
 import { chatQueryKeys, fetchSessions } from '@/screens/chat/chat-queries'
-import type { SessionMeta } from '@/screens/chat/types'
 import { getMessageTimestamp, textFromMessage } from '@/screens/chat/utils'
 
 type RecentSessionsWidgetProps = {

@@ -23,8 +23,11 @@ type CronJobCardProps = {
   expanded: boolean
   togglePending: boolean
   runPending: boolean
+  deletePending: boolean
   onToggleEnabled: (job: CronJob, enabled: boolean) => void
   onRunNow: (job: CronJob) => void
+  onEdit: (job: CronJob) => void
+  onDelete: (job: CronJob) => void
   onToggleExpanded: (jobId: string) => void
   children: React.ReactNode
 }
@@ -34,8 +37,11 @@ export function CronJobCard({
   expanded,
   togglePending,
   runPending,
+  deletePending,
   onToggleEnabled,
   onRunNow,
+  onEdit,
+  onDelete,
   onToggleExpanded,
   children,
 }: CronJobCardProps) {
@@ -84,7 +90,7 @@ export function CronJobCard({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Switch
             checked={job.enabled}
             disabled={togglePending}
@@ -104,6 +110,28 @@ export function CronJobCard({
           >
             <HugeiconsIcon icon={PlayCircleIcon} size={20} strokeWidth={1.5} />
             Run Now
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={deletePending}
+            onClick={function onClickEdit() {
+              onEdit(job)
+            }}
+            className="tabular-nums"
+          >
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={deletePending}
+            onClick={function onClickDelete() {
+              onDelete(job)
+            }}
+            className="tabular-nums"
+          >
+            {deletePending ? 'Deleting...' : 'Delete'}
           </Button>
         </div>
       </div>

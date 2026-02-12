@@ -57,6 +57,7 @@ import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
+import { Route as ApiCronRouteImport } from './routes/api/cron'
 import { Route as ApiCostRouteImport } from './routes/api/cost'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiConfigPatchRouteImport } from './routes/api/config-patch'
@@ -71,9 +72,11 @@ import { Route as ApiGatewayAgentsRouteImport } from './routes/api/gateway/agent
 import { Route as ApiEventsRecentRouteImport } from './routes/api/events/recent'
 import { Route as ApiDebugStatusRouteImport } from './routes/api/debug/status'
 import { Route as ApiDebugReconnectRouteImport } from './routes/api/debug/reconnect'
+import { Route as ApiCronUpsertRouteImport } from './routes/api/cron/upsert'
 import { Route as ApiCronToggleRouteImport } from './routes/api/cron/toggle'
 import { Route as ApiCronRunRouteImport } from './routes/api/cron/run'
 import { Route as ApiCronListRouteImport } from './routes/api/cron/list'
+import { Route as ApiCronDeleteRouteImport } from './routes/api/cron/delete'
 import { Route as ApiBrowserTabsRouteImport } from './routes/api/browser/tabs'
 import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
@@ -318,6 +321,11 @@ const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
   path: '/api/debug-analyze',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronRoute = ApiCronRouteImport.update({
+  id: '/api/cron',
+  path: '/api/cron',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCostRoute = ApiCostRouteImport.update({
   id: '/api/cost',
   path: '/api/cost',
@@ -388,20 +396,30 @@ const ApiDebugReconnectRoute = ApiDebugReconnectRouteImport.update({
   path: '/api/debug/reconnect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronUpsertRoute = ApiCronUpsertRouteImport.update({
+  id: '/upsert',
+  path: '/upsert',
+  getParentRoute: () => ApiCronRoute,
+} as any)
 const ApiCronToggleRoute = ApiCronToggleRouteImport.update({
-  id: '/api/cron/toggle',
-  path: '/api/cron/toggle',
-  getParentRoute: () => rootRouteImport,
+  id: '/toggle',
+  path: '/toggle',
+  getParentRoute: () => ApiCronRoute,
 } as any)
 const ApiCronRunRoute = ApiCronRunRouteImport.update({
-  id: '/api/cron/run',
-  path: '/api/cron/run',
-  getParentRoute: () => rootRouteImport,
+  id: '/run',
+  path: '/run',
+  getParentRoute: () => ApiCronRoute,
 } as any)
 const ApiCronListRoute = ApiCronListRouteImport.update({
-  id: '/api/cron/list',
-  path: '/api/cron/list',
-  getParentRoute: () => rootRouteImport,
+  id: '/list',
+  path: '/list',
+  getParentRoute: () => ApiCronRoute,
+} as any)
+const ApiCronDeleteRoute = ApiCronDeleteRouteImport.update({
+  id: '/delete',
+  path: '/delete',
+  getParentRoute: () => ApiCronRoute,
 } as any)
 const ApiBrowserTabsRoute = ApiBrowserTabsRouteImport.update({
   id: '/api/browser/tabs',
@@ -414,9 +432,9 @@ const ApiBrowserScreenshotRoute = ApiBrowserScreenshotRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCronRunsJobIdRoute = ApiCronRunsJobIdRouteImport.update({
-  id: '/api/cron/runs/$jobId',
-  path: '/api/cron/runs/$jobId',
-  getParentRoute: () => rootRouteImport,
+  id: '/runs/$jobId',
+  path: '/runs/$jobId',
+  getParentRoute: () => ApiCronRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -447,6 +465,7 @@ export interface FileRoutesByFullPath {
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/cost': typeof ApiCostRoute
+  '/api/cron': typeof ApiCronRouteWithChildren
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
@@ -475,9 +494,11 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
+  '/api/cron/delete': typeof ApiCronDeleteRoute
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/cron/upsert': typeof ApiCronUpsertRoute
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
   '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
@@ -516,6 +537,7 @@ export interface FileRoutesByTo {
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/cost': typeof ApiCostRoute
+  '/api/cron': typeof ApiCronRouteWithChildren
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
@@ -544,9 +566,11 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
+  '/api/cron/delete': typeof ApiCronDeleteRoute
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/cron/upsert': typeof ApiCronUpsertRoute
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
   '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
@@ -587,6 +611,7 @@ export interface FileRoutesById {
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/cost': typeof ApiCostRoute
+  '/api/cron': typeof ApiCronRouteWithChildren
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
@@ -615,9 +640,11 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
+  '/api/cron/delete': typeof ApiCronDeleteRoute
   '/api/cron/list': typeof ApiCronListRoute
   '/api/cron/run': typeof ApiCronRunRoute
   '/api/cron/toggle': typeof ApiCronToggleRoute
+  '/api/cron/upsert': typeof ApiCronUpsertRoute
   '/api/debug/reconnect': typeof ApiDebugReconnectRoute
   '/api/debug/status': typeof ApiDebugStatusRoute
   '/api/events/recent': typeof ApiEventsRecentRoute
@@ -659,6 +686,7 @@ export interface FileRouteTypes {
     | '/api/config-patch'
     | '/api/context-usage'
     | '/api/cost'
+    | '/api/cron'
     | '/api/debug-analyze'
     | '/api/events'
     | '/api/files'
@@ -687,9 +715,11 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/api/browser/screenshot'
     | '/api/browser/tabs'
+    | '/api/cron/delete'
     | '/api/cron/list'
     | '/api/cron/run'
     | '/api/cron/toggle'
+    | '/api/cron/upsert'
     | '/api/debug/reconnect'
     | '/api/debug/status'
     | '/api/events/recent'
@@ -728,6 +758,7 @@ export interface FileRouteTypes {
     | '/api/config-patch'
     | '/api/context-usage'
     | '/api/cost'
+    | '/api/cron'
     | '/api/debug-analyze'
     | '/api/events'
     | '/api/files'
@@ -756,9 +787,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/browser/screenshot'
     | '/api/browser/tabs'
+    | '/api/cron/delete'
     | '/api/cron/list'
     | '/api/cron/run'
     | '/api/cron/toggle'
+    | '/api/cron/upsert'
     | '/api/debug/reconnect'
     | '/api/debug/status'
     | '/api/events/recent'
@@ -798,6 +831,7 @@ export interface FileRouteTypes {
     | '/api/config-patch'
     | '/api/context-usage'
     | '/api/cost'
+    | '/api/cron'
     | '/api/debug-analyze'
     | '/api/events'
     | '/api/files'
@@ -826,9 +860,11 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/api/browser/screenshot'
     | '/api/browser/tabs'
+    | '/api/cron/delete'
     | '/api/cron/list'
     | '/api/cron/run'
     | '/api/cron/toggle'
+    | '/api/cron/upsert'
     | '/api/debug/reconnect'
     | '/api/debug/status'
     | '/api/events/recent'
@@ -869,6 +905,7 @@ export interface RootRouteChildren {
   ApiConfigPatchRoute: typeof ApiConfigPatchRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCostRoute: typeof ApiCostRoute
+  ApiCronRoute: typeof ApiCronRouteWithChildren
   ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
   ApiEventsRoute: typeof ApiEventsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
@@ -895,9 +932,6 @@ export interface RootRouteChildren {
   ChatIndexRoute: typeof ChatIndexRoute
   ApiBrowserScreenshotRoute: typeof ApiBrowserScreenshotRoute
   ApiBrowserTabsRoute: typeof ApiBrowserTabsRoute
-  ApiCronListRoute: typeof ApiCronListRoute
-  ApiCronRunRoute: typeof ApiCronRunRoute
-  ApiCronToggleRoute: typeof ApiCronToggleRoute
   ApiDebugReconnectRoute: typeof ApiDebugReconnectRoute
   ApiDebugStatusRoute: typeof ApiDebugStatusRoute
   ApiGatewayAgentsRoute: typeof ApiGatewayAgentsRoute
@@ -905,7 +939,6 @@ export interface RootRouteChildren {
   ApiGatewayNodesRoute: typeof ApiGatewayNodesRoute
   ApiGatewaySessionsRoute: typeof ApiGatewaySessionsRoute
   ApiGatewayUsageRoute: typeof ApiGatewayUsageRoute
-  ApiCronRunsJobIdRoute: typeof ApiCronRunsJobIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1246,6 +1279,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDebugAnalyzeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron': {
+      id: '/api/cron'
+      path: '/api/cron'
+      fullPath: '/api/cron'
+      preLoaderRoute: typeof ApiCronRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cost': {
       id: '/api/cost'
       path: '/api/cost'
@@ -1344,26 +1384,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDebugReconnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/upsert': {
+      id: '/api/cron/upsert'
+      path: '/upsert'
+      fullPath: '/api/cron/upsert'
+      preLoaderRoute: typeof ApiCronUpsertRouteImport
+      parentRoute: typeof ApiCronRoute
+    }
     '/api/cron/toggle': {
       id: '/api/cron/toggle'
-      path: '/api/cron/toggle'
+      path: '/toggle'
       fullPath: '/api/cron/toggle'
       preLoaderRoute: typeof ApiCronToggleRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiCronRoute
     }
     '/api/cron/run': {
       id: '/api/cron/run'
-      path: '/api/cron/run'
+      path: '/run'
       fullPath: '/api/cron/run'
       preLoaderRoute: typeof ApiCronRunRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiCronRoute
     }
     '/api/cron/list': {
       id: '/api/cron/list'
-      path: '/api/cron/list'
+      path: '/list'
       fullPath: '/api/cron/list'
       preLoaderRoute: typeof ApiCronListRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiCronRoute
+    }
+    '/api/cron/delete': {
+      id: '/api/cron/delete'
+      path: '/delete'
+      fullPath: '/api/cron/delete'
+      preLoaderRoute: typeof ApiCronDeleteRouteImport
+      parentRoute: typeof ApiCronRoute
     }
     '/api/browser/tabs': {
       id: '/api/browser/tabs'
@@ -1381,10 +1435,10 @@ declare module '@tanstack/react-router' {
     }
     '/api/cron/runs/$jobId': {
       id: '/api/cron/runs/$jobId'
-      path: '/api/cron/runs/$jobId'
+      path: '/runs/$jobId'
       fullPath: '/api/cron/runs/$jobId'
       preLoaderRoute: typeof ApiCronRunsJobIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiCronRoute
     }
   }
 }
@@ -1402,6 +1456,27 @@ const SettingsRouteChildren: SettingsRouteChildren = {
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
+
+interface ApiCronRouteChildren {
+  ApiCronDeleteRoute: typeof ApiCronDeleteRoute
+  ApiCronListRoute: typeof ApiCronListRoute
+  ApiCronRunRoute: typeof ApiCronRunRoute
+  ApiCronToggleRoute: typeof ApiCronToggleRoute
+  ApiCronUpsertRoute: typeof ApiCronUpsertRoute
+  ApiCronRunsJobIdRoute: typeof ApiCronRunsJobIdRoute
+}
+
+const ApiCronRouteChildren: ApiCronRouteChildren = {
+  ApiCronDeleteRoute: ApiCronDeleteRoute,
+  ApiCronListRoute: ApiCronListRoute,
+  ApiCronRunRoute: ApiCronRunRoute,
+  ApiCronToggleRoute: ApiCronToggleRoute,
+  ApiCronUpsertRoute: ApiCronUpsertRoute,
+  ApiCronRunsJobIdRoute: ApiCronRunsJobIdRoute,
+}
+
+const ApiCronRouteWithChildren =
+  ApiCronRoute._addFileChildren(ApiCronRouteChildren)
 
 interface ApiEventsRouteChildren {
   ApiEventsRecentRoute: typeof ApiEventsRecentRoute
@@ -1455,6 +1530,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiConfigPatchRoute: ApiConfigPatchRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCostRoute: ApiCostRoute,
+  ApiCronRoute: ApiCronRouteWithChildren,
   ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
   ApiEventsRoute: ApiEventsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
@@ -1481,9 +1557,6 @@ const rootRouteChildren: RootRouteChildren = {
   ChatIndexRoute: ChatIndexRoute,
   ApiBrowserScreenshotRoute: ApiBrowserScreenshotRoute,
   ApiBrowserTabsRoute: ApiBrowserTabsRoute,
-  ApiCronListRoute: ApiCronListRoute,
-  ApiCronRunRoute: ApiCronRunRoute,
-  ApiCronToggleRoute: ApiCronToggleRoute,
   ApiDebugReconnectRoute: ApiDebugReconnectRoute,
   ApiDebugStatusRoute: ApiDebugStatusRoute,
   ApiGatewayAgentsRoute: ApiGatewayAgentsRoute,
@@ -1491,7 +1564,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGatewayNodesRoute: ApiGatewayNodesRoute,
   ApiGatewaySessionsRoute: ApiGatewaySessionsRoute,
   ApiGatewayUsageRoute: ApiGatewayUsageRoute,
-  ApiCronRunsJobIdRoute: ApiCronRunsJobIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

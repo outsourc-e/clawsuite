@@ -36,7 +36,7 @@ export function HeroMetricsRow({
   uptimeSeconds,
   totalSpend,
 }: HeroMetricsRowProps) {
-  const metrics: HeroMetric[] = [
+  const metrics: Array<HeroMetric> = [
     { label: 'Total Sessions', value: `${totalSessions}`, icon: Activity01Icon },
     { label: 'Active Agents', value: `${activeAgents}`, icon: UserGroupIcon },
     { label: 'Uptime', value: formatUptime(uptimeSeconds), icon: Timer02Icon },

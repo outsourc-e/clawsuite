@@ -26,8 +26,7 @@ function getLevelDotClass(level: ActivityEvent['level']): string {
   if (level === 'debug') return 'bg-primary-400'
   if (level === 'info') return 'bg-blue-500'
   if (level === 'warn') return 'bg-amber-500'
-  if (level === 'error') return 'bg-red-500'
-  return 'bg-primary-400'
+  return 'bg-red-500'
 }
 
 function getLevelBorderClass(level: ActivityEvent['level']): string {

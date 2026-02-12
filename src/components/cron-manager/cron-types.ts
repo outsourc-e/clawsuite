@@ -22,5 +22,15 @@ export type CronJob = {
   lastRun?: CronRun
 }
 
+export type CronJobUpsertInput = {
+  jobId?: string
+  name: string
+  schedule: string
+  enabled: boolean
+  description?: string
+  payload?: unknown
+  deliveryConfig?: unknown
+}
+
 export type CronSortKey = 'name' | 'schedule' | 'lastRun'
 export type CronStatusFilter = 'all' | 'enabled' | 'disabled'

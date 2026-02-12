@@ -11,19 +11,20 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ActivityEvent } from '@/types/activity-event'
+import type { DiagnosticsBundle } from '@/lib/diagnostics'
 import { DashboardGlassCard } from '@/screens/dashboard/components/dashboard-glass-card'
 import { ActivityEventRow } from '@/screens/activity/components/activity-event-row'
 import { useActivityEvents } from '@/screens/activity/use-activity-events'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import {
-  type DiagnosticsBundle,
   DIAGNOSTICS_BUNDLE_VERSION,
-  redactSensitiveData,
-  downloadBundle,
   buildGitHubIssueUrl,
+  downloadBundle,
+  redactSensitiveData,
 } from '@/lib/diagnostics'
 
 type DebugConnectionState = 'connecting' | 'connected' | 'disconnected'
@@ -51,8 +52,28 @@ type TroubleshooterSuggestion = {
   matchedAt: number
 }
 
+type ActivityLogFilterId =
+  | 'all'
+  | 'errors'
+  | 'agent-activity'
+  | 'gateway'
+  | 'cron'
+
+type ActivityLogFilterOption = {
+  id: ActivityLogFilterId
+  label: string
+}
+
 const MAX_ERROR_EVENTS = 20
 const RECENT_ERROR_WINDOW_MS = 5 * 60 * 1000
+
+const ACTIVITY_LOG_FILTERS: Array<ActivityLogFilterOption> = [
+  { id: 'all', label: 'All' },
+  { id: 'errors', label: 'Errors' },
+  { id: 'agent-activity', label: 'Agent Activity' },
+  { id: 'gateway', label: 'Gateway' },
+  { id: 'cron', label: 'Cron' },
+]
 
 const TROUBLESHOOTER_RULES: Array<TroubleshooterRule> = [
   {
@@ -246,9 +267,13 @@ function getConnectionDotClass(state: DebugConnectionState): string {
   return 'bg-amber-500'
 }
 
+function isIssueLevel(level: ActivityEvent['level']): boolean {
+  return level === 'error' || level === 'warn'
+}
+
 function filterIssueEvents(events: Array<ActivityEvent>): Array<ActivityEvent> {
   const issueEvents = events.filter(function keepIssueEvents(event) {
-    return event.level === 'error' || event.level === 'warn'
+    return isIssueLevel(event.level)
   })
 
   return issueEvents
@@ -259,9 +284,42 @@ function filterIssueEvents(events: Array<ActivityEvent>): Array<ActivityEvent> {
 function countRecentErrors(events: Array<ActivityEvent>): number {
   const cutoff = Date.now() - RECENT_ERROR_WINDOW_MS
   return events.reduce(function count(accumulator, event) {
-    if (event.timestamp >= cutoff) return accumulator + 1
+    if (event.timestamp < cutoff) return accumulator
+    if (isIssueLevel(event.level)) return accumulator + 1
     return accumulator
   }, 0)
+}
+
+function getSourceText(source: ActivityEvent['source']): string {
+  if (!source) return ''
+  return source.toLowerCase()
+}
+
+function matchesLogFilter(
+  event: ActivityEvent,
+  filterId: ActivityLogFilterId,
+): boolean {
+  if (filterId === 'all') return true
+
+  if (filterId === 'errors') {
+    return isIssueLevel(event.level)
+  }
+
+  const sourceText = getSourceText(event.source)
+  if (!sourceText) return false
+
+  if (filterId === 'agent-activity') {
+    return sourceText.includes('agent') || sourceText.includes('subagent')
+  }
+  if (filterId === 'gateway') return sourceText.includes('gateway')
+  return sourceText.includes('cron')
+}
+
+function matchesLogSearch(event: ActivityEvent, searchText: string): boolean {
+  if (!searchText) return true
+
+  const content = `${event.title}\n${event.detail || ''}\n${event.source || ''}`.toLowerCase()
+  return content.includes(searchText)
 }
 
 function matchTroubleshooterRule(event: ActivityEvent): TroubleshooterRule {
@@ -318,6 +376,11 @@ export function DebugConsoleScreen() {
   const [copiedSuggestionId, setCopiedSuggestionId] = useState<string | null>(
     null,
   )
+  const [selectedLogFilter, setSelectedLogFilter] =
+    useState<ActivityLogFilterId>('all')
+  const [logSearch, setLogSearch] = useState('')
+  const [isAutoScrollPinned, setIsAutoScrollPinned] = useState(true)
+  const logViewportRef = useRef<HTMLDivElement | null>(null)
 
   const connectionQuery = useQuery({
     queryKey: ['debug', 'connection-status'],
@@ -346,8 +409,19 @@ export function DebugConsoleScreen() {
   }, [events])
 
   const recentIssueCount = useMemo(function memoRecentIssueCount() {
-    return countRecentErrors(issueEvents)
-  }, [issueEvents])
+    return countRecentErrors(events)
+  }, [events])
+
+  const normalizedLogSearch = useMemo(function memoNormalizedLogSearch() {
+    return logSearch.trim().toLowerCase()
+  }, [logSearch])
+
+  const filteredLogEvents = useMemo(function memoFilteredLogEvents() {
+    return events.filter(function keepMatchingEvent(event) {
+      if (!matchesLogFilter(event, selectedLogFilter)) return false
+      return matchesLogSearch(event, normalizedLogSearch)
+    })
+  }, [events, normalizedLogSearch, selectedLogFilter])
 
   const troubleshooterSuggestions = useMemo(
     function memoTroubleshooterSuggestions() {
@@ -358,6 +432,26 @@ export function DebugConsoleScreen() {
 
   const connectionStatus = connectionQuery.data || FALLBACK_CONNECTION_STATUS
   const connectionTiming = resolveConnectionTiming(connectionStatus)
+
+  const scrollLogsToBottom = useCallback(function scrollLogsToBottom() {
+    const viewport = logViewportRef.current
+    if (!viewport) return
+    viewport.scrollTop = viewport.scrollHeight
+  }, [])
+
+  useEffect(
+    function keepLogViewportPinned() {
+      if (!isAutoScrollPinned) return
+      scrollLogsToBottom()
+    },
+    [
+      filteredLogEvents.length,
+      isAutoScrollPinned,
+      normalizedLogSearch,
+      scrollLogsToBottom,
+      selectedLogFilter,
+    ],
+  )
 
   async function handleCopyCommand(id: string, command: string) {
     try {
@@ -376,6 +470,18 @@ export function DebugConsoleScreen() {
 
   function handleReconnect() {
     reconnectMutation.mutate()
+  }
+
+  function handleToggleAutoScroll() {
+    setIsAutoScrollPinned(function toggleAutoScroll(currentValue) {
+      const nextValue = !currentValue
+      if (nextValue) {
+        window.requestAnimationFrame(function scrollAfterPin() {
+          scrollLogsToBottom()
+        })
+      }
+      return nextValue
+    })
   }
 
   const [isExporting, setIsExporting] = useState(false)
@@ -532,8 +638,8 @@ export function DebugConsoleScreen() {
         </DashboardGlassCard>
 
         <DashboardGlassCard
-          title="Recent Errors & Events"
-          description="Last 20 warn/error activity events from the Gateway stream."
+          title="Activity Logs"
+          description="Live stream with level styling, source filters, and search."
           icon={Notification03Icon}
         >
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs tabular-nums">
@@ -558,17 +664,66 @@ export function DebugConsoleScreen() {
             </span>
           </div>
 
-          {isEventsLoading && issueEvents.length === 0 ? (
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            {ACTIVITY_LOG_FILTERS.map(function renderFilter(filterOption) {
+              const selected = selectedLogFilter === filterOption.id
+              return (
+                <Button
+                  key={filterOption.id}
+                  size="sm"
+                  variant={selected ? 'default' : 'outline'}
+                  className="h-7 px-2 text-xs tabular-nums"
+                  onClick={function onSelectFilter() {
+                    setSelectedLogFilter(filterOption.id)
+                  }}
+                  aria-pressed={selected}
+                >
+                  {filterOption.label}
+                </Button>
+              )
+            })}
+          </div>
+
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <Input
+              type="search"
+              size="sm"
+              value={logSearch}
+              onChange={function onSearchChange(event) {
+                setLogSearch(event.target.value)
+              }}
+              placeholder="Search logs"
+              className="w-full max-w-md tabular-nums"
+              aria-label="Search logs"
+            />
+            <Button
+              size="sm"
+              variant={isAutoScrollPinned ? 'default' : 'outline'}
+              className="h-7 px-2 text-xs tabular-nums"
+              onClick={handleToggleAutoScroll}
+              aria-pressed={isAutoScrollPinned}
+            >
+              {isAutoScrollPinned ? 'Auto-scroll on' : 'Auto-scroll off'}
+            </Button>
+            <span className="text-[11px] text-primary-600 tabular-nums">
+              {filteredLogEvents.length} log(s)
+            </span>
+          </div>
+
+          {isEventsLoading && events.length === 0 ? (
             <div className="rounded-xl border border-primary-200 bg-primary-100/50 px-3 py-4 text-sm text-primary-600 text-pretty">
-              Loading issue events…
+              Loading log events…
             </div>
-          ) : issueEvents.length === 0 ? (
+          ) : filteredLogEvents.length === 0 ? (
             <div className="rounded-xl border border-primary-200 bg-primary-100/50 px-3 py-4 text-sm text-primary-600 text-pretty">
-              No warn/error events in the recent stream window.
+              No log events match the current filter and search.
             </div>
           ) : (
-            <div className="space-y-1.5">
-              {issueEvents.map(function renderIssueEvent(event) {
+            <div
+              ref={logViewportRef}
+              className="max-h-[360px] space-y-1.5 overflow-y-auto pr-1"
+            >
+              {filteredLogEvents.map(function renderFilteredLogEvent(event) {
                 return <ActivityEventRow key={event.id} event={event} />
               })}
             </div>

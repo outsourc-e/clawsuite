@@ -5,6 +5,7 @@ import { motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import type {
   CronJob,
+  CronJobUpsertInput,
   CronRun,
   CronSortKey,
   CronStatusFilter,
@@ -13,10 +14,12 @@ import { CronJobForm } from '@/components/cron-manager/CronJobForm'
 import { CronJobList } from '@/components/cron-manager/CronJobList'
 import { Button } from '@/components/ui/button'
 import {
+  deleteCronJob,
   fetchCronJobs,
   fetchCronRuns,
   runCronJob,
   toggleCronJob,
+  upsertCronJob,
 } from '@/lib/cron-api'
 
 const cronQueryKeys = {
@@ -32,9 +35,15 @@ export function CronManagerScreen() {
   const [searchText, setSearchText] = useState('')
   const [sortBy, setSortBy] = useState<CronSortKey>('lastRun')
   const [statusFilter, setStatusFilter] = useState<CronStatusFilter>('all')
-  const [showForm, setShowForm] = useState(false)
+  const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null)
+  const [editingJobId, setEditingJobId] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [togglePendingJobId, setTogglePendingJobId] = useState<string | null>(null)
   const [runPendingJobId, setRunPendingJobId] = useState<string | null>(null)
+  const [deletePendingJobId, setDeletePendingJobId] = useState<string | null>(
+    null,
+  )
 
   const jobsQuery = useQuery({
     queryKey: cronQueryKeys.jobs,
@@ -56,6 +65,9 @@ export function CronManagerScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: cronQueryKeys.jobs })
     },
+    onError: (error) => {
+      setActionError(error instanceof Error ? error.message : String(error))
+    },
     onSettled: () => {
       setTogglePendingJobId(null)
     },
@@ -67,8 +79,22 @@ export function CronManagerScreen() {
       await queryClient.invalidateQueries({ queryKey: cronQueryKeys.jobs })
       await queryClient.invalidateQueries({ queryKey: cronQueryKeys.runs(jobId) })
     },
+    onError: (error) => {
+      setActionError(error instanceof Error ? error.message : String(error))
+    },
     onSettled: () => {
       setRunPendingJobId(null)
+    },
+  })
+
+  const upsertMutation = useMutation({
+    mutationFn: upsertCronJob,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteCronJob,
+    onSettled: () => {
+      setDeletePendingJobId(null)
     },
   })
 
@@ -79,6 +105,10 @@ export function CronManagerScreen() {
     jobsQuery.error instanceof Error ? jobsQuery.error.message : null
   const runsErrorMessage =
     runsQuery.error instanceof Error ? runsQuery.error.message : null
+  const editingJob = useMemo(function deriveEditingJob() {
+    if (formMode !== 'edit' || !editingJobId) return null
+    return jobs.find((job) => job.id === editingJobId) ?? null
+  }, [editingJobId, formMode, jobs])
 
   const runsByJobId = useMemo<Record<string, Array<CronRun>>>(
     function deriveRunsByJobId() {
@@ -91,6 +121,7 @@ export function CronManagerScreen() {
   )
 
   function handleToggleEnabled(job: CronJob, enabled: boolean) {
+    setActionError(null)
     setTogglePendingJobId(job.id)
     void toggleMutation.mutate({
       jobId: job.id,
@@ -99,6 +130,7 @@ export function CronManagerScreen() {
   }
 
   function handleRunNow(job: CronJob) {
+    setActionError(null)
     setRunPendingJobId(job.id)
     void runMutation.mutate(job.id)
   }
@@ -107,6 +139,71 @@ export function CronManagerScreen() {
     setSelectedJobId(function setNextExpanded(prev) {
       return prev === jobId ? null : jobId
     })
+  }
+
+  function closeForm() {
+    setFormMode(null)
+    setEditingJobId(null)
+    setFormError(null)
+  }
+
+  function handleStartCreate() {
+    if (formMode === 'create') {
+      closeForm()
+      return
+    }
+    setFormMode('create')
+    setEditingJobId(null)
+    setFormError(null)
+  }
+
+  function handleStartEdit(job: CronJob) {
+    setFormMode('edit')
+    setEditingJobId(job.id)
+    setFormError(null)
+    setActionError(null)
+  }
+
+  async function handleSubmitForm(payload: CronJobUpsertInput) {
+    setActionError(null)
+    setFormError(null)
+
+    try {
+      await upsertMutation.mutateAsync(payload)
+      await queryClient.invalidateQueries({ queryKey: cronQueryKeys.jobs })
+      if (payload.jobId) {
+        await queryClient.invalidateQueries({
+          queryKey: cronQueryKeys.runs(payload.jobId),
+        })
+      }
+      closeForm()
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function handleDeleteJob(job: CronJob) {
+    setActionError(null)
+    const shouldDelete = window.confirm(
+      `Delete cron job "${job.name}"? This cannot be undone.`,
+    )
+    if (!shouldDelete) return
+
+    setDeletePendingJobId(job.id)
+    try {
+      await deleteMutation.mutateAsync(job.id)
+      await queryClient.invalidateQueries({ queryKey: cronQueryKeys.jobs })
+      await queryClient.invalidateQueries({ queryKey: cronQueryKeys.runs(job.id) })
+
+      if (selectedJobId === job.id) {
+        setSelectedJobId(null)
+      }
+      if (editingJobId === job.id) {
+        closeForm()
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error))
+    }
   }
 
   return (
@@ -145,25 +242,41 @@ export function CronManagerScreen() {
               Refresh
             </Button>
             <Button
-              variant={showForm ? 'secondary' : 'outline'}
+              variant={formMode ? 'secondary' : 'outline'}
               size="sm"
-              onClick={function onToggleForm() {
-                setShowForm(!showForm)
+              onClick={function onClickCreate() {
+                handleStartCreate()
               }}
               className="tabular-nums"
             >
-              {showForm ? 'Hide Form' : 'Show Form'}
+              {formMode === 'create' ? 'Hide Create Form' : 'Create Job'}
             </Button>
           </div>
         </header>
 
-        {showForm ? (
+        {actionError ? (
+          <section className="mb-4 rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 text-sm text-orange-500 text-pretty">
+            {actionError}
+          </section>
+        ) : null}
+
+        {formMode ? (
           <div className="mb-4">
-            <CronJobForm
-              onClose={function onCloseForm() {
-                setShowForm(false)
-              }}
-            />
+            {formMode === 'edit' && !editingJob ? (
+              <section className="rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 text-sm text-orange-500 text-pretty">
+                The selected cron job is no longer available.
+              </section>
+            ) : (
+              <CronJobForm
+                key={`${formMode}-${editingJob?.id ?? 'create'}`}
+                mode={formMode}
+                initialJob={formMode === 'edit' ? editingJob : null}
+                pending={upsertMutation.isPending}
+                error={formError}
+                onSubmit={handleSubmitForm}
+                onClose={closeForm}
+              />
+            )}
           </div>
         ) : null}
 
@@ -190,9 +303,12 @@ export function CronManagerScreen() {
             onStatusFilterChange={setStatusFilter}
             onToggleEnabled={handleToggleEnabled}
             onRunNow={handleRunNow}
+            onEdit={handleStartEdit}
+            onDelete={handleDeleteJob}
             onToggleExpanded={handleToggleExpanded}
             togglePendingJobId={togglePendingJobId}
             runPendingJobId={runPendingJobId}
+            deletePendingJobId={deletePendingJobId}
           />
         )}
       </section>

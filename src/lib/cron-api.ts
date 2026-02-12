@@ -17,6 +17,21 @@ type RunCronPayload = {
   ok?: boolean
 }
 
+export type UpsertCronJobInput = {
+  jobId?: string
+  name: string
+  schedule: string
+  enabled: boolean
+  description?: string
+  payload?: unknown
+  deliveryConfig?: unknown
+}
+
+type UpsertCronPayload = {
+  ok?: boolean
+  jobId?: string
+}
+
 function normalizeStatus(value: unknown): CronRunStatus {
   if (typeof value !== 'string') return 'unknown'
   const normalized = value.trim().toLowerCase()
@@ -123,7 +138,7 @@ async function readError(response: Response): Promise<string> {
 }
 
 export async function fetchCronJobs(): Promise<Array<CronJob>> {
-  const response = await fetch('/api/cron/list')
+  const response = await fetch('/api/cron')
   if (!response.ok) {
     throw new Error(await readError(response))
   }
@@ -181,4 +196,38 @@ export async function toggleCronJob(payload: {
   }
 
   return (await response.json()) as ToggleCronPayload
+}
+
+export async function upsertCronJob(
+  payload: UpsertCronJobInput,
+): Promise<UpsertCronPayload> {
+  const response = await fetch('/api/cron/upsert', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readError(response))
+  }
+
+  return (await response.json()) as UpsertCronPayload
+}
+
+export async function deleteCronJob(jobId: string): Promise<{ ok?: boolean }> {
+  const response = await fetch('/api/cron/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ jobId }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readError(response))
+  }
+
+  return (await response.json()) as { ok?: boolean }
 }
