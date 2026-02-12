@@ -118,7 +118,7 @@ function ChatMessageListComponent({
 
   // Filter out toolResult messages - they'll be displayed inside their associated tool calls
   const displayMessages = useMemo(() => {
-    return messages.filter((msg) => {
+    const filteredMessages = messages.filter((msg) => {
       if (msg.role === 'toolResult') return false
 
       const cleanedText = textFromMessage(msg).trim()
@@ -152,6 +152,27 @@ function ChatMessageListComponent({
         if (containsSystemFailure || matchesHeartbeatPrompt) return false
       }
 
+      return true
+    })
+
+    const seenUserFingerprints = new Map<string, number>()
+    return filteredMessages.filter((message) => {
+      if (message.role !== 'user') return true
+
+      const trimmedText = textFromMessage(message).trim()
+      if (trimmedText.length === 0) return true
+
+      const fingerprint = `${message.role}:${trimmedText}`
+      const timestamp = getMessageTimestamp(message)
+      const previousTimestamp = seenUserFingerprints.get(fingerprint)
+      if (
+        typeof previousTimestamp === 'number' &&
+        Math.abs(timestamp - previousTimestamp) <= 5000
+      ) {
+        return false
+      }
+
+      seenUserFingerprints.set(fingerprint, timestamp)
       return true
     })
   }, [messages])

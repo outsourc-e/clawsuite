@@ -12,6 +12,41 @@ type GatewayStatusResponse = {
   error?: string
 }
 
+function normalizeId(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : ''
+}
+
+function getMessageClientId(message: GatewayMessage): string {
+  const raw = message as Record<string, unknown>
+  const candidates = [raw.clientId, raw.client_id]
+  for (const candidate of candidates) {
+    const normalized = normalizeId(candidate)
+    if (normalized) return normalized
+  }
+  return ''
+}
+
+function getMessageOptimisticId(message: GatewayMessage): string {
+  return normalizeId(message.__optimisticId)
+}
+
+function isMatchingClientMessage(
+  message: GatewayMessage,
+  clientId: string,
+  optimisticId: string,
+): boolean {
+  const messageClientId = getMessageClientId(message)
+  if (messageClientId === clientId) return true
+
+  const messageOptimisticId = getMessageOptimisticId(message)
+  if (!messageOptimisticId) return false
+  if (messageOptimisticId === clientId) return true
+  if (messageOptimisticId === optimisticId) return true
+  return false
+}
+
 export const chatQueryKeys = {
   sessions: ['chat', 'sessions'] as const,
   history: function history(friendlyId: string, sessionKey: string) {
@@ -98,7 +133,9 @@ export function updateHistoryMessageByClientId(
   clientId: string,
   updater: (message: GatewayMessage) => GatewayMessage,
 ) {
-  const optimisticId = `opt-${clientId}`
+  const normalizedClientId = normalizeId(clientId)
+  if (!normalizedClientId) return
+  const optimisticId = `opt-${normalizedClientId}`
   updateHistoryMessages(
     queryClient,
     friendlyId,
@@ -106,9 +143,11 @@ export function updateHistoryMessageByClientId(
     function update(messages) {
       return messages.map((message) => {
         if (
-          message.clientId === clientId ||
-          message.__optimisticId === clientId ||
-          message.__optimisticId === optimisticId
+          isMatchingClientMessage(
+            message,
+            normalizedClientId,
+            optimisticId,
+          )
         ) {
           return updater(message)
         }
@@ -125,17 +164,22 @@ export function removeHistoryMessageByClientId(
   clientId: string,
   optimisticId?: string,
 ) {
+  const normalizedClientId = normalizeId(clientId)
+  if (!normalizedClientId) return
+  const resolvedOptimisticId =
+    normalizeId(optimisticId) || `opt-${normalizedClientId}`
+
   updateHistoryMessages(
     queryClient,
     friendlyId,
     sessionKey,
     function remove(messages) {
       return messages.filter((message) => {
-        if (message.clientId === clientId) return false
-        if (message.__optimisticId === clientId) return false
-        if (optimisticId && message.__optimisticId === optimisticId)
-          return false
-        return true
+        return !isMatchingClientMessage(
+          message,
+          normalizedClientId,
+          resolvedOptimisticId,
+        )
       })
     },
   )

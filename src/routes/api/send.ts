@@ -66,21 +66,29 @@ export const Route = createFileRoute('/api/send')({
             sessionKey = 'main'
           }
 
-          const res = await gatewayRpc<{ runId: string }>('chat.send', {
+          const sendPayload: Record<string, unknown> = {
             sessionKey,
             message,
             thinking,
             attachments,
-            clientId,
             deliver: false,
             timeoutMs: 120_000,
             idempotencyKey:
               typeof body.idempotencyKey === 'string'
                 ? body.idempotencyKey
                 : randomUUID(),
-          })
+          }
+          if (clientId) {
+            sendPayload.clientId = clientId
+            sendPayload.client_id = clientId
+          }
 
-          return json({ ok: true, ...res, sessionKey })
+          const res = await gatewayRpc<{ runId: string }>(
+            'chat.send',
+            sendPayload,
+          )
+
+          return json({ ok: true, ...res, sessionKey, clientId: clientId ?? null })
         } catch (err) {
           return json(
             {
