@@ -32,7 +32,7 @@ function highlightMatches(text: string, query: string) {
       return (
         <mark
           key={`${part}-${index}`}
-          className="rounded-sm bg-orange-500/25 px-0.5 text-orange-200"
+          className="rounded-sm bg-accent-500/25 px-0.5 text-accent-200"
         >
           {part}
         </mark>
@@ -58,7 +58,7 @@ export function SearchResultItem({
       className={cn(
         'group flex w-full items-start gap-3 rounded-lg border border-transparent px-3 py-2 text-left transition-colors',
         selected
-          ? 'border-orange-500/35 bg-orange-500/15'
+          ? 'border-accent-500/35 bg-accent-500/15'
           : 'hover:border-border hover:bg-muted/70',
       )}
     >

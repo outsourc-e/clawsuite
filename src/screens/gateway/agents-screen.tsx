@@ -77,13 +77,13 @@ export function AgentsScreen() {
                   <div
                     key={agent.id}
                     className={`rounded-lg border p-4 transition-colors ${
-                      isDefault ? 'border-orange-300 bg-orange-50/50' : 'border-primary-200 hover:bg-primary-50'
+                      isDefault ? 'border-accent-300 bg-accent-50/50' : 'border-primary-200 hover:bg-primary-50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-[13px] text-ink">{agent.name || agent.id}</span>
                       {isDefault ? (
-                        <span className="text-[10px] font-medium bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">default</span>
+                        <span className="text-[10px] font-medium bg-accent-100 text-accent-700 px-1.5 py-0.5 rounded">default</span>
                       ) : null}
                     </div>
                     <p className="text-[11px] text-primary-500 mt-1 font-mono">{agent.id}</p>

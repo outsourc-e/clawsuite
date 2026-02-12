@@ -110,7 +110,7 @@ export function HeaderAmbientStatus() {
             <span className="text-primary-400">·</span>
             <span className="text-primary-600">
               {weather.emoji}{' '}
-              <span className="font-medium text-orange-600 tabular-nums">
+              <span className="font-medium text-accent-600 tabular-nums">
                 {weather.tempF}°
               </span>
             </span>

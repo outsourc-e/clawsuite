@@ -93,7 +93,7 @@ export function CronJobDetail({ job, runs, loading, error }: CronJobDetailProps)
             Loading run history...
           </p>
         ) : error ? (
-          <p className="rounded-md border border-orange-500/40 bg-orange-500/10 p-3 text-sm text-orange-500 text-pretty">
+          <p className="rounded-md border border-accent-500/40 bg-accent-500/10 p-3 text-sm text-accent-500 text-pretty">
             {error}
           </p>
         ) : runs.length === 0 ? (
@@ -114,7 +114,7 @@ export function CronJobDetail({ job, runs, loading, error }: CronJobDetailProps)
                       {formatDateTime(run.startedAt)}
                     </p>
                     {run.error ? (
-                      <p className="mt-1 line-clamp-1 text-xs text-orange-500 text-pretty">{run.error}</p>
+                      <p className="mt-1 line-clamp-1 text-xs text-accent-500 text-pretty">{run.error}</p>
                     ) : null}
                   </div>
                   <span

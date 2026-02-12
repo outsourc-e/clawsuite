@@ -152,7 +152,7 @@ function NavItem({
     'w-full h-auto gap-2.5 py-2',
     isCollapsed ? 'justify-center px-0' : 'justify-start px-3',
     item.active
-      ? 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/15'
+      ? 'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15'
       : 'text-primary-900 hover:bg-primary-200',
   )
 

@@ -160,7 +160,7 @@ export function NotificationsWidget({
                       'text-sm font-semibold',
                       item.label === 'Error'
                         ? 'text-red-700'
-                        : 'text-orange-700',
+                        : 'text-accent-700',
                     )}
                   >
                     {item.label}

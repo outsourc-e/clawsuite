@@ -94,7 +94,7 @@ const STATE_GLOW: Record<string, string> = {
   thinking: 'border-yellow-400/50 shadow-[0_0_8px_rgba(234,179,8,0.15)]',
   responding: 'border-emerald-400/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]',
   'tool-use': 'border-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.15)]',
-  orchestrating: 'border-orange-400/50 shadow-[0_0_8px_rgba(249,115,22,0.2)]',
+  orchestrating: 'border-accent-400/50 shadow-[0_0_8px_rgba(249,115,22,0.2)]',
 }
 
 function OrchestratorCard({
@@ -156,7 +156,7 @@ function OrchestratorCard({
       )}
     >
       {state !== 'idle' && (
-        <div className="pointer-events-none absolute inset-0 animate-pulse rounded-2xl bg-gradient-to-br from-orange-500/[0.03] to-transparent" />
+        <div className="pointer-events-none absolute inset-0 animate-pulse rounded-2xl bg-gradient-to-br from-accent-500/[0.03] to-transparent" />
       )}
 
       <div className={cn('relative flex items-center', compact ? 'gap-2' : 'flex-col text-center gap-2')}>
@@ -175,7 +175,7 @@ function OrchestratorCard({
                   if (e.key === 'Escape') setIsEditing(false)
                 }}
                 placeholder="Agent name..."
-                className="w-24 rounded border border-primary-300/70 bg-primary-50 px-1.5 py-0.5 text-xs font-semibold text-primary-900 outline-none focus:border-orange-400"
+                className="w-24 rounded border border-primary-300/70 bg-primary-50 px-1.5 py-0.5 text-xs font-semibold text-primary-900 outline-none focus:border-accent-400"
                 maxLength={20}
               />
             ) : (
@@ -183,7 +183,7 @@ function OrchestratorCard({
                 type="button"
                 onClick={startEdit}
                 className={cn(
-                  'font-semibold text-primary-900 hover:text-orange-600 transition-colors',
+                  'font-semibold text-primary-900 hover:text-accent-600 transition-colors',
                   compact ? 'text-[11px]' : 'text-xs',
                 )}
                 title="Click to rename"
@@ -192,7 +192,7 @@ function OrchestratorCard({
               </button>
             )}
             {!compact && (
-              <span className="rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-medium text-orange-600">
+              <span className="rounded-full bg-accent-500/15 px-1.5 py-0.5 text-[9px] font-medium text-accent-600">
                 Main Agent
               </span>
             )}
@@ -615,7 +615,7 @@ export function AgentViewPanel() {
                                     ? { duration: 0.12, ease: 'easeOut' }
                                     : { duration: 0.42, ease: 'easeInOut' }
                                 }
-                                className="pointer-events-none fixed z-30 rounded-full border border-orange-500/40 bg-orange-500/20 shadow-sm backdrop-blur-sm"
+                                className="pointer-events-none fixed z-30 rounded-full border border-accent-500/40 bg-accent-500/20 shadow-sm backdrop-blur-sm"
                                 style={{ top, left, width, height }}
                               />
                             )
@@ -653,7 +653,7 @@ export function AgentViewPanel() {
                                       onKill={killAgent}
                                       useInlineDetail
                                       className={cn(
-                                        agentSpawn.isSpawning(node.id) ? 'ring-2 ring-orange-500/35' : '',
+                                        agentSpawn.isSpawning(node.id) ? 'ring-2 ring-accent-500/35' : '',
                                       )}
                                     />
                                   </motion.div>
@@ -863,7 +863,7 @@ export function AgentViewPanel() {
             onClick={function handleOpenPanel() {
               setOpen(true)
             }}
-            className="fixed right-4 bottom-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-linear-to-br from-orange-500 to-orange-600 text-primary-50 shadow-lg"
+            className="fixed right-4 bottom-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-linear-to-br from-accent-500 to-accent-600 text-primary-50 shadow-lg"
             aria-label="Open Agent View"
           >
             <motion.span

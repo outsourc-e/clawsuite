@@ -473,7 +473,7 @@ export function SearchModal() {
                     className={cn(
                       'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
                       scope === tab.value
-                        ? 'border-orange-500/40 bg-orange-500/20 text-orange-400'
+                        ? 'border-accent-500/40 bg-accent-500/20 text-accent-400'
                         : 'border-primary-200 bg-primary-100/60 text-primary-500 hover:bg-primary-100',
                     )}
                   >

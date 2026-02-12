@@ -451,7 +451,7 @@ function AvatarPicker({ current, onSelect }: { current: AvatarStyle; onSelect: (
           className={cn(
             'flex flex-col items-center gap-1 rounded-xl p-2.5 transition-all',
             current === opt.id
-              ? 'bg-orange-500/20 ring-2 ring-orange-500 scale-105'
+              ? 'bg-accent-500/20 ring-2 ring-accent-500 scale-105'
               : 'hover:bg-primary-200/60 hover:scale-105',
           )}
         >

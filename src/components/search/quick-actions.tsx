@@ -50,7 +50,7 @@ export function QuickActions({
               onClick={action.onSelect}
               className={cn(
                 'flex min-h-20 flex-col items-start rounded-lg border border-border bg-card/80 p-3 text-left transition-colors backdrop-blur-sm',
-                'hover:border-orange-500/35 hover:bg-orange-500/15',
+                'hover:border-accent-500/35 hover:bg-accent-500/15',
               )}
             >
               <span className="text-base leading-none">{action.emoji}</span>

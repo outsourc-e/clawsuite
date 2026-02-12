@@ -26,14 +26,14 @@ const PRIORITY_ORDER: Array<TaskPriority> = ['P0', 'P1', 'P2', 'P3']
 
 function priorityColor(p: TaskPriority): string {
   if (p === 'P0') return 'bg-red-100/70 text-red-700'
-  if (p === 'P1') return 'bg-orange-100/70 text-orange-700'
+  if (p === 'P1') return 'bg-accent-100/70 text-accent-700'
   if (p === 'P2') return 'bg-primary-200/60 text-primary-600'
   return 'bg-primary-100 text-primary-400'
 }
 
 function statusDotColor(s: TaskStatus): string {
-  if (s === 'in_progress') return 'bg-orange-500'
-  if (s === 'review') return 'bg-orange-400'
+  if (s === 'in_progress') return 'bg-accent-500'
+  if (s === 'review') return 'bg-accent-400'
   if (s === 'done') return 'bg-primary-300'
   return 'bg-primary-300'
 }
@@ -197,7 +197,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
         </div>
       ) : null}
       {cronJobsQuery.isError ? (
-        <div className="mb-2 rounded-lg border border-orange-300 bg-orange-100/65 px-3 py-2.5 text-sm text-orange-700 text-pretty">
+        <div className="mb-2 rounded-lg border border-accent-300 bg-accent-100/65 px-3 py-2.5 text-sm text-accent-700 text-pretty">
           {errorMessage ?? 'Unable to load gateway tasks.'}
         </div>
       ) : null}
@@ -219,7 +219,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
         <button
           type="button"
           onClick={() => void navigate({ to: '/cron' })}
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary-400 transition-colors hover:text-orange-600"
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary-400 transition-colors hover:text-accent-600"
         >
           View all
           <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.5} />

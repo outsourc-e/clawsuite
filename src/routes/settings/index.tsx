@@ -135,7 +135,7 @@ function SettingsRoute() {
   }
 
   function getAccentBadgeClass(color: AccentColor): string {
-    if (color === 'orange') return 'bg-orange-500'
+    if (color === 'orange') return 'bg-accent-500'
     if (color === 'purple') return 'bg-purple-500'
     if (color === 'blue') return 'bg-blue-500'
     return 'bg-green-500'
@@ -144,7 +144,7 @@ function SettingsRoute() {
   function getConnectionDotClass(): string {
     if (connectionStatus === 'connected') return 'bg-green-500'
     if (connectionStatus === 'failed') return 'bg-red-500'
-    if (connectionStatus === 'testing') return 'bg-orange-500'
+    if (connectionStatus === 'testing') return 'bg-accent-500'
     return 'bg-primary-500'
   }
 
@@ -189,7 +189,7 @@ function SettingsRoute() {
                   'border-green-500/35 bg-green-500/10 text-green-500',
                 connectionStatus === 'failed' && 'border-red-500/35 bg-red-500/10 text-red-500',
                 connectionStatus === 'testing' &&
-                  'border-orange-500/35 bg-orange-500/10 text-orange-500',
+                  'border-accent-500/35 bg-accent-500/10 text-accent-500',
                 connectionStatus === 'idle' &&
                   'border-primary-300 bg-primary-100 text-primary-700',
               )}

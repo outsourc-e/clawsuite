@@ -155,9 +155,9 @@ export function ActivityPanel({ sessions, className }: ActivityPanelProps) {
           <div className="text-lg font-bold text-emerald-400">{completed.length}</div>
           <div className="text-[10px] text-emerald-300/70">Done</div>
         </div>
-        <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 px-3 py-2 text-center">
-          <div className="text-lg font-bold text-orange-400">{formatTokens(totalTokens)}</div>
-          <div className="text-[10px] text-orange-300/70">Tokens</div>
+        <div className="rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2 text-center">
+          <div className="text-lg font-bold text-accent-400">{formatTokens(totalTokens)}</div>
+          <div className="text-[10px] text-accent-300/70">Tokens</div>
         </div>
         <div className="rounded-lg border border-slate-500/20 bg-slate-500/10 px-3 py-2 text-center">
           <div className="text-lg font-bold text-slate-300">{formatCost(totalCost)}</div>

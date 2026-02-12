@@ -18,7 +18,7 @@ type AgentProgressProps = {
 
 function getProgressStrokeClassName(status: AgentProgressStatus): string {
   if (status === 'failed') return 'text-red-400'
-  if (status === 'thinking') return 'text-orange-400'
+  if (status === 'thinking') return 'text-accent-400'
   if (status === 'complete') return 'text-emerald-400'
   if (status === 'queued') return 'text-primary-500'
   return 'text-emerald-400'

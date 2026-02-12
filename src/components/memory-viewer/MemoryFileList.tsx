@@ -198,7 +198,7 @@ function MemoryRow({
       className={cn(
         'w-full rounded-md border px-2 py-1.5 text-left transition-colors',
         selected
-          ? 'border-orange-500/40 bg-orange-500/10'
+          ? 'border-accent-500/40 bg-accent-500/10'
           : 'border-primary-200 bg-primary-50 hover:bg-primary-100',
       )}
     >

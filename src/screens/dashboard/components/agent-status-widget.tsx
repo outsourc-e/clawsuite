@@ -259,7 +259,7 @@ export function AgentStatusWidget({
                   className={cn(
                     'size-1.5 shrink-0 rounded-full',
                     agent.status === 'running'
-                      ? 'bg-orange-500'
+                      ? 'bg-accent-500'
                       : 'bg-primary-300',
                   )}
                 />
@@ -267,7 +267,7 @@ export function AgentStatusWidget({
                   {agent.name}
                 </span>
                 {model ? (
-                  <span className="shrink-0 rounded-full border border-orange-200 bg-orange-100/55 px-2 py-0.5 text-xs font-medium text-orange-700">
+                  <span className="shrink-0 rounded-full border border-accent-200 bg-accent-100/55 px-2 py-0.5 text-xs font-medium text-accent-700">
                     {model}
                   </span>
                 ) : null}

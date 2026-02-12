@@ -67,7 +67,7 @@ function BrowserControls({
           <span className="block truncate tabular-nums">{url || 'about:blank'}</span>
         </div>
         {demoMode ? (
-          <span className="inline-flex items-center rounded-full border border-orange-500/40 bg-orange-500/15 px-2.5 py-1 text-xs text-orange-500 tabular-nums">
+          <span className="inline-flex items-center rounded-full border border-accent-500/40 bg-accent-500/15 px-2.5 py-1 text-xs text-accent-500 tabular-nums">
             Demo Mode
           </span>
         ) : null}

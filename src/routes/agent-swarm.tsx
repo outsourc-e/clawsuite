@@ -153,7 +153,7 @@ function AgentSwarmRoute() {
                   className={cn(
                     'rounded-md px-3 py-1 text-xs font-medium transition-colors',
                     viewMode === 'office'
-                      ? 'bg-orange-500 text-white'
+                      ? 'bg-accent-500 text-white'
                       : 'text-primary-500 hover:text-primary-700'
                   )}
                 >
@@ -164,7 +164,7 @@ function AgentSwarmRoute() {
                   className={cn(
                     'rounded-md px-3 py-1 text-xs font-medium transition-colors',
                     viewMode === 'cards'
-                      ? 'bg-orange-500 text-white'
+                      ? 'bg-accent-500 text-white'
                       : 'text-primary-500 hover:text-primary-700'
                   )}
                 >

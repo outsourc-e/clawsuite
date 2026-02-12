@@ -120,7 +120,7 @@ function AgentAvatar({
         <TooltipTrigger
           type="button"
           className={cn(
-            'inline-flex cursor-pointer items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/70 text-primary-900 transition-transform duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/45',
+            'inline-flex cursor-pointer items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/70 text-primary-900 transition-transform duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/45',
             getContainerSizeClassName(size),
             className,
           )}

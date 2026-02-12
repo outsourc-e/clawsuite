@@ -106,7 +106,7 @@ export function CronJobForm({
       </div>
 
       {error || localError ? (
-        <p className="mb-3 rounded-lg border border-orange-500/40 bg-orange-500/10 px-3 py-2 text-sm text-orange-500 text-pretty">
+        <p className="mb-3 rounded-lg border border-accent-500/40 bg-accent-500/10 px-3 py-2 text-sm text-accent-500 text-pretty">
           {localError ?? error}
         </p>
       ) : null}

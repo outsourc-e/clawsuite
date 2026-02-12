@@ -319,7 +319,7 @@ export function UsageMeterWidget({
                 className={cn(
                   'rounded-full px-2 py-0.5 font-medium transition',
                   view === tab
-                    ? 'bg-orange-100 text-orange-700 shadow-sm'
+                    ? 'bg-accent-100 text-accent-700 shadow-sm'
                     : 'text-primary-500 hover:text-primary-700',
                 )}
               >
@@ -361,7 +361,7 @@ export function UsageMeterWidget({
                       {provider.displayName}
                     </span>
                     {provider.plan && (
-                      <span className="rounded-full border border-orange-200 bg-orange-100/55 px-1.5 py-0.5 text-[10px] font-medium text-orange-700">
+                      <span className="rounded-full border border-accent-200 bg-accent-100/55 px-1.5 py-0.5 text-[10px] font-medium text-accent-700">
                         {provider.plan}
                       </span>
                     )}
@@ -370,7 +370,7 @@ export function UsageMeterWidget({
                     className={cn(
                       'rounded-full px-2 py-0.5 text-[10px] font-medium',
                       provider.status === 'ok'
-                        ? 'bg-orange-100 text-orange-700'
+                        ? 'bg-accent-100 text-accent-700'
                         : provider.status === 'auth_expired'
                           ? 'bg-primary-200/70 text-primary-700'
                           : 'bg-red-100 text-red-700',
@@ -399,8 +399,8 @@ export function UsageMeterWidget({
                           pct >= 90
                             ? 'bg-red-500'
                             : pct >= 75
-                              ? 'bg-orange-500'
-                              : 'bg-orange-400'
+                              ? 'bg-accent-500'
+                              : 'bg-accent-400'
                         return (
                           <div key={`${line.label}-${i}`}>
                             <div className="flex items-center justify-between text-xs">
@@ -490,14 +490,14 @@ export function UsageMeterWidget({
                   setLoadingTimedOut(false)
                   usageQuery.refetch()
                 }}
-                className="text-sm font-medium text-orange-600 underline underline-offset-2 hover:text-orange-700"
+                className="text-sm font-medium text-accent-600 underline underline-offset-2 hover:text-accent-700"
               >
                 Retry
               </button>
             </>
           ) : (
             <>
-              <span className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-orange-600" />
+              <span className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-accent-600" />
               <span className="text-sm text-primary-600">
                 Loading usage data…
               </span>
@@ -535,7 +535,7 @@ export function UsageMeterWidget({
                   cy="70"
                   r={radius}
                   fill="none"
-                  className="stroke-orange-600"
+                  className="stroke-accent-600"
                   strokeWidth="14"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
@@ -611,8 +611,8 @@ export function UsageMeterWidget({
                   <div className="h-2.5 overflow-hidden rounded-full bg-primary-200/80">
                     <div
                       className={cn(
-                        'h-full rounded-full bg-orange-600 transition-[width] duration-500',
-                        index > 1 && 'bg-orange-500',
+                        'h-full rounded-full bg-accent-600 transition-[width] duration-500',
+                        index > 1 && 'bg-accent-500',
                       )}
                       style={{ width: `${widthPercent}%` }}
                     />

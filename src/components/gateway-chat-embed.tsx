@@ -35,7 +35,7 @@ function GatewayChatEmbedComponent({ className }: { className?: string }) {
       {!loaded && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-surface">
           <div className="flex flex-col items-center gap-2">
-            <div className="size-6 animate-spin rounded-full border-2 border-primary-300 border-t-orange-500" />
+            <div className="size-6 animate-spin rounded-full border-2 border-primary-300 border-t-accent-500" />
             <p className="text-xs text-primary-600">Connecting to gateway...</p>
           </div>
         </div>

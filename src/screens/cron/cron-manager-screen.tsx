@@ -255,7 +255,7 @@ export function CronManagerScreen() {
         </header>
 
         {actionError ? (
-          <section className="mb-4 rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 text-sm text-orange-500 text-pretty">
+          <section className="mb-4 rounded-2xl border border-accent-500/40 bg-accent-500/10 p-4 text-sm text-accent-500 text-pretty">
             {actionError}
           </section>
         ) : null}
@@ -263,7 +263,7 @@ export function CronManagerScreen() {
         {formMode ? (
           <div className="mb-4">
             {formMode === 'edit' && !editingJob ? (
-              <section className="rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 text-sm text-orange-500 text-pretty">
+              <section className="rounded-2xl border border-accent-500/40 bg-accent-500/10 p-4 text-sm text-accent-500 text-pretty">
                 The selected cron job is no longer available.
               </section>
             ) : (
@@ -285,7 +285,7 @@ export function CronManagerScreen() {
             Loading cron jobs...
           </section>
         ) : jobsQuery.isError ? (
-          <section className="rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 text-sm text-orange-500 text-pretty">
+          <section className="rounded-2xl border border-accent-500/40 bg-accent-500/10 p-4 text-sm text-accent-500 text-pretty">
             {jobsErrorMessage ?? 'Failed to load cron jobs.'}
           </section>
         ) : (

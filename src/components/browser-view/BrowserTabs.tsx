@@ -77,7 +77,7 @@ function BrowserTabs({ tabs, activeTabId, loading, onSelect }: BrowserTabsProps)
                     className={cn(
                       'w-full rounded-xl border px-3 py-2.5 text-left transition-colors',
                       'bg-primary-50/70 border-primary-200 hover:bg-primary-100',
-                      isActive && 'border-orange-500/45 bg-orange-500/12',
+                      isActive && 'border-accent-500/45 bg-accent-500/12',
                     )}
                   >
                     <div className="flex items-start gap-2.5">
@@ -87,7 +87,7 @@ function BrowserTabs({ tabs, activeTabId, loading, onSelect }: BrowserTabsProps)
                         strokeWidth={1.5}
                         className={cn(
                           'shrink-0 text-primary-500',
-                          isActive && 'text-orange-500',
+                          isActive && 'text-accent-500',
                         )}
                       />
                       <div className="min-w-0 flex-1">
@@ -96,7 +96,7 @@ function BrowserTabs({ tabs, activeTabId, loading, onSelect }: BrowserTabsProps)
                             {tab.title || 'Untitled Tab'}
                           </span>
                           {isActive ? (
-                            <span className="size-2 rounded-full bg-orange-500" />
+                            <span className="size-2 rounded-full bg-accent-500" />
                           ) : null}
                         </div>
                         <p className="truncate text-xs text-primary-500 tabular-nums">

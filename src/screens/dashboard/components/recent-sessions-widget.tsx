@@ -131,7 +131,7 @@ export function RecentSessionsWidget({
                 key={session.friendlyId}
                 variant="outline"
                 className={cn(
-                  'group h-auto w-full flex-col items-start rounded-lg border border-primary-200 px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:border-orange-200',
+                  'group h-auto w-full flex-col items-start rounded-lg border border-primary-200 px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:border-accent-200',
                   index % 2 === 0
                     ? 'bg-primary-50/90 hover:bg-primary-50'
                     : 'bg-primary-100/55 hover:bg-primary-100/70',
@@ -152,7 +152,7 @@ export function RecentSessionsWidget({
                       icon={ArrowRight01Icon}
                       size={14}
                       strokeWidth={1.5}
-                      className="text-orange-500 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="text-accent-500 opacity-0 transition-opacity group-hover:opacity-100"
                     />
                   </span>
                 </div>

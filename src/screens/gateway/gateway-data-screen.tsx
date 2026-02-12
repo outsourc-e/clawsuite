@@ -26,7 +26,7 @@ function formatValue(value: unknown, depth = 0): React.ReactNode {
     )
   }
   if (typeof value === 'number') {
-    return <span className="text-orange-600">{value}</span>
+    return <span className="text-accent-600">{value}</span>
   }
   if (typeof value === 'string') {
     if (value.length > 200) return <span className="text-ink break-all">{value.slice(0, 200)}…</span>

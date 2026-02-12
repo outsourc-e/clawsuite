@@ -71,11 +71,11 @@ export function DebugPanel({
 
         {!isLoading && analysis ? (
           <div className="space-y-4">
-            <section className="rounded-lg border border-orange-500/40 bg-orange-500/10 p-3">
-              <h4 className="text-xs font-medium text-orange-200 text-balance">
+            <section className="rounded-lg border border-accent-500/40 bg-accent-500/10 p-3">
+              <h4 className="text-xs font-medium text-accent-200 text-balance">
                 Summary
               </h4>
-              <p className="mt-1 text-sm text-orange-100 text-pretty">
+              <p className="mt-1 text-sm text-accent-100 text-pretty">
                 {analysis.summary}
               </p>
             </section>

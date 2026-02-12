@@ -54,12 +54,12 @@ export function HeroMetricsRow({
           key={m.label}
           className="group flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3.5 shadow-sm transition-transform duration-150 hover:-translate-y-[1px]"
         >
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-orange-100/70">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-100/70">
             <HugeiconsIcon
               icon={m.icon}
               size={20}
               strokeWidth={1.5}
-              className="shrink-0 text-orange-600"
+              className="shrink-0 text-accent-600"
             />
           </span>
           <div className="min-w-0">

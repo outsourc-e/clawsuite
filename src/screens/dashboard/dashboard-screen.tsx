@@ -268,7 +268,7 @@ export function DashboardScreen() {
                 <button
                   type="button"
                   onClick={() => void navigate({ to: '/settings' })}
-                  className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 hover:text-orange-600"
+                  className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 hover:text-accent-600"
                   aria-label="Settings"
                   title="Settings"
                 >
@@ -299,7 +299,7 @@ export function DashboardScreen() {
           <button
             type="button"
             onClick={handleResetLayout}
-            className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-orange-200 hover:text-orange-600"
+            className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-accent-200 hover:text-accent-600"
             aria-label="Reset Layout"
             title="Reset Layout"
           >

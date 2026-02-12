@@ -14,8 +14,8 @@ type ActivityLogWidgetProps = {
 
 function getEventLevelDot(level: ActivityEvent['level']): string {
   if (level === 'error') return 'bg-red-500'
-  if (level === 'warn') return 'bg-orange-500'
-  if (level === 'info') return 'bg-orange-400'
+  if (level === 'warn') return 'bg-accent-500'
+  if (level === 'info') return 'bg-accent-400'
   return 'bg-primary-300'
 }
 
@@ -105,7 +105,7 @@ export function ActivityLogWidget({
         <button
           type="button"
           onClick={() => void navigate({ to: '/activity' })}
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary-400 transition-colors hover:text-orange-600"
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary-400 transition-colors hover:text-accent-600"
         >
           View all
           <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.5} />
@@ -119,7 +119,7 @@ export function ActivityLogWidget({
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-1.5 rounded text-xs font-medium text-orange-600 underline underline-offset-2 hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:ring-offset-1"
+            className="mt-1.5 rounded text-xs font-medium text-accent-600 underline underline-offset-2 hover:text-accent-700 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:ring-offset-1"
             aria-label="Retry connection"
           >
             Retry

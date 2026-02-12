@@ -33,7 +33,7 @@ function MemorySearch({
             onQueryChange(event.target.value)
           }}
           placeholder="Search across MEMORY.md and memory/*.md"
-          className="h-9 w-full rounded-lg border border-primary-200 bg-primary-50 pr-3 pl-9 text-sm text-primary-900 outline-none focus:border-orange-500/40"
+          className="h-9 w-full rounded-lg border border-primary-200 bg-primary-50 pr-3 pl-9 text-sm text-primary-900 outline-none focus:border-accent-500/40"
         />
       </label>
       {query.trim() ? (

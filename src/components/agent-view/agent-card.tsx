@@ -79,14 +79,14 @@ type AgentCardProps = {
 function getModelBadgeClassName(model: string): string {
   if (model === 'opus') return 'bg-violet-500/20 text-violet-200 ring-violet-500/40'
   if (model === 'sonnet') return 'bg-sky-500/20 text-sky-200 ring-sky-500/40'
-  if (model === 'codex') return 'bg-orange-500/20 text-orange-200 ring-orange-500/40'
+  if (model === 'codex') return 'bg-accent-500/20 text-accent-200 ring-accent-500/40'
   if (model === 'swarm') return 'bg-primary-300/70 text-primary-800 ring-primary-400/50'
   return 'bg-primary-300/70 text-primary-800 ring-primary-400/50'
 }
 
 function getStatusRingClassName(status: AgentNodeStatus): string {
   if (status === 'failed') return 'ring-red-500/70'
-  if (status === 'thinking') return 'ring-orange-500/70'
+  if (status === 'thinking') return 'ring-accent-500/70'
   if (status === 'complete') return 'ring-emerald-500/70'
   if (status === 'queued') return 'ring-primary-500/70'
   return 'ring-emerald-500/70'
@@ -94,7 +94,7 @@ function getStatusRingClassName(status: AgentNodeStatus): string {
 
 function getStatusTextClassName(status: AgentNodeStatus): string {
   if (status === 'failed') return 'text-red-300'
-  if (status === 'thinking') return 'text-orange-300'
+  if (status === 'thinking') return 'text-accent-300'
   if (status === 'complete') return 'text-emerald-300'
   if (status === 'queued') return 'text-primary-700'
   return 'text-emerald-300'
@@ -276,7 +276,7 @@ export function AgentCard({
                 'h-full rounded-full',
                 node.status === 'complete' ? 'bg-emerald-500' :
                 node.status === 'failed' ? 'bg-red-500' :
-                node.status === 'thinking' ? 'bg-orange-500' :
+                node.status === 'thinking' ? 'bg-accent-500' :
                 'bg-emerald-500',
               )}
             />
@@ -410,7 +410,7 @@ export function AgentCard({
                   className={cn(
                     node.status === 'complete' ? 'text-emerald-400' :
                     node.status === 'failed' ? 'text-red-400' :
-                    node.status === 'thinking' ? 'text-orange-400' :
+                    node.status === 'thinking' ? 'text-accent-400' :
                     'text-emerald-400',
                   )}
                   stroke="currentColor"
