@@ -9,7 +9,7 @@ export type DebugAnalysis = {
   docsLink?: string
 }
 
-type ProviderName = 'anthropic' | 'openai'
+type ProviderName = 'gateway' | 'anthropic' | 'openai'
 
 type ProviderConfig = {
   api?: string
@@ -58,6 +58,9 @@ const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
 const ANTHROPIC_MODEL = 'claude-sonnet-4-5-20250514'
 const OPENAI_MODEL = 'gpt-4o-mini'
+
+// Gateway's OpenAI-compatible endpoint (works with any configured provider)
+const GATEWAY_URL = 'http://127.0.0.1:18789/v1/chat/completions'
 const MAX_PROMPT_CHARS = 14_000
 
 function formatLogDate(value: Date): string {
@@ -119,6 +122,20 @@ async function readOpenClawConfig(): Promise<OpenClawConfig | null> {
 }
 
 async function resolveProvider(): Promise<ResolvedProvider | null> {
+  // Try gateway first — works with any configured provider, uses gateway token
+  try {
+    const gwTokenEnv = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim()
+    if (gwTokenEnv) {
+      // Quick probe to see if gateway is up
+      const probe = await fetch('http://127.0.0.1:18789/health', {
+        signal: AbortSignal.timeout(1000),
+      }).catch(() => null)
+      if (probe?.ok) {
+        return { provider: 'gateway', apiKey: gwTokenEnv }
+      }
+    }
+  } catch { /* gateway not available, fall through */ }
+
   const anthropicEnv = process.env.ANTHROPIC_API_KEY?.trim()
   if (anthropicEnv) {
     return { provider: 'anthropic', apiKey: anthropicEnv }
@@ -302,6 +319,40 @@ async function callOpenAI(apiKey: string, prompt: string): Promise<string> {
   return text
 }
 
+async function callGateway(token: string, prompt: string): Promise<string> {
+  const response = await fetch(GATEWAY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      max_tokens: 1024,
+      messages: [
+        { role: 'system', content: ANALYZER_SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+    }),
+    signal: AbortSignal.timeout(30_000),
+  })
+
+  const payload = (await response
+    .json()
+    .catch(() => ({}))) as OpenAIChatResponse
+  if (!response.ok) {
+    throw new Error(
+      payload.error?.message || `Gateway request failed (${response.status})`,
+    )
+  }
+
+  const text = payload.choices?.[0]?.message?.content
+  if (!text) {
+    throw new Error('Gateway response did not contain message content.')
+  }
+
+  return text
+}
+
 function parseModelResponse(modelOutput: string): DebugAnalysis {
   const jsonBody = extractJsonBody(modelOutput)
   const parsed = JSON.parse(jsonBody) as unknown
@@ -320,10 +371,14 @@ export async function analyzeError(
   const prompt = buildPrompt(terminalOutput, logContent)
 
   try {
-    const modelOutput =
-      provider.provider === 'anthropic'
-        ? await callAnthropic(provider.apiKey, prompt)
-        : await callOpenAI(provider.apiKey, prompt)
+    let modelOutput: string
+    if (provider.provider === 'gateway') {
+      modelOutput = await callGateway(provider.apiKey, prompt)
+    } else if (provider.provider === 'anthropic') {
+      modelOutput = await callAnthropic(provider.apiKey, prompt)
+    } else {
+      modelOutput = await callOpenAI(provider.apiKey, prompt)
+    }
 
     return parseModelResponse(modelOutput)
   } catch (error) {
