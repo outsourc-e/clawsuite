@@ -299,12 +299,12 @@ export function AgentViewPanel() {
     agentName: string
     statusLabel: string
   } | null>(null)
-  // Auto: expanded avatar when idle, compact when agents are working
-  const viewMode = activeCount > 0 || cliAgents.length > 0 ? 'compact' : 'expanded'
   const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
   const [browserPreviewExpanded, setBrowserPreviewExpanded] = useState(true)
   const cliAgentsQuery = useCliAgents()
   const cliAgents = cliAgentsQuery.data ?? []
+  // Auto: expanded avatar when idle, compact when agents are working
+  const viewMode = activeCount > 0 || cliAgents.length > 0 ? 'compact' : 'expanded'
 
   // Auto-expand history when there are entries
   useEffect(() => {
