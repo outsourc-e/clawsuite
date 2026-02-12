@@ -51,18 +51,27 @@ function buildVersionLabel(baseVersion: string, commit: string): string {
   return `${baseVersion} (${commit})`
 }
 
+function detectRemote(repoPath: string): string {
+  // Prefer 'production' or 'studio' remote (Eric's fork), fall back to 'origin'
+  const remotes = runGit('remote', repoPath).split('\n').map((r) => r.trim()).filter(Boolean)
+  if (remotes.includes('production')) return 'production'
+  if (remotes.includes('studio')) return 'studio'
+  return 'origin'
+}
+
 function checkForUpdates(): UpdateCheckResult {
   const repoPath = path.resolve(process.cwd())
   const pkgVersion = readPackageVersion(repoPath)
+  const remote = detectRemote(repoPath)
 
   // Fetch latest from remote (quiet, won't fail if offline)
-  runGit('fetch origin --quiet', repoPath)
+  runGit(`fetch ${remote} --quiet`, repoPath)
 
   const currentBranch = runGit('rev-parse --abbrev-ref HEAD', repoPath) || 'main'
   const localCommit = runGit('rev-parse --short HEAD', repoPath)
   const localDate = runGit('log -1 --format=%ci', repoPath)
 
-  const remoteRef = `origin/${currentBranch}`
+  const remoteRef = `${remote}/${currentBranch}`
   const remoteCommit = runGit(`rev-parse --short ${remoteRef}`, repoPath)
   const remoteDate = runGit(`log -1 --format=%ci ${remoteRef}`, repoPath)
 
@@ -108,11 +117,12 @@ function checkForUpdates(): UpdateCheckResult {
 
 function runUpdate(): { ok: boolean; output: string } {
   const repoPath = path.resolve(process.cwd())
+  const remote = detectRemote(repoPath)
   const currentBranch = runGit('rev-parse --abbrev-ref HEAD', repoPath) || 'main'
 
   try {
-    // Pull latest
-    const pullOutput = execSync(`git pull --rebase --autostash origin ${currentBranch}`, {
+    // Pull latest — use merge (not rebase) to avoid conflict hell with forked repos
+    const pullOutput = execSync(`git pull ${remote} ${currentBranch}`, {
       cwd: repoPath,
       timeout: 30_000,
       encoding: 'utf8',
