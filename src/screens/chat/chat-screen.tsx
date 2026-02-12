@@ -670,11 +670,7 @@ export function ChatScreen({
         setWaitingForResponse(true)
 
         // Send directly to main session — gateway routes all chat.send to main anyway
-        navigate({
-          to: '/chat/$sessionKey',
-          params: { sessionKey: 'main' },
-          replace: true,
-        })
+        // Fire send BEFORE navigate — navigating unmounts the component and can cancel the fetch
         sendMessage(
           'main',
           'main',
@@ -685,6 +681,12 @@ export function ChatScreen({
             ? optimisticMessage.clientId
             : '',
         )
+        // Navigate after send is fired (fetch is in-flight, won't be cancelled)
+        navigate({
+          to: '/chat/$sessionKey',
+          params: { sessionKey: 'main' },
+          replace: true,
+        })
         return
       }
 

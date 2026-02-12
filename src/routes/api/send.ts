@@ -101,10 +101,12 @@ export const Route = createFileRoute('/api/send')({
 
           return json({ ok: true, ...res, sessionKey, clientId: clientId ?? null })
         } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err)
+          console.error('[/api/send] Error:', errorMessage)
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: errorMessage,
             },
             { status: 500 },
           )
