@@ -32,10 +32,12 @@ import {
   formatCost,
   useAgentView,
 } from '@/hooks/use-agent-view'
+import { useCliAgents } from '@/hooks/use-cli-agents'
 import { useSounds } from '@/hooks/use-sounds'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
+import { BrowserSidebarPreview } from '@/components/browser-view/browser-sidebar-preview'
 import { cn } from '@/lib/utils'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
@@ -50,6 +52,19 @@ function formatRelativeMs(msAgo: number): string {
   if (seconds < 60) return `${seconds}s ago`
   const minutes = Math.floor(seconds / 60)
   return `${minutes}m ago`
+}
+
+function formatRuntimeLabel(runtimeSeconds: number): string {
+  const clampedSeconds = Math.max(0, Math.floor(runtimeSeconds))
+  const hours = Math.floor(clampedSeconds / 3600)
+  const minutes = Math.floor((clampedSeconds % 3600) / 60)
+  const seconds = clampedSeconds % 60
+
+  return [
+    String(hours).padStart(2, '0'),
+    String(minutes).padStart(2, '0'),
+    String(seconds).padStart(2, '0'),
+  ].join(':')
 }
 
 const AGENT_NAME_KEY = 'clawsuite-agent-name'
@@ -274,6 +289,16 @@ export function AgentViewPanel() {
     statusLabel: string
   } | null>(null)
   const [viewMode, setViewMode] = useState<'expanded' | 'compact'>('compact')
+  const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
+  const [browserPreviewExpanded, setBrowserPreviewExpanded] = useState(true)
+  const [selectedCliAgentPid, setSelectedCliAgentPid] = useState<number | null>(
+    null,
+  )
+  const cliAgentsQuery = useCliAgents()
+  const cliAgents = cliAgentsQuery.data ?? []
+  const selectedCliAgent = cliAgents.find(function findSelectedCliAgent(agent) {
+    return agent.pid === selectedCliAgentPid
+  }) || null
 
   // Auto-expand history when there are entries
   useEffect(() => {
@@ -744,6 +769,101 @@ export function AgentViewPanel() {
                     </CollapsiblePanel>
                   </Collapsible>
                 ) : null}
+
+                <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
+                  <Collapsible open={cliAgentsExpanded} onOpenChange={setCliAgentsExpanded}>
+                    <div className="flex items-center justify-between">
+                      <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
+                        <HugeiconsIcon
+                          icon={cliAgentsExpanded ? ArrowDown01Icon : ArrowRight01Icon}
+                          size={20}
+                          strokeWidth={1.5}
+                        />
+                        ⚡ CLI Agents
+                      </CollapsibleTrigger>
+                      <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
+                        {cliAgents.length}
+                      </span>
+                    </div>
+                    <CollapsiblePanel contentClassName="pt-1">
+                      <div className="space-y-1">
+                        {cliAgentsQuery.isLoading ? (
+                          <p className="px-3 py-1.5 text-[11px] text-primary-500 tabular-nums">
+                            Scanning...
+                          </p>
+                        ) : null}
+                        {!cliAgentsQuery.isLoading && !cliAgents.length ? (
+                          <p className="px-3 py-1.5 text-[11px] text-primary-500 text-pretty">
+                            No codex agents detected
+                          </p>
+                        ) : null}
+                        {cliAgents.map(function renderCliAgent(agent) {
+                          return (
+                            <button
+                              key={agent.pid}
+                              type="button"
+                              onClick={function handleSelectCliAgent() {
+                                setSelectedCliAgentPid(agent.pid)
+                              }}
+                              className={cn(
+                                'w-full rounded-lg border border-primary-200 bg-primary-100/50 px-2.5 py-2 text-left transition-colors hover:bg-primary-200/75',
+                                selectedCliAgentPid === agent.pid &&
+                                  'border-primary-300 bg-primary-200',
+                              )}
+                              title={`${agent.name} (PID ${agent.pid})`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={cn(
+                                    'size-2 rounded-full',
+                                    agent.status === 'running'
+                                      ? 'bg-emerald-500'
+                                      : 'bg-gray-400',
+                                  )}
+                                />
+                                <span className="min-w-0 flex-1 truncate text-xs font-medium text-primary-900">
+                                  {agent.name}
+                                </span>
+                                <span className="rounded-full border border-primary-200 bg-primary-50/80 px-1.5 py-0.5 text-[10px] text-primary-600 tabular-nums">
+                                  {formatRuntimeLabel(agent.runtimeSeconds)}
+                                </span>
+                              </div>
+                              <p className="mt-1 truncate text-[11px] text-primary-600 text-pretty">
+                                {agent.task}
+                              </p>
+                            </button>
+                          )
+                        })}
+                        {selectedCliAgent ? (
+                          <p className="px-3 pb-1 text-[11px] text-primary-500 tabular-nums text-pretty">
+                            PID {selectedCliAgent.pid} - {selectedCliAgent.status}
+                          </p>
+                        ) : null}
+                      </div>
+                    </CollapsiblePanel>
+                  </Collapsible>
+                </section>
+
+                <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
+                  <Collapsible
+                    open={browserPreviewExpanded}
+                    onOpenChange={setBrowserPreviewExpanded}
+                  >
+                    <div className="flex items-center justify-between">
+                      <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
+                        <HugeiconsIcon
+                          icon={browserPreviewExpanded ? ArrowDown01Icon : ArrowRight01Icon}
+                          size={20}
+                          strokeWidth={1.5}
+                        />
+                        🌐 Browser
+                      </CollapsibleTrigger>
+                    </div>
+                    <CollapsiblePanel contentClassName="pt-1">
+                      <BrowserSidebarPreview />
+                    </CollapsiblePanel>
+                  </Collapsible>
+                </section>
               </div>
             </ScrollAreaViewport>
             <ScrollAreaScrollbar>

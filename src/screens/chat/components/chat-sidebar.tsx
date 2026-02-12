@@ -83,20 +83,6 @@ type RecentEventsResponse = {
   events?: Array<unknown>
 }
 
-type CliAgentStatus = 'running' | 'finished'
-
-type CliAgent = {
-  pid: number
-  name: string
-  task: string
-  runtimeSeconds: number
-  status: CliAgentStatus
-}
-
-type CliAgentsResponse = {
-  agents?: Array<unknown>
-}
-
 const DEBUG_ERROR_WINDOW_MS = 5 * 60 * 1000
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -136,73 +122,6 @@ async function fetchHasRecentIssues(): Promise<boolean> {
   }
 }
 
-function isCliAgentStatus(value: unknown): value is CliAgentStatus {
-  return value === 'running' || value === 'finished'
-}
-
-function toCliAgent(value: unknown): CliAgent | null {
-  const record = toRecord(value)
-  if (!record) return null
-
-  const pid = record.pid
-  const name = record.name
-  const task = record.task
-  const runtimeSeconds = record.runtimeSeconds
-  const status = record.status
-
-  if (typeof pid !== 'number' || !Number.isFinite(pid)) return null
-  if (typeof name !== 'string' || !name.trim()) return null
-  if (typeof task !== 'string') return null
-  if (
-    typeof runtimeSeconds !== 'number' ||
-    !Number.isFinite(runtimeSeconds) ||
-    runtimeSeconds < 0
-  ) {
-    return null
-  }
-  if (!isCliAgentStatus(status)) return null
-
-  return {
-    pid,
-    name,
-    task: task.trim() || 'No task description',
-    runtimeSeconds: Math.floor(runtimeSeconds),
-    status,
-  }
-}
-
-function formatRuntimeLabel(runtimeSeconds: number): string {
-  const clampedSeconds = Math.max(0, Math.floor(runtimeSeconds))
-  const hours = Math.floor(clampedSeconds / 3600)
-  const minutes = Math.floor((clampedSeconds % 3600) / 60)
-  const seconds = clampedSeconds % 60
-
-  return [
-    String(hours).padStart(2, '0'),
-    String(minutes).padStart(2, '0'),
-    String(seconds).padStart(2, '0'),
-  ].join(':')
-}
-
-async function fetchCliAgents(): Promise<Array<CliAgent>> {
-  try {
-    const response = await fetch('/api/cli-agents')
-    if (!response.ok) return []
-
-    const payload = (await response.json()) as CliAgentsResponse
-    if (!Array.isArray(payload.agents)) return []
-
-    return payload.agents
-      .map(function mapCliAgent(item) {
-        return toCliAgent(item)
-      })
-      .filter(function isPresent(item): item is CliAgent {
-        return item !== null
-      })
-  } catch {
-    return []
-  }
-}
 
 // ── Reusable nav item ───────────────────────────────────────────────────
 
@@ -610,30 +529,12 @@ function ChatSidebarComponent({
     retry: false,
   })
   const showDebugErrorDot = Boolean(recentIssuesQuery.data)
-  const cliAgentsQuery = useQuery({
-    queryKey: ['sidebar', 'cli-agents'],
-    queryFn: fetchCliAgents,
-    refetchInterval: 5_000,
-    retry: false,
-  })
-  const cliAgents = cliAgentsQuery.data ?? []
 
   // Collapsible section states
   const [gatewayExpanded, toggleGateway] = usePersistedBool(
     'openclaw-sidebar-gateway-expanded',
     false,
   )
-  const [cliAgentsExpanded, toggleCliAgentsExpanded] = usePersistedBool(
-    'openclaw-sidebar-cli-agents-expanded',
-    true,
-  )
-  const [selectedCliAgentPid, setSelectedCliAgentPid] = useState<number | null>(
-    null,
-  )
-
-  const selectedCliAgent = cliAgents.find(function findSelectedCliAgent(agent) {
-    return agent.pid === selectedCliAgentPid
-  }) || null
 
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
   const [renameSessionKey, setRenameSessionKey] = useState<string | null>(null)
@@ -813,18 +714,6 @@ function ChatSidebarComponent({
     },
   ]
 
-  const agentHubIndex = studioItems.findIndex(function findAgentHubItem(item) {
-    return item.to === '/agent-swarm'
-  })
-  const studioItemsBeforeCliAgents =
-    agentHubIndex >= 0
-      ? studioItems.slice(0, agentHubIndex + 1)
-      : studioItems
-  const studioItemsAfterCliAgents =
-    agentHubIndex >= 0
-      ? studioItems.slice(agentHubIndex + 1)
-      : []
-
   const gatewayItems: NavItemDef[] = [
     {
       kind: 'link',
@@ -961,94 +850,7 @@ function ChatSidebarComponent({
           transition={transition}
           navigateTo={studioNav}
         />
-        {studioItemsBeforeCliAgents.map((item) => (
-          <motion.div
-            key={item.label}
-            layout
-            transition={{ layout: transition }}
-            className="w-full"
-          >
-            <NavItem
-              item={item}
-              isCollapsed={isCollapsed}
-              transition={transition}
-              onSelectSession={onSelectSession}
-            />
-          </motion.div>
-        ))}
-        <SectionLabel
-          label="⚡ CLI Agents"
-          isCollapsed={isCollapsed}
-          transition={transition}
-          collapsible
-          expanded={cliAgentsExpanded}
-          onToggle={toggleCliAgentsExpanded}
-        />
-        <AnimatePresence initial={false}>
-          {cliAgentsExpanded && !isCollapsed ? (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="overflow-hidden space-y-1"
-            >
-              {cliAgentsQuery.isLoading ? (
-                <p className="px-3 py-1.5 text-[11px] text-primary-500 tabular-nums">
-                  Scanning...
-                </p>
-              ) : null}
-              {!cliAgentsQuery.isLoading && !cliAgents.length ? (
-                <p className="px-3 py-1.5 text-[11px] text-primary-500 text-pretty">
-                  No codex agents detected
-                </p>
-              ) : null}
-              {cliAgents.map(function renderCliAgent(agent) {
-                return (
-                  <button
-                    key={agent.pid}
-                    type="button"
-                    onClick={function handleSelectCliAgent() {
-                      setSelectedCliAgentPid(agent.pid)
-                    }}
-                    className={cn(
-                      'w-full rounded-lg border border-primary-200 bg-primary-100/50 px-2.5 py-2 text-left transition-colors hover:bg-primary-200/75',
-                      selectedCliAgentPid === agent.pid &&
-                        'border-primary-300 bg-primary-200',
-                    )}
-                    title={`${agent.name} (PID ${agent.pid})`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          'size-2 rounded-full',
-                          agent.status === 'running'
-                            ? 'bg-emerald-500'
-                            : 'bg-gray-400',
-                        )}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-primary-900">
-                        {agent.name}
-                      </span>
-                      <span className="rounded-full border border-primary-200 bg-primary-50/80 px-1.5 py-0.5 text-[10px] text-primary-600 tabular-nums">
-                        {formatRuntimeLabel(agent.runtimeSeconds)}
-                      </span>
-                    </div>
-                    <p className="mt-1 truncate text-[11px] text-primary-600 text-pretty">
-                      {agent.task}
-                    </p>
-                  </button>
-                )
-              })}
-              {selectedCliAgent ? (
-                <p className="px-3 pb-1 text-[11px] text-primary-500 tabular-nums text-pretty">
-                  PID {selectedCliAgent.pid} - {selectedCliAgent.status}
-                </p>
-              ) : null}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-        {studioItemsAfterCliAgents.map((item) => (
+        {studioItems.map((item) => (
           <motion.div
             key={item.label}
             layout
