@@ -453,3 +453,18 @@ code {
   max-width: 420px !important;
   overflow-x: hidden !important;
 }
+
+/* Activity ticker animation */
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-content {
+  animation: ticker-scroll 30s linear infinite;
+  will-change: transform;
+}
+
+.ticker-container:hover .ticker-content {
+  animation-play-state: paused;
+}

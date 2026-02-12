@@ -22,6 +22,7 @@ import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
+import { ActivityTicker } from '@/components/activity-ticker'
 import type { SessionMeta } from '@/screens/chat/types'
 
 type SessionsListResponse = Array<SessionMeta>
@@ -103,9 +104,14 @@ export function WorkspaceShell() {
       <div
         className={cn(
           'h-full overflow-hidden',
-          isOnChatRoute ? 'grid grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)]' : 'grid grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)] min-[1200px]:grid-cols-[auto_1fr_auto]',
+          isOnChatRoute ? 'grid grid-cols-[auto_1fr] grid-rows-[auto_minmax(0,1fr)]' : 'grid grid-cols-[auto_1fr] grid-rows-[auto_minmax(0,1fr)] min-[1200px]:grid-cols-[auto_1fr_auto]',
         )}
       >
+        {/* Activity ticker bar */}
+        <div className="col-span-full">
+          <ActivityTicker />
+        </div>
+
         {/* Persistent sidebar */}
         <ChatSidebar
           sessions={sessions}
