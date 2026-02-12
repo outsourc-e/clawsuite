@@ -305,7 +305,7 @@ export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidg
               className={cn(
                 'rounded-full px-2 py-0.5 font-medium transition',
                 view === tab
-                  ? 'bg-white text-primary-900 shadow-sm'
+                  ? 'bg-primary-50 text-primary-900 shadow-sm dark:bg-primary-100 dark:text-primary-900'
                   : 'text-primary-500 hover:text-primary-700',
               )}
             >
@@ -379,10 +379,7 @@ export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidg
                         return (
                           <div key={`${line.label}-${i}`} className="flex items-center gap-1.5 text-[11px]">
                             <span className="text-primary-600">{line.label}</span>
-                            <span
-                              className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                              style={{ backgroundColor: line.color ? `${line.color}20` : '#f3f4f6', color: line.color ?? '#6b7280' }}
-                            >
+                            <span className="rounded-full border border-primary-200 bg-primary-100/70 px-1.5 py-0.5 text-[10px] font-medium text-primary-700 dark:border-primary-300 dark:bg-primary-200/50 dark:text-primary-800">
                               {line.value ?? '—'}
                             </span>
                           </div>

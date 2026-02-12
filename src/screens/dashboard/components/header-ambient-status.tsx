@@ -162,7 +162,7 @@ export function HeaderAmbientStatus() {
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
                 placeholder="ZIP or city (blank = auto)"
-                className="mt-1 w-full rounded-lg border border-primary-200 bg-white px-2.5 py-1.5 text-sm text-ink placeholder:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400 dark:bg-primary-50"
+                className="mt-1 w-full rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-ink placeholder:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400 dark:bg-primary-50"
               />
             </div>
 
@@ -201,7 +201,7 @@ export function HeaderAmbientStatus() {
               <button
                 type="button"
                 onClick={handleSave}
-                className="rounded-lg bg-primary-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 dark:bg-primary-700 dark:hover:bg-primary-600"
+                className="rounded-lg bg-primary-800 px-3 py-1.5 text-xs font-medium text-primary-50 hover:bg-primary-700 dark:bg-primary-700 dark:text-primary-100 dark:hover:bg-primary-600"
               >
                 Save
               </button>

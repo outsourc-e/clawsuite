@@ -23,9 +23,18 @@ function getEventIcon(eventType: ActivityEvent['type']) {
 }
 
 function getLevelDotClass(level: ActivityEvent['level']): string {
+  if (level === 'debug') return 'bg-primary-400'
+  if (level === 'info') return 'bg-blue-500'
   if (level === 'warn') return 'bg-amber-500'
   if (level === 'error') return 'bg-red-500'
-  return 'bg-emerald-500'
+  return 'bg-primary-400'
+}
+
+function getLevelBorderClass(level: ActivityEvent['level']): string {
+  if (level === 'error') return 'border-l-red-500'
+  if (level === 'warn') return 'border-l-amber-500'
+  if (level === 'info') return 'border-l-blue-500'
+  return 'border-l-primary-400'
 }
 
 function getTypeLabel(eventType: ActivityEvent['type']): string {
@@ -56,7 +65,12 @@ export function formatRelativeTimestamp(timestamp: number): string {
 
 export const ActivityEventRow = memo(function ActivityEventRow({ event }: { event: ActivityEvent }) {
   return (
-    <article className="rounded-lg border border-primary-200 bg-primary-50/80 px-2.5 py-2">
+    <article
+      className={cn(
+        'rounded-lg border border-primary-200 border-l-2 bg-primary-50/80 px-2.5 py-2',
+        getLevelBorderClass(event.level),
+      )}
+    >
       <div className="flex items-start gap-2.5">
         <span
           className={cn(

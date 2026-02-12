@@ -95,7 +95,7 @@ function buildPrompt(terminalOutput: string, logContent: string): string {
   ].join('\n')
 }
 
-function readProviderApiKey(config: OpenClawConfig, provider: ProviderName): string {
+function readProviderApiKey(config: OpenClawConfig, provider: 'anthropic' | 'openai'): string {
   const providerConfig = config.models?.providers?.[provider]
   if (!providerConfig) return ''
 
