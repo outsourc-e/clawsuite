@@ -121,6 +121,7 @@ export async function startProxy(): Promise<{ port: number; url: string }> {
             host: parsed.host,
             origin: parsed.origin,
             referer: parsed.origin + '/',
+            'accept-encoding': 'identity', // Request uncompressed so we can rewrite HTML
           },
           rejectUnauthorized: false,
         },
