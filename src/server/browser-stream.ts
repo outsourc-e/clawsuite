@@ -71,6 +71,33 @@ async function launchBrowserInstance() {
     // Persistent context may already have pages open
     page = context.pages()[0] || await context.newPage()
 
+    // Helper to attach CDP + screencast to a page
+    async function attachToPage(p: Page) {
+      page = p
+      // Clean up old CDP
+      if (cdp) {
+        try { await cdp.send('Page.stopScreencast') } catch {}
+        try { await cdp.detach() } catch {}
+      }
+      cdp = await context!.newCDPSession(p)
+      cdp.on('Page.screencastFrame', (params: { data: string; sessionId: number; metadata: any }) => {
+        const frame = `data:image/jpeg;base64,${params.data}`
+        lastFrame = frame
+        broadcast({ type: 'frame', data: frame })
+        cdp.send('Page.screencastFrameAck', { sessionId: params.sessionId }).catch(() => {})
+      })
+      await cdp.send('Page.startScreencast', {
+        format: 'jpeg',
+        quality: 85,
+        maxWidth: VIEWPORT.width,
+        maxHeight: VIEWPORT.height,
+        everyNthFrame: 1,
+      })
+      currentUrl = p.url()
+      currentTitle = await p.title().catch(() => '')
+      broadcastState()
+    }
+
     // Track URL changes
     page.on('framenavigated', async (frame) => {
       if (frame === page?.mainFrame()) {
@@ -80,7 +107,26 @@ async function launchBrowserInstance() {
       }
     })
 
-    // Start CDP screencast — pushes frames only when screen changes
+    // Track new pages (popups, new tabs) — auto-switch to newest
+    context.on('page', async (newPage: Page) => {
+      await newPage.waitForLoadState('domcontentloaded').catch(() => {})
+      await attachToPage(newPage)
+    })
+
+    // Track page close — switch back to remaining page
+    page.on('close', async () => {
+      if (!context) return
+      const pages = context.pages()
+      if (pages.length > 0) {
+        await attachToPage(pages[pages.length - 1])
+      } else {
+        page = null
+        cdp = null
+        broadcastState()
+      }
+    })
+
+    // Initial CDP attach
     cdp = await context.newCDPSession(page)
     cdp.on('Page.screencastFrame', (params: { data: string; sessionId: number; metadata: any }) => {
       const frame = `data:image/jpeg;base64,${params.data}`
@@ -121,11 +167,47 @@ async function closeBrowserInstance() {
   broadcast({ type: 'closed' })
 }
 
+// Recover stale page reference
+async function recoverPage(): Promise<boolean> {
+  if (!context) return false
+  const pages = context.pages()
+  if (pages.length === 0) return false
+  page = pages[pages.length - 1]
+  try {
+    if (cdp) { try { await cdp.detach() } catch {} }
+    cdp = await context.newCDPSession(page)
+    currentUrl = page.url()
+    currentTitle = await page.title().catch(() => '')
+    broadcastState()
+    return true
+  } catch { return false }
+}
+
 async function handleAction(action: string, params: Record<string, unknown>) {
   if (!page && action !== 'launch') {
-    return { error: 'Browser not running' }
+    // Try to recover
+    if (context && await recoverPage()) {
+      // recovered
+    } else {
+      return { error: 'Browser not running' }
+    }
   }
 
+  try { return await executeAction(action, params) } catch (err: any) {
+    // Auto-recover on stale page/CDP errors
+    if (err?.message?.includes('closed') || err?.message?.includes('Target') || err?.message?.includes('detached')) {
+      const recovered = await recoverPage()
+      if (recovered) {
+        try { return await executeAction(action, params) } catch (retryErr: any) {
+          return { error: retryErr?.message || String(retryErr) }
+        }
+      }
+    }
+    return { error: err?.message || String(err) }
+  }
+}
+
+async function executeAction(action: string, params: Record<string, unknown>): Promise<Record<string, unknown>> {
   switch (action) {
     case 'launch':
       await launchBrowserInstance()
