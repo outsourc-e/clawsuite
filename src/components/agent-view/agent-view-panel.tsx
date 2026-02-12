@@ -54,6 +54,17 @@ function formatRelativeMs(msAgo: number): string {
   return `${minutes}m ago`
 }
 
+function summarizeTask(raw: string): string {
+  if (!raw) return ''
+  // Strip "exec " prefix and clean up codex command noise
+  let t = raw.replace(/^exec\s+/i, '').replace(/^codex\s+exec\s+--full-auto\s+/i, '')
+  // Remove quotes wrapping the whole thing
+  t = t.replace(/^['"]|['"]$/g, '')
+  // Take first sentence or first 60 chars
+  const firstLine = t.split(/[.\n]/)[0] || t
+  return firstLine.slice(0, 60).trim() + (firstLine.length > 60 ? '…' : '')
+}
+
 function formatRuntimeLabel(runtimeSeconds: number): string {
   const clampedSeconds = Math.max(0, Math.floor(runtimeSeconds))
   const hours = Math.floor(clampedSeconds / 3600)
@@ -771,7 +782,6 @@ export function AgentViewPanel() {
                             <div
                               key={agent.pid}
                               className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
-                              title={agent.task}
                             >
                               <div className="flex items-center gap-1.5">
                                 <span
@@ -791,7 +801,7 @@ export function AgentViewPanel() {
                               </div>
                               {agent.task ? (
                                 <p className="mt-0.5 truncate pl-3 text-[10px] text-primary-500">
-                                  {agent.task.split('\n')[0].slice(0, 80)}
+                                  {summarizeTask(agent.task)}
                                 </p>
                               ) : null}
                               <div className="mt-1 ml-3 h-1 overflow-hidden rounded-full bg-primary-200">
