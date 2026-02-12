@@ -15,6 +15,7 @@ import {
   getPageContent,
   cdpMouseClick,
 } from '../../server/browser-session'
+import { startProxy, stopProxy, getProxyUrl, getCurrentTarget } from '../../server/browser-proxy'
 
 export const Route = createFileRoute('/api/browser')({
   server: {
@@ -93,6 +94,32 @@ export const Route = createFileRoute('/api/browser')({
             case 'content': {
               const content = await getPageContent()
               return json({ ok: true, ...content })
+            }
+
+            // Proxy mode — iframe-based browsing
+            case 'proxy-start': {
+              const result = await startProxy()
+              return json({ ok: true, ...result })
+            }
+
+            case 'proxy-stop': {
+              await stopProxy()
+              return json({ ok: true })
+            }
+
+            case 'proxy-navigate': {
+              const url = typeof body.url === 'string' ? body.url.trim() : ''
+              if (!url) return json({ error: 'url required' }, { status: 400 })
+              let normalizedUrl = url
+              if (!normalizedUrl.match(/^https?:\/\//)) normalizedUrl = `https://${normalizedUrl}`
+              // Navigate the proxy
+              const proxyUrl = getProxyUrl()
+              await fetch(`${proxyUrl}/__proxy__/navigate?url=${encodeURIComponent(normalizedUrl)}`)
+              return json({ ok: true, proxyUrl, iframeSrc: `${proxyUrl}/?url=${encodeURIComponent(normalizedUrl)}`, url: normalizedUrl })
+            }
+
+            case 'proxy-status': {
+              return json({ ok: true, proxyUrl: getProxyUrl(), target: getCurrentTarget() })
             }
 
             default:
