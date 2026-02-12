@@ -13,6 +13,8 @@ let lastScreenshot: string | null = null
 let lastUrl = ''
 let lastTitle = ''
 let isLaunching = false
+let screencastRunning = false
+let cdpSession: any = null
 
 const VIEWPORT = { width: 1280, height: 800 }
 const SCREENSHOT_TIMEOUT = 10_000
@@ -45,14 +47,13 @@ export async function launchBrowser(): Promise<BrowserState> {
   isLaunching = true
   try {
     const pw = await getPlaywright()
-    // Launch VISIBLE browser — user interacts with it directly like a real browser
-    // Agent controls it programmatically via Playwright API
+    // Headless browser — rendered inside ClawSuite via CDP screencast
     browserInstance = await pw.chromium.launch({
-      headless: false,
+      headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--start-maximized',
+        '--disable-dev-shm-usage',
       ],
     })
 
@@ -63,6 +64,9 @@ export async function launchBrowser(): Promise<BrowserState> {
 
     pageInstance = await contextInstance.newPage()
     await pageInstance.goto('about:blank')
+
+    // Start CDP screencast — pushes frames on change instead of polling
+    await startScreencast()
     await captureScreenshot()
 
     return getState()
@@ -71,7 +75,64 @@ export async function launchBrowser(): Promise<BrowserState> {
   }
 }
 
+async function startScreencast(): Promise<void> {
+  if (!pageInstance || screencastRunning) return
+  try {
+    cdpSession = await pageInstance.context().newCDPSession(pageInstance)
+    cdpSession.on('Page.screencastFrame', (params: { data: string; sessionId: number }) => {
+      lastScreenshot = `data:image/jpeg;base64,${params.data}`
+      // Acknowledge frame so Chrome keeps sending
+      cdpSession.send('Page.screencastFrameAck', { sessionId: params.sessionId }).catch(() => {})
+    })
+    await cdpSession.send('Page.startScreencast', {
+      format: 'jpeg',
+      quality: 80,
+      maxWidth: VIEWPORT.width,
+      maxHeight: VIEWPORT.height,
+      everyNthFrame: 1,
+    })
+    screencastRunning = true
+  } catch {
+    // Fallback to manual screenshots if CDP screencast isn't available
+    screencastRunning = false
+  }
+}
+
+async function stopScreencast(): Promise<void> {
+  if (cdpSession && screencastRunning) {
+    try {
+      await cdpSession.send('Page.stopScreencast')
+    } catch {}
+    screencastRunning = false
+  }
+  cdpSession = null
+}
+
+// CDP input dispatch — sends real mouse/keyboard events, way more reliable than Playwright click
+export async function cdpMouseClick(x: number, y: number): Promise<BrowserState> {
+  if (!cdpSession || !pageInstance) return clickAt(x, y)
+  try {
+    await cdpSession.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
+    await cdpSession.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 })
+    // Give page time to react
+    await pageInstance.waitForTimeout(200)
+    lastUrl = pageInstance.url()
+    lastTitle = await pageInstance.title().catch(() => '')
+  } catch {
+    await pageInstance.mouse.click(x, y)
+  }
+  return getState()
+}
+
+export async function cdpMouseMove(x: number, y: number): Promise<void> {
+  if (!cdpSession) return
+  try {
+    await cdpSession.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
+  } catch {}
+}
+
 export async function closeBrowser(): Promise<void> {
+  await stopScreencast()
   if (contextInstance) {
     await contextInstance.close().catch(() => {})
     contextInstance = null

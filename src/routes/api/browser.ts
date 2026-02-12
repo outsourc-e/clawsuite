@@ -13,6 +13,7 @@ import {
   scrollPage,
   getScreenshot,
   getPageContent,
+  cdpMouseClick,
 } from '../../server/browser-session'
 
 export const Route = createFileRoute('/api/browser')({
@@ -44,7 +45,7 @@ export const Route = createFileRoute('/api/browser')({
             case 'click': {
               const x = typeof body.x === 'number' ? body.x : 0
               const y = typeof body.y === 'number' ? body.y : 0
-              const state = await clickAt(x, y)
+              const state = await cdpMouseClick(x, y)
               return json({ ok: true, ...state })
             }
 
