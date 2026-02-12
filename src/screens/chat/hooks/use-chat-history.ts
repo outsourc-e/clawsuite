@@ -91,6 +91,7 @@ export function useChatHistory({
     placeholderData: function useCachedHistory(): HistoryResponse | undefined {
       return queryClient.getQueryData(historyKey)
     },
+    refetchOnWindowFocus: true,
     gcTime: 1000 * 60 * 10,
   })
 
