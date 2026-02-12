@@ -167,6 +167,54 @@ async function handleAction(action: string, params: Record<string, unknown>) {
       return { ok: true }
     }
 
+    case 'keydown': {
+      const key = String(params.key || '')
+      if (cdp) {
+        // Map special keys to CDP key identifiers
+        const text = key.length === 1 ? key : undefined
+        await cdp.send('Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          key,
+          code: String(params.code || ''),
+          text,
+          windowsVirtualKeyCode: Number(params.keyCode) || 0,
+          nativeVirtualKeyCode: Number(params.keyCode) || 0,
+          modifiers: Number(params.modifiers) || 0,
+        })
+        if (text) {
+          await cdp.send('Input.dispatchKeyEvent', {
+            type: 'char',
+            key,
+            code: String(params.code || ''),
+            text,
+            windowsVirtualKeyCode: Number(params.keyCode) || 0,
+            nativeVirtualKeyCode: Number(params.keyCode) || 0,
+            modifiers: Number(params.modifiers) || 0,
+          })
+        }
+      } else {
+        await page!.keyboard.down(key)
+      }
+      return { ok: true }
+    }
+
+    case 'keyup': {
+      const key = String(params.key || '')
+      if (cdp) {
+        await cdp.send('Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          key,
+          code: String(params.code || ''),
+          windowsVirtualKeyCode: Number(params.keyCode) || 0,
+          nativeVirtualKeyCode: Number(params.keyCode) || 0,
+          modifiers: Number(params.modifiers) || 0,
+        })
+      } else {
+        await page!.keyboard.up(key)
+      }
+      return { ok: true }
+    }
+
     case 'scroll': {
       const dy = params.direction === 'up' ? -400 : 400
       if (cdp) {

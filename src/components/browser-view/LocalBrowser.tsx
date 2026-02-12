@@ -115,6 +115,29 @@ export function LocalBrowser() {
     send('scroll', { direction: e.deltaY > 0 ? 'down' : 'up' })
   }, [send])
 
+  // Keyboard → CDP forwarding
+  const getModifiers = (e: React.KeyboardEvent) => {
+    let m = 0
+    if (e.altKey) m |= 1
+    if (e.ctrlKey) m |= 2
+    if (e.metaKey) m |= 4
+    if (e.shiftKey) m |= 8
+    return m
+  }
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Don't capture if URL bar or agent input is focused
+    if ((e.target as HTMLElement).tagName === 'INPUT') return
+    e.preventDefault()
+    send('keydown', { key: e.key, code: e.code, keyCode: e.keyCode, modifiers: getModifiers(e) })
+  }, [send])
+
+  const handleKeyUp = useCallback((e: React.KeyboardEvent) => {
+    if ((e.target as HTMLElement).tagName === 'INPUT') return
+    e.preventDefault()
+    send('keyup', { key: e.key, code: e.code, keyCode: e.keyCode, modifiers: getModifiers(e) })
+  }, [send])
+
   // Agent handoff
   async function handleHandoff() {
     if (!agentPrompt.trim() && !status.url) return
@@ -230,15 +253,26 @@ export function LocalBrowser() {
         </button>
       </div>
 
-      {/* Viewport */}
-      <div className="flex-1 min-h-0 bg-white relative overflow-hidden" onWheel={handleScroll}>
+      {/* Viewport — click to focus, then type directly */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <div
+        className="flex-1 min-h-0 bg-white relative overflow-hidden outline-none"
+        tabIndex={0}
+        onWheel={handleScroll}
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
+      >
         {frame ? (
           <img
             ref={imgRef}
             src={frame}
             alt=""
             className="w-full h-full object-contain object-top cursor-default select-none"
-            onClick={handleClick}
+            onClick={(e) => {
+              // Focus viewport for keyboard capture + send click coords
+              ;(e.currentTarget.parentElement as HTMLElement)?.focus()
+              handleClick(e)
+            }}
             draggable={false}
           />
         ) : (
@@ -247,28 +281,6 @@ export function LocalBrowser() {
             <p className="text-sm text-primary-400">Loading browser...</p>
           </div>
         )}
-      </div>
-
-      {/* Keyboard input */}
-      <div className="border-t border-primary-200 bg-primary-50/80 px-2 py-1.5 shrink-0">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            const input = e.currentTarget.querySelector('input') as HTMLInputElement
-            if (input.value) { send('type', { text: input.value }); input.value = '' }
-          }}
-          className="flex items-center gap-1.5"
-        >
-          <input
-            type="text"
-            placeholder="Type into page..."
-            className="flex-1 rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-[13px] text-ink placeholder:text-primary-400 focus:border-accent-500 focus:outline-none"
-          />
-          <Button type="submit" variant="outline" size="sm" className="h-7 px-2 text-[11px]">Type</Button>
-          <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => send('press', { key: 'Enter' })}>↵</Button>
-          <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => send('press', { key: 'Tab' })}>⇥</Button>
-          <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => send('press', { key: 'Escape' })}>Esc</Button>
-        </form>
       </div>
 
       {/* Agent handoff */}
