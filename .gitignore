@@ -84,3 +84,4 @@ debug-export-*.txt
 
 # Keep these files
 !.github/workflows
+tmp/
