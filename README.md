@@ -6,7 +6,7 @@
 
 ![ClawSuite Dashboard](./public/screenshots/dashboard.png)
 
-> ⬆️ *Replace with your own screenshot: take a screenshot of the dashboard at 1440×900+ and save to `public/screenshots/dashboard.png`*
+> Self-hosted command center — chat with any model, orchestrate agents, manage your gateway.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
