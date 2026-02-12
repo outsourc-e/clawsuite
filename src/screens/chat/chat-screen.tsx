@@ -815,6 +815,8 @@ export function ChatScreen({
               showFileExplorerButton={!isMobile}
               fileExplorerCollapsed={fileExplorerCollapsed}
               onToggleFileExplorer={handleToggleFileExplorer}
+              dataUpdatedAt={historyQuery.dataUpdatedAt}
+              onRefresh={() => void historyQuery.refetch()}
             />
           )}
 

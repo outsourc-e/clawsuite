@@ -1,6 +1,6 @@
-import { memo } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Folder01Icon, Menu01Icon } from '@hugeicons/core-free-icons'
+import { Folder01Icon, Menu01Icon, ReloadIcon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { UsageMeter } from '@/components/usage-meter'
 import {
@@ -9,6 +9,16 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+
+function formatSyncAge(updatedAt: number): string {
+  if (updatedAt <= 0) return ''
+  const seconds = Math.round((Date.now() - updatedAt) / 1000)
+  if (seconds < 5) return 'just now'
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.round(seconds / 60)
+  return `${minutes}m ago`
+}
 
 type ChatHeaderProps = {
   activeTitle: string
@@ -18,6 +28,10 @@ type ChatHeaderProps = {
   showFileExplorerButton?: boolean
   fileExplorerCollapsed?: boolean
   onToggleFileExplorer?: () => void
+  /** Timestamp (ms) of last successful history fetch */
+  dataUpdatedAt?: number
+  /** Callback to manually refresh history */
+  onRefresh?: () => void
 }
 
 function ChatHeaderComponent({
@@ -28,7 +42,29 @@ function ChatHeaderComponent({
   showFileExplorerButton = false,
   fileExplorerCollapsed = true,
   onToggleFileExplorer,
+  dataUpdatedAt = 0,
+  onRefresh,
 }: ChatHeaderProps) {
+  const [syncLabel, setSyncLabel] = useState('')
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  useEffect(() => {
+    if (dataUpdatedAt <= 0) return
+    const update = () => setSyncLabel(formatSyncAge(dataUpdatedAt))
+    update()
+    const id = setInterval(update, 5000)
+    return () => clearInterval(id)
+  }, [dataUpdatedAt])
+
+  const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
+
+  const handleRefresh = useCallback(() => {
+    if (!onRefresh) return
+    setIsRefreshing(true)
+    onRefresh()
+    setTimeout(() => setIsRefreshing(false), 600)
+  }, [onRefresh])
+
   return (
     <div
       ref={wrapperRef}
@@ -68,6 +104,42 @@ function ChatHeaderComponent({
         </TooltipProvider>
       ) : null}
       <div className="text-sm font-medium truncate flex-1" suppressHydrationWarning>{activeTitle}</div>
+      {syncLabel ? (
+        <span
+          className={cn(
+            'mr-1 text-[11px] tabular-nums transition-colors',
+            isStale ? 'text-amber-500' : 'text-primary-400',
+          )}
+          title={dataUpdatedAt > 0 ? `Last synced: ${new Date(dataUpdatedAt).toLocaleTimeString()}` : undefined}
+        >
+          {isStale ? '⚠ ' : ''}{syncLabel}
+        </span>
+      ) : null}
+      {onRefresh ? (
+        <TooltipProvider>
+          <TooltipRoot>
+            <TooltipTrigger
+              onClick={handleRefresh}
+              render={
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="mr-1 text-primary-500 hover:bg-primary-100 hover:text-primary-700"
+                  aria-label="Refresh chat"
+                >
+                  <HugeiconsIcon
+                    icon={ReloadIcon}
+                    size={15}
+                    strokeWidth={1.8}
+                    className={cn(isRefreshing && 'animate-spin')}
+                  />
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">Sync messages</TooltipContent>
+          </TooltipRoot>
+        </TooltipProvider>
+      ) : null}
       <UsageMeter />
     </div>
   )
