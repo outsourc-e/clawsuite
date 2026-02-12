@@ -89,10 +89,8 @@ export const Route = createFileRoute('/api/send')({
                 ? body.idempotencyKey
                 : randomUUID(),
           }
-          if (clientId) {
-            sendPayload.clientId = clientId
-            sendPayload.client_id = clientId
-          }
+          // Note: clientId is NOT sent to gateway (chat.send rejects unknown props)
+          // It's only used for client-side optimistic message matching
 
           const res = await gatewayRpc<{ runId: string }>(
             'chat.send',
