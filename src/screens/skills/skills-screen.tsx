@@ -532,11 +532,21 @@ function SkillsGrid({
   }
 
   if (skills.length === 0) {
+    const isMarketplace = tab === 'marketplace' || tab === 'featured'
     return (
       <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-8 text-center">
-        <p className="text-sm font-medium text-primary-700">No skills found</p>
-        <p className="mt-1 text-xs text-primary-500 text-pretty">
-          Try adjusting your filters or search term
+        <p className="text-sm font-medium text-primary-700">
+          {isMarketplace && !searchInput ? 'Marketplace Not Configured' : 'No skills found'}
+        </p>
+        <p className="mt-1 text-xs text-primary-500 text-pretty max-w-sm mx-auto">
+          {isMarketplace && !searchInput ? (
+            <>
+              Run <code className="rounded bg-primary-200 px-1.5 py-0.5 font-mono text-[11px]">clawdhub sync</code> in your terminal to download the skills registry, or browse skills at{' '}
+              <a href="https://clawdhub.com" target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline">clawdhub.com</a>
+            </>
+          ) : (
+            'Try adjusting your filters or search term'
+          )}
         </p>
       </div>
     )

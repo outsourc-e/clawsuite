@@ -10,6 +10,7 @@ import { TerminalShortcutListener } from '@/components/terminal-shortcut-listene
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { useTaskReminders } from '@/hooks/use-task-reminders'
+import { UpdateNotifier } from '@/components/update-notifier'
 
 const themeScript = `
 (() => {
@@ -121,6 +122,7 @@ function RootLayout() {
       <GlobalShortcutListener />
       <TerminalShortcutListener />
       <TaskReminderRunner />
+      <UpdateNotifier />
       <WorkspaceShell />
       <SearchModal />
     </QueryClientProvider>

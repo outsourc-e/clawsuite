@@ -37,6 +37,7 @@ import { Route as SettingsProvidersRouteImport } from './routes/settings/provide
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiUsageRouteImport } from './routes/api/usage'
+import { Route as ApiUpdateCheckRouteImport } from './routes/api/update-check'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
@@ -225,6 +226,11 @@ const ApiUsageRoute = ApiUsageRouteImport.update({
   path: '/api/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUpdateCheckRoute = ApiUpdateCheckRouteImport.update({
+  id: '/api/update-check',
+  path: '/api/update-check',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
   id: '/api/terminal-stream',
   path: '/api/terminal-stream',
@@ -366,9 +372,9 @@ const ApiTasksIndexRoute = ApiTasksIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksTaskIdRoute = ApiTasksTaskIdRouteImport.update({
-  id: '/$taskId',
-  path: '/$taskId',
-  getParentRoute: () => ApiTasksRoute,
+  id: '/api/tasks/$taskId',
+  path: '/api/tasks/$taskId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   id: '/send',
@@ -511,6 +517,7 @@ export interface FileRoutesByFullPath {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -587,6 +594,7 @@ export interface FileRoutesByTo {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -665,6 +673,7 @@ export interface FileRoutesById {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -744,6 +753,7 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/update-check'
     | '/api/usage'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -820,6 +830,7 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/update-check'
     | '/api/usage'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -897,6 +908,7 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/update-check'
     | '/api/usage'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -975,6 +987,7 @@ export interface RootRouteChildren {
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
+  ApiUpdateCheckRoute: typeof ApiUpdateCheckRoute
   ApiUsageRoute: typeof ApiUsageRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
@@ -989,6 +1002,7 @@ export interface RootRouteChildren {
   ApiGatewayNodesRoute: typeof ApiGatewayNodesRoute
   ApiGatewaySessionsRoute: typeof ApiGatewaySessionsRoute
   ApiGatewayUsageRoute: typeof ApiGatewayUsageRoute
+  ApiTasksTaskIdRoute: typeof ApiTasksTaskIdRoute
   ApiTasksIndexRoute: typeof ApiTasksIndexRoute
 }
 
@@ -1190,6 +1204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/update-check': {
+      id: '/api/update-check'
+      path: '/api/update-check'
+      fullPath: '/api/update-check'
+      preLoaderRoute: typeof ApiUpdateCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/terminal-stream': {
       id: '/api/terminal-stream'
       path: '/api/terminal-stream'
@@ -1388,10 +1409,10 @@ declare module '@tanstack/react-router' {
     }
     '/api/tasks/$taskId': {
       id: '/api/tasks/$taskId'
-      path: '/$taskId'
+      path: '/api/tasks/$taskId'
       fullPath: '/api/tasks/$taskId'
       preLoaderRoute: typeof ApiTasksTaskIdRouteImport
-      parentRoute: typeof ApiTasksRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/sessions/send': {
       id: '/api/sessions/send'
@@ -1631,6 +1652,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
+  ApiUpdateCheckRoute: ApiUpdateCheckRoute,
   ApiUsageRoute: ApiUsageRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
@@ -1645,6 +1667,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGatewayNodesRoute: ApiGatewayNodesRoute,
   ApiGatewaySessionsRoute: ApiGatewaySessionsRoute,
   ApiGatewayUsageRoute: ApiGatewayUsageRoute,
+  ApiTasksTaskIdRoute: ApiTasksTaskIdRoute,
   ApiTasksIndexRoute: ApiTasksIndexRoute,
 }
 export const routeTree = rootRouteImport
