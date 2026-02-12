@@ -18,7 +18,7 @@ type ProvidersDialogProps = {
 export function ProvidersDialog({ open, onOpenChange }: ProvidersDialogProps) {
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[88dvh] w-[min(960px,96vw)] max-w-none flex-col overflow-hidden p-0">
+      <DialogContent className="flex h-[min(85dvh,680px)] w-[min(640px,92vw)] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden p-0">
         <div className="flex items-start justify-between border-b border-primary-200 p-4 pb-3">
           <div>
             <DialogTitle className="mb-1 text-balance">Providers</DialogTitle>

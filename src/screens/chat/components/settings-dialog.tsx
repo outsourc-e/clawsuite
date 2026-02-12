@@ -228,7 +228,7 @@ export function SettingsDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="left-auto right-0 top-0 h-[100dvh] w-screen translate-x-0 translate-y-0 overflow-hidden rounded-none border-primary-200 bg-primary-50 duration-300 ease-out sm:w-[min(560px,100vw)] sm:rounded-l-2xl data-[state=open]:scale-100 data-[state=closed]:scale-100 data-[state=open]:translate-x-0 data-[state=closed]:translate-x-full">
+      <DialogContent className="h-[min(85dvh,680px)] w-[min(520px,92vw)] max-h-[calc(100dvh-3rem)] overflow-hidden">
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex items-start justify-between border-b border-primary-200 p-4 pb-3">
             <div>
