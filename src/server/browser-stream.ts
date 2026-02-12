@@ -44,7 +44,7 @@ async function launchBrowserInstance() {
   try {
     const pw = await import('playwright')
     browser = await pw.chromium.launch({
-      headless: true,
+      headless: false,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     })
 
