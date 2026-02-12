@@ -139,11 +139,21 @@ export function useChatHistory({
         if (!content || !Array.isArray(content)) return false
         if (content.length === 0) return false
 
+        // Hide messages that are just tool-call narration (text + toolUse/toolCall blocks)
+        const hasToolCall = content.some(
+          (c) => c.type === 'toolCall' || c.type === 'tool_use' || c.type === 'toolUse'
+        )
+        
         // Has at least one text block with actual content?
         const hasText = content.some(
           (c) => c.type === 'text' && typeof c.text === 'string' && c.text.trim().length > 0
         )
         if (!hasText) return false
+        
+        // If message has tool calls alongside text, it's narration — hide it
+        // unless it's the LAST assistant message (which is the final response)
+        if (hasToolCall) return false
+        
         return true
       }
 
