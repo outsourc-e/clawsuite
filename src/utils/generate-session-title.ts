@@ -104,75 +104,16 @@ const NOISE_PREFIXES =
   /^(?:hey|hi|hello|ok(?:ay)?|so|well|please|kindly|um|uh|can you|could you|would you|will you|i want(?: to)?|i need(?: to)?|help me(?: with)?|let'?s|lets|also|just)\b[\s,:-]*/i
 
 const STOP_WORDS = new Set([
-  'a',
-  'an',
-  'the',
-  'and',
-  'or',
-  'but',
-  'if',
-  'then',
-  'else',
-  'for',
-  'to',
-  'of',
-  'in',
-  'on',
-  'at',
-  'with',
-  'from',
-  'by',
-  'this',
-  'that',
-  'these',
-  'those',
-  'it',
-  'its',
-  'is',
-  'are',
-  'was',
-  'were',
-  'be',
-  'been',
-  'being',
-  'i',
-  'me',
-  'my',
-  'we',
-  'our',
-  'you',
-  'your',
-  'he',
-  'she',
-  'they',
-  'them',
-  'can',
-  'could',
-  'would',
-  'should',
-  'will',
-  'do',
-  'does',
-  'did',
-  'how',
-  'what',
-  'why',
-  'when',
-  'where',
-  'who',
-  'which',
-  'about',
-  'into',
-  'over',
-  'under',
-  'again',
-  'still',
-  'just',
-  'also',
-  'please',
-  'help',
-  'need',
-  'want',
+  'a', 'an', 'the', 'and', 'or', 'but', 'if', 'then', 'else',
+  'for', 'to', 'of', 'in', 'on', 'at', 'with', 'from', 'by',
+  'this', 'that', 'these', 'those', 'it', 'its',
+  'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'i', 'me', 'my', 'we', 'our', 'you', 'your',
+  'he', 'she', 'they', 'them',
+  'can', 'could', 'would', 'should', 'will',
+  'do', 'does', 'did',
+  'just', 'also', 'please', 'need', 'want',
+  'some', 'any', 'very', 'really', 'so', 'too',
 ])
 
 const UPPERCASE_TOKENS = new Set([
@@ -430,7 +371,7 @@ function selectFocusTokens(
   for (const token of combined) {
     if (selected.length >= maxTokens) break
     if (selected.includes(token)) continue
-    if (ACTION_TOKENS.has(token)) continue
+    // Keep action tokens if they're from primaryTokens (the user's actual words)
     selected.push(token)
   }
   return selected
@@ -461,8 +402,6 @@ export function generateSessionTitle(
       : [normalizeToken(CATEGORY_SUBJECT_FALLBACK[category])]
   const coreTokens = [action, ...subjectTokens]
   const truncatedCoreTokens = coreTokens.slice(0, maxWords)
-  const decorated = `${CATEGORY_EMOJI[category]} ${truncatedCoreTokens
-    .map(formatToken)
-    .join(' ')}`
-  return truncateToLength(decorated, maxLength)
+  const title = truncatedCoreTokens.map(formatToken).join(' ')
+  return truncateToLength(title, maxLength)
 }
