@@ -56,6 +56,7 @@ import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
 import { Route as ApiCostRouteImport } from './routes/api/cost'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiConfigPatchRouteImport } from './routes/api/config-patch'
@@ -312,6 +313,11 @@ const ApiEventsRoute = ApiEventsRouteImport.update({
   path: '/api/events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
+  id: '/api/debug-analyze',
+  path: '/api/debug-analyze',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCostRoute = ApiCostRouteImport.update({
   id: '/api/cost',
   path: '/api/cost',
@@ -441,6 +447,7 @@ export interface FileRoutesByFullPath {
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/cost': typeof ApiCostRoute
+  '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
@@ -509,6 +516,7 @@ export interface FileRoutesByTo {
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/cost': typeof ApiCostRoute
+  '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
@@ -579,6 +587,7 @@ export interface FileRoutesById {
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/cost': typeof ApiCostRoute
+  '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/events': typeof ApiEventsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
@@ -650,6 +659,7 @@ export interface FileRouteTypes {
     | '/api/config-patch'
     | '/api/context-usage'
     | '/api/cost'
+    | '/api/debug-analyze'
     | '/api/events'
     | '/api/files'
     | '/api/history'
@@ -718,6 +728,7 @@ export interface FileRouteTypes {
     | '/api/config-patch'
     | '/api/context-usage'
     | '/api/cost'
+    | '/api/debug-analyze'
     | '/api/events'
     | '/api/files'
     | '/api/history'
@@ -787,6 +798,7 @@ export interface FileRouteTypes {
     | '/api/config-patch'
     | '/api/context-usage'
     | '/api/cost'
+    | '/api/debug-analyze'
     | '/api/events'
     | '/api/files'
     | '/api/history'
@@ -857,6 +869,7 @@ export interface RootRouteChildren {
   ApiConfigPatchRoute: typeof ApiConfigPatchRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCostRoute: typeof ApiCostRoute
+  ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
   ApiEventsRoute: typeof ApiEventsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
@@ -1226,6 +1239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/debug-analyze': {
+      id: '/api/debug-analyze'
+      path: '/api/debug-analyze'
+      fullPath: '/api/debug-analyze'
+      preLoaderRoute: typeof ApiDebugAnalyzeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cost': {
       id: '/api/cost'
       path: '/api/cost'
@@ -1435,6 +1455,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiConfigPatchRoute: ApiConfigPatchRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCostRoute: ApiCostRoute,
+  ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
   ApiEventsRoute: ApiEventsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
   ApiHistoryRoute: ApiHistoryRoute,

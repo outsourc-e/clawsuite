@@ -11,19 +11,18 @@ import {
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SearchInput } from './search-input'
-import {  QuickActions } from './quick-actions'
-import {  SearchResults } from './search-results'
-import type {QuickAction} from './quick-actions';
-import type {SearchResultItemData} from './search-results';
-import type {SearchScope} from '@/hooks/use-search-modal';
+import { QuickActions } from './quick-actions'
+import { SearchResults } from './search-results'
+import type { QuickAction } from './quick-actions'
+import type { SearchResultItemData } from './search-results'
+import type { SearchScope } from '@/hooks/use-search-modal'
 import {
   SEARCH_MODAL_EVENTS,
-  
   emitSearchModalEvent,
-  useSearchModal
+  useSearchModal,
 } from '@/hooks/use-search-modal'
 import { filterResults, useSearchData } from '@/hooks/use-search-data'
 import { cn } from '@/lib/utils'
@@ -43,6 +42,15 @@ const RECENT_SEARCHES = [
   'agent memory',
   'usage alerts',
 ]
+
+const RESULT_LIMITS = {
+  chats: 24,
+  files: 40,
+  agents: 24,
+  skills: 24,
+  actions: 10,
+  total: 80,
+} as const
 
 function includesQuery(value: string, query: string) {
   return value.toLowerCase().includes(query.toLowerCase())
@@ -67,9 +75,14 @@ export function SearchModal() {
 
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const deferredQuery = useDeferredValue(debouncedQuery)
 
   // Real data (Phase 3.2)
   const { sessions, files, skills, activity } = useSearchData(scope)
+  const searchableFiles = useMemo(
+    () => files.filter((entry) => entry.type === 'file'),
+    [files],
+  )
 
   const quickActions = useMemo<Array<QuickAction>>(
     () => [
@@ -199,11 +212,16 @@ export function SearchModal() {
   }, [isOpen])
 
   const resultItems = useMemo<Array<SearchResultItemData>>(() => {
-    const normalized = debouncedQuery.trim()
+    const normalized = deferredQuery.trim()
     if (!normalized) return []
 
     // Real sessions data
-    const chats = filterResults(sessions, normalized, ['friendlyId', 'key', 'title']).map<SearchResultItemData>((entry) => ({
+    const chats = filterResults(
+      sessions,
+      normalized,
+      ['friendlyId', 'key', 'title'],
+      RESULT_LIMITS.chats,
+    ).map<SearchResultItemData>((entry) => ({
       id: entry.id,
       scope: 'chats',
       icon: <HugeiconsIcon icon={Chat01Icon} size={20} strokeWidth={1.5} />,
@@ -220,7 +238,12 @@ export function SearchModal() {
     }))
 
     // Real files data
-    const fileResults = filterResults(files.filter((f) => f.type === 'file'), normalized, ['path', 'name']).map<SearchResultItemData>((entry) => ({
+    const fileResults = filterResults(
+      searchableFiles,
+      normalized,
+      ['path', 'name'],
+      RESULT_LIMITS.files,
+    ).map<SearchResultItemData>((entry) => ({
       id: entry.id,
       scope: 'files',
       icon: <HugeiconsIcon icon={File01Icon} size={20} strokeWidth={1.5} />,
@@ -235,7 +258,12 @@ export function SearchModal() {
     }))
 
     // Real activity data
-    const activityResults = filterResults(activity, normalized, ['title', 'detail', 'source']).map<SearchResultItemData>((entry) => ({
+    const activityResults = filterResults(
+      activity,
+      normalized,
+      ['title', 'detail', 'source'],
+      RESULT_LIMITS.agents,
+    ).map<SearchResultItemData>((entry) => ({
       id: entry.id,
       scope: 'agents',
       icon: <HugeiconsIcon icon={AiBrain01Icon} size={20} strokeWidth={1.5} />,
@@ -250,7 +278,12 @@ export function SearchModal() {
     }))
 
     // Real skills data (static)
-    const skillResults = filterResults(skills, normalized, ['name', 'description']).map<SearchResultItemData>((entry) => ({
+    const skillResults = filterResults(
+      skills,
+      normalized,
+      ['name', 'description'],
+      RESULT_LIMITS.skills,
+    ).map<SearchResultItemData>((entry) => ({
       id: entry.id,
       scope: 'skills',
       icon: <HugeiconsIcon icon={LanguageSkillIcon} size={20} strokeWidth={1.5} />,
@@ -264,9 +297,10 @@ export function SearchModal() {
       },
     }))
 
-    const actions = quickActions
-      .filter((entry) => includesQuery(`${entry.label} ${entry.description}`, normalized))
-      .map<SearchResultItemData>((entry) => ({
+    const actions: Array<SearchResultItemData> = []
+    for (const entry of quickActions) {
+      if (!includesQuery(`${entry.label} ${entry.description}`, normalized)) continue
+      actions.push({
         id: entry.id,
         scope: 'actions',
         icon: (
@@ -286,7 +320,9 @@ export function SearchModal() {
         snippet: entry.description,
         meta: 'Action',
         onSelect: entry.onSelect,
-      }))
+      })
+      if (actions.length >= RESULT_LIMITS.actions) break
+    }
 
     if (scope === 'chats') return chats
     if (scope === 'files') return fileResults
@@ -294,12 +330,25 @@ export function SearchModal() {
     if (scope === 'skills') return skillResults
     if (scope === 'actions') return actions
 
-    return [...chats, ...fileResults, ...activityResults, ...skillResults, ...actions]
-  }, [debouncedQuery, navigate, quickActions, scope, sessions, files, skills, activity, closeModal])
+    return [...chats, ...fileResults, ...activityResults, ...skillResults, ...actions].slice(
+      0,
+      RESULT_LIMITS.total,
+    )
+  }, [
+    activity,
+    closeModal,
+    deferredQuery,
+    navigate,
+    quickActions,
+    scope,
+    searchableFiles,
+    sessions,
+    skills,
+  ])
 
   useEffect(() => {
     setSelectedIndex(0)
-  }, [debouncedQuery, scope])
+  }, [deferredQuery, scope])
 
   useEffect(() => {
     if (selectedIndex < resultItems.length) return

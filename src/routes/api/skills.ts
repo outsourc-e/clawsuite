@@ -705,10 +705,14 @@ function sortSkills(items: Array<SkillIndexRecord>, sort: SkillsSort): Array<Ski
 async function inflateSkillSummaries(
   items: Array<SkillIndexRecord>,
   installedLookup: Set<string>,
+  options?: { includeFileCount?: boolean },
 ): Promise<Array<SkillSummary>> {
+  const includeFileCount = options?.includeFileCount !== false
   const output: Array<SkillSummary> = []
   for (const item of items) {
-    const fileCount = await countFilesInFolder(item.folderPath)
+    const fileCount = includeFileCount
+      ? await countFilesInFolder(item.folderPath)
+      : 0
     const installed = installedLookup.has(item.name.toLowerCase())
       || installedLookup.has(item.slug.toLowerCase())
       || installedLookup.has(item.id.toLowerCase())
@@ -848,6 +852,7 @@ export const Route = createFileRoute('/api/skills')({
 
           const rawSearch = (url.searchParams.get('search') || '').trim()
           const category = (url.searchParams.get('category') || 'All').trim()
+          const summaryMode = (url.searchParams.get('summary') || '').trim()
           const sortParam = (url.searchParams.get('sort') || 'name').trim()
           const sort: SkillsSort =
             sortParam === 'category' || sortParam === 'name'
@@ -890,7 +895,11 @@ export const Route = createFileRoute('/api/skills')({
           const start = (page - 1) * limit
           const paged = filtered.slice(start, start + limit)
 
-          const skills = await inflateSkillSummaries(paged, installedLookup)
+          const skills = await inflateSkillSummaries(
+            paged,
+            installedLookup,
+            { includeFileCount: summaryMode !== 'search' },
+          )
 
           return json({
             skills,

@@ -14,14 +14,23 @@ import {
   ComputerTerminal01Icon,
   SidebarLeft01Icon,
 } from '@hugeicons/core-free-icons'
-import type { Terminal } from 'xterm'
 import type { FitAddon } from 'xterm-addon-fit'
+import type * as FitAddonModule from 'xterm-addon-fit'
+import type { Terminal } from 'xterm'
+import type * as XtermModule from 'xterm'
+import type * as WebLinksAddonModule from 'xterm-addon-web-links'
+import type { DebugAnalysis } from '@/components/terminal/debug-panel'
+import type { TerminalTab } from '@/stores/terminal-panel-store'
+import { DebugPanel } from '@/components/terminal/debug-panel'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 
 // Dynamic imports to avoid SSR crash (xterm uses `self` which doesn't exist on server)
 let xtermLoaded = false
-let TerminalCtor: typeof import('xterm').Terminal
-let FitAddonCtor: typeof import('xterm-addon-fit').FitAddon
-let WebLinksAddonCtor: typeof import('xterm-addon-web-links').WebLinksAddon
+let TerminalCtor: typeof XtermModule.Terminal
+let FitAddonCtor: typeof FitAddonModule.FitAddon
+let WebLinksAddonCtor: typeof WebLinksAddonModule.WebLinksAddon
 
 async function ensureXterm() {
   if (xtermLoaded) return
@@ -37,13 +46,6 @@ async function ensureXterm() {
   WebLinksAddonCtor = linksMod.WebLinksAddon
   xtermLoaded = true
 }
-import type {TerminalTab} from '@/stores/terminal-panel-store';
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import {
-  
-  useTerminalPanelStore
-} from '@/stores/terminal-panel-store'
 
 type ContextMenuState = {
   tabId: string
@@ -67,6 +69,51 @@ type TerminalSessionResponse = {
 const DEFAULT_TERMINAL_CWD = '~/.openclaw/workspace'
 const TERMINAL_BG = '#0d0d0d'
 
+function toDebugAnalysis(value: unknown): DebugAnalysis | null {
+  if (!value || typeof value !== 'object') return null
+  const entry = value as Record<string, unknown>
+  const summary =
+    typeof entry.summary === 'string' ? entry.summary.trim() : ''
+  const rootCause =
+    typeof entry.rootCause === 'string' ? entry.rootCause.trim() : ''
+  const rawCommands = Array.isArray(entry.suggestedCommands)
+    ? entry.suggestedCommands
+    : []
+
+  if (!summary || !rootCause) return null
+
+  const suggestedCommands = rawCommands
+    .map(function mapCommand(commandEntry) {
+      if (!commandEntry || typeof commandEntry !== 'object') return null
+      const command = commandEntry as Record<string, unknown>
+      const commandText =
+        typeof command.command === 'string' ? command.command.trim() : ''
+      const descriptionText =
+        typeof command.description === 'string'
+          ? command.description.trim()
+          : ''
+      if (!commandText || !descriptionText) return null
+      return { command: commandText, description: descriptionText }
+    })
+    .filter(function removeNulls(
+      command,
+    ): command is { command: string; description: string } {
+      return Boolean(command)
+    })
+
+  const docsLink =
+    typeof entry.docsLink === 'string' && entry.docsLink.trim()
+      ? entry.docsLink.trim()
+      : undefined
+
+  return {
+    summary,
+    rootCause,
+    suggestedCommands,
+    ...(docsLink ? { docsLink } : {}),
+  }
+}
+
 export function TerminalWorkspace({
   mode,
   panelVisible = true,
@@ -86,6 +133,9 @@ export function TerminalWorkspace({
   const setTabStatus = useTerminalPanelStore((state) => state.setTabStatus)
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [debugAnalysis, setDebugAnalysis] = useState<DebugAnalysis | null>(null)
+  const [debugLoading, setDebugLoading] = useState(false)
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
 
   const containerMapRef = useRef(new Map<string, HTMLDivElement>())
   const terminalMapRef = useRef(new Map<string, Terminal>())
@@ -130,6 +180,80 @@ export function TerminalWorkspace({
     }).catch(function ignore() {
       return undefined
     })
+  }, [])
+
+  const captureRecentTerminalOutput = useCallback(
+    function captureRecentTerminalOutput(tabId: string): string {
+      const terminal = terminalMapRef.current.get(tabId)
+      if (!terminal) return ''
+
+      const buffer = terminal.buffer.active
+      const startLine = Math.max(0, buffer.length - 100)
+      const recentLines: Array<string> = []
+
+      for (let index = startLine; index < buffer.length; index += 1) {
+        const line = buffer.getLine(index)
+        if (!line) continue
+        recentLines.push(line.translateToString(true))
+      }
+
+      return recentLines.join('\n').trim()
+    },
+    [],
+  )
+
+  const handleAnalyzeDebug = useCallback(
+    async function handleAnalyzeDebug() {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+      if (!activeTab) return
+
+      setShowDebugPanel(true)
+      setDebugLoading(true)
+      setDebugAnalysis(null)
+
+      try {
+        const terminalOutput = captureRecentTerminalOutput(activeTab.id)
+        const response = await fetch('/api/debug-analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ terminalOutput }),
+        })
+
+        const payload = (await response.json().catch(function fallback() {
+          return null
+        })) as unknown
+
+        const analysis = toDebugAnalysis(payload)
+        if (!analysis) {
+          throw new Error('Invalid analysis response payload')
+        }
+
+        setDebugAnalysis(analysis)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setDebugAnalysis({
+          summary: 'Debug analysis failed.',
+          rootCause: message,
+          suggestedCommands: [],
+        })
+      } finally {
+        setDebugLoading(false)
+      }
+    },
+    [activeTab, captureRecentTerminalOutput],
+  )
+
+  const handleRunDebugCommand = useCallback(
+    function handleRunDebugCommand(command: string) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+      if (!activeTab) return
+      void sendInput(activeTab.id, `${command}\r`)
+    },
+    [activeTab, sendInput],
+  )
+
+  const handleCloseDebugPanel = useCallback(function handleCloseDebugPanel() {
+    setShowDebugPanel(false)
   }, [])
 
   const focusActiveTerminal = useCallback(
@@ -183,6 +307,7 @@ export function TerminalWorkspace({
         void closeTabResources(tab.id, tab.sessionId)
       }
       closeAllTabs()
+      setShowDebugPanel(false)
       if (onClosePanel) onClosePanel()
     },
     [closeAllTabs, closeTabResources, onClosePanel],
@@ -463,7 +588,7 @@ export function TerminalWorkspace({
   }, [])
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-primary-50">
+    <div className="relative flex h-full min-h-0 flex-col bg-primary-50">
       {mode === 'fullscreen' ? (
         <div className="flex h-11 items-center border-b border-primary-300 bg-primary-100 px-2 text-sm font-medium">
           <Button size="sm" variant="ghost" className="mr-2" onClick={onBack}>
@@ -549,6 +674,15 @@ export function TerminalWorkspace({
 
         <div className="flex items-center gap-0.5">
           <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleAnalyzeDebug}
+            disabled={debugLoading}
+            aria-label="Analyze terminal output"
+          >
+            🔍 Debug
+          </Button>
+          <Button
             size="icon-sm"
             variant="ghost"
             onClick={handleCreateTab}
@@ -615,6 +749,15 @@ export function TerminalWorkspace({
           )
         })}
       </div>
+
+      {showDebugPanel ? (
+        <DebugPanel
+          analysis={debugAnalysis}
+          isLoading={debugLoading}
+          onRunCommand={handleRunDebugCommand}
+          onClose={handleCloseDebugPanel}
+        />
+      ) : null}
 
       {contextMenu ? (
         <div

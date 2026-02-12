@@ -81,19 +81,60 @@ const IGNORED_DIRS = new Set([
   '__pycache__', '.venv', 'dist', '.DS_Store',
 ])
 
-async function readDirectory(dirPath: string, depth = 0): Promise<Array<FileEntry>> {
-  if (depth > 8) return [] // prevent infinite recursion on deep trees
+const MAX_DIRECTORY_DEPTH = 8
+const MAX_DIRECTORY_ENTRIES = 20_000
+
+type ReadDirectoryOptions = {
+  maxDepth: number
+  maxEntries: number | null
+  countedEntries: { value: number }
+}
+
+function parseMaxDepth(input: string | null): number | null {
+  if (!input) return null
+  const parsed = Number(input)
+  if (!Number.isFinite(parsed)) return null
+  return Math.min(MAX_DIRECTORY_DEPTH, Math.max(0, Math.floor(parsed)))
+}
+
+function parseMaxEntries(input: string | null): number | null {
+  if (!input) return null
+  const parsed = Number(input)
+  if (!Number.isFinite(parsed)) return null
+  return Math.min(MAX_DIRECTORY_ENTRIES, Math.max(1, Math.floor(parsed)))
+}
+
+async function readDirectory(
+  dirPath: string,
+  depth: number,
+  options: ReadDirectoryOptions,
+): Promise<Array<FileEntry>> {
+  if (depth > options.maxDepth) return []
+  if (
+    options.maxEntries !== null &&
+    options.countedEntries.value >= options.maxEntries
+  ) {
+    return []
+  }
+
   const entries = await fs.readdir(dirPath, { withFileTypes: true })
   const mapped: Array<FileEntry> = []
 
   for (const entry of entries) {
+    if (
+      options.maxEntries !== null &&
+      options.countedEntries.value >= options.maxEntries
+    ) {
+      break
+    }
+
     if (IGNORED_DIRS.has(entry.name)) continue
     const fullPath = path.join(dirPath, entry.name)
     const relativePath = toRelative(fullPath)
     try {
       const stats = await fs.stat(fullPath)
       if (entry.isDirectory()) {
-        const children = await readDirectory(fullPath, depth + 1)
+        const children = await readDirectory(fullPath, depth + 1, options)
         mapped.push({
           name: entry.name,
           path: relativePath,
@@ -111,6 +152,7 @@ async function readDirectory(dirPath: string, depth = 0): Promise<Array<FileEntr
           modifiedAt: stats.mtime.toISOString(),
         })
       }
+      options.countedEntries.value += 1
     } catch {
       // Skip broken symlinks or inaccessible entries
       continue
@@ -177,6 +219,8 @@ export const Route = createFileRoute('/api/files')({
           const url = new URL(request.url)
           const action = url.searchParams.get('action') || 'list'
           const inputPath = url.searchParams.get('path') || ''
+          const maxDepthParam = parseMaxDepth(url.searchParams.get('maxDepth'))
+          const maxEntriesParam = parseMaxEntries(url.searchParams.get('maxEntries'))
 
           if (action === 'list' && hasGlob(inputPath)) {
             const globListing = await readGlobDirectory(inputPath)
@@ -218,7 +262,11 @@ export const Route = createFileRoute('/api/files')({
             })
           }
 
-          const tree = await readDirectory(resolvedPath)
+          const tree = await readDirectory(resolvedPath, 0, {
+            maxDepth: maxDepthParam ?? MAX_DIRECTORY_DEPTH,
+            maxEntries: maxEntriesParam,
+            countedEntries: { value: 0 },
+          })
           return json({
             root: toRelative(resolvedPath),
             base: WORKSPACE_ROOT,
