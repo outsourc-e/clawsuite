@@ -646,13 +646,6 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/new',
-      icon: PencilEdit02Icon,
-      label: 'New Session',
-      active: isNewSessionActive,
-    },
-    {
-      kind: 'link',
       to: '/browser',
       icon: GlobeIcon,
       label: 'Browser',
@@ -676,28 +669,28 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/skills',
       icon: PuzzleIcon,
-      label: 'Skills+',
+      label: 'Skills',
       active: isSkillsActive,
     },
     {
       kind: 'link',
       to: '/cron',
       icon: Clock01Icon,
-      label: 'Cron+',
+      label: 'Cron Jobs',
       active: isCronActive,
     },
     {
       kind: 'link',
       to: '/activity',
       icon: ListViewIcon,
-      label: 'Logs+',
+      label: 'Logs',
       active: isLogsActive,
     },
     {
       kind: 'link',
       to: '/debug',
       icon: Notification03Icon,
-      label: 'Debug+',
+      label: 'Debug',
       active: isDebugActive,
       badge: showDebugErrorDot ? 'error-dot' : undefined,
     },
@@ -705,14 +698,14 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/files',
       icon: File01Icon,
-      label: 'Files+',
+      label: 'Files',
       active: isFilesActive,
     },
     {
       kind: 'link',
       to: '/memory',
       icon: BrainIcon,
-      label: 'Memory+',
+      label: 'Memory',
       active: isMemoryActive,
     },
   ]
@@ -845,8 +838,26 @@ function ChatSidebarComponent({
         </motion.div>
       </div>
 
+      {/* ── New Session button ──────────────────────────────────────── */}
+      {!isCollapsed && (
+        <div className="px-2 pb-1">
+          <Link
+            to="/new"
+            onClick={onSelectSession}
+            className={cn(
+              buttonVariants({ variant: 'ghost', size: 'sm' }),
+              'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200',
+              isNewSessionActive && 'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15',
+            )}
+          >
+            <HugeiconsIcon icon={PencilEdit02Icon} size={20} strokeWidth={1.5} className="size-5 shrink-0" />
+            <span>New Session</span>
+          </Link>
+        </div>
+      )}
+
       {/* ── Navigation sections ─────────────────────────────────────── */}
-      <div className="mb-2 space-y-0.5 px-2 overflow-y-auto scrollbar-thin">
+      <div className="flex-1 min-h-0 space-y-0.5 px-2 overflow-y-auto scrollbar-thin">
         {/* SUITE */}
         <SectionLabel
           label="Suite"
