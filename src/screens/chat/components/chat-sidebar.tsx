@@ -485,7 +485,7 @@ function ChatSidebarComponent({
   // Route active states
   const isDashboardActive = pathname === '/dashboard'
   const isAgentSwarmActive = pathname === '/agent-swarm'
-  const isNewSessionActive = pathname === '/new'
+  const isNewSessionActive = pathname === '/new' || pathname === '/chat/new'
   const isBrowserActive = pathname === '/browser'
   const isTerminalActive = pathname === '/terminal'
   const isTasksActive = pathname === '/tasks'
@@ -842,7 +842,8 @@ function ChatSidebarComponent({
       {!isCollapsed && (
         <div className="px-2 pb-1">
           <Link
-            to="/new"
+            to="/chat/$sessionKey"
+            params={{ sessionKey: 'new' }}
             onClick={onSelectSession}
             className={cn(
               buttonVariants({ variant: 'ghost', size: 'sm' }),
