@@ -160,6 +160,7 @@ export function useGatewayChatStream(options: UseGatewayChatStreamOptions = {}) 
           errorMessage?: string
           runId?: string
           sessionKey: string
+          message?: GatewayMessage
         }
         processEvent({ type: 'done', ...data })
         onDone?.(data.state, data.sessionKey)

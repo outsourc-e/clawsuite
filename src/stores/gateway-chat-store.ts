@@ -157,6 +157,20 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const streamingMap = new Map(state.streamingState)
         const streaming = streamingMap.get(sessionKey)
         
+        // If done event includes a message and we didn't stream it, add it directly
+        if ((!streaming || !streaming.text) && event.message) {
+          const messages = new Map(state.realtimeMessages)
+          const sessionMessages = [...(messages.get(sessionKey) ?? [])]
+          const doneMessage: GatewayMessage = {
+            ...event.message,
+            timestamp: now,
+            __streamingStatus: 'complete' as any,
+          }
+          sessionMessages.push(doneMessage)
+          messages.set(sessionKey, sessionMessages)
+          set({ realtimeMessages: messages })
+        }
+
         if (streaming && streaming.text) {
           // Convert streaming state to a complete message
           const messages = new Map(state.realtimeMessages)
