@@ -3,8 +3,9 @@
  * Fetches sessions, files, and activity from existing sources
  */
 import { useQuery } from '@tanstack/react-query'
-import type { ActivityEvent } from '@/types/activity-event'
-import { useActivityEvents } from '@/screens/activity/use-activity-events'
+// import type { ActivityEvent } from '@/types/activity-event'
+// Activity events disabled in search — SSE connection caused freezing
+// import { useActivityEvents } from '@/screens/activity/use-activity-events'
 
 export type SearchSession = {
   id: string
@@ -128,20 +129,8 @@ export function useSearchData(scope: 'all' | 'chats' | 'files' | 'agents' | 'ski
     staleTime: 60_000,
   })
 
-  // Activity events (from existing hook)
-  const { events } = useActivityEvents({
-    initialCount: 100,
-    maxEvents: 200,
-  })
-
-  const activityResults: Array<SearchActivity> = events.map((event: ActivityEvent) => ({
-    id: event.id,
-    title: event.title,
-    detail: event.detail,
-    timestamp: event.timestamp,
-    level: event.level,
-    source: event.source,
-  }))
+  // Activity events disabled — SSE to /api/events caused UI freeze
+  const activityResults: Array<SearchActivity> = []
 
   return {
     sessions: sessionsQuery.data || [],
