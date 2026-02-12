@@ -31,7 +31,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
 import { useRenameSession } from '../hooks/use-rename-session'
-import { SettingsDialog } from './settings-dialog'
+import { SettingsDialog } from '@/components/settings-dialog'
 import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
@@ -946,7 +946,9 @@ function ChatSidebarComponent({
           </MenuTrigger>
           <MenuContent side="top" align="start" className="min-w-[200px]">
             <MenuItem
-              render={<Link to="/settings" />}
+              onClick={function onOpenSettings() {
+                setSettingsOpen(true)
+              }}
               className="justify-between"
             >
               <span className="flex items-center gap-2">
@@ -978,16 +980,6 @@ function ChatSidebarComponent({
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-        pathsLoading={pathsLoading}
-        pathsError={pathsError}
-        paths={paths}
-        onClose={closeSettings}
-        onCopySessionsDir={copySessionsDir}
-        onCopyStorePath={copyStorePath}
-        onOpenProviders={function onOpenProviders() {
-          setSettingsOpen(false)
-          setProvidersOpen(true)
-        }}
       />
 
       <ProvidersDialog open={providersOpen} onOpenChange={setProvidersOpen} />

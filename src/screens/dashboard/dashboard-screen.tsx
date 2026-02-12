@@ -34,6 +34,7 @@ import { useVisibleWidgets } from './hooks/use-visible-widgets'
 import type { ResponsiveLayouts } from 'react-grid-layout'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { SettingsDialog } from '@/components/settings-dialog'
 import {
   chatQueryKeys,
   fetchGatewayStatus,
@@ -102,7 +103,7 @@ export function DashboardScreen() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [gridLayouts, setGridLayouts] = useState<ResponsiveLayouts>(loadLayouts)
-  // refresh removed from header — data auto-refreshes via query intervals
+  const [dashSettingsOpen, setDashSettingsOpen] = useState(false)
   const { visibleIds, addWidget, removeWidget, resetVisible } =
     useVisibleWidgets()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -231,6 +232,7 @@ export function DashboardScreen() {
   )
 
   return (
+    <>
     <main className="h-full overflow-y-auto bg-primary-100/45 px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <section className="mx-auto w-full max-w-[1600px]">
         <header className="relative z-20 mb-4 rounded-xl border border-primary-200 bg-primary-50/95 px-4 py-3 shadow-sm md:mb-5 md:px-5">
@@ -267,7 +269,7 @@ export function DashboardScreen() {
                 <NotificationsPopover />
                 <button
                   type="button"
-                  onClick={() => void navigate({ to: '/settings' })}
+                  onClick={() => setDashSettingsOpen(true)}
                   className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 hover:text-accent-600"
                   aria-label="Settings"
                   title="Settings"
@@ -383,5 +385,8 @@ export function DashboardScreen() {
         </div>
       </section>
     </main>
+
+    <SettingsDialog open={dashSettingsOpen} onOpenChange={setDashSettingsOpen} />
+    </>
   )
 }
