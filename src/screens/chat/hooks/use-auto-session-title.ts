@@ -12,6 +12,8 @@ import { generateSessionTitle } from '@/utils/generate-session-title'
 
 const MIN_MESSAGES_FOR_TITLE = 2
 const MAX_MESSAGES_FOR_TITLE = 50
+const MAX_SNIPPET_MESSAGES = 4
+const SUBSTANTIVE_FIRST_USER_CHARS = 20
 
 const GENERIC_TITLE_PATTERNS = [
   /^a new session/i,
@@ -27,29 +29,31 @@ function isGenericTitle(title: string): boolean {
   if (!trimmed || trimmed === 'New Session') return true
   return GENERIC_TITLE_PATTERNS.some(pattern => pattern.test(trimmed))
 }
-const MAX_PER_MESSAGE_CHARS = 400
+const MAX_PER_MESSAGE_CHARS = 600
 
 function buildSnippet(messages: Array<GatewayMessage>) {
-  let firstUser: string | null = null
-  let firstAssistant: string | null = null
+  const snippet: Array<{ role: string; text: string }> = []
 
   for (const message of messages) {
-    if (message.role === 'user' && firstUser === null) {
-      const text = textFromMessage(message)
-      if (text) firstUser = text.slice(0, MAX_PER_MESSAGE_CHARS)
-      continue
-    }
-    if (message.role === 'assistant' && firstUser && firstAssistant === null) {
-      const text = textFromMessage(message)
-      if (text) firstAssistant = text.slice(0, MAX_PER_MESSAGE_CHARS)
-    }
-    if (firstUser && firstAssistant) break
+    if (message.role !== 'user' && message.role !== 'assistant') continue
+    const text = textFromMessage(message)
+    if (!text) continue
+    snippet.push({
+      role: message.role,
+      text: text.slice(0, MAX_PER_MESSAGE_CHARS),
+    })
+    if (snippet.length >= MAX_SNIPPET_MESSAGES) break
   }
 
-  const snippet: Array<{ role: string; text: string }> = []
-  if (firstUser) snippet.push({ role: 'user', text: firstUser })
-  if (firstAssistant) snippet.push({ role: 'assistant', text: firstAssistant })
   return snippet
+}
+
+function requiredMessagesForTitle(snippet: Array<{ role: string; text: string }>) {
+  const firstUser = snippet.find((message) => message.role === 'user')
+  if ((firstUser?.text.trim().length ?? 0) > SUBSTANTIVE_FIRST_USER_CHARS) {
+    return 1
+  }
+  return MIN_MESSAGES_FOR_TITLE
 }
 
 function countRelevantMessages(messages: Array<GatewayMessage>) {
@@ -123,13 +127,18 @@ export function useAutoSessionTitle({
     return countRelevantMessages(messages)
   }, [messageCount, messages])
 
+  const minMessagesForThisSnippet = useMemo(
+    () => requiredMessagesForTitle(snippet),
+    [snippet],
+  )
+
   const shouldGenerate = useMemo(() => {
     if (!enabled) return false
     if (!friendlyId || friendlyId === 'new') return false
     if (!sessionKey || sessionKey === 'new') return false
     if (!snippetSignature) return false
-    if (snippet.length < 2) return false
-    if (resolvedMessageCount < MIN_MESSAGES_FOR_TITLE) return false
+    if (snippet.length < minMessagesForThisSnippet) return false
+    if (resolvedMessageCount < minMessagesForThisSnippet) return false
     if (resolvedMessageCount > MAX_MESSAGES_FOR_TITLE) return false
     if (activeSession?.label || activeSession?.title) return false
     if (activeSession?.derivedTitle && activeSession.titleSource === 'auto' && !isGenericTitle(activeSession.derivedTitle))
@@ -144,6 +153,7 @@ export function useAutoSessionTitle({
     activeSession?.titleSource,
     enabled,
     friendlyId,
+    minMessagesForThisSnippet,
     resolvedMessageCount,
     sessionKey,
     snippet.length,
@@ -196,7 +206,7 @@ export function useAutoSessionTitle({
           friendlyId: payload.friendlyId,
           sessionKey: payload.sessionKey,
           messages: payload.snippet,
-          maxWords: 5,
+          maxWords: 6,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as GenerateTitleResponse

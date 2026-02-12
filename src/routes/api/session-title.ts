@@ -1,9 +1,27 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
+import { generateSessionTitle } from '@/utils/generate-session-title'
 
 const MAX_MESSAGES = 8
-const MAX_CHAR_PER_MESSAGE = 400
+const MAX_CHAR_PER_MESSAGE = 600
+const SUBSTANTIVE_FIRST_USER_CHARS = 20
+
+const GENERIC_TITLE_PATTERNS = [
+  /^a new session/i,
+  /^new session/i,
+  /^untitled/i,
+  /^session \d/i,
+  /^conversation$/i,
+  /^chat$/i,
+  /^\w{8} \(\d{4}-\d{2}-\d{2}\)$/,
+]
+
+function isGenericTitle(title: string): boolean {
+  const trimmed = title.trim()
+  if (!trimmed) return true
+  return GENERIC_TITLE_PATTERNS.some((pattern) => pattern.test(trimmed))
+}
 
 function normalizeMessages(raw: unknown): Array<{ role: string; text: string }> {
   if (!Array.isArray(raw)) return []
@@ -25,56 +43,24 @@ function normalizeMessages(raw: unknown): Array<{ role: string; text: string }> 
   return normalized
 }
 
-function toTitleCase(text: string): string {
-  return text
-    .split(/\s+/)
-    .map((word) => {
-      if (!word) return ''
-      const lower = word.toLowerCase()
-      return `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`
-    })
-    .filter(Boolean)
-    .join(' ')
+function minimumMessagesForTitle(
+  messages: Array<{ role: string; text: string }>,
+): number {
+  const firstUser = messages.find((message) => message.role === 'user')
+  if ((firstUser?.text.trim().length ?? 0) > SUBSTANTIVE_FIRST_USER_CHARS) {
+    return 1
+  }
+  return 2
 }
 
-function fallbackTitle(messages: Array<{ role: string; text: string }>): string {
-  const firstUser = messages.find((msg) => msg.role === 'user')
-  if (!firstUser) return ''
-
-  let text = firstUser.text.trim()
-
-  // Strip common prefixes/noise
-  text = text
-    .replace(/^(hey|hi|hello|ok|okay|so|well|please|can you|could you|i want to|i need to|let's|lets)\s+/i, '')
-    .trim()
-
-  // If it's a question, try to capture the topic
-  const questionMatch = text.match(/(?:what|how|why|where|when|who|which|can|could|should|would|is|are|do|does)\s+(.+?)(?:\?|$)/i)
-  if (questionMatch) {
-    text = questionMatch[1].trim()
-  }
-
-  // If there's a code block or long text, extract the first meaningful line
-  if (text.includes('\n')) {
-    const firstLine = text.split('\n').find(line => line.trim().length > 5)
-    if (firstLine) text = firstLine.trim()
-  }
-
-  // Remove markdown formatting
-  text = text.replace(/[#*`_~[\]()]/g, '').trim()
-
-  // Take first 5-7 meaningful words
-  const words = text
-    .split(/\s+/)
-    .filter(w => w.length > 1)
-    .slice(0, 6)
-
-  if (!words.length) return ''
-
-  const title = toTitleCase(words.join(' '))
-
-  // Ensure it's not too long
-  return title.length > 45 ? title.slice(0, 45).trim() : title
+function fallbackTitle(
+  messages: Array<{ role: string; text: string }>,
+  maxWords: number,
+): string {
+  return generateSessionTitle(messages, {
+    maxLength: 48,
+    maxWords,
+  })
 }
 
 type GatewayTitleResponse = {
@@ -104,7 +90,7 @@ export const Route = createFileRoute('/api/session-title')({
           const messages = normalizeMessages(body.messages)
           const maxWords = Math.max(
             3,
-            Math.min(7, Number(body.maxWords) || 5),
+            Math.min(8, Number(body.maxWords) || 6),
           )
 
           if (!sessionKey && !friendlyId) {
@@ -114,7 +100,7 @@ export const Route = createFileRoute('/api/session-title')({
             )
           }
 
-          if (messages.length < 2) {
+          if (messages.length < minimumMessagesForTitle(messages)) {
             return json(
               { ok: false, error: 'insufficient message context' },
               { status: 400 },
@@ -123,6 +109,7 @@ export const Route = createFileRoute('/api/session-title')({
 
           let title = ''
           let usedFallback = false
+          let gatewayError = ''
 
           try {
             const payload = await gatewayRpc<GatewayTitleResponse>(
@@ -139,29 +126,30 @@ export const Route = createFileRoute('/api/session-title')({
               title = payload.title.trim()
             }
           } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : String(err)
-            if (!title) {
-              const fallback = fallbackTitle(messages)
-              if (fallback) {
-                usedFallback = true
-                title = fallback
-              } else {
-                return json(
-                  {
-                    ok: false,
-                    error: errorMessage || 'failed to generate title',
-                  },
-                  { status: 502 },
-                )
-              }
+            gatewayError = err instanceof Error ? err.message : String(err)
+          }
+
+          if (title && isGenericTitle(title)) {
+            const fallback = fallbackTitle(messages, maxWords)
+            if (fallback) {
+              title = fallback
+              usedFallback = true
             }
           }
 
           if (!title) {
-            const fallback = fallbackTitle(messages)
+            const fallback = fallbackTitle(messages, maxWords)
             if (fallback) {
               title = fallback
               usedFallback = true
+            } else if (gatewayError) {
+              return json(
+                {
+                  ok: false,
+                  error: gatewayError || 'failed to generate title',
+                },
+                { status: 502 },
+              )
             }
           }
 

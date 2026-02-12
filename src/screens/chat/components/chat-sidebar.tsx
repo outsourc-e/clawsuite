@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowDown01Icon,
+  Cancel01Icon,
   BotIcon,
   BrainIcon,
   ChartLineData01Icon,
@@ -25,12 +26,13 @@ import {
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
 import { useRenameSession } from '../hooks/use-rename-session'
+import { textFromMessage } from '../utils'
 import { SettingsDialog } from './settings-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
@@ -62,6 +64,7 @@ import {
   MenuContent,
   MenuItem,
 } from '@/components/ui/menu'
+import { Input } from '@/components/ui/input'
 
 type ChatSidebarProps = {
   sessions: Array<SessionMeta>
@@ -80,6 +83,11 @@ type ChatSidebarProps = {
 
 type RecentEventsResponse = {
   events?: Array<unknown>
+}
+
+type SessionSearchEntry = {
+  session: SessionMeta
+  searchText: string
 }
 
 const DEBUG_ERROR_WINDOW_MS = 5 * 60 * 1000
@@ -119,6 +127,35 @@ async function fetchHasRecentIssues(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+function getSessionSearchTitle(session: SessionMeta): string {
+  const label = session.label?.trim()
+  if (label) return label
+  const title = session.title?.trim()
+  if (title) return title
+  const derivedTitle = session.derivedTitle?.trim()
+  if (derivedTitle) return derivedTitle
+  const friendlyId = session.friendlyId?.trim()
+  if (friendlyId) return `Session ${friendlyId.slice(0, 8)}`
+  return 'Session'
+}
+
+function getSessionSearchPreview(session: SessionMeta): string {
+  if (!session.lastMessage) return ''
+  return textFromMessage(session.lastMessage).trim()
+}
+
+function buildSessionSearchText(session: SessionMeta): string {
+  const searchParts = [
+    getSessionSearchTitle(session),
+    session.label ?? '',
+    session.title ?? '',
+    session.derivedTitle ?? '',
+    session.friendlyId ?? '',
+    getSessionSearchPreview(session),
+  ]
+  return searchParts.join('\n').toLocaleLowerCase()
 }
 
 // ── Reusable nav item ───────────────────────────────────────────────────
@@ -480,6 +517,8 @@ function ChatSidebarComponent({
       return state.location.pathname
     },
   })
+  const sessionSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const [sessionSearchValue, setSessionSearchValue] = useState('')
 
   // Route active states
   const isDashboardActive = pathname === '/dashboard'
@@ -528,6 +567,30 @@ function ChatSidebarComponent({
     retry: false,
   })
   const showDebugErrorDot = Boolean(recentIssuesQuery.data)
+
+  const normalizedSessionSearch = sessionSearchValue.trim().toLocaleLowerCase()
+  const isSessionSearchActive = normalizedSessionSearch.length > 0
+  const sessionSearchIndex = useMemo<Array<SessionSearchEntry>>(() => {
+    return sessions.map((session) => ({
+      session,
+      searchText: buildSessionSearchText(session),
+    }))
+  }, [sessions])
+  const filteredSessions = useMemo(() => {
+    if (!isSessionSearchActive) return sessions
+    const matchedSessions: Array<SessionMeta> = []
+    for (const entry of sessionSearchIndex) {
+      if (entry.searchText.includes(normalizedSessionSearch)) {
+        matchedSessions.push(entry.session)
+      }
+    }
+    return matchedSessions
+  }, [isSessionSearchActive, normalizedSessionSearch, sessionSearchIndex, sessions])
+  const shouldShowNoSessionSearchResults =
+    isSessionSearchActive &&
+    !sessionsLoading &&
+    !sessionsError &&
+    filteredSessions.length === 0
 
   // Collapsible section states
   const [gatewayExpanded, toggleGateway] = usePersistedBool(
@@ -590,6 +653,13 @@ function ChatSidebarComponent({
     setDeleteFriendlyId(null)
   }
 
+  function handleClearSessionSearch() {
+    setSessionSearchValue('')
+    const input = sessionSearchInputRef.current
+    if (!input) return
+    input.focus()
+  }
+
   const asideProps = {
     className:
       'border-r border-primary-200 h-full overflow-hidden bg-primary-50 dark:bg-primary-100 flex flex-col',
@@ -611,6 +681,32 @@ function ChatSidebarComponent({
       )
     }
   }, [handleOpenSettings])
+
+  useEffect(() => {
+    function handleSessionSearchShortcut(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing) return
+      if (event.altKey || event.shiftKey) return
+      if (!(event.metaKey || event.ctrlKey)) return
+      if (event.key.toLowerCase() !== 'k') return
+      if (isSearchModalOpen) return
+      if (isCollapsed) return
+      const isChatSessionRoute =
+        pathname === '/new' || pathname.startsWith('/chat/')
+      if (!isChatSessionRoute) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      const input = sessionSearchInputRef.current
+      if (!input) return
+      input.focus()
+      input.select()
+    }
+
+    window.addEventListener('keydown', handleSessionSearchShortcut, true)
+    return () => {
+      window.removeEventListener('keydown', handleSessionSearchShortcut, true)
+    }
+  }, [isCollapsed, isSearchModalOpen, pathname])
 
   // ── Nav definitions ─────────────────────────────────────────────────
 
@@ -896,18 +992,69 @@ function ChatSidebarComponent({
               transition={transition}
               className="flex flex-col w-full min-h-0 h-full"
             >
+              <div className="shrink-0 border-b border-primary-200/60 px-2 py-2">
+                <div className="relative">
+                  <HugeiconsIcon
+                    icon={Search01Icon}
+                    size={20}
+                    strokeWidth={1.5}
+                    className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-primary-500"
+                  />
+                  <Input
+                    ref={sessionSearchInputRef}
+                    value={sessionSearchValue}
+                    onChange={(event) => {
+                      setSessionSearchValue(event.target.value)
+                    }}
+                    placeholder="Search sessions..."
+                    aria-label="Search sessions"
+                    className="h-8.5 bg-primary-50 [&>[data-slot=input]]:pl-9 [&>[data-slot=input]]:pr-8"
+                  />
+                  {isSessionSearchActive ? (
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      onClick={handleClearSessionSearch}
+                      aria-label="Clear session search"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 text-primary-600 hover:bg-primary-200"
+                    >
+                      <HugeiconsIcon
+                        icon={Cancel01Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                    </Button>
+                  ) : null}
+                </div>
+                {isSessionSearchActive && !sessionsLoading && !sessionsError ? (
+                  <div className="px-1 pt-1 text-[11px] text-primary-500 tabular-nums">
+                    Showing {filteredSessions.length} of {sessions.length} sessions
+                  </div>
+                ) : null}
+              </div>
               <div className="flex-1 min-h-0">
-                <SidebarSessions
-                  sessions={sessions}
-                  activeFriendlyId={activeFriendlyId}
-                  onSelect={onSelectSession}
-                  onRename={handleOpenRename}
-                  onDelete={handleOpenDelete}
-                  loading={sessionsLoading}
-                  fetching={sessionsFetching}
-                  error={sessionsError}
-                  onRetry={onRetrySessions}
-                />
+                {shouldShowNoSessionSearchResults ? (
+                  <div className="px-3 py-3 text-xs text-primary-500 text-pretty">
+                    No results for{' '}
+                    <span className="font-medium text-primary-700">
+                      "{sessionSearchValue.trim()}"
+                    </span>
+                    .
+                  </div>
+                ) : (
+                  <SidebarSessions
+                    sessions={filteredSessions}
+                    activeFriendlyId={activeFriendlyId}
+                    onSelect={onSelectSession}
+                    onRename={handleOpenRename}
+                    onDelete={handleOpenDelete}
+                    loading={sessionsLoading}
+                    fetching={sessionsFetching}
+                    error={sessionsError}
+                    onRetry={onRetrySessions}
+                  />
+                )}
               </div>
             </motion.div>
           )}
