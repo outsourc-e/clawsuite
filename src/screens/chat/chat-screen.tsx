@@ -599,6 +599,12 @@ export function ChatScreen({
     setError(null)
     setWaitingForResponse(true)
 
+    // Failsafe: clear waitingForResponse after 120s no matter what
+    // Prevents infinite spinner if SSE/idle detection both fail
+    const failsafeTimer = window.setTimeout(() => {
+      streamFinish()
+    }, 120_000)
+
     const payloadAttachments = normalizedAttachments.map((attachment) => ({
       id: attachment.id,
       name: attachment.name,
@@ -624,10 +630,11 @@ export function ChatScreen({
         if (!res.ok) throw new Error(await readError(res))
         streamStart()
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
+        window.clearTimeout(failsafeTimer)
         const messageText = err instanceof Error ? err.message : String(err)
         if (isMissingGatewayAuth(messageText)) {
-          navigate({ to: '/connect', replace: true })
+          try { navigate({ to: '/connect', replace: true }) } catch { /* router not ready */ }
           return
         }
         if (optimisticClientId) {

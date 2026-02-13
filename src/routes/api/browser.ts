@@ -21,6 +21,24 @@ import { startBrowserStream } from '../../server/browser-stream'
 export const Route = createFileRoute('/api/browser')({
   server: {
     handlers: {
+      GET: async ({ request }) => {
+        const url = new URL(request.url)
+        const action = url.searchParams.get('action') || 'status'
+
+        if (action === 'status' || action === 'proxy-status') {
+          try {
+            return json({ ok: true, proxyUrl: getProxyUrl(), target: getCurrentTarget() })
+          } catch (err) {
+            return json(
+              { ok: false, error: err instanceof Error ? err.message : String(err) },
+              { status: 500 },
+            )
+          }
+        }
+
+        return json({ error: `Unsupported GET action: ${action}` }, { status: 400 })
+      },
+
       POST: async ({ request }) => {
         try {
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>

@@ -97,10 +97,13 @@ export function useRealtimeChatHistory({
   }, [sessionKey, historyMessages, mergeHistoryMessages, lastEventAt])
 
   // Periodic history sync — catch missed messages every 30s
+  // Skip during active streaming to prevent race conditions
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   useEffect(() => {
     if (!sessionKey || sessionKey === 'new' || !enabled) return
     syncIntervalRef.current = setInterval(() => {
+      // Don't poll during active streaming — causes flicker/overwrites
+      if (streamingState !== null) return
       const key = chatQueryKeys.history(friendlyId, sessionKey)
       queryClient.invalidateQueries({ queryKey: key })
     }, 30000)
