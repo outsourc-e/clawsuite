@@ -268,13 +268,23 @@ export function ChatScreen({
     }
   }, [displayMessages, historyMessages, waitingForResponse, streamFinish])
 
-  // Clear waiting state immediately when assistant response appears
+  // Clear waiting state when assistant response appears (min 800ms thinking display)
+  const waitingStartRef = useRef<number>(0)
+  useEffect(() => {
+    if (waitingForResponse) {
+      waitingStartRef.current = Date.now()
+    }
+  }, [waitingForResponse])
+
   useEffect(() => {
     if (!waitingForResponse) return
     if (finalDisplayMessages.length === 0) return
     const last = finalDisplayMessages[finalDisplayMessages.length - 1]
     if (last && last.role === 'assistant') {
-      streamFinish()
+      const elapsed = Date.now() - waitingStartRef.current
+      const minDelay = Math.max(0, 800 - elapsed)
+      const timer = window.setTimeout(() => streamFinish(), minDelay)
+      return () => window.clearTimeout(timer)
     }
   }, [finalDisplayMessages, waitingForResponse, streamFinish])
 
