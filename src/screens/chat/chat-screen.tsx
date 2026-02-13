@@ -382,9 +382,12 @@ export function ChatScreen({
         ? gatewayStatusQuery.data.error || 'Gateway unavailable'
         : null
   const gatewayError = gatewayStatusError ?? sessionsError ?? historyError
+  const showErrorNotice = Boolean(gatewayError)
   const handleGatewayRefetch = useCallback(() => {
     void gatewayStatusQuery.refetch()
-  }, [gatewayStatusQuery])
+    void sessionsQuery.refetch()
+    void historyQuery.refetch()
+  }, [gatewayStatusQuery, sessionsQuery, historyQuery])
    
   const terminalPanelInset =
     !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
@@ -398,6 +401,16 @@ export function ChatScreen({
     }
   }, [terminalPanelInset])
 
+  const shouldRedirectToNew =
+    !isNewChat &&
+    !forcedSessionKey &&
+    !isRecentSession(activeFriendlyId) &&
+    sessionsQuery.isSuccess &&
+    sessions.length > 0 &&
+    !sessions.some((session) => session.friendlyId === activeFriendlyId) &&
+    !historyQuery.isFetching &&
+    !historyQuery.isSuccess
+
   useEffect(() => {
     if (isRedirecting) {
       if (error) setError(null)
@@ -407,7 +420,7 @@ export function ChatScreen({
       if (error) setError(null)
       return
     }
-    if (sessionsQuery.isSuccess && !activeExists) {
+    if (sessionsQuery.isSuccess && !activeExists && !sessionsError && !historyError) {
       if (error) setError(null)
       return
     }
@@ -430,23 +443,16 @@ export function ChatScreen({
           : null
     if (message) setError(message)
   }, [
+    activeExists,
     error,
     gatewayStatusError,
     historyError,
     isRedirecting,
     navigate,
     sessionsError,
+    sessionsQuery.isSuccess,
+    shouldRedirectToNew,
   ])
-
-  const shouldRedirectToNew =
-    !isNewChat &&
-    !forcedSessionKey &&
-    !isRecentSession(activeFriendlyId) &&
-    sessionsQuery.isSuccess &&
-    sessions.length > 0 &&
-    !sessions.some((session) => session.friendlyId === activeFriendlyId) &&
-    !historyQuery.isFetching &&
-    !historyQuery.isSuccess
 
   useEffect(() => {
     if (!isRedirecting) return
@@ -819,13 +825,9 @@ export function ChatScreen({
   const historyLoading =
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     (historyQuery.isLoading && !historyQuery.data) || isRedirecting
-  const showGatewayDown = Boolean(gatewayStatusError)
-  const showGatewayNotice =
-    showGatewayDown &&
-    gatewayStatusQuery.errorUpdatedAt > gatewayStatusMountRef.current
   const historyEmpty = !historyLoading && finalDisplayMessages.length === 0
   const gatewayNotice = useMemo(() => {
-    if (!showGatewayNotice) return null
+    if (!showErrorNotice) return null
     if (!gatewayError) return null
     return (
       <GatewayStatusMessage
@@ -834,7 +836,7 @@ export function ChatScreen({
         onRetry={handleGatewayRefetch}
       />
     )
-  }, [gatewayError, handleGatewayRefetch, showGatewayNotice])
+  }, [gatewayError, handleGatewayRefetch, showErrorNotice])
 
   return (
     <div className="relative h-full min-w-0 flex flex-col overflow-hidden">
@@ -876,6 +878,12 @@ export function ChatScreen({
 
           <ContextBar compact={compact} />
 
+          {gatewayNotice && (
+            <div className="px-4 py-2">
+              {gatewayNotice}
+            </div>
+          )}
+
           {hideUi ? null : (
             <ChatMessageList
               messages={finalDisplayMessages}
@@ -884,7 +892,7 @@ export function ChatScreen({
               emptyState={<ChatEmptyState compact={compact} onSuggestionClick={(prompt) => {
                 composerHandleRef.current?.setValue(prompt + ' ')
               }} />}
-              notice={gatewayNotice}
+              notice={null}
               noticePosition="end"
               waitingForResponse={waitingForResponse}
               sessionKey={activeCanonicalKey}

@@ -3,8 +3,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 export const Route = createFileRoute('/')({
   beforeLoad: function redirectToWorkspace() {
     throw redirect({
-      to: '/chat/$sessionKey',
-      params: { sessionKey: 'main' },
+      to: '/dashboard',
       replace: true,
     })
   },

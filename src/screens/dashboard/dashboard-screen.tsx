@@ -254,7 +254,7 @@ export function DashboardScreen() {
             <div className="flex items-center gap-3">
               <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
               <div className="flex items-center gap-2.5">
-                <h1 className="text-base font-semibold text-ink">ClawSuite</h1>
+                <h1 className="text-base font-semibold text-ink text-balance">ClawSuite</h1>
                 <span
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium',
@@ -289,7 +289,7 @@ export function DashboardScreen() {
                 >
                   <HugeiconsIcon
                     icon={Settings01Icon}
-                    size={15}
+                    size={20}
                     strokeWidth={1.5}
                   />
                 </button>
@@ -320,7 +320,7 @@ export function DashboardScreen() {
             aria-label="Reset Layout"
             title="Reset Layout"
           >
-            <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.5} />
+            <HugeiconsIcon icon={RefreshIcon} size={20} strokeWidth={1.5} />
             <span>Reset</span>
           </button>
         </div>

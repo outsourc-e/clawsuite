@@ -992,7 +992,7 @@ function ChatComposerComponent({
                 title={modelAvailabilityLabel ?? undefined}
               >
                 <span className="max-w-[12rem] truncate">{modelButtonLabel}</span>
-                <HugeiconsIcon icon={ArrowDown01Icon} size={14} strokeWidth={1.5} className="opacity-60" />
+                <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="opacity-60" />
               </button>
               {modelAvailabilityLabel ? (
                 <span className="text-xs text-primary-500 text-pretty">
@@ -1218,7 +1218,7 @@ function ChatComposerComponent({
                   }
                   disabled={disabled}
                 >
-                  <HugeiconsIcon icon={Mic01Icon} size={18} strokeWidth={1.5} />
+                  <HugeiconsIcon icon={Mic01Icon} size={20} strokeWidth={1.5} />
                   {voiceRecorder.isRecording ? (
                     <span className="absolute -top-1 -right-1 flex size-3">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
@@ -1237,7 +1237,7 @@ function ChatComposerComponent({
                   className="rounded-md"
                   aria-label="Stop generation"
                 >
-                  <HugeiconsIcon icon={StopIcon} size={16} strokeWidth={2} />
+                  <HugeiconsIcon icon={StopIcon} size={20} strokeWidth={1.5} />
                 </Button>
               </PromptInputAction>
             ) : (
