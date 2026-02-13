@@ -242,20 +242,30 @@ export function ChatScreen({
   }, [waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear waitingForResponse when a NEW assistant message appears after send
+  // Use a ref to prevent the cleanup/restart race condition
+  const clearTimerRef = useRef<number | null>(null)
   useEffect(() => {
-    if (!waitingForResponse) return
+    if (!waitingForResponse) {
+      if (clearTimerRef.current) { window.clearTimeout(clearTimerRef.current); clearTimerRef.current = null }
+      return
+    }
     // Only check if display has grown since we sent
     if (finalDisplayMessages.length <= messageCountAtSendRef.current) return
     const last = finalDisplayMessages[finalDisplayMessages.length - 1]
     if (last && last.role === 'assistant') {
-      streamFinish()
+      // Already scheduled? Don't restart
+      if (clearTimerRef.current) return
+      clearTimerRef.current = window.setTimeout(() => {
+        clearTimerRef.current = null
+        streamFinish()
+      }, 50) // Tiny delay to let React render the message first
     }
   }, [finalDisplayMessages.length, waitingForResponse, streamFinish])
 
-  // Failsafe: clear after done event + 5s if response never shows in display
+  // Failsafe: clear after done event + 10s if response never shows in display
   useEffect(() => {
     if (lastCompletedRunAt && waitingForResponse) {
-      const timer = window.setTimeout(() => streamFinish(), 5000)
+      const timer = window.setTimeout(() => streamFinish(), 10000)
       return () => window.clearTimeout(timer)
     }
   }, [lastCompletedRunAt, waitingForResponse, streamFinish])
