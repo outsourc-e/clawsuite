@@ -46,7 +46,8 @@ type InflightRequest = {
 const RECONNECT_DELAYS_MS = [1000, 2000, 4000]
 const MAX_RECONNECT_DELAY_MS = 30000
 const HEARTBEAT_INTERVAL_MS = 30000
-const HEARTBEAT_TIMEOUT_MS = 10000
+const HEARTBEAT_TIMEOUT_MS = 20000
+const HANDSHAKE_TIMEOUT_MS = 15000
 
 export function getGatewayConfig() {
   const url = process.env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
@@ -174,44 +175,79 @@ class GatewayClient {
   }
 
   private async openAndHandshake(): Promise<void> {
-    const { url, token, password } = getGatewayConfig()
-    const ws = new WebSocket(url)
+    let lastError: Error | null = null
+    const maxRetries = 2
 
-    this.clearReconnectTimer()
-    this.attachSocket(ws)
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          // Wait a bit before retry (WebSocket Race Condition mitigation)
+          await new Promise(resolve => setTimeout(resolve, 500 * attempt))
+        }
 
-    await this.waitForOpen(ws)
+        const { url, token, password } = getGatewayConfig()
+        const ws = new WebSocket(url)
 
-    if (this.destroyed) {
-      throw new Error('Gateway client is shut down')
+        this.clearReconnectTimer()
+        this.attachSocket(ws)
+
+        await this.waitForOpen(ws, HANDSHAKE_TIMEOUT_MS)
+
+        if (this.destroyed) {
+          ws.terminate()
+          throw new Error('Gateway client is shut down')
+        }
+
+        this.ws = ws
+        this.authenticated = false
+
+        const connectId = randomUUID()
+        const connectReq: GatewayFrame = {
+          type: 'req',
+          id: connectId,
+          method: 'connect',
+          params: buildConnectParams(token, password),
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            this.inflight.delete(connectId)
+            reject(new Error('Gateway handshake timed out'))
+          }, HANDSHAKE_TIMEOUT_MS)
+
+          this.inflight.set(connectId, {
+            resolve: () => {
+              clearTimeout(timeout)
+              resolve()
+            },
+            reject: (err) => {
+              clearTimeout(timeout)
+              reject(err)
+            },
+          })
+
+          this.sendFrame(connectReq).catch((error: unknown) => {
+            this.inflight.delete(connectId)
+            clearTimeout(timeout)
+            reject(error)
+          })
+        })
+
+        this.authenticated = true
+        this.startHeartbeat()
+        this.flushQueue()
+        return // Success
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+        if (this.ws) {
+          this.ws.terminate()
+          this.ws = null
+        }
+        if (this.destroyed) break
+      }
     }
 
-    this.ws = ws
-    this.authenticated = false
-
-    const connectId = randomUUID()
-    const connectReq: GatewayFrame = {
-      type: 'req',
-      id: connectId,
-      method: 'connect',
-      params: buildConnectParams(token, password),
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      this.inflight.set(connectId, {
-        resolve: () => resolve(),
-        reject,
-      })
-
-      this.sendFrame(connectReq).catch((error: unknown) => {
-        this.inflight.delete(connectId)
-        reject(error)
-      })
-    })
-
-    this.authenticated = true
-    this.startHeartbeat()
-    this.flushQueue()
+    throw lastError || new Error('Failed to connect to gateway after retries')
   }
 
   private attachSocket(ws: WebSocket) {
@@ -396,10 +432,15 @@ class GatewayClient {
     })
   }
 
-  private waitForOpen(ws: WebSocket): Promise<void> {
+  private waitForOpen(ws: WebSocket, timeoutMs: number): Promise<void> {
     if (ws.readyState === WebSocket.OPEN) return Promise.resolve()
 
     return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup()
+        reject(new Error('WebSocket connection timed out'))
+      }, timeoutMs)
+
       function onOpen() {
         cleanup()
         resolve()
@@ -411,6 +452,7 @@ class GatewayClient {
       }
 
       function cleanup() {
+        clearTimeout(timeout)
         ws.off('open', onOpen)
         ws.off('error', onError)
       }
