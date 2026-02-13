@@ -128,6 +128,10 @@ export function useChatHistory({
         const text = textFromMessage(msg)
         // Filter out system event forwards (subagent task announcements etc)
         if (text.startsWith('A subagent task')) return false
+        if (text.startsWith('[Queued announce messages')) return false
+        if (text.startsWith('Pre-compaction memory flush')) return false
+        if (text.includes('Summarize this naturally for the user')) return false
+        if (text.includes('Stats: runtime') && text.includes('sessionKey agent:codex:subagent:')) return false
         return true
       }
 
