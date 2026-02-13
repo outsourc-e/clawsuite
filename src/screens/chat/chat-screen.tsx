@@ -613,11 +613,10 @@ export function ChatScreen({
     }, 120_000)
 
     const payloadAttachments = normalizedAttachments.map((attachment) => ({
-      id: attachment.id,
-      name: attachment.name,
-      contentType: attachment.contentType,
-      size: attachment.size,
-      dataUrl: attachment.dataUrl,
+      type: 'image',
+      mimeType: attachment.contentType,
+      content: attachment.dataUrl,
+      fileName: attachment.name,
     }))
 
     fetch('/api/send', {
