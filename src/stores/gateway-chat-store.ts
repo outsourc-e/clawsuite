@@ -72,12 +72,16 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const messages = new Map(state.realtimeMessages)
         const sessionMessages = [...(messages.get(sessionKey) ?? [])]
         
-        // Check for duplicates by timestamp and role
+        // Check for duplicates by content or timestamp
+        const newText = extractTextFromContent(event.message.content)
         const isDuplicate = sessionMessages.some((existing) => {
           if (existing.role !== event.message.role) return false
+          // Content match (most reliable)
+          if (newText && newText === extractTextFromContent(existing.content)) return true
+          // Timestamp proximity fallback
           const existingTs = getMessageTimestamp(existing)
           const newTs = getMessageTimestamp(event.message)
-          return Math.abs(existingTs - newTs) < 5000
+          return existingTs > 0 && newTs > 0 && Math.abs(existingTs - newTs) < 5000
         })
 
         if (!isDuplicate) {
@@ -157,25 +161,11 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const streamingMap = new Map(state.streamingState)
         const streaming = streamingMap.get(sessionKey)
         
-        // If done event includes a message and we didn't stream it, add it directly
-        if ((!streaming || !streaming.text) && event.message) {
-          const messages = new Map(state.realtimeMessages)
-          const sessionMessages = [...(messages.get(sessionKey) ?? [])]
-          const doneMessage: GatewayMessage = {
-            ...event.message,
-            timestamp: now,
-            __streamingStatus: 'complete' as any,
-          }
-          sessionMessages.push(doneMessage)
-          messages.set(sessionKey, sessionMessages)
-          set({ realtimeMessages: messages })
-        }
+        // Build the complete message from either done payload or streaming state
+        let completeMessage: GatewayMessage | null = null
 
         if (streaming && streaming.text) {
           // Convert streaming state to a complete message
-          const messages = new Map(state.realtimeMessages)
-          const sessionMessages = [...(messages.get(sessionKey) ?? [])]
-          
           const content: Array<MessageContent> = []
           
           if (streaming.thinking) {
@@ -202,16 +192,41 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             } as ToolCallContent)
           }
           
-          const completeMessage: GatewayMessage = {
+          completeMessage = {
             role: 'assistant',
             content,
             timestamp: now,
             __streamingStatus: 'complete',
           }
+        } else if (event.message) {
+          // No streaming state — use done event's message payload directly
+          completeMessage = {
+            ...event.message,
+            timestamp: now,
+            __streamingStatus: 'complete' as any,
+          }
+        }
+
+        if (completeMessage) {
+          const messages = new Map(state.realtimeMessages)
+          const sessionMessages = [...(messages.get(sessionKey) ?? [])]
           
-          sessionMessages.push(completeMessage)
-          messages.set(sessionKey, sessionMessages)
-          set({ realtimeMessages: messages })
+          // Deduplicate: check if an identical assistant message already exists
+          const completeText = extractTextFromContent(completeMessage.content)
+          const isDuplicate = sessionMessages.some((existing) => {
+            if (existing.role !== 'assistant') return false
+            // Check by text content match (most reliable)
+            if (completeText && completeText === extractTextFromContent(existing.content)) return true
+            // Check by timestamp proximity
+            const existingTs = getMessageTimestamp(existing)
+            return existingTs > 0 && Math.abs(existingTs - now) < 5000
+          })
+          
+          if (!isDuplicate) {
+            sessionMessages.push(completeMessage)
+            messages.set(sessionKey, sessionMessages)
+            set({ realtimeMessages: messages })
+          }
         }
         
         // Clear streaming state
@@ -249,6 +264,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     const newRealtimeMessages = realtimeMessages.filter((rtMsg) => {
       const rtTimestamp = getMessageTimestamp(rtMsg)
       const rtId = (rtMsg as { id?: string }).id
+      const rtText = extractTextFromContent(rtMsg.content)
       
       return !historyMessages.some((histMsg) => {
         // First check: match by message id if both have one
@@ -257,10 +273,16 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           return true
         }
         
-        // Second check: match by timestamp proximity (2s window) and role
+        // Second check: match by text content + role (most reliable)
+        if (histMsg.role === rtMsg.role && rtText) {
+          const histText = extractTextFromContent(histMsg.content)
+          if (histText === rtText) return true
+        }
+        
+        // Third check: match by timestamp proximity (10s window) and role
         if (histMsg.role !== rtMsg.role) return false
         const histTimestamp = getMessageTimestamp(histMsg)
-        return Math.abs(histTimestamp - rtTimestamp) < 10000
+        return histTimestamp > 0 && rtTimestamp > 0 && Math.abs(histTimestamp - rtTimestamp) < 10000
       })
     })
     
@@ -276,6 +298,15 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     return [...historyMessages, ...newRealtimeMessages]
   },
 }))
+
+function extractTextFromContent(content: Array<MessageContent> | undefined): string {
+  if (!content || !Array.isArray(content)) return ''
+  return content
+    .filter((c): c is TextContent => c.type === 'text' && typeof (c as any).text === 'string')
+    .map((c) => c.text)
+    .join('\n')
+    .trim()
+}
 
 function getMessageTimestamp(message: GatewayMessage): number {
   const candidates = [
