@@ -5,11 +5,18 @@ const SETUP_STORAGE_KEY = 'clawsuite-gateway-configured'
 type GatewaySetupState = {
   isOpen: boolean
   step: 'gateway' | 'provider' | 'complete'
-  connectionOk: boolean
+  gatewayUrl: string
+  gatewayToken: string
   testStatus: 'idle' | 'testing' | 'success' | 'error'
   testError: string | null
+  saving: boolean
   _initialized: boolean
   initialize: () => Promise<void>
+  setGatewayUrl: (url: string) => void
+  setGatewayToken: (token: string) => void
+  /** Save URL/token to server .env, then test connection */
+  saveAndTest: () => Promise<boolean>
+  /** Just test current server connection (no save) */
   testConnection: () => Promise<boolean>
   proceed: () => void
   skipProviderSetup: () => void
@@ -18,11 +25,6 @@ type GatewaySetupState = {
   open: () => void
 }
 
-/**
- * Test gateway connectivity through ClawSuite's server-side /api/ping.
- * The gateway is a WebSocket server — browsers can't connect directly.
- * /api/ping does the real WS handshake on the server and returns {ok: true/false}.
- */
 async function pingGateway(): Promise<{ ok: boolean; error?: string }> {
   try {
     const response = await fetch('/api/ping', {
@@ -35,12 +37,41 @@ async function pingGateway(): Promise<{ ok: boolean; error?: string }> {
   }
 }
 
+async function fetchCurrentConfig(): Promise<{ url: string; hasToken: boolean }> {
+  try {
+    const response = await fetch('/api/gateway-config', {
+      signal: AbortSignal.timeout(5000),
+    })
+    const data = (await response.json()) as { url?: string; hasToken?: boolean }
+    return { url: data.url || 'ws://127.0.0.1:18789', hasToken: Boolean(data.hasToken) }
+  } catch {
+    return { url: 'ws://127.0.0.1:18789', hasToken: false }
+  }
+}
+
+async function saveConfig(url: string, token: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const response = await fetch('/api/gateway-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, token }),
+      signal: AbortSignal.timeout(5000),
+    })
+    const data = (await response.json()) as { ok?: boolean; error?: string }
+    return { ok: Boolean(data.ok), error: data.error }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Failed to save config' }
+  }
+}
+
 export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
   isOpen: false,
   step: 'gateway',
-  connectionOk: false,
+  gatewayUrl: 'ws://127.0.0.1:18789',
+  gatewayToken: '',
   testStatus: 'idle',
   testError: null,
+  saving: false,
   _initialized: false,
 
   initialize: async () => {
@@ -49,52 +80,82 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
     if (typeof window === 'undefined') return
 
     try {
-      // If already configured, just verify silently
       const configured = localStorage.getItem(SETUP_STORAGE_KEY) === 'true'
 
+      // Check if gateway is already working
       const { ok } = await pingGateway()
-
       if (ok) {
-        // Gateway works — mark configured, don't show wizard
         localStorage.setItem(SETUP_STORAGE_KEY, 'true')
-        set({ connectionOk: true })
         return
       }
 
       if (configured) {
-        // Was configured before but now unreachable — don't show full wizard,
-        // the reconnect banner handles this
-        set({ connectionOk: false })
+        // Was configured but now down — banner handles this, not wizard
         return
       }
 
-      // First run + gateway not working → show wizard
-      set({ isOpen: true, step: 'gateway', connectionOk: false })
+      // First run + gateway not working → load current config and show wizard
+      const config = await fetchCurrentConfig()
+      set({
+        isOpen: true,
+        step: 'gateway',
+        gatewayUrl: config.url,
+        gatewayToken: '', // Don't pre-fill token for security
+      })
     } catch {
       // Ignore init errors
     }
   },
 
-  testConnection: async () => {
-    set({ testStatus: 'testing', testError: null })
+  setGatewayUrl: (url) => set({ gatewayUrl: url, testStatus: 'idle', testError: null }),
+  setGatewayToken: (token) => set({ gatewayToken: token, testStatus: 'idle', testError: null }),
 
+  saveAndTest: async () => {
+    const { gatewayUrl, gatewayToken } = get()
+    set({ saving: true, testStatus: 'testing', testError: null })
+
+    // 1. Save to .env via server API
+    const saveResult = await saveConfig(gatewayUrl, gatewayToken)
+    if (!saveResult.ok) {
+      set({
+        saving: false,
+        testStatus: 'error',
+        testError: saveResult.error || 'Failed to save configuration',
+      })
+      return false
+    }
+
+    // 2. Brief delay for server to pick up new env vars
+    await new Promise((r) => setTimeout(r, 500))
+
+    // 3. Test connection via /api/ping
     const { ok, error } = await pingGateway()
+    set({ saving: false })
 
     if (ok) {
-      set({ testStatus: 'success', testError: null, connectionOk: true })
+      set({ testStatus: 'success', testError: null })
       return true
     }
 
     set({
       testStatus: 'error',
-      testError: error || 'Gateway not reachable. Check your .env configuration.',
+      testError: error || 'Gateway not reachable after saving config. You may need to restart ClawSuite.',
     })
     return false
   },
 
-  proceed: () => {
-    set({ step: 'provider' })
+  testConnection: async () => {
+    set({ testStatus: 'testing', testError: null })
+    const { ok, error } = await pingGateway()
+    if (ok) {
+      set({ testStatus: 'success', testError: null })
+      return true
+    }
+    set({ testStatus: 'error', testError: error || 'Gateway not reachable' })
+    return false
   },
+
+  proceed: () => set({ step: 'provider' }),
 
   skipProviderSetup: () => {
     localStorage.setItem(SETUP_STORAGE_KEY, 'true')
@@ -111,13 +172,22 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
     set({
       isOpen: true,
       step: 'gateway',
-      connectionOk: false,
+      gatewayUrl: 'ws://127.0.0.1:18789',
+      gatewayToken: '',
       testStatus: 'idle',
       testError: null,
     })
   },
 
-  open: () => {
-    set({ isOpen: true, step: 'gateway', testStatus: 'idle', testError: null })
+  open: async () => {
+    const config = await fetchCurrentConfig()
+    set({
+      isOpen: true,
+      step: 'gateway',
+      gatewayUrl: config.url,
+      gatewayToken: '',
+      testStatus: 'idle',
+      testError: null,
+    })
   },
 }))
