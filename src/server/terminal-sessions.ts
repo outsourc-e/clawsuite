@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { homedir } from 'node:os'
 import EventEmitter from 'node:events'
 
 export type TerminalSessionEvent = {
@@ -41,9 +42,10 @@ export function createTerminalSession(params: {
   const sessionId = randomUUID()
 
   const shell = params.command?.[0] ?? process.env.SHELL ?? '/bin/zsh'
-  let cwd = params.cwd ?? process.env.HOME ?? '/tmp'
+  const home = process.env.HOME ?? homedir() ?? '/tmp'
+  let cwd = params.cwd ?? home
   if (cwd.startsWith('~')) {
-    cwd = cwd.replace('~', process.env.HOME ?? '/tmp')
+    cwd = cwd.replace('~', home)
   }
 
   const cols = params.cols ?? 80
