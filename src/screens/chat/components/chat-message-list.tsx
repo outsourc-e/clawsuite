@@ -351,6 +351,9 @@ function ChatMessageListComponent({
     const toStream = new Set<string>()
     const isInitialRender = initialRenderRef.current
 
+    // Track the last new assistant message — only that one gets typewriter
+    let lastNewAssistantId: string | null = null
+
     displayMessages.forEach((message, index) => {
       const stableId = getStableMessageId(message, index)
       const text = textFromMessage(message)
@@ -365,8 +368,9 @@ function ChatMessageListComponent({
         streamingStatus !== 'streaming'
       ) {
         const prevSignature = prevSignatures.get(stableId)
-        if (prevSignature !== signature && text.trim().length > 0) {
-          toStream.add(stableId)
+        // Only animate if this message is truly new (no previous signature at all)
+        if (!prevSignature && text.trim().length > 0) {
+          lastNewAssistantId = stableId
         }
       }
     })
@@ -377,6 +381,8 @@ function ChatMessageListComponent({
       return { streamingTargets: new Set<string>(), signatureById: nextSignatures }
     }
 
+    // Only typewriter the last new assistant message
+    if (lastNewAssistantId) toStream.add(lastNewAssistantId)
     return { streamingTargets: toStream, signatureById: nextSignatures }
   }, [displayMessages])
 
