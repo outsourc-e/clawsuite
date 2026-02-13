@@ -414,22 +414,9 @@ function ChatMessageListComponent({
     if (!waitingForResponse) return false
     // If streaming has visible text, don't show dots
     if (isStreaming && streamingText && streamingText.length > 0) return false
-    // Check if any recent assistant message (after last user message) has real content
+    // If there's an assistant message after the last user message, don't show dots
     if (typeof lastUserIndex === 'number' && typeof lastAssistantIndex === 'number' && lastAssistantIndex > lastUserIndex) {
-      const msg = displayMessages[lastAssistantIndex]
-      if (msg && !msg.__optimisticId?.startsWith('streaming-') && !msg.__streamingStatus) {
-        // Real assistant message with content exists
-        const text = typeof msg.content === 'string' ? msg.content : ''
-        if (text.length > 0) return false
-        // Check array content
-        if (Array.isArray(msg.content)) {
-          const hasContent = msg.content.some((c: any) =>
-            (typeof c === 'string' && c.length > 0) ||
-            (c && typeof c === 'object' && c.type === 'text' && c.text?.length > 0)
-          )
-          if (hasContent) return false
-        }
-      }
+      return false
     }
     return true
   })()
