@@ -633,15 +633,21 @@ export function ChatScreen({
           try { errorText = await readError(res) } catch { /* ignore parse errors */ }
           throw new Error(errorText)
         }
-        try { streamStart() } catch { /* don't fail send on stream setup error */ }
+        // Stream setup is separate — don't let it trigger send failure
+        try { streamStart() } catch (e) {
+          console.warn('[chat] streamStart error (non-fatal):', e)
+        }
+        setSending(false)
       })
       .catch((err: unknown) => {
         window.clearTimeout(failsafeTimer)
+        setSending(false)
         const messageText = err instanceof Error ? err.message : String(err)
         if (isMissingGatewayAuth(messageText)) {
           try { navigate({ to: '/connect', replace: true }) } catch { /* router not ready */ }
           return
         }
+        // Only mark as failed for actual network/API errors
         if (optimisticClientId) {
           updateHistoryMessageByClientId(
             queryClient,
@@ -658,9 +664,6 @@ export function ChatScreen({
         toast('Failed to send message', { type: 'error' })
         setPendingGeneration(false)
         setWaitingForResponse(false)
-      })
-      .finally(() => {
-        setSending(false)
       })
   }
 
