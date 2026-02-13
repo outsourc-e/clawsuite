@@ -11,6 +11,8 @@ import { UpdateNotifier } from '@/components/update-notifier'
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
+import { GatewaySetupWizard } from '@/components/gateway-setup-wizard'
+import { GatewayReconnectBanner } from '@/components/gateway-reconnect-banner'
 
 const themeScript = `
 (() => {
@@ -175,6 +177,7 @@ function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <GatewayReconnectBanner />
       <GlobalShortcutListener />
       <TerminalShortcutListener />
       <TaskReminderRunner />
@@ -182,6 +185,7 @@ function RootLayout() {
       <Toaster />
       <WorkspaceShell />
       <SearchModal />
+      <GatewaySetupWizard />
       <OnboardingTour />
       <KeyboardShortcutsModal />
     </QueryClientProvider>
