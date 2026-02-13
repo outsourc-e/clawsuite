@@ -241,8 +241,8 @@ export function ChatPanel() {
           </AnimatePresence>
 
           {/* Chat content — force width containment to panel width */}
-          <div className="flex-1 min-h-0 w-[420px] max-w-[420px] overflow-hidden chat-panel-content">
-            <div className="h-full w-full max-w-[420px] overflow-hidden">
+          <div className="flex-1 min-h-0 w-full max-w-full overflow-hidden chat-panel-content">
+            <div className="h-full w-full max-w-full overflow-hidden">
               <ChatScreen
                 key={activeFriendlyId}
                 activeFriendlyId={activeFriendlyId}
