@@ -150,6 +150,11 @@ export function ChatScreen({
     friendlyId: activeFriendlyId,
     historyMessages,
     enabled: !isNewChat && !isRedirecting,
+    onUserMessage: useCallback(() => {
+      // External message arrived (e.g. from Telegram) — show thinking indicator
+      setWaitingForResponse(true)
+      setPendingGeneration(true)
+    }, []),
   })
 
   // Use realtime-merged messages for display (SSE + history)
