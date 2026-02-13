@@ -197,7 +197,7 @@ export function ChatScreen({
     return { isStreaming: false, streamingMessageId: null as string | null }
   }, [waitingForResponse, finalDisplayMessages])
 
-  // --- Stream management (upstream webclaw pattern) ---
+  // --- Stream management ---
   const streamStop = useCallback(() => {
     if (streamTimer.current) {
       window.clearInterval(streamTimer.current)
