@@ -233,7 +233,6 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          command: ['/bin/zsh'],
           cwd: DEFAULT_CWD,
         }),
       })

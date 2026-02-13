@@ -59,8 +59,20 @@ const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
 const ANTHROPIC_MODEL = 'claude-sonnet-4-5-20250514'
 const OPENAI_MODEL = 'gpt-4o-mini'
 
+function getGatewayHttpUrl(path: string): string {
+  const envUrl = process.env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+  try {
+    const parsed = new URL(envUrl)
+    parsed.protocol = parsed.protocol === 'wss:' ? 'https:' : 'http:'
+    parsed.pathname = path
+    return parsed.toString()
+  } catch {
+    return `http://127.0.0.1:18789${path}`
+  }
+}
+
 // Gateway's OpenAI-compatible endpoint (works with any configured provider)
-const GATEWAY_URL = 'http://127.0.0.1:18789/v1/chat/completions'
+const GATEWAY_URL = getGatewayHttpUrl('/v1/chat/completions')
 const MAX_PROMPT_CHARS = 14_000
 
 function formatLogDate(value: Date): string {
@@ -127,7 +139,7 @@ async function resolveProvider(): Promise<ResolvedProvider | null> {
     const gwTokenEnv = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim()
     if (gwTokenEnv) {
       // Quick probe to see if gateway is up
-      const probe = await fetch('http://127.0.0.1:18789/health', {
+      const probe = await fetch(getGatewayHttpUrl('/health'), {
         signal: AbortSignal.timeout(1000),
       }).catch(() => null)
       if (probe?.ok) {
