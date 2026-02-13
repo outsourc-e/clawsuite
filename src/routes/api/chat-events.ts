@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createGatewayStreamConnection } from '../../server/gateway-stream'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 /**
  * Extract text content from a gateway message.
@@ -36,6 +37,14 @@ export const Route = createFileRoute('/api/chat-events')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        // Auth check
+        if (!isAuthenticated(request)) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Unauthorized' }),
+            { status: 401, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+
         const url = new URL(request.url)
         const sessionKeyParam = url.searchParams.get('sessionKey')?.trim()
         

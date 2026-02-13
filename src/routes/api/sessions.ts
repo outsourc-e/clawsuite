@@ -62,7 +62,12 @@ function normalizeSessions(
 export const Route = createFileRoute('/api/sessions')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        // Auth check
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
         try {
           const payload = await gatewayRpc<SessionsListGatewayResponse>(
             'sessions.list',
