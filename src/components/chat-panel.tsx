@@ -248,8 +248,8 @@ export function ChatPanel() {
               )}
             </AnimatePresence>
 
-            {/* Chat content — simplified wrapper, width controlled by parent motion.div */}
-            <div className="flex-1 min-h-0 overflow-hidden">
+            {/* Chat content */}
+            <div className="flex-1 min-h-0 overflow-hidden relative">
               <ChatScreen
                 key={activeFriendlyId}
                 activeFriendlyId={activeFriendlyId}
