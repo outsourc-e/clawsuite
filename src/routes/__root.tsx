@@ -108,6 +108,22 @@ export const Route = createRootRoute({
 
   shellComponent: RootDocument,
   component: RootLayout,
+  errorComponent: function RootError({ error }) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-primary-50">
+        <h1 className="text-2xl font-semibold text-primary-900 mb-4">Something went wrong</h1>
+        <pre className="p-4 bg-primary-100 rounded-lg text-sm text-primary-700 max-w-full overflow-auto mb-6">
+          {error instanceof Error ? error.message : String(error)}
+        </pre>
+        <button
+          onClick={() => window.location.href = '/'}
+          className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
+        >
+          Return Home
+        </button>
+      </div>
+    )
+  },
 })
 
 const queryClient = new QueryClient()
