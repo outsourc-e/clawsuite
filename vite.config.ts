@@ -23,10 +23,14 @@ const config = defineConfig(({ mode, isSsrBuild }) => {
   }
 
   return {
-    define: !isSsrBuild ? {
-      'process.env': {},
-      'process.platform': '"browser"',
-    } : {},
+    define: {
+      'process.env.CLAWDBOT_GATEWAY_URL': JSON.stringify(gatewayUrl),
+      'process.env.CLAWDBOT_GATEWAY_TOKEN': JSON.stringify(env.CLAWDBOT_GATEWAY_TOKEN || ''),
+      ...(!isSsrBuild ? {
+        'process.env': {},
+        'process.platform': '"browser"',
+      } : {})
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
