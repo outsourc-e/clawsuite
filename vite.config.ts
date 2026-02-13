@@ -1,4 +1,6 @@
 import { URL, fileURLToPath } from 'node:url'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 // devtools removed
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
@@ -13,6 +15,12 @@ const config = defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+  ssr: {
+    external: ['playwright', 'playwright-core', 'playwright-extra', 'puppeteer-extra-plugin-stealth'],
+  },
+  optimizeDeps: {
+    exclude: ['playwright', 'playwright-core', 'playwright-extra', 'puppeteer-extra-plugin-stealth'],
   },
   server: {
     proxy: {
@@ -40,6 +48,19 @@ const config = defineConfig({
     tailwindcss(),
     tanstackStart(),
     viteReact(),
+    // Copy pty-helper.py into the server assets directory after build
+    {
+      name: 'copy-pty-helper',
+      closeBundle() {
+        const src = resolve('src/server/pty-helper.py')
+        const destDir = resolve('dist/server/assets')
+        const dest = resolve(destDir, 'pty-helper.py')
+        if (existsSync(src)) {
+          mkdirSync(destDir, { recursive: true })
+          copyFileSync(src, dest)
+        }
+      },
+    },
   ],
 })
 

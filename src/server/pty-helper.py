@@ -11,7 +11,8 @@ def set_winsize(fd, rows, cols):
     fcntl.ioctl(fd, termios.TIOCSWINSZ, s)
 
 def main():
-    shell = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('SHELL', '/bin/zsh')
+    default_shell = '/bin/zsh' if sys.platform == 'darwin' else '/bin/bash'
+    shell = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('SHELL', default_shell)
     cwd = sys.argv[2] if len(sys.argv) > 2 else os.environ.get('HOME', '/tmp')
     cols = int(sys.argv[3]) if len(sys.argv) > 3 else 80
     rows = int(sys.argv[4]) if len(sys.argv) > 4 else 24

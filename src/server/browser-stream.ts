@@ -41,7 +41,7 @@ function broadcastState() {
 }
 
 async function launchBrowserInstance() {
-  if (browser || isLaunching) return
+  if (context || isLaunching) return
   isLaunching = true
 
   try {

@@ -100,6 +100,9 @@ cd clawsuite
 # Install dependencies
 npm install
 
+# Install Playwright browser (required for Browser tab)
+npx playwright install chromium
+
 # Start development server
 npm run dev
 ```
@@ -118,7 +121,30 @@ npm run preview
 
 ### Optional: Desktop App (Tauri)
 
-ClawSuite can be packaged as a native desktop application using Tauri:
+ClawSuite can be packaged as a native desktop application using Tauri.
+
+#### Ubuntu / Debian Prerequisites
+
+Install the Rust toolchain and required system libraries before building:
+
+```bash
+# Install Rust via rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+
+# Install system dependencies
+sudo apt update
+sudo apt install -y \
+  build-essential \
+  pkg-config \
+  libssl-dev \
+  libgtk-3-dev \
+  libwebkit2gtk-4.1-dev \
+  libappindicator3-dev \
+  librsvg2-dev
+```
+
+#### Run / Build
 
 ```bash
 # Install Tauri CLI (if not already installed)
@@ -328,6 +354,39 @@ ClawSuite is open-source software licensed under the [MIT License](LICENSE).
 ## 🙏 Acknowledgments
 
 ClawSuite is built on top of the incredible [OpenClaw](https://openclaw.ai) project. Special thanks to all contributors and the open-source community.
+
+---
+
+## Extra
+
+### Playwright Browser Setup
+
+The **Browser tab** requires Playwright's Chromium binary. If you skip the install step, clicking "Launch Browser" will silently fail.
+
+```bash
+# Install Chromium (required)
+npx playwright install chromium
+
+# If you encounter missing system dependencies (common on fresh Ubuntu/Debian):
+npx playwright install-deps chromium
+```
+
+### Terminal Shell
+
+The integrated terminal automatically detects your system shell via the `$SHELL` environment variable. If `$SHELL` is not set, it falls back to:
+
+- **macOS**: `/bin/zsh`
+- **Linux / Windows (WSL)**: `/bin/bash`
+
+### Python 3 Requirement
+
+The terminal uses a Python PTY helper for real pseudo-terminal support. Ensure `python3` is available on your `PATH`:
+
+```bash
+python3 --version
+```
+
+Most macOS and Linux systems include Python 3 by default. On minimal installations, install it with your package manager (e.g., `sudo apt install python3`).
 
 ---
 
