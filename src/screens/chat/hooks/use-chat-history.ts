@@ -94,6 +94,8 @@ export function useChatHistory({
     },
     refetchOnWindowFocus: true,
     gcTime: 1000 * 60 * 10,
+    structuralSharing: true,
+    notifyOnChangeProps: ['data', 'error', 'isError'],
   })
 
   const stableHistorySignatureRef = useRef('')
