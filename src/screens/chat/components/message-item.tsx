@@ -344,7 +344,10 @@ function MessageItemComponent({
     }
   }, [])
 
-  const effectiveIsStreaming = remoteStreamingActive || _simulateStreaming
+  // Simulate streaming is only active while words are still being revealed
+  const totalWords = countWords(displayText)
+  const revealComplete = revealedWordCount >= totalWords && totalWords > 0
+  const effectiveIsStreaming = remoteStreamingActive || (_simulateStreaming && !revealComplete)
   const assistantDisplayText = effectiveIsStreaming ? revealedText : displayText
 
   useEffect(() => {
