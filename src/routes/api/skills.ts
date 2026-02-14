@@ -29,6 +29,7 @@ type SkillSummary = {
   sourcePath: string
   installed: boolean
   enabled: boolean
+  builtin?: boolean
   featuredGroup?: string
   security: SecurityRisk
 }
@@ -48,6 +49,7 @@ type SkillIndexRecord = {
   sourcePath: string
   folderPath: string
   enabled: boolean
+  builtin?: boolean
 }
 
 type CachedDataset = {
@@ -67,6 +69,45 @@ const CACHE_TTL_MS = 5 * 60 * 1000
 const HOME_DIR = os.homedir()
 const WORKSPACE_ROOT = path.join(HOME_DIR, '.openclaw', 'workspace')
 const INSTALLED_ROOT = path.join(WORKSPACE_ROOT, 'skills')
+// Resolve OpenClaw's built-in skills directory at runtime
+let _builtinRoot: string | null = null
+async function getBuiltinRoot(): Promise<string | null> {
+  if (_builtinRoot !== null) return _builtinRoot || null
+
+  const candidates = [
+    // npm global (nvm)
+    path.join(HOME_DIR, '.nvm', 'versions', 'node', process.version, 'lib', 'node_modules', 'openclaw', 'skills'),
+    // npm global (system)
+    path.join('/usr', 'local', 'lib', 'node_modules', 'openclaw', 'skills'),
+    path.join('/usr', 'lib', 'node_modules', 'openclaw', 'skills'),
+    // Docker / custom prefix
+    path.join('/app', 'node_modules', 'openclaw', 'skills'),
+    // Docker bundled skills (copied during build)
+    path.join('/app', 'openclaw-skills'),
+  ]
+
+  // Also try `npm root -g` result
+  try {
+    const cp = await import('node:child_process')
+    const globalRoot = cp.execSync('npm root -g', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim()
+    candidates.unshift(path.join(globalRoot, 'openclaw', 'skills'))
+  } catch {
+    // npm not available (Docker etc)
+  }
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate)
+      _builtinRoot = candidate
+      return candidate
+    } catch {
+      continue
+    }
+  }
+
+  _builtinRoot = ''
+  return null
+}
 const MARKETPLACE_ROOT = path.join(
   WORKSPACE_ROOT,
   'openclaw-skills-registry',
@@ -610,6 +651,38 @@ async function collectInstalledSkillEntries(): Promise<
   return entries
 }
 
+async function collectBuiltinSkillEntries(): Promise<
+  Array<{ id: string; owner: string; folderPath: string }>
+> {
+  const builtinRoot = await getBuiltinRoot()
+  if (!builtinRoot) return []
+
+  const entries: Array<{ id: string; owner: string; folderPath: string }> = []
+
+  try {
+    const dirs = await fs.readdir(builtinRoot, { withFileTypes: true })
+    for (const dir of dirs) {
+      if (!dir.isDirectory() || dir.name.startsWith('.')) continue
+      const folderPath = path.join(builtinRoot, dir.name)
+      const skillPath = path.join(folderPath, 'SKILL.md')
+      try {
+        await fs.access(skillPath)
+        entries.push({
+          id: `builtin/${dir.name}`,
+          owner: 'openclaw',
+          folderPath,
+        })
+      } catch {
+        // No SKILL.md, skip
+      }
+    }
+  } catch {
+    // Can't read builtin dir
+  }
+
+  return entries
+}
+
 const REGISTRY_REPO = 'https://github.com/openclaw/skills.git'
 const REGISTRY_PARENT = path.dirname(MARKETPLACE_ROOT)
 let registryCloneAttempted = false
@@ -673,37 +746,58 @@ async function fetchMarketplaceFromApi(): Promise<Array<SkillIndexRecord>> {
     return apiMarketplaceCache.items
   }
 
+  type ApiSkillItem = {
+    slug: string
+    displayName: string
+    summary: string
+    tags?: Record<string, string>
+    stats?: {
+      downloads?: number
+      stars?: number
+      comments?: number
+    }
+    createdAt?: number
+    updatedAt?: number
+    latestVersion?: {
+      version: string
+      changelog?: string
+    }
+  }
+
   try {
-    const response = await fetch(`${CLAWHUB_API_URL}?limit=100`, {
-      signal: AbortSignal.timeout(15_000),
-      headers: { 'Accept': 'application/json' },
-    })
+    // Fetch all pages using cursor-based pagination
+    const allItems: Array<ApiSkillItem> = []
+    let cursor: string | undefined
+    const MAX_PAGES = 10
 
-    if (!response.ok) return apiMarketplaceCache?.items ?? []
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const url = cursor
+        ? `${CLAWHUB_API_URL}?limit=100&cursor=${encodeURIComponent(cursor)}`
+        : `${CLAWHUB_API_URL}?limit=100`
 
-    const data = (await response.json()) as {
-      items?: Array<{
-        slug: string
-        displayName: string
-        summary: string
-        tags?: Record<string, string>
-        stats?: {
-          downloads?: number
-          stars?: number
-          comments?: number
-        }
-        createdAt?: number
-        updatedAt?: number
-        latestVersion?: {
-          version: string
-          changelog?: string
-        }
-      }>
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(15_000),
+        headers: { Accept: 'application/json' },
+      })
+
+      if (!response.ok) break
+
+      const data = (await response.json()) as {
+        items?: Array<ApiSkillItem>
+        nextCursor?: string
+      }
+
+      if (data.items?.length) {
+        allItems.push(...data.items)
+      }
+
+      if (!data.nextCursor || !data.items?.length) break
+      cursor = data.nextCursor
     }
 
-    if (!data.items?.length) return apiMarketplaceCache?.items ?? []
+    if (!allItems.length) return apiMarketplaceCache?.items ?? []
 
-    const skills: Array<SkillIndexRecord> = data.items.map((item) => {
+    const skills: Array<SkillIndexRecord> = allItems.map((item) => {
       const version = item.latestVersion?.version ?? item.tags?.latest ?? ''
       const downloads = item.stats?.downloads ?? 0
 
@@ -788,7 +882,10 @@ async function buildSkillsIndex(
 
   const entries =
     tab === 'installed'
-      ? await collectInstalledSkillEntries()
+      ? [
+          ...(await collectInstalledSkillEntries()),
+          ...(await collectBuiltinSkillEntries()),
+        ]
       : await collectMarketplaceSkillEntries()
 
   const skills: Array<SkillIndexRecord> = []
@@ -834,6 +931,7 @@ async function buildSkillsIndex(
         tab === 'installed'
           ? !(await pathExists(path.join(entry.folderPath, '.disabled')))
           : true,
+      builtin: entry.id.startsWith('builtin/'),
     })
   }
 
@@ -1082,6 +1180,7 @@ async function inflateSkillSummaries(
       sourcePath: item.sourcePath,
       installed,
       enabled: item.enabled,
+      builtin: item.builtin || false,
       security,
     })
   }

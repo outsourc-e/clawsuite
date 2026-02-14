@@ -54,6 +54,7 @@ import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiOpenclawUpdateRouteImport } from './routes/api/openclaw-update'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
@@ -322,6 +323,11 @@ const ApiPathsRoute = ApiPathsRouteImport.update({
   path: '/api/paths',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOpenclawUpdateRoute = ApiOpenclawUpdateRouteImport.update({
+  id: '/api/openclaw-update',
+  path: '/api/openclaw-update',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
   id: '/api/models',
   path: '/api/models',
@@ -578,6 +584,7 @@ export interface FileRoutesByFullPath {
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
@@ -666,6 +673,7 @@ export interface FileRoutesByTo {
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
@@ -756,6 +764,7 @@ export interface FileRoutesById {
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
@@ -847,6 +856,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
     | '/api/provider-usage'
@@ -935,6 +945,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
     | '/api/provider-usage'
@@ -1024,6 +1035,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
     | '/api/provider-usage'
@@ -1114,6 +1126,7 @@ export interface RootRouteChildren {
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
+  ApiOpenclawUpdateRoute: typeof ApiOpenclawUpdateRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
@@ -1461,6 +1474,13 @@ declare module '@tanstack/react-router' {
       path: '/api/paths'
       fullPath: '/api/paths'
       preLoaderRoute: typeof ApiPathsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/openclaw-update': {
+      id: '/api/openclaw-update'
+      path: '/api/openclaw-update'
+      fullPath: '/api/openclaw-update'
+      preLoaderRoute: typeof ApiOpenclawUpdateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/models': {
@@ -1881,6 +1901,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
+  ApiOpenclawUpdateRoute: ApiOpenclawUpdateRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,

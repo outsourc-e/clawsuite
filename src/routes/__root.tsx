@@ -8,6 +8,7 @@ import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { useTaskReminders } from '@/hooks/use-task-reminders'
 import { UpdateNotifier } from '@/components/update-notifier'
+import { OpenClawUpdateNotifier } from '@/components/openclaw-update-notifier'
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
@@ -189,6 +190,7 @@ function RootLayout() {
       <TerminalShortcutListener />
       <TaskReminderRunner />
       <UpdateNotifier />
+      <OpenClawUpdateNotifier />
       <Toaster />
       <WorkspaceShell />
       <SearchModal />

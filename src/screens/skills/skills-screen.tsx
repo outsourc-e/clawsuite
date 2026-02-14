@@ -45,6 +45,7 @@ type SkillSummary = {
   sourcePath: string
   installed: boolean
   enabled: boolean
+  builtin?: boolean
   featuredGroup?: string
   security?: SecurityRisk
 }
@@ -810,6 +811,11 @@ function SkillsGrid({
               </p>
 
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {skill.builtin && (
+                  <span className="rounded-md border border-accent-300 bg-accent-100/50 px-2 py-0.5 text-xs font-medium text-accent-600">
+                    Built-in
+                  </span>
+                )}
                 <SecurityBadge security={skill.security} />
                 <span className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500">
                   {skill.category}
@@ -835,25 +841,29 @@ function SkillsGrid({
 
                 {tab === 'installed' ? (
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 text-xs text-primary-500">
-                      <Switch
-                        checked={skill.enabled}
+                    {!skill.builtin && (
+                      <div className="flex items-center gap-1.5 text-xs text-primary-500">
+                        <Switch
+                          checked={skill.enabled}
+                          disabled={isActing}
+                          onCheckedChange={(checked) =>
+                            onToggle(skill.id, checked)
+                          }
+                          aria-label={`Toggle ${skill.name}`}
+                        />
+                        {skill.enabled ? 'Enabled' : 'Disabled'}
+                      </div>
+                    )}
+                    {!skill.builtin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
                         disabled={isActing}
-                        onCheckedChange={(checked) =>
-                          onToggle(skill.id, checked)
-                        }
-                        aria-label={`Toggle ${skill.name}`}
-                      />
-                      {skill.enabled ? 'Enabled' : 'Disabled'}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isActing}
-                      onClick={() => onUninstall(skill.id)}
-                    >
-                      Uninstall
-                    </Button>
+                        onClick={() => onUninstall(skill.id)}
+                      >
+                        Uninstall
+                      </Button>
+                    )}
                   </div>
                 ) : skill.installed ? (
                   <Button
