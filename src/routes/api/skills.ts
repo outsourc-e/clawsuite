@@ -661,6 +661,79 @@ async function collectMarketplaceSkillEntries(): Promise<
   return entries
 }
 
+// --- ClawHub API-based marketplace (fallback when git registry is unavailable) ---
+
+const CLAWHUB_API_URL = 'https://clawhub.ai/api/v1/skills'
+let apiMarketplaceCache: { builtAt: number; items: Array<SkillIndexRecord> } | null = null
+const API_CACHE_TTL_MS = 10 * 60 * 1000
+
+async function fetchMarketplaceFromApi(): Promise<Array<SkillIndexRecord>> {
+  const now = Date.now()
+  if (apiMarketplaceCache && now - apiMarketplaceCache.builtAt < API_CACHE_TTL_MS) {
+    return apiMarketplaceCache.items
+  }
+
+  try {
+    const response = await fetch(`${CLAWHUB_API_URL}?limit=100`, {
+      signal: AbortSignal.timeout(15_000),
+      headers: { 'Accept': 'application/json' },
+    })
+
+    if (!response.ok) return apiMarketplaceCache?.items ?? []
+
+    const data = (await response.json()) as {
+      items?: Array<{
+        slug: string
+        displayName: string
+        summary: string
+        tags?: Record<string, string>
+        stats?: {
+          downloads?: number
+          stars?: number
+          comments?: number
+        }
+        createdAt?: number
+        updatedAt?: number
+        latestVersion?: {
+          version: string
+          changelog?: string
+        }
+      }>
+    }
+
+    if (!data.items?.length) return apiMarketplaceCache?.items ?? []
+
+    const skills: Array<SkillIndexRecord> = data.items.map((item) => {
+      const version = item.latestVersion?.version ?? item.tags?.latest ?? ''
+      const downloads = item.stats?.downloads ?? 0
+
+      return {
+        id: `clawhub/${item.slug}`,
+        slug: item.slug,
+        name: item.displayName || item.slug,
+        description: item.summary || '',
+        author: 'ClawHub',
+        triggers: [],
+        tags: version ? [version] : [],
+        homepage: `https://clawhub.ai/skills/${item.slug}`,
+        category: deriveCategory({}, `${item.displayName} ${item.summary}`),
+        icon: CATEGORY_ICONS[deriveCategory({}, `${item.displayName} ${item.summary}`)] || '🧩',
+        content: item.summary || '',
+        sourcePath: `clawhub://${item.slug}`,
+        folderPath: '',
+        enabled: true,
+        _downloads: downloads,
+        _stars: item.stats?.stars ?? 0,
+      } as SkillIndexRecord & { _downloads: number; _stars: number }
+    })
+
+    apiMarketplaceCache = { builtAt: now, items: skills }
+    return skills
+  } catch {
+    return apiMarketplaceCache?.items ?? []
+  }
+}
+
 async function countFilesInFolder(folderPath: string): Promise<number> {
   let count = 0
   const stack = [folderPath]
@@ -704,6 +777,15 @@ function invalidateSkillsCache(tab?: SkillsTab) {
 async function buildSkillsIndex(
   tab: Exclude<SkillsTab, 'featured'>,
 ): Promise<Array<SkillIndexRecord>> {
+  // For marketplace: try git registry first, fall back to ClawHub API
+  if (tab === 'marketplace') {
+    const entries = await collectMarketplaceSkillEntries()
+    if (entries.length === 0) {
+      // No local registry — fetch from ClawHub API
+      return await fetchMarketplaceFromApi()
+    }
+  }
+
   const entries =
     tab === 'installed'
       ? await collectInstalledSkillEntries()

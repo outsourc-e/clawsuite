@@ -5,7 +5,7 @@ const TIPS = [
   { emoji: '⌨️', text: 'Press Cmd+K to search sessions, skills, and commands' },
   {
     emoji: '🔧',
-    text: "Install skills from ClawdHub to extend your agent's capabilities",
+    text: "Install skills from ClawHub to extend your agent's capabilities",
   },
   { emoji: '💬', text: 'Use /model to switch models mid-conversation' },
   {

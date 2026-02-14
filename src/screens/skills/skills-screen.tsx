@@ -277,7 +277,7 @@ export function SkillsScreen() {
               </h1>
               <p className="text-sm text-primary-500 text-pretty sm:text-base">
                 Discover, install, and manage skills across your local workspace
-                and ClawdHub registry.
+                and ClawHub registry.
               </p>
             </div>
           </div>
@@ -294,7 +294,7 @@ export function SkillsScreen() {
                   Installed Skills
                 </TabsTab>
                 <TabsTab value="marketplace" className="min-w-[168px]">
-                  ClawdHub Marketplace
+                  ClawHub Marketplace
                 </TabsTab>
                 <TabsTab value="featured" className="min-w-[120px]">
                   Featured
@@ -727,7 +727,17 @@ function SkillsGrid({
   onToggle,
 }: SkillsGridProps) {
   if (loading) {
-    return <SkillsSkeleton count={tab === 'installed' ? 6 : 9} />
+    return (
+      <>
+        {tab !== 'installed' && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-accent-200 bg-accent-50/60 px-3 py-2 text-xs text-accent-700">
+            <span className="inline-block size-2 animate-pulse rounded-full bg-accent-400" />
+            Loading skills from ClawHub...
+          </div>
+        )}
+        <SkillsSkeleton count={tab === 'installed' ? 6 : 9} />
+      </>
+    )
   }
 
   if (skills.length === 0) {
@@ -735,24 +745,20 @@ function SkillsGrid({
     return (
       <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-8 text-center">
         <p className="text-sm font-medium text-primary-700">
-          {isMarketplace ? 'Marketplace Not Configured' : 'No skills found'}
+          {isMarketplace ? 'No marketplace skills available' : 'No skills found'}
         </p>
         <p className="mt-1 text-xs text-primary-500 text-pretty max-w-sm mx-auto">
           {isMarketplace ? (
             <>
-              Run{' '}
-              <code className="rounded bg-primary-200 px-1.5 py-0.5 font-mono text-[11px]">
-                clawdhub sync
-              </code>{' '}
-              in your terminal to download the skills registry, or browse skills
-              at{' '}
+              Could not load skills from ClawHub. Check your internet connection
+              or browse skills at{' '}
               <a
-                href="https://clawdhub.com"
+                href="https://clawhub.ai"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-accent-500 hover:underline"
               >
-                clawdhub.com
+                clawhub.ai
               </a>
             </>
           ) : (
