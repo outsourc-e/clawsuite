@@ -9,6 +9,15 @@ type GatewayConfig = {
   models?: {
     providers?: Record<string, { models?: Array<{ id?: string }> }>
   }
+  agents?: {
+    defaults?: {
+      model?: {
+        primary?: string
+        fallbacks?: Array<string>
+      }
+      models?: Record<string, unknown>
+    }
+  }
 }
 
 let cachedProviderNames: Array<string> | null = null
@@ -22,6 +31,21 @@ function providerNameFromProfileKey(profileKey: string): string | null {
   const raw = profileKey.split(':')[0]?.trim().toLowerCase() ?? ''
   if (raw.length === 0) return null
   return raw
+}
+
+/**
+ * Convert provider/model key to model id.
+ * Example: "openai-codex/gpt-5.2-codex" -> "gpt-5.2-codex"
+ */
+function modelIdFromScopedKey(scoped: string): string | null {
+  const raw = scoped.trim()
+  if (!raw) return null
+
+  const slashIndex = raw.indexOf('/')
+  if (slashIndex < 0) return raw
+
+  const modelId = raw.slice(slashIndex + 1).trim()
+  return modelId.length > 0 ? modelId : null
 }
 
 /**
@@ -67,7 +91,7 @@ export function getConfiguredProviders(): Array<string> {
 
 /**
  * Read configured model IDs from the Gateway config file.
- * Returns a Set of allowed model IDs (e.g., {"claude-opus-4-6", "gpt-5-codex"}).
+ * Supports both legacy models.providers.*.models[] and newer agents.defaults.models keys.
  */
 export function getConfiguredModelIds(): Set<string> {
   if (cachedModelIds) return cachedModelIds
@@ -89,6 +113,27 @@ export function getConfiguredModelIds(): Set<string> {
             }
           }
         }
+      }
+    }
+
+    // Current schema: agents.defaults.models["provider/model-id"]
+    const defaults = config.agents?.defaults
+    if (defaults?.models) {
+      for (const scopedKey of Object.keys(defaults.models)) {
+        const modelId = modelIdFromScopedKey(scopedKey)
+        if (modelId) modelIds.add(modelId)
+      }
+    }
+
+    // Include primary + fallback models as an additional source of configured IDs.
+    if (defaults?.model?.primary) {
+      const modelId = modelIdFromScopedKey(defaults.model.primary)
+      if (modelId) modelIds.add(modelId)
+    }
+    if (Array.isArray(defaults?.model?.fallbacks)) {
+      for (const fallback of defaults.model.fallbacks) {
+        const modelId = modelIdFromScopedKey(fallback)
+        if (modelId) modelIds.add(modelId)
       }
     }
 
