@@ -1129,7 +1129,7 @@ export function ChatScreen({
 
           <ContextBar compact={compact} />
 
-          {gatewayNotice && <div className="px-4 py-2">{gatewayNotice}</div>}
+          {gatewayNotice && <div className="sticky top-0 z-20 px-4 py-2">{gatewayNotice}</div>}
 
           {hideUi ? null : (
             <ChatMessageList

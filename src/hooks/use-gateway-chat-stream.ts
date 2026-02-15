@@ -70,6 +70,14 @@ export function useGatewayChatStream(
     const eventSource = new EventSource(url)
     eventSourceRef.current = eventSource
 
+    // Native open event fires on initial connect AND every auto-reconnect
+    eventSource.onopen = () => {
+      if (!mountedRef.current) return
+      reconnectAttempts.current = 0
+      // Mark connected immediately — don't wait for custom 'connected' event
+      setConnectionState('connected')
+    }
+
     eventSource.addEventListener('connected', () => {
       if (!mountedRef.current) return
       reconnectAttempts.current = 0
@@ -88,10 +96,9 @@ export function useGatewayChatStream(
       if (eventSource.readyState === EventSource.CLOSED) {
         setConnectionState('disconnected')
         scheduleReconnect()
-      } else {
-        // EventSource auto-reconnects on non-fatal errors — show connecting, not error
-        setConnectionState('connecting')
       }
+      // Don't set 'connecting' on transient errors — EventSource auto-reconnects
+      // and onopen will fire when it succeeds. Avoids flashing red dot.
     })
 
     eventSource.addEventListener('heartbeat', () => {
