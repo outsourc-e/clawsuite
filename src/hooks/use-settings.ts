@@ -61,6 +61,7 @@ export const useSettingsStore = create<SettingsState>()(
     },
     {
       name: 'openclaw-settings',
+      skipHydration: true,
     },
   ),
 )
@@ -110,7 +111,7 @@ function applySettingsAppearance(settings: StudioSettings) {
 
 let didInitializeSettingsAppearance = false
 
-function initializeSettingsAppearance() {
+export function initializeSettingsAppearance() {
   if (didInitializeSettingsAppearance) return
   if (typeof window === 'undefined') return
 
@@ -133,4 +134,3 @@ function initializeSettingsAppearance() {
   )
 }
 
-initializeSettingsAppearance()

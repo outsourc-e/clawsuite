@@ -63,9 +63,18 @@ import {
 import { Sun02Icon, Moon02Icon } from '@hugeicons/core-free-icons'
 
 function ThemeToggleMini() {
-  const [isDark, setIsDark] = useState(() =>
-    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-  )
+  const [mounted, setMounted] = useState(false)
+  const [isDark, setIsDark] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    setIsDark(document.documentElement.classList.contains('dark'))
+  }, [mounted])
+
   return (
     <button
       type="button"
