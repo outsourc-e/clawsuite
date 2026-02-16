@@ -312,6 +312,7 @@ function ChatComposerComponent({
   )
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
+  const [isMobileViewport, setIsMobileViewport] = useState(false)
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
@@ -559,6 +560,15 @@ function ChatComposerComponent({
     focusPrompt()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey])
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
+    const media = window.matchMedia('(max-width: 767px)')
+    const updateIsMobile = () => setIsMobileViewport(media.matches)
+    updateIsMobile()
+    media.addEventListener('change', updateIsMobile)
+    return () => media.removeEventListener('change', updateIsMobile)
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -812,6 +822,9 @@ function ChatComposerComponent({
     disabled || (value.trim().length === 0 && attachments.length === 0)
 
   const hasDraft = value.trim().length > 0 || attachments.length > 0
+  const promptPlaceholder = isMobileViewport
+    ? 'Message...'
+    : 'Ask anything... (⌘↵ to send)'
 
   const handleClearDraft = useCallback(() => {
     reset()
@@ -940,6 +953,24 @@ function ChatComposerComponent({
     [addAttachments],
   )
 
+  const handleComposerWrapperClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (disabled) return
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      if (
+        target.closest('button') ||
+        target.closest('select') ||
+        target.closest('input') ||
+        target.closest('[role="button"]')
+      ) {
+        return
+      }
+      promptRef.current?.focus()
+    },
+    [disabled],
+  )
+
   // Combine internal ref with external wrapperRef
   const setWrapperRefs = useCallback(
     (node: HTMLDivElement | null) => {
@@ -970,6 +1001,7 @@ function ChatComposerComponent({
         } as React.CSSProperties
       }
       ref={setWrapperRefs}
+      onClick={handleComposerWrapperClick}
     >
       <input
         ref={attachmentInputRef}
@@ -1045,11 +1077,12 @@ function ChatComposerComponent({
         ) : null}
 
         <PromptInputTextarea
-          placeholder="Ask anything... (⌘↵ to send)"
+          placeholder={promptPlaceholder}
           autoFocus
           inputRef={promptRef}
           onFocus={() => setMobileKeyboardOpen(true)}
           onBlur={() => setTimeout(() => setMobileKeyboardOpen(false), 120)}
+          className="min-h-[44px]"
         />
         <PromptInputActions className="justify-between px-3">
           <div className="flex items-center gap-1">
