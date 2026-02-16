@@ -499,3 +499,9 @@ code {
   max-width: 420px !important;
   overflow-x: hidden !important;
 }
+
+@media (hover: none) and (pointer: coarse) {
+  :where(button, [data-slot='button'], a, [role='button']) {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

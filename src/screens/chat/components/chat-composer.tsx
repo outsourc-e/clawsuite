@@ -66,7 +66,6 @@ type ChatComposerProps = {
   wrapperRef?: Ref<HTMLDivElement>
   composerRef?: Ref<ChatComposerHandle>
   focusKey?: string
-  fixedOnMobile?: boolean
 }
 
 type ChatComposerHelpers = {
@@ -302,7 +301,6 @@ function ChatComposerComponent({
   wrapperRef,
   composerRef,
   focusKey,
-  fixedOnMobile = false,
 }: ChatComposerProps) {
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<Array<ChatComposerAttachment>>(
@@ -955,10 +953,7 @@ function ChatComposerComponent({
   return (
     <div
       className={cn(
-        'z-30 mx-auto w-full bg-surface/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 backdrop-blur sm:px-5',
-        fixedOnMobile
-          ? 'fixed inset-x-0 bottom-0 border-t border-primary-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] md:static md:shrink-0 md:border-t-0 md:shadow-none'
-          : 'shrink-0',
+        'z-30 mx-auto w-full shrink-0 bg-surface/95 px-3 pb-[calc(env(safe-area-inset-bottom)+5rem)] pt-2 backdrop-blur md:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-5',
       )}
       style={{ maxWidth: 'min(768px, 100%)' }}
       ref={setWrapperRefs}

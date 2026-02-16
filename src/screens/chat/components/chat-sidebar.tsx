@@ -888,7 +888,7 @@ function ChatSidebarComponent({
       animate={{
         width: isCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
       }}
-      transition={transition}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={asideProps.className}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}

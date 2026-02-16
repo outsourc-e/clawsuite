@@ -492,18 +492,18 @@ export function ChatScreen({
 
   const terminalPanelInset =
     !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
-  const mobileComposerInset = isMobile
-    ? 'calc(env(safe-area-inset-bottom) + 8.75rem)'
+  const mobileMessageInset = isMobile
+    ? 'calc(env(safe-area-inset-bottom) + 5rem)'
     : null
-  // Keep message list clear of fixed mobile composer and desktop terminal panel.
+  // Keep message list clear of the mobile tab bar and desktop terminal panel.
   const stableContentStyle = useMemo<React.CSSProperties>(() => {
     return {
       paddingBottom:
         terminalPanelInset > 0
           ? `${terminalPanelInset + 16}px`
-          : mobileComposerInset || '16px',
+          : mobileMessageInset || '16px',
     }
-  }, [mobileComposerInset, terminalPanelInset])
+  }, [mobileMessageInset, terminalPanelInset])
 
   const shouldRedirectToNew =
     !isNewChat &&
@@ -1115,9 +1115,8 @@ export function ChatScreen({
 
         <main
           className={cn(
-            'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
+            'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
             !compact && isAgentViewOpen ? 'min-[1024px]:mr-80' : 'mr-0',
-            isMobile && !compact && 'h-full',
           )}
           style={{
             marginBottom:
@@ -1186,7 +1185,6 @@ export function ChatScreen({
               }
               wrapperRef={composerRef}
               composerRef={composerHandleRef}
-              fixedOnMobile={isMobile && !compact}
               // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
               focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
             />

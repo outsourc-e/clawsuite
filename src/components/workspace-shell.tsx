@@ -14,8 +14,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Menu01Icon } from '@hugeicons/core-free-icons'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -23,7 +21,7 @@ import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
-import { Button } from '@/components/ui/button'
+import { MobileTabBar } from '@/components/mobile-tab-bar'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
 
@@ -49,7 +47,6 @@ export function WorkspaceShell() {
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
-  const setChatPanelOpen = useWorkspaceStore((s) => s.setChatPanelOpen)
 
   const [creatingSession, setCreatingSession] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -125,9 +122,7 @@ export function WorkspaceShell() {
     }
   }, [isMobile, setSidebarCollapsed])
 
-  // Edge swipe gestures:
-  // - left edge swipe opens sidebar
-  // - right edge swipe opens chat panel on non-chat routes
+  // Edge swipe gesture: left edge swipe opens sidebar
   useEffect(() => {
     const EDGE_ZONE_PX = 28
     const MIN_SWIPE_PX = 56
@@ -157,17 +152,9 @@ export function WorkspaceShell() {
       if (elapsed > MAX_DURATION_MS) return
       if (Math.abs(dy) > MAX_VERTICAL_DRIFT_PX) return
 
-      const viewportWidth = window.innerWidth
       const fromLeftEdge = start.x <= EDGE_ZONE_PX
-      const fromRightEdge = start.x >= viewportWidth - EDGE_ZONE_PX
-
       if (fromLeftEdge && dx >= MIN_SWIPE_PX) {
         setSidebarCollapsed(false)
-        return
-      }
-
-      if (!isOnChatRoute && fromRightEdge && Math.abs(dx) >= MIN_SWIPE_PX) {
-        setChatPanelOpen(true)
       }
     }
 
@@ -177,7 +164,7 @@ export function WorkspaceShell() {
       window.removeEventListener('touchstart', handleTouchStart)
       window.removeEventListener('touchend', handleTouchEnd)
     }
-  }, [isMobile, isOnChatRoute, setChatPanelOpen, setSidebarCollapsed])
+  }, [isMobile, setSidebarCollapsed])
 
   // Listen for global sidebar toggle shortcut
   useEffect(() => {
@@ -208,18 +195,6 @@ export function WorkspaceShell() {
 
   return (
     <div className="relative h-dvh bg-surface text-primary-900">
-      {isMobile && sidebarCollapsed && !isOnChatRoute ? (
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          className="fixed left-3 top-3 z-[60] h-11 w-11 rounded-xl border border-primary-200 bg-primary-50/95 text-primary-800 shadow-sm"
-          onClick={() => setSidebarCollapsed(false)}
-          aria-label="Open sidebar"
-        >
-          <HugeiconsIcon icon={Menu01Icon} size={20} strokeWidth={1.5} />
-        </Button>
-      ) : null}
-
       <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]">
         {/* Activity ticker bar */}
         {/* Persistent sidebar */}
@@ -248,18 +223,24 @@ export function WorkspaceShell() {
 
         {/* Main content area — renders the matched route */}
         <main
-          className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+          className={[
+            'h-full min-h-0 min-w-0 overflow-x-hidden',
+            isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
+            isMobile && !isOnChatRoute ? 'pb-20' : '',
+          ].join(' ')}
           data-tour="chat-area"
         >
           <Outlet />
         </main>
 
         {/* Chat panel — visible on non-chat routes */}
-        {!isOnChatRoute && <ChatPanel />}
+        {!isOnChatRoute && !isMobile && <ChatPanel />}
       </div>
 
       {/* Floating chat toggle — visible on non-chat routes */}
-      {!isOnChatRoute && <ChatPanelToggle />}
+      {!isOnChatRoute && !isMobile && <ChatPanelToggle />}
+
+      {isMobile ? <MobileTabBar /> : null}
     </div>
   )
 }
