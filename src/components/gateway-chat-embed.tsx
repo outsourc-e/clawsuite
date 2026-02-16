@@ -36,6 +36,41 @@ function GatewayChatEmbedComponent({ className }: { className?: string }) {
     return () => clearTimeout(timer)
   }, [loaded])
 
+  // Clear problematic model selection from gateway UI localStorage on load
+  useEffect(() => {
+    if (!loaded || !iframeRef.current) return
+
+    const iframe = iframeRef.current
+    const timer = setTimeout(() => {
+      try {
+        // Try to access iframe's localStorage directly and clear bad model cache
+        const iframeWindow = iframe.contentWindow
+        if (iframeWindow?.localStorage) {
+          // Clear any model-related localStorage keys that might have invalid Google auth
+          const keysToCheck = [
+            'selectedModel',
+            'model',
+            'defaultModel',
+            'lastUsedModel',
+          ]
+          keysToCheck.forEach((key) => {
+            const val = iframeWindow.localStorage.getItem(key)
+            // If it's a Google model, clear it to force default
+            if (val && val.includes('google')) {
+              iframeWindow.localStorage.removeItem(key)
+              console.log(`Cleared problematic model key: ${key}`)
+            }
+          })
+        }
+      } catch (err) {
+        // CORS might block this, but worth trying
+        console.warn('Could not access gateway UI localStorage:', err)
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [loaded])
+
   return (
     <div className={cn('relative h-full w-full', className)}>
       {!loaded && !error && (
