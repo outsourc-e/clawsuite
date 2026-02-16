@@ -10,8 +10,9 @@ import {
 import { cn } from '@/lib/utils'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
-/** Height constant for consistent bottom insets across the app */
-export const MOBILE_TAB_BAR_OFFSET = '5rem'
+/** Height constant for consistent bottom insets across the app.
+ * Matches: tab bar inner height (~52px) + mb-1 (4px) + mx-2 visual margin ≈ 3.75rem */
+export const MOBILE_TAB_BAR_OFFSET = '3.75rem'
 
 type TabItem = {
   id: string

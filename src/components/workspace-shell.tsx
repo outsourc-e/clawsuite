@@ -176,7 +176,7 @@ export function WorkspaceShell() {
           className={[
             'h-full min-h-0 min-w-0 overflow-x-hidden',
             isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
-            isMobile && !isOnChatRoute ? 'pb-20' : '',
+            isMobile && !isOnChatRoute ? 'pb-16' : '',
           ].join(' ')}
           data-tour="chat-area"
         >
