@@ -256,17 +256,20 @@ export function ChatScreen({
   }, [realtimeMessages])
 
   // Derive streaming state from realtime SSE state (bug #2 fix)
+  // Don't show empty streaming bubble during thinking/tool phase —
+  // tool call chips handle that. Only stream once text arrives.
+  const hasStreamingText = (realtimeStreamingText?.length ?? 0) > 0
   const derivedStreamingInfo = useMemo(() => {
-    // Use actual realtime streaming state when available
-    if (isRealtimeStreaming) {
+    // Use actual realtime streaming state when available — but only if text has arrived
+    if (isRealtimeStreaming && hasStreamingText) {
       const last = finalDisplayMessages[finalDisplayMessages.length - 1]
       const id = last?.role === 'assistant'
         ? ((last as any).__optimisticId || (last as any).id || null)
         : null
       return { isStreaming: true, streamingMessageId: id }
     }
-    // Fallback: waiting for response + last message is assistant
-    if (waitingForResponse && finalDisplayMessages.length > 0) {
+    // Fallback: waiting for response + last message is assistant + has text
+    if (waitingForResponse && hasStreamingText && finalDisplayMessages.length > 0) {
       const last = finalDisplayMessages[finalDisplayMessages.length - 1]
       if (last && last.role === 'assistant') {
         const id = (last as any).__optimisticId || (last as any).id || null
@@ -274,7 +277,7 @@ export function ChatScreen({
       }
     }
     return { isStreaming: false, streamingMessageId: null as string | null }
-  }, [waitingForResponse, finalDisplayMessages, isRealtimeStreaming])
+  }, [waitingForResponse, finalDisplayMessages, isRealtimeStreaming, hasStreamingText])
 
   // --- Stream management ---
   const streamStop = useCallback(() => {
@@ -1158,6 +1161,7 @@ export function ChatScreen({
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
               streamingText={realtimeStreamingText || undefined}
               streamingThinking={realtimeStreamingThinking || undefined}
+              activeToolCalls={activeToolCalls}
             />
           )}
           {showComposer ? (

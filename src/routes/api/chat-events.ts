@@ -89,10 +89,18 @@ export const Route = createFileRoute('/api/chat-events')({
                   const data = rawPayload?.data
                   const runId = rawPayload?.runId
 
-                  if (stream === 'assistant' && data?.text) {
-                    sendEvent('chunk', { text: data.text, runId, sessionKey: targetSessionKey })
-                  } else if (stream === 'thinking' && data?.text) {
-                    sendEvent('thinking', { text: data.text, runId, sessionKey: targetSessionKey })
+                  if (stream === 'assistant' && (data?.text || data?.delta)) {
+                    // Prefer delta (append-only) for iMessage-style streaming
+                    // Fall back to full text replacement if no delta available
+                    if (data?.delta) {
+                      sendEvent('chunk', { text: data.delta, runId, sessionKey: targetSessionKey, fullReplace: false })
+                    } else {
+                      sendEvent('chunk', { text: data.text, runId, sessionKey: targetSessionKey })
+                    }
+                  } else if (stream === 'thinking' && (data?.text || data?.delta)) {
+                    sendEvent('thinking', { text: data?.text || data?.delta, runId, sessionKey: targetSessionKey })
+                  } else if (stream === 'lifecycle' && data?.phase) {
+                    sendEvent('lifecycle', { phase: data.phase, runId, sessionKey: targetSessionKey })
                   } else if (stream === 'tool') {
                     sendEvent('tool', {
                       phase: data?.phase, name: data?.name, toolCallId: data?.toolCallId,

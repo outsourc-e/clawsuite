@@ -161,6 +161,7 @@ export function buildConnectParams(
       signedAt: signedAtMs,
       nonce,
     },
+    caps: ['tool-events'],
   }
 }
 
