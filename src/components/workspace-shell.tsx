@@ -49,11 +49,29 @@ export function WorkspaceShell() {
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
 
   const [creatingSession, setCreatingSession] = useState(false)
-  const [authState] = useState({
-    checked: true,
-    authenticated: true,
-    authRequired: false,
+
+  // Fetch actual auth status from server instead of hardcoding
+  interface AuthStatus {
+    authenticated: boolean
+    authRequired: boolean
+  }
+
+  const authQuery = useQuery<AuthStatus>({
+    queryKey: ['auth-status'],
+    queryFn: async () => {
+      const res = await fetch('/api/auth-check')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json() as Promise<AuthStatus>
+    },
+    staleTime: 60_000, // Cache for 1 minute
+    retry: false,
   })
+
+  const authState = {
+    checked: !authQuery.isLoading,
+    authenticated: authQuery.data?.authenticated ?? false,
+    authRequired: authQuery.data?.authRequired ?? true,
+  }
 
   // Derive active session from URL
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
