@@ -55,9 +55,12 @@ async function saveConfig(url: string, token: string): Promise<{ ok: boolean; er
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url, token }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(15000),
     })
-    const data = (await response.json()) as { ok?: boolean; error?: string }
+    const data = (await response.json()) as { ok?: boolean; connected?: boolean; error?: string }
+    if (data.ok && data.connected === false) {
+      return { ok: true, error: 'Config saved. Reconnecting to gateway...' }
+    }
     return { ok: Boolean(data.ok), error: data.error }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Failed to save config' }

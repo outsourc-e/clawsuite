@@ -99,8 +99,7 @@ type MobileWidgetSection = {
   content: ReactNode
 }
 
-const PULL_REFRESH_THRESHOLD = 60
-const PULL_REFRESH_MAX_DISTANCE = 96
+// Pull-to-refresh constants removed
 
 function readNumeric(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -116,17 +115,6 @@ function toLocalDateKey(date: Date): string {
   const month = `${date.getMonth() + 1}`.padStart(2, '0')
   const day = `${date.getDate()}`.padStart(2, '0')
   return `${year}-${month}-${day}`
-}
-
-function formatUpdatedAgo(checkedAtIso: string, nowMs: number): string {
-  const timestamp = Date.parse(checkedAtIso)
-  if (Number.isNaN(timestamp)) return 'just now'
-
-  const elapsedSeconds = Math.max(0, Math.floor((nowMs - timestamp) / 1000))
-  if (elapsedSeconds < 45) return 'just now'
-  if (elapsedSeconds < 3600) return `${Math.floor(elapsedSeconds / 60)}m ago`
-  if (elapsedSeconds < 86_400) return `${Math.floor(elapsedSeconds / 3600)}h ago`
-  return `${Math.floor(elapsedSeconds / 86_400)}d ago`
 }
 
 function formatCurrency(amount: number): string {
@@ -253,10 +241,7 @@ export function DashboardScreen() {
       return false
     }
   })
-  const [pullDistance, setPullDistance] = useState(0)
-  const [isPullRefreshing, setIsPullRefreshing] = useState(false)
-  const pullStartRef = useRef<{ x: number; y: number } | null>(null)
-  const pullHorizontalRef = useRef(false)
+  // Pull-to-refresh removed (was buggy on mobile)
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)')
@@ -507,13 +492,6 @@ export function DashboardScreen() {
       }
     },
     [costTimeseriesQuery.data, nowMs, usageSummaryQuery.data, usageSummaryQuery.isError],
-  )
-
-  const greetingUpdatedText = useMemo(
-    function buildGreetingUpdatedText() {
-      return formatUpdatedAgo(systemStatus.gateway.checkedAtIso, nowMs)
-    },
-    [nowMs, systemStatus.gateway.checkedAtIso],
   )
 
   const nextTheme = useMemo(
@@ -777,97 +755,11 @@ export function DashboardScreen() {
     [mobileSections, moveWidget, widgetOrder],
   )
 
-  const handlePullTouchStart = useCallback(
-    function handlePullTouchStart(event: TouchEvent<HTMLElement>) {
-      if (!isMobile || isPullRefreshing || event.touches.length === 0) return
-      if (event.currentTarget.scrollTop !== 0) {
-        pullStartRef.current = null
-        pullHorizontalRef.current = false
-        return
-      }
-
-      const touch = event.touches[0]
-      pullStartRef.current = { x: touch.clientX, y: touch.clientY }
-      pullHorizontalRef.current = false
-    },
-    [isMobile, isPullRefreshing],
-  )
-
-  const handlePullTouchMove = useCallback(
-    function handlePullTouchMove(event: TouchEvent<HTMLElement>) {
-      if (!isMobile || isPullRefreshing || event.touches.length === 0) return
-      const start = pullStartRef.current
-      if (!start) return
-
-      const touch = event.touches[0]
-      const deltaX = touch.clientX - start.x
-      const deltaY = touch.clientY - start.y
-
-      if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        pullHorizontalRef.current = true
-      }
-      if (pullHorizontalRef.current) {
-        setPullDistance(0)
-        return
-      }
-      if (event.currentTarget.scrollTop > 0 || deltaY <= 0) {
-        setPullDistance(0)
-        return
-      }
-
-      const nextDistance = Math.min(
-        PULL_REFRESH_MAX_DISTANCE,
-        Math.max(0, deltaY * 0.5),
-      )
-      setPullDistance(nextDistance)
-      if (nextDistance > 0) event.preventDefault()
-    },
-    [isMobile, isPullRefreshing],
-  )
-
-  const handlePullTouchEnd = useCallback(
-    function handlePullTouchEnd() {
-      if (!isMobile) return
-      const shouldRefresh =
-        !pullHorizontalRef.current && pullDistance > PULL_REFRESH_THRESHOLD
-
-      pullStartRef.current = null
-      pullHorizontalRef.current = false
-      setPullDistance(0)
-
-      if (!shouldRefresh || isPullRefreshing) return
-      setIsPullRefreshing(true)
-      void handleRefreshAll().finally(() => setIsPullRefreshing(false))
-    },
-    [handleRefreshAll, isMobile, isPullRefreshing, pullDistance],
-  )
-
   return (
     <>
       <main
         className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-3 pt-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8"
-        onTouchStart={isMobile ? handlePullTouchStart : undefined}
-        onTouchMove={isMobile ? handlePullTouchMove : undefined}
-        onTouchEnd={isMobile ? handlePullTouchEnd : undefined}
-        onTouchCancel={isMobile ? handlePullTouchEnd : undefined}
       >
-        {isMobile &&
-        (isPullRefreshing || pullDistance > PULL_REFRESH_THRESHOLD) ? (
-          <div className="pointer-events-none sticky top-1 z-30 mb-1 flex h-5 items-center justify-center">
-            <div
-              className={cn(
-                'size-4 rounded-full border-2 border-primary-300 border-t-accent-600',
-                (isPullRefreshing || pullDistance > PULL_REFRESH_THRESHOLD) &&
-                  'animate-spin',
-              )}
-              style={{
-                opacity: isPullRefreshing
-                  ? 1
-                  : Math.min(pullDistance / PULL_REFRESH_THRESHOLD, 1),
-              }}
-            />
-          </div>
-        ) : null}
         <section className="mx-auto w-full max-w-[1600px]">
           <header className="relative z-20 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm md:mb-5 md:px-5 md:py-3">
             <div className="flex items-center justify-between gap-3">
@@ -884,14 +776,16 @@ export function DashboardScreen() {
                     {shouldShowLogoTip ? (
                       <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duratrion-300">
                         <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md ">
-                          <button
-                            type="button"
-                            className="whitespace-nowrap"
-                            onClick={markLogoTipSeen}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className="whitespace-nowrap cursor-pointer"
+                            onClick={(e) => { e.stopPropagation(); markLogoTipSeen(); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') markLogoTipSeen(); }}
                             aria-label="Dismiss quick menu tip"
                           >
                             Tap for quick menu
-                          </button>
+                          </span>
                           <div className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-primary-900 shadow-md" />
                         </div>
                       </div>
@@ -1026,16 +920,6 @@ export function DashboardScreen() {
               </div>
             </div>
 
-            {isMobile ? (
-              <div className="mt-1.5 border-t border-primary-200/60 pt-1.5">
-                <p className="text-[13px] font-medium text-ink">Welcome back</p>
-                <p className="text-[11px] text-primary-400 truncate">
-                  {systemStatus.currentModel !== '—' ? `${systemStatus.currentModel} • ` : ''}
-                  {systemStatus.totalSessions} sessions • {systemStatus.activeAgents}{' '}
-                  agents • {greetingUpdatedText}
-                </p>
-              </div>
-            ) : null}
           </header>
 
           {/* Activity ticker — keep full banner behavior on desktop */}

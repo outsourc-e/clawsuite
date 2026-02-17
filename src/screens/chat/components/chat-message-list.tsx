@@ -1,4 +1,11 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Robot01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -83,6 +90,7 @@ function getToolLabel(name: string, phase: string): string {
 const VIRTUAL_ROW_HEIGHT = 136
 const VIRTUAL_OVERSCAN = 8
 const NEAR_BOTTOM_THRESHOLD = 200
+// Pull-to-refresh constants removed
 
 type MessageSearchMatch = {
   stableId: string
@@ -100,6 +108,7 @@ function escapeAttributeSelector(value: string): string {
 type ChatMessageListProps = {
   messages: Array<GatewayMessage>
   onRetryMessage?: (message: GatewayMessage) => void
+  onRefresh?: () => void | Promise<unknown>
   loading: boolean
   empty: boolean
   emptyState?: React.ReactNode
@@ -125,6 +134,7 @@ type ChatMessageListProps = {
 function ChatMessageListComponent({
   messages,
   onRetryMessage,
+  onRefresh: _onRefresh,
   loading,
   empty,
   emptyState,
@@ -163,12 +173,40 @@ function ChatMessageListComponent({
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false)
   const [messageSearchValue, setMessageSearchValue] = useState('')
   const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(0)
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 767px)').matches
+  })
+  // Pull-to-refresh removed (was buggy on mobile)
   const keyboardInsetRef = useRef(keyboardInset)
   const [scrollMetrics] = useState({
     scrollTop: 0,
     scrollHeight: 0,
     clientHeight: 0,
   })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const media = window.matchMedia('(max-width: 767px)')
+    const updateIsMobile = () => setIsMobileViewport(media.matches)
+    updateIsMobile()
+    media.addEventListener('change', updateIsMobile)
+    return () => media.removeEventListener('change', updateIsMobile)
+  }, [])
+
+  // Pull-to-refresh handlers removed
+
+    // contentContainerStyle removed with pull-to-refresh
+
+  const chatContentStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (!isMobileViewport) return contentStyle
+    return {
+      ...contentStyle,
+      paddingBottom:
+        contentStyle?.paddingBottom ??
+        'calc(var(--chat-composer-height, 96px) + var(--safe-b) + 20px)',
+    }
+  }, [contentStyle, isMobileViewport])
 
   // Simple scroll handler — only tracks if user is near bottom via refs (no state updates)
   const handleUserScroll = useCallback(function handleUserScroll(metrics: {
@@ -434,13 +472,8 @@ function ChatMessageListComponent({
     toolInteractionCount > 0
 
   const streamingState = useMemo(() => {
-    const prevSignatures = messageSignatureRef.current
     const nextSignatures = new Map<string, string>()
-    const toStream = new Set<string>()
     const isInitialRender = initialRenderRef.current
-
-    // Track the last new assistant message — only that one gets typewriter
-    let lastNewAssistantId: string | null = null
 
     displayMessages.forEach((message, index) => {
       const stableId = getStableMessageId(message, index)
@@ -449,18 +482,6 @@ function ChatMessageListComponent({
       const streamingStatus = message.__streamingStatus ?? 'idle'
       const signature = `${streamingStatus}:${timestamp}:${text.length}:${text.slice(-48)}`
       nextSignatures.set(stableId, signature)
-
-      if (
-        !isInitialRender &&
-        message.role === 'assistant' &&
-        streamingStatus !== 'streaming'
-      ) {
-        const prevSignature = prevSignatures.get(stableId)
-        // Only animate if this message is truly new (no previous signature at all)
-        if (!prevSignature && text.trim().length > 0) {
-          lastNewAssistantId = stableId
-        }
-      }
     })
 
     messageSignatureRef.current = nextSignatures
@@ -782,10 +803,11 @@ function ChatMessageListComponent({
 
   const scrollToBottomOverlay = useMemo(() => {
     const isVisible = !isNearBottom && displayMessages.length > 0
+    const overlayGap = isMobileViewport ? 32 : 24
     const overlayBottom =
       typeof bottomOffset === 'number'
-        ? `${bottomOffset + 24}px`
-        : `calc(${bottomOffset} + 24px)`
+        ? `${bottomOffset + overlayGap}px`
+        : `calc(${bottomOffset} + ${overlayGap}px)`
     return (
       <div
         className="pointer-events-none absolute left-1/2 z-40 -translate-x-1/2"
@@ -802,6 +824,7 @@ function ChatMessageListComponent({
     bottomOffset,
     displayMessages.length,
     handleScrollToBottom,
+    isMobileViewport,
     isNearBottom,
     unreadCount,
   ])
@@ -814,260 +837,262 @@ function ChatMessageListComponent({
       onUserScroll={handleUserScroll}
       overlay={scrollToBottomOverlay}
     >
-      {isMessageSearchOpen && (
-        <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-primary-200 bg-primary-50/95 px-3 py-2 backdrop-blur-sm">
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={messageSearchValue}
-            onChange={(e) => setMessageSearchValue(e.target.value)}
-            placeholder="Search messages..."
-            className="min-w-0 flex-1 rounded-md border border-primary-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 py-1.5 text-sm text-primary-900 dark:text-gray-100 outline-none placeholder:text-primary-400 dark:placeholder:text-gray-500 focus:border-primary-400 dark:focus:border-primary-500 focus:ring-1 focus:ring-primary-400 dark:focus:ring-primary-500"
-          />
-          {isMessageSearchActive && (
-            <span className="shrink-0 text-xs text-primary-500 dark:text-gray-400">
-              {messageSearchMatches.length > 0
-                ? `${activeSearchMatchIndex + 1} of ${messageSearchMatches.length}`
-                : 'No matches'}
-            </span>
-          )}
-          <div className="flex shrink-0 items-center gap-0.5">
-            <button
-              type="button"
-              onClick={jumpToPreviousMatch}
-              disabled={messageSearchMatches.length === 0}
-              className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200 disabled:opacity-30"
-              aria-label="Previous match"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M4 10l4-4 4 4"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={jumpToNextMatch}
-              disabled={messageSearchMatches.length === 0}
-              className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200 disabled:opacity-30"
-              aria-label="Next match"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M4 6l4 4 4-4"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={closeMessageSearch}
-              className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200"
-              aria-label="Close search"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M4 4l8 8M12 4l-8 8"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-      <ChatContainerContent className="pt-4 md:pt-6" style={contentStyle}>
-        {notice && noticePosition === 'start' ? notice : null}
-        {showToolOnlyNotice ? (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-2.5">
-                <HugeiconsIcon
-                  icon={Robot01Icon}
-                  size={20}
-                  strokeWidth={1.5}
-                  className="mt-0.5 shrink-0 text-amber-600"
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-amber-800 text-balance">
-                    This session contains{' '}
-                    <span className="tabular-nums">{toolInteractionCount}</span>{' '}
-                    tool interactions
-                  </p>
-                  <p className="mt-1 text-sm text-amber-700 text-pretty">
-                    Most content is AI agent tool usage (file reads, code
-                    execution, etc.)
-                  </p>
-                </div>
-              </div>
+      <div className="w-full">
+        {isMessageSearchOpen && (
+          <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-primary-200 bg-primary-50/95 px-3 py-2 backdrop-blur-sm">
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={messageSearchValue}
+              onChange={(e) => setMessageSearchValue(e.target.value)}
+              placeholder="Search messages..."
+              className="min-w-0 flex-1 rounded-md border border-primary-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 py-1.5 text-sm text-primary-900 dark:text-gray-100 outline-none placeholder:text-primary-400 dark:placeholder:text-gray-500 focus:border-primary-400 dark:focus:border-primary-500 focus:ring-1 focus:ring-primary-400 dark:focus:ring-primary-500"
+            />
+            {isMessageSearchActive && (
+              <span className="shrink-0 text-xs text-primary-500 dark:text-gray-400">
+                {messageSearchMatches.length > 0
+                  ? `${activeSearchMatchIndex + 1} of ${messageSearchMatches.length}`
+                  : 'No matches'}
+              </span>
+            )}
+            <div className="flex shrink-0 items-center gap-0.5">
               <button
                 type="button"
-                onClick={() => setExpandAllToolSections(true)}
-                disabled={expandAllToolSections}
-                className={cn(
-                  'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
-                  expandAllToolSections
-                    ? 'border-amber-300 bg-amber-100 text-amber-700 cursor-default'
-                    : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 hover:border-amber-400',
-                )}
-                aria-label={
-                  expandAllToolSections
-                    ? 'All tool sections expanded'
-                    : 'Expand all tool sections'
-                }
+                onClick={jumpToPreviousMatch}
+                disabled={messageSearchMatches.length === 0}
+                className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200 disabled:opacity-30"
+                aria-label="Previous match"
               >
-                {expandAllToolSections ? '✓ Expanded' : 'Show All'}
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M4 10l4-4 4 4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={jumpToNextMatch}
+                disabled={messageSearchMatches.length === 0}
+                className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200 disabled:opacity-30"
+                aria-label="Next match"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M4 6l4 4 4-4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={closeMessageSearch}
+                className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200"
+                aria-label="Close search"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M4 4l8 8M12 4l-8 8"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
             </div>
           </div>
-        ) : null}
-        {loading && displayMessages.length === 0 ? (
-          <div className="flex flex-col gap-4 animate-pulse">
-            <div className="flex gap-3">
-              <div className="size-6 rounded-full bg-primary-200" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 bg-primary-200 rounded w-3/4" />
-                <div className="h-4 bg-primary-200 rounded w-1/2" />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="size-6 rounded-full bg-primary-200" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 bg-primary-200 rounded w-2/3" />
-                <div className="h-4 bg-primary-200 rounded w-5/6" />
-                <div className="h-4 bg-primary-200 rounded w-1/3" />
-              </div>
-            </div>
-          </div>
-        ) : empty && !notice ? (
-          (emptyState ?? <div aria-hidden></div>)
-        ) : hasGroup ? (
-          <>
-            {displayMessages.slice(0, groupStartIndex).map(renderMessage)}
-            {/* // Keep the last exchange pinned without extra tail gap. // Account
-            for space-y-6 (24px) when pinning. */}
-            <div
-              className="my-2 flex flex-col gap-2 md:my-3 md:gap-3"
-              style={{ minHeight: `${Math.max(0, pinGroupMinHeight - 12)}px` }}
-            >
-              {displayMessages
-                .slice(groupStartIndex)
-                .map((chatMessage, index) => {
-                  const realIndex = groupStartIndex + index
-                  const messageIsStreaming = isMessageStreaming(
-                    chatMessage,
-                    realIndex,
-                  )
-                  const stableId = getStableMessageId(chatMessage, realIndex)
-                  const signature = streamingState.signatureById.get(stableId)
-                  const simulateStreaming =
-                    !messageIsStreaming &&
-                    streamingState.streamingTargets.has(stableId)
-                  const forceActionsVisible =
-                    typeof lastAssistantIndex === 'number' &&
-                    realIndex === lastAssistantIndex
-                  const wrapperRef =
-                    realIndex === lastUserIndex ? lastUserRef : undefined
-                  const wrapperClassName = cn(
-                    getMessageSpacingClass(displayMessages, realIndex),
-                    getToolGroupClass(displayMessages, realIndex),
-                    realIndex === lastUserIndex ? 'scroll-mt-0' : '',
-                  )
-                  const wrapperScrollMarginTop =
-                    realIndex === lastUserIndex ? headerHeight : undefined
-                  const hasToolCalls =
-                    chatMessage.role === 'assistant' &&
-                    getToolCallsFromMessage(chatMessage).length > 0
-                  return (
-                    <MessageItem
-                      key={stableId}
-                      message={chatMessage}
-                      onRetryMessage={onRetryMessage}
-                      toolResultsByCallId={
-                        hasToolCalls ? toolResultsByCallId : undefined
-                      }
-                      forceActionsVisible={forceActionsVisible}
-                      wrapperRef={wrapperRef}
-                      wrapperClassName={wrapperClassName}
-                      wrapperScrollMarginTop={wrapperScrollMarginTop}
-                      isStreaming={messageIsStreaming}
-                      streamingText={
-                        messageIsStreaming ? streamingText : undefined
-                      }
-                      streamingThinking={
-                        messageIsStreaming ? streamingThinking : undefined
-                      }
-                      simulateStreaming={simulateStreaming}
-                      streamingKey={signature}
-                      expandAllToolSections={expandAllToolSections}
-                    />
-                  )
-                })}
-            </div>
-          </>
-        ) : (
-          <>
-            {shouldVirtualize && virtualRange.topSpacerHeight > 0 ? (
-              <div
-                aria-hidden="true"
-                style={{ height: `${virtualRange.topSpacerHeight}px` }}
-              />
-            ) : null}
-            {displayMessages
-              .slice(virtualRange.startIndex, virtualRange.endIndex)
-              .map((chatMessage, index) =>
-                renderMessage(chatMessage, virtualRange.startIndex + index),
-              )}
-            {shouldVirtualize && virtualRange.bottomSpacerHeight > 0 ? (
-              <div
-                aria-hidden="true"
-                style={{ height: `${virtualRange.bottomSpacerHeight}px` }}
-              />
-            ) : null}
-          </>
         )}
-        {showTypingIndicator || (isStreaming && activeToolCalls.length > 0) ? (
-          <div
-            className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
-            role="status"
-            aria-live="polite"
-          >
-            {activeToolCalls.length > 0 ? (
-              activeToolCalls.map((tool) => (
-                <div key={tool.id} className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                  <div className="size-5 rounded-full bg-accent-100 flex items-center justify-center shrink-0">
-                    <span className="text-[10px]">{getToolIcon(tool.name)}</span>
-                  </div>
-                  <span className="text-xs text-accent-600 font-medium">
-                    {getToolLabel(tool.name, tool.phase)}
-                  </span>
-                  {tool.phase !== 'result' && (
-                    <span className="inline-block size-1.5 rounded-full bg-accent-400 animate-pulse" />
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="flex items-center gap-3">
-                <LoadingIndicator
-                    ariaLabel="Assistant is working"
-                    className="!ml-0"
+        <ChatContainerContent className="pt-2.5 md:pt-6" style={chatContentStyle}>
+          {notice && noticePosition === 'start' ? notice : null}
+          {showToolOnlyNotice ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <HugeiconsIcon
+                    icon={Robot01Icon}
+                    size={20}
+                    strokeWidth={1.5}
+                    className="mt-0.5 shrink-0 text-amber-600"
                   />
-                <ThinkingStatusText />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-amber-800 text-balance">
+                      This session contains{' '}
+                      <span className="tabular-nums">{toolInteractionCount}</span>{' '}
+                      tool interactions
+                    </p>
+                    <p className="mt-1 text-sm text-amber-700 text-pretty">
+                      Most content is AI agent tool usage (file reads, code
+                      execution, etc.)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandAllToolSections(true)}
+                  disabled={expandAllToolSections}
+                  className={cn(
+                    'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                    expandAllToolSections
+                      ? 'border-amber-300 bg-amber-100 text-amber-700 cursor-default'
+                      : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 hover:border-amber-400',
+                  )}
+                  aria-label={
+                    expandAllToolSections
+                      ? 'All tool sections expanded'
+                      : 'Expand all tool sections'
+                  }
+                >
+                  {expandAllToolSections ? '✓ Expanded' : 'Show All'}
+                </button>
               </div>
-            )}
-          </div>
-        ) : null}
-        {notice && noticePosition === 'end' ? notice : null}
-        <ChatContainerScrollAnchor ref={anchorRef} />
-      </ChatContainerContent>
+            </div>
+          ) : null}
+          {loading && displayMessages.length === 0 ? (
+            <div className="flex flex-col gap-4 animate-pulse">
+              <div className="flex gap-3">
+                <div className="size-6 rounded-full bg-primary-200" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-primary-200 rounded w-3/4" />
+                  <div className="h-4 bg-primary-200 rounded w-1/2" />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="size-6 rounded-full bg-primary-200" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-primary-200 rounded w-2/3" />
+                  <div className="h-4 bg-primary-200 rounded w-5/6" />
+                  <div className="h-4 bg-primary-200 rounded w-1/3" />
+                </div>
+              </div>
+            </div>
+          ) : empty && !notice ? (
+            (emptyState ?? <div aria-hidden></div>)
+          ) : hasGroup ? (
+            <>
+              {displayMessages.slice(0, groupStartIndex).map(renderMessage)}
+              {/* // Keep the last exchange pinned without extra tail gap. // Account
+              for space-y-6 (24px) when pinning. */}
+              <div
+                className="my-2 flex flex-col gap-2 md:my-3 md:gap-3"
+                style={{ minHeight: `${Math.max(0, pinGroupMinHeight - 12)}px` }}
+              >
+                {displayMessages
+                  .slice(groupStartIndex)
+                  .map((chatMessage, index) => {
+                    const realIndex = groupStartIndex + index
+                    const messageIsStreaming = isMessageStreaming(
+                      chatMessage,
+                      realIndex,
+                    )
+                    const stableId = getStableMessageId(chatMessage, realIndex)
+                    const signature = streamingState.signatureById.get(stableId)
+                    const simulateStreaming =
+                      !messageIsStreaming &&
+                      streamingState.streamingTargets.has(stableId)
+                    const forceActionsVisible =
+                      typeof lastAssistantIndex === 'number' &&
+                      realIndex === lastAssistantIndex
+                    const wrapperRef =
+                      realIndex === lastUserIndex ? lastUserRef : undefined
+                    const wrapperClassName = cn(
+                      getMessageSpacingClass(displayMessages, realIndex),
+                      getToolGroupClass(displayMessages, realIndex),
+                      realIndex === lastUserIndex ? 'scroll-mt-0' : '',
+                    )
+                    const wrapperScrollMarginTop =
+                      realIndex === lastUserIndex ? headerHeight : undefined
+                    const hasToolCalls =
+                      chatMessage.role === 'assistant' &&
+                      getToolCallsFromMessage(chatMessage).length > 0
+                    return (
+                      <MessageItem
+                        key={stableId}
+                        message={chatMessage}
+                        onRetryMessage={onRetryMessage}
+                        toolResultsByCallId={
+                          hasToolCalls ? toolResultsByCallId : undefined
+                        }
+                        forceActionsVisible={forceActionsVisible}
+                        wrapperRef={wrapperRef}
+                        wrapperClassName={wrapperClassName}
+                        wrapperScrollMarginTop={wrapperScrollMarginTop}
+                        isStreaming={messageIsStreaming}
+                        streamingText={
+                          messageIsStreaming ? streamingText : undefined
+                        }
+                        streamingThinking={
+                          messageIsStreaming ? streamingThinking : undefined
+                        }
+                        simulateStreaming={simulateStreaming}
+                        streamingKey={signature}
+                        expandAllToolSections={expandAllToolSections}
+                      />
+                    )
+                  })}
+              </div>
+            </>
+          ) : (
+            <>
+              {shouldVirtualize && virtualRange.topSpacerHeight > 0 ? (
+                <div
+                  aria-hidden="true"
+                  style={{ height: `${virtualRange.topSpacerHeight}px` }}
+                />
+              ) : null}
+              {displayMessages
+                .slice(virtualRange.startIndex, virtualRange.endIndex)
+                .map((chatMessage, index) =>
+                  renderMessage(chatMessage, virtualRange.startIndex + index),
+                )}
+              {shouldVirtualize && virtualRange.bottomSpacerHeight > 0 ? (
+                <div
+                  aria-hidden="true"
+                  style={{ height: `${virtualRange.bottomSpacerHeight}px` }}
+                />
+              ) : null}
+            </>
+          )}
+          {showTypingIndicator || (isStreaming && activeToolCalls.length > 0) ? (
+            <div
+              className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
+              role="status"
+              aria-live="polite"
+            >
+              {activeToolCalls.length > 0 ? (
+                activeToolCalls.map((tool) => (
+                  <div key={tool.id} className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                    <div className="size-5 rounded-full bg-accent-100 flex items-center justify-center shrink-0">
+                      <span className="text-[10px]">{getToolIcon(tool.name)}</span>
+                    </div>
+                    <span className="text-xs text-accent-600 font-medium">
+                      {getToolLabel(tool.name, tool.phase)}
+                    </span>
+                    {tool.phase !== 'result' && (
+                      <span className="inline-block size-1.5 rounded-full bg-accent-400 animate-pulse" />
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center gap-3">
+                  <LoadingIndicator
+                      ariaLabel="Assistant is working"
+                      className="!ml-0"
+                    />
+                  <ThinkingStatusText />
+                </div>
+              )}
+            </div>
+          ) : null}
+          {notice && noticePosition === 'end' ? notice : null}
+          <ChatContainerScrollAnchor ref={anchorRef} />
+        </ChatContainerContent>
+      </div>
     </ChatContainerRoot>
   )
 }
@@ -1164,6 +1189,7 @@ function areChatMessageListEqual(
   return (
     prev.messages === next.messages &&
     prev.onRetryMessage === next.onRetryMessage &&
+    prev.onRefresh === next.onRefresh &&
     prev.loading === next.loading &&
     prev.empty === next.empty &&
     prev.emptyState === next.emptyState &&

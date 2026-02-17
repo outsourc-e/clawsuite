@@ -175,6 +175,7 @@ export function ChatScreen({
   const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const mobileKeyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const isAgentViewOpen = useAgentViewStore((state) => state.isOpen)
+  const setAgentViewOpen = useAgentViewStore((state) => state.setOpen)
   const isTerminalPanelOpen = useTerminalPanelStore(
     (state) => state.isPanelOpen,
   )
@@ -196,7 +197,6 @@ export function ChatScreen({
   const {
     historyQuery,
     historyMessages,
-    displayMessages,
     messageCount,
     historyError,
     resolvedSessionKey,
@@ -222,7 +222,6 @@ export function ChatScreen({
     realtimeStreamingText,
     realtimeStreamingThinking,
     activeToolCalls,
-    streamingRunId,
   } = useRealtimeChatHistory({
       sessionKey: resolvedSessionKey || activeCanonicalKey,
       friendlyId: activeFriendlyId,
@@ -481,7 +480,6 @@ export function ChatScreen({
     staleTime: 30_000,
     refetchInterval: 60_000, // Re-check every 60s to clear stale errors
   })
-  const gatewayStatusMountRef = useRef(Date.now())
   // Don't show gateway errors for new chats or when SSE is connected (proves gateway works)
   const gatewayStatusError =
     !isNewChat && connectionState !== 'connected' &&
@@ -497,6 +495,20 @@ export function ChatScreen({
     void sessionsQuery.refetch()
     void historyQuery.refetch()
   }, [gatewayStatusQuery, sessionsQuery, historyQuery])
+
+  const handleRefreshHistory = useCallback(() => {
+    void historyQuery.refetch()
+  }, [historyQuery])
+
+  useEffect(() => {
+    const handleRefreshRequest = () => {
+      void historyQuery.refetch()
+    }
+    window.addEventListener('clawsuite:chat-refresh', handleRefreshRequest)
+    return () => {
+      window.removeEventListener('clawsuite:chat-refresh', handleRefreshRequest)
+    }
+  }, [historyQuery])
 
   const terminalPanelInset =
     !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
@@ -1040,15 +1052,10 @@ export function ChatScreen({
   )
 
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
-  const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
 
   const handleToggleSidebarCollapse = useCallback(() => {
     toggleSidebar()
   }, [toggleSidebar])
-
-  const handleOpenSidebar = useCallback(() => {
-    setSidebarCollapsed(false)
-  }, [setSidebarCollapsed])
 
   const handleToggleFileExplorer = useCallback(() => {
     setFileExplorerCollapsed((prev) => {
@@ -1109,6 +1116,19 @@ export function ChatScreen({
         ? 'disconnected'
         : 'connecting'
 
+  // Pull-to-refresh offset removed
+
+  const handleOpenAgentDetails = useCallback(() => {
+    setAgentViewOpen(true)
+  }, [setAgentViewOpen])
+
+  // Listen for mobile header agent-details tap
+  useEffect(() => {
+    const handler = () => setAgentViewOpen(true)
+    window.addEventListener('clawsuite:chat-agent-details', handler)
+    return () => window.removeEventListener('clawsuite:chat-agent-details', handler)
+  }, [setAgentViewOpen])
+
   return (
     <div
       className={cn(
@@ -1154,7 +1174,11 @@ export function ChatScreen({
               fileExplorerCollapsed={fileExplorerCollapsed}
               onToggleFileExplorer={handleToggleFileExplorer}
               dataUpdatedAt={historyQuery.dataUpdatedAt}
-              onRefresh={() => void historyQuery.refetch()}
+              onRefresh={handleRefreshHistory}
+              agentModel={currentModel}
+              agentConnected={mobileHeaderStatus === 'connected'}
+              onOpenAgentDetails={handleOpenAgentDetails}
+              pullOffset={0}
             />
           )}
 
@@ -1166,6 +1190,7 @@ export function ChatScreen({
             <ChatMessageList
               messages={finalDisplayMessages}
               onRetryMessage={handleRetryMessage}
+              onRefresh={handleRefreshHistory}
               loading={historyLoading}
               empty={historyEmpty}
               emptyState={
@@ -1191,6 +1216,7 @@ export function ChatScreen({
               streamingText={realtimeStreamingText || undefined}
               streamingThinking={realtimeStreamingThinking || undefined}
               hideSystemMessages={isMobile}
+              activeToolCalls={activeToolCalls}
             />
           )}
           {showComposer ? (
