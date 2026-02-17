@@ -2,9 +2,9 @@ import { memo, useCallback, useEffect, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
-  ListViewIcon,
   ReloadIcon,
 } from '@hugeicons/core-free-icons'
+import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { Button } from '@/components/ui/button'
 import { UsageMeter } from '@/components/usage-meter'
 import {
@@ -83,15 +83,14 @@ function ChatHeaderComponent({
         className="shrink-0 border-b border-primary-200 px-4 h-12 flex items-center justify-between bg-surface"
       >
         <div className="flex min-w-0 items-center gap-2">
-          <Button
-            size="icon-sm"
-            variant="ghost"
+          <button
+            type="button"
             onClick={onOpenSessions}
-            className="h-10 w-10 shrink-0 text-primary-800 hover:bg-primary-100"
+            className="shrink-0 rounded-lg transition-transform active:scale-95"
             aria-label="Open sessions"
           >
-            <HugeiconsIcon icon={ListViewIcon} size={20} strokeWidth={1.5} />
-          </Button>
+            <OpenClawStudioIcon className="size-8 rounded-lg" />
+          </button>
           <div className="truncate text-sm font-semibold tracking-tight text-ink">
             ClawSuite
           </div>
