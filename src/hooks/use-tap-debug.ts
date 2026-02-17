@@ -93,29 +93,7 @@ export function useTapDebug(
       )
     }
 
-    const toggleButton = document.createElement('button')
-    toggleButton.type = 'button'
-    toggleButton.style.position = 'fixed'
-    toggleButton.style.right = '8px'
-    toggleButton.style.top = '8px'
-    toggleButton.style.zIndex = '1000'
-    toggleButton.style.padding = '4px 8px'
-    toggleButton.style.borderRadius = '8px'
-    toggleButton.style.border = '1px solid rgba(0,0,0,0.2)'
-    toggleButton.style.background = 'rgba(255,255,255,0.92)'
-    toggleButton.style.color = '#1f2937'
-    toggleButton.style.fontSize = '10px'
-    toggleButton.style.fontWeight = '700'
-    toggleButton.style.pointerEvents = 'auto'
-    const syncToggleButton = () => {
-      toggleButton.textContent = enabled ? 'TapDebug ON' : 'TapDebug OFF'
-      toggleButton.style.opacity = enabled ? '1' : '0.7'
-    }
-    syncToggleButton()
-    toggleButton.addEventListener('click', () => {
-      applyEnabled(!enabled)
-    })
-    document.body.appendChild(toggleButton)
+    // No visible button — use console: window.toggleChatTapDebug()
 
     debugWindow.setChatTapDebug = (next: boolean) => {
       applyEnabled(Boolean(next))
@@ -133,7 +111,6 @@ export function useTapDebug(
       } else {
         enabled = readEnabled(debugWindow)
       }
-      syncToggleButton()
     }
 
     function logTap(
@@ -194,7 +171,6 @@ export function useTapDebug(
         TAP_DEBUG_EVENT,
         handleToggleEvent as EventListener,
       )
-      toggleButton.remove()
       delete debugWindow.setChatTapDebug
       delete debugWindow.toggleChatTapDebug
     }
