@@ -59,12 +59,30 @@ function bindGlobalPromptListener() {
     const isEditKey = event.key === 'Backspace'
     if (!isPrintable && !isEditKey) return
     if (!globalPromptTarget || globalPromptTarget.disabled) return
-    globalPromptTarget.focus()
+    focusTextareaTarget(globalPromptTarget)
   })
 }
 
 function usePromptInput() {
   return useContext(PromptInputContext)
+}
+
+function focusTextareaTarget(target: HTMLTextAreaElement | null) {
+  if (!target) return
+  try {
+    target.focus({ preventScroll: true })
+  } catch {
+    target.focus()
+  }
+}
+
+function isInteractiveTarget(target: HTMLElement | null): boolean {
+  if (!target) return false
+  return Boolean(
+    target.closest(
+      'button, a, select, input[type="file"], [role="button"], [contenteditable]',
+    ),
+  )
 }
 
 export type PromptInputProps = {
@@ -102,13 +120,21 @@ function PromptInput({
   }
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!disabled) textareaRef.current?.focus()
+    const target = e.target instanceof HTMLElement ? e.target : null
+    if (!disabled && !isInteractiveTarget(target)) {
+      focusTextareaTarget(textareaRef.current)
+    }
     onClick?.(e)
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (!disabled && e.pointerType === 'touch') {
-      textareaRef.current?.focus()
+    const target = e.target instanceof HTMLElement ? e.target : null
+    if (
+      !disabled &&
+      e.pointerType === 'touch' &&
+      !isInteractiveTarget(target)
+    ) {
+      focusTextareaTarget(textareaRef.current)
     }
     onPointerDown?.(e)
   }
@@ -130,7 +156,7 @@ function PromptInput({
           onClick={handleClick}
           onPointerDown={handlePointerDown}
           className={cn(
-            'bg-surface cursor-text rounded-[22px] outline outline-ink/10 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.05)] py-3 gap-3 flex flex-col',
+            'bg-surface cursor-text rounded-[22px] outline outline-ink/10 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.05)] py-3 gap-3 flex flex-col touch-manipulation',
             disabled && 'cursor-not-allowed opacity-60',
             className,
           )}
@@ -211,14 +237,35 @@ function PromptInputTextarea({
     onKeyDown?.(e)
   }
 
+  /**
+   * iOS Safari fix: onPointerDown ensures the textarea gets focus even when
+   * tapped from deep scroll positions or after the keyboard was recently dismissed.
+   * Without this, iOS sometimes swallows the tap and the keyboard never opens.
+   */
+  function handlePointerDown(e: React.PointerEvent<HTMLTextAreaElement>) {
+    // Only on touch devices; avoid interfering with mouse selection
+    if (e.pointerType !== 'touch') return
+    const el = e.currentTarget
+    // Use rAF to let the browser process the touch event first
+    requestAnimationFrame(() => {
+      try {
+        el.focus({ preventScroll: true })
+      } catch {
+        el.focus()
+      }
+    })
+    props.onPointerDown?.(e)
+  }
+
   return (
     <textarea
       ref={handleRef}
       value={value}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
+      onPointerDown={handlePointerDown}
       className={cn(
-        'text-primary-950 min-h-[28px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 pl-4 pr-1 text-[15px] placeholder:text-primary-500',
+        'text-primary-950 min-h-[28px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 pl-4 pr-1 py-2 md:py-0 text-[15px] placeholder:text-primary-500',
         className,
       )}
       rows={1}

@@ -83,7 +83,7 @@ export function ActivityLogWidget({
       icon={Activity01Icon}
       draggable={draggable}
       onRemove={onRemove}
-      className="h-full rounded-xl border-primary-200 p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:normal-case [&_h2]:text-ink"
+      className="h-full rounded-xl border-primary-200 p-3.5 md:p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:normal-case [&_h2]:text-ink"
     >
       <div className="mb-2 flex items-center justify-between">
         <span

@@ -61,36 +61,36 @@ export function HeroMetricsRow({
   ]
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+    <div className="mb-3 grid grid-cols-2 gap-2 md:mb-4 md:gap-4 md:grid-cols-4">
       {metrics.map((m) => (
         <div
           key={m.label}
-          className="group flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3.5 shadow-sm transition-transform duration-150 hover:-translate-y-[1px]"
+          className="group flex items-center gap-2 md:gap-3 rounded-xl border border-primary-200 bg-primary-50 px-2.5 py-2 md:px-4 md:py-3.5 shadow-sm transition-transform duration-150 hover:-translate-y-[1px]"
         >
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-100/70">
+          <span className="inline-flex size-7 md:size-10 shrink-0 items-center justify-center rounded-lg bg-accent-100/70">
             <HugeiconsIcon
               icon={m.icon}
-              size={20}
+              size={14}
               strokeWidth={1.5}
-              className="shrink-0 text-accent-600"
+              className="shrink-0 text-accent-600 md:[&>svg]:size-5"
             />
           </span>
           <div className="min-w-0 flex-1">
             {m.isError ? (
               <>
-                <p className="text-2xl font-bold font-mono tabular-nums leading-none text-primary-300">
+                <p className="text-xl md:text-2xl font-extrabold font-mono tabular-nums leading-none text-primary-300">
                   —
                 </p>
-                <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-500">
+                <p className="mt-0.5 md:mt-1 text-[10px] md:text-xs font-medium text-red-600 dark:text-red-500">
                   {m.value}
                 </p>
               </>
             ) : (
               <>
-                <p className="truncate text-2xl font-bold font-mono tabular-nums leading-none text-ink">
+                <p className="truncate text-xl md:text-2xl font-extrabold font-mono tabular-nums leading-none text-ink">
                   {m.value}
                 </p>
-                <p className="mt-1 text-xs uppercase tracking-wider text-primary-500">
+                <p className="mt-0.5 md:mt-1 text-[10px] md:text-xs uppercase tracking-wider text-primary-500">
                   {m.label}
                 </p>
               </>

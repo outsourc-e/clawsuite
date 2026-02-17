@@ -16,12 +16,14 @@ import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
-import { cn } from '@/lib/utils'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
+import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
+import { MobileTabBar } from '@/components/mobile-tab-bar'
+import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
 
@@ -47,8 +49,13 @@ export function WorkspaceShell() {
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
+  const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
+
+  // ChatGPT-style: track visual viewport height for keyboard-aware layout
+  useMobileKeyboard()
 
   const [creatingSession, setCreatingSession] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   // Fetch actual auth status from server instead of hardcoding
   interface AuthStatus {
@@ -63,7 +70,7 @@ export function WorkspaceShell() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.json() as Promise<AuthStatus>
     },
-    staleTime: 60_000, // Cache for 1 minute
+    staleTime: 60_000,
     retry: false,
   })
 
@@ -119,6 +126,21 @@ export function WorkspaceShell() {
     navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })
   }, [navigate])
 
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  // Auto-collapse sidebar on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarCollapsed(true)
+    }
+  }, [isMobile, setSidebarCollapsed])
+
   // Listen for global sidebar toggle shortcut
   useEffect(() => {
     function handleToggleEvent() {
@@ -147,39 +169,57 @@ export function WorkspaceShell() {
   }
 
   return (
-    <div className="relative h-dvh bg-surface text-primary-900">
-      <div className="h-full overflow-hidden grid grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)]">
-        {/* Activity ticker bar */}
-        {/* Persistent sidebar */}
-        <ChatSidebar
-          sessions={sessions}
-          activeFriendlyId={activeFriendlyId}
-          creatingSession={creatingSession}
-          onCreateSession={startNewChat}
-          isCollapsed={sidebarCollapsed}
-          onToggleCollapse={toggleSidebar}
-          onSelectSession={handleSelectSession}
-          onActiveSessionDelete={handleActiveSessionDelete}
-          sessionsLoading={sessionsLoading}
-          sessionsFetching={sessionsFetching}
-          sessionsError={sessionsError}
-          onRetrySessions={refetchSessions}
-        />
+    <>
+      <div
+        className="relative overflow-hidden bg-surface text-primary-900"
+        style={{ height: 'calc(var(--vvh, 100dvh) + var(--kb-inset, 0px))' }}
+      >
+        <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]">
+          {/* Activity ticker bar */}
+          {/* Persistent sidebar */}
+          {!isMobile && (
+            <ChatSidebar
+              sessions={sessions}
+              activeFriendlyId={activeFriendlyId}
+              creatingSession={creatingSession}
+              onCreateSession={startNewChat}
+              isCollapsed={sidebarCollapsed}
+              onToggleCollapse={toggleSidebar}
+              onSelectSession={handleSelectSession}
+              onActiveSessionDelete={handleActiveSessionDelete}
+              sessionsLoading={sessionsLoading}
+              sessionsFetching={sessionsFetching}
+              sessionsError={sessionsError}
+              onRetrySessions={refetchSessions}
+            />
+          )}
 
-        {/* Main content area — renders the matched route */}
-        <main
-          className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
-          data-tour="chat-area"
-        >
-          <Outlet />
-        </main>
+          {/* Main content area — renders the matched route */}
+          <main
+            onTouchStart={isMobile ? onTouchStart : undefined}
+            onTouchMove={isMobile ? onTouchMove : undefined}
+            onTouchEnd={isMobile ? onTouchEnd : undefined}
+            className={[
+              'h-full min-h-0 min-w-0 overflow-x-hidden',
+              isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
+              isMobile && !isOnChatRoute ? 'pb-16' : '',
+            ].join(' ')}
+            data-tour="chat-area"
+          >
+            <div key={pathname} className="page-transition h-full">
+              <Outlet />
+            </div>
+          </main>
 
-        {/* Chat panel — visible on non-chat routes */}
-        {!isOnChatRoute && <ChatPanel />}
+          {/* Chat panel — visible on non-chat routes */}
+          {!isOnChatRoute && !isMobile && <ChatPanel />}
+        </div>
+
+        {/* Floating chat toggle — visible on non-chat routes */}
+        {!isOnChatRoute && !isMobile && <ChatPanelToggle />}
       </div>
 
-      {/* Floating chat toggle — visible on non-chat routes */}
-      {!isOnChatRoute && <ChatPanelToggle />}
-    </div>
+      {isMobile ? <MobileTabBar /> : null}
+    </>
   )
 }

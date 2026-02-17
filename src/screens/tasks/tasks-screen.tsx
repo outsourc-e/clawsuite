@@ -479,13 +479,15 @@ export function TasksScreen() {
   }))
 
   return (
-    <main className="h-full overflow-y-auto bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
+    <main className="h-full overflow-y-auto bg-surface px-4 pt-6 pb-24 text-primary-900 md:px-6 md:pt-8 md:pb-0">
       <section className="mx-auto w-full max-w-[1600px]">
         {/* Header */}
-        <header className="mb-6 flex items-center justify-between">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-2.5 md:mb-6">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-lg font-semibold text-ink">Tasks</h1>
+              <h1 className="text-base font-semibold text-ink md:text-lg">
+                Tasks
+              </h1>
               <p className="text-[11px] text-primary-400">
                 {tasks.filter((t) => t.status !== 'done').length} active ·{' '}
                 {tasks.filter((t) => t.status === 'done').length} completed
@@ -495,7 +497,7 @@ export function TasksScreen() {
           <button
             type="button"
             onClick={() => setShowAdd(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-3 py-1.5 text-[13px] font-medium text-primary-50 transition-colors hover:bg-primary-800 dark:bg-primary-200 dark:text-primary-900 dark:hover:bg-primary-300"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-primary-50 transition-colors hover:bg-primary-800 md:text-[13px] dark:bg-primary-200 dark:text-primary-900 dark:hover:bg-primary-300"
           >
             <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.5} />
             New Task

@@ -174,7 +174,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
       icon={Task01Icon}
       draggable={draggable}
       onRemove={onRemove}
-      className="h-full rounded-xl border-primary-200 p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:normal-case [&_h2]:text-ink"
+      className="h-full rounded-xl border-primary-200 p-3.5 md:p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:normal-case [&_h2]:text-ink"
     >
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm text-primary-600">

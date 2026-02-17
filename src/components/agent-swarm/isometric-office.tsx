@@ -14,6 +14,7 @@ import {
 import { assignPersona } from '@/lib/agent-personas'
 import type { SwarmSession } from '@/stores/agent-swarm-store'
 import { cn } from '@/lib/utils'
+import { getSwarmSessionDisplayName } from './session-display-name'
 
 type IsometricOfficeProps = {
   sessions: Array<SwarmSession>
@@ -226,6 +227,7 @@ function AnimatedAgent({
     behavior.sessionKey,
     session.task ?? session.initialMessage ?? session.label ?? '',
   )
+  const displayName = getSwarmSessionDisplayName(session)
   const colors = PERSONA_COLORS[persona.name] ?? {
     body: '#6b7280',
     accent: '#9ca3af',
@@ -282,11 +284,11 @@ function AnimatedAgent({
       {/* Name */}
       <span
         className={cn(
-          'mt-0.5 text-[10px] font-bold drop-shadow-md',
+          'mt-0.5 max-w-[96px] truncate text-[10px] font-bold drop-shadow-md',
           persona.color,
         )}
       >
-        {persona.name}
+        {displayName}
       </span>
 
       {/* Role + status */}

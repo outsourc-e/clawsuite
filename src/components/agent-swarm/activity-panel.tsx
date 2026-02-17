@@ -7,6 +7,7 @@ import { assignPersona } from '@/lib/agent-personas'
 import { PERSONA_COLORS } from './pixel-avatar'
 import type { SwarmSession } from '@/stores/agent-swarm-store'
 import { cn } from '@/lib/utils'
+import { getSwarmSessionDisplayName } from './session-display-name'
 
 type ActivityPanelProps = {
   sessions: Array<SwarmSession>
@@ -63,6 +64,7 @@ function AgentRosterItem({ session }: { session: SwarmSession }) {
     key,
     session.task ?? session.initialMessage ?? session.label ?? '',
   )
+  const displayName = getSwarmSessionDisplayName(session)
   const colors = PERSONA_COLORS[persona.name]
   const tokens =
     session.usage?.totalTokens ?? session.totalTokens ?? session.tokenCount ?? 0
@@ -90,8 +92,8 @@ function AgentRosterItem({ session }: { session: SwarmSession }) {
       {/* Info */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className={cn('text-xs font-semibold', persona.color)}>
-            {persona.name}
+          <span className="truncate text-xs font-semibold text-slate-200">
+            {displayName}
           </span>
           <div
             className={cn(
@@ -122,11 +124,7 @@ function ActivityFeedItem({
   session: SwarmSession
   index: number
 }) {
-  const key = session.key ?? session.friendlyId ?? ''
-  const persona = assignPersona(
-    key,
-    session.task ?? session.initialMessage ?? session.label ?? '',
-  )
+  const displayName = getSwarmSessionDisplayName(session)
   const task =
     session.task ?? session.initialMessage ?? session.label ?? 'Working...'
 
@@ -141,8 +139,8 @@ function ActivityFeedItem({
         {statusIcon[session.swarmStatus]}
       </span>
       <div className="min-w-0 flex-1">
-        <span className={cn('text-[11px] font-semibold', persona.color)}>
-          {persona.name}
+        <span className="truncate text-[11px] font-semibold text-slate-200">
+          {displayName}
         </span>
         <span className="text-[11px] text-slate-500"> — </span>
         <span className={cn('text-[11px]', statusColor[session.swarmStatus])}>
@@ -265,13 +263,13 @@ export function ActivityPanel({ sessions, className }: ActivityPanelProps) {
             ⚠️ {failed.length} Failed
           </div>
           {failed.map((s) => {
-            const p = assignPersona(s.key ?? '', s.task ?? '')
+            const displayName = getSwarmSessionDisplayName(s)
             return (
               <div
                 key={s.key ?? s.friendlyId}
                 className="mt-1 text-[10px] text-red-300/70"
               >
-                {p.name}: {s.task?.slice(0, 50) ?? 'Unknown task'}
+                {displayName}: {s.task?.slice(0, 50) ?? 'Unknown task'}
               </div>
             )
           })}

@@ -7,13 +7,21 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useEffect, useRef, useState } from 'react'
 import type { WidgetId } from '../constants/grid-config'
 import { WIDGET_META } from '../constants/widget-meta'
+import { cn } from '@/lib/utils'
 
 type AddWidgetPopoverProps = {
   visibleIds: WidgetId[]
   onAdd: (id: WidgetId) => void
+  buttonClassName?: string
+  compact?: boolean
 }
 
-export function AddWidgetPopover({ visibleIds, onAdd }: AddWidgetPopoverProps) {
+export function AddWidgetPopover({
+  visibleIds,
+  onAdd,
+  buttonClassName,
+  compact,
+}: AddWidgetPopoverProps) {
   const [open, setOpen] = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
 
@@ -40,13 +48,16 @@ export function AddWidgetPopover({ visibleIds, onAdd }: AddWidgetPopoverProps) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-primary-400 transition-colors hover:text-primary-700 disabled:opacity-30 dark:hover:text-primary-300"
+        className={cn(
+          'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-primary-400 transition-colors hover:text-primary-700 disabled:opacity-30 dark:hover:text-primary-300',
+          buttonClassName,
+        )}
         aria-label="Widgets"
         title="Widgets"
         disabled={hiddenWidgets.length === 0}
       >
-        <HugeiconsIcon icon={Add01Icon} size={13} strokeWidth={1.5} />
-        <span>Widgets</span>
+        <HugeiconsIcon icon={Add01Icon} size={compact ? 16 : 13} strokeWidth={1.5} />
+        {!compact ? <span>Widgets</span> : null}
       </button>
 
       {open ? (

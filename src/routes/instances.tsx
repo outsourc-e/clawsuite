@@ -176,12 +176,12 @@ function InstancesRoute() {
   }
 
   return (
-    <div className="h-full overflow-auto bg-surface px-3 py-3 sm:px-4 sm:py-4">
+    <div className="h-full overflow-auto bg-surface px-3 pt-3 pb-24 sm:px-4 sm:pt-4 md:pb-0">
       <div className="mx-auto max-w-6xl space-y-4">
-        <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-4 sm:px-5">
+        <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 sm:px-5 sm:py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-medium text-balance text-primary-900">
+              <h1 className="text-lg font-medium text-balance text-primary-900 md:text-xl">
                 Instances
               </h1>
               <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700 tabular-nums">

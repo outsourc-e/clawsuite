@@ -589,10 +589,10 @@ export function DebugConsoleScreen() {
   )
 
   return (
-    <main className="h-full overflow-y-auto bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
+    <main className="h-full overflow-y-auto bg-surface px-4 pt-6 pb-24 text-primary-900 md:px-6 md:pt-8 md:pb-0">
       <div className="mx-auto w-full max-w-6xl space-y-4">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl md:p-5">
-          <h1 className="text-2xl font-medium text-ink text-balance md:text-3xl">
+          <h1 className="text-xl font-medium text-ink text-balance md:text-3xl">
             Gateway Debug Console
           </h1>
           <p className="mt-1 text-sm text-primary-600 text-pretty md:text-base">

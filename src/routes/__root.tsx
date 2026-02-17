@@ -19,6 +19,15 @@ import { initializeSettingsAppearance } from '@/hooks/use-settings'
 const themeScript = `
 (() => {
   window.process = window.process || { env: {}, platform: 'browser' };
+  
+  // Auto-configure gateway URL for network access (mobile)
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      window.__GATEWAY_URL__ = 'ws://' + hostname + ':18789';
+    }
+  }
+  
   try {
     const stored = localStorage.getItem('openclaw-settings')
     const fallback = localStorage.getItem('chat-settings')
@@ -71,7 +80,8 @@ export const Route = createRootRoute({
       },
       {
         name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
+        content:
+          'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no, interactive-widget=resizes-visual',
       },
       {
         title: 'ClawSuite',

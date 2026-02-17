@@ -63,6 +63,9 @@ import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
+import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
+import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
+import { useTapDebug } from '@/hooks/use-tap-debug'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -143,10 +146,12 @@ export function ChatScreen({
   const queryClient = useQueryClient()
   const [sending, setSending] = useState(false)
   const [_creatingSession, setCreatingSession] = useState(false)
+  const [sessionsOpen, setSessionsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const { headerRef, composerRef, mainRef, pinGroupMinHeight, headerHeight } =
     useChatMeasurements()
+  useTapDebug(mainRef, { label: 'chat-main' })
   const [waitingForResponse, setWaitingForResponse] = useState(
     () => hasPendingSend() || hasPendingGeneration(),
   )
@@ -166,6 +171,9 @@ export function ChatScreen({
     return stored === null ? true : stored === 'true'
   })
   const { isMobile } = useChatMobile(queryClient)
+  const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
+  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
+  const mobileKeyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const isAgentViewOpen = useAgentViewStore((state) => state.isOpen)
   const isTerminalPanelOpen = useTerminalPanelStore(
     (state) => state.isPanelOpen,
@@ -492,14 +500,31 @@ export function ChatScreen({
 
   const terminalPanelInset =
     !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
-  // Composer is in normal flex flow (shrink-0), so scroll area naturally stops above it.
-  // Only add minimal bottom padding for breathing room + terminal panel offset.
+  const mobileScrollBottomOffset = useMemo(() => {
+    if (!isMobile) return 0
+    if (mobileKeyboardActive) {
+      return 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
+    }
+    return `calc(var(--chat-composer-height, 96px) + ${MOBILE_TAB_BAR_OFFSET})`
+  }, [isMobile, mobileKeyboardActive])
+
+  // Keep message list clear of composer, keyboard, and desktop terminal panel.
   const stableContentStyle = useMemo<React.CSSProperties>(() => {
+    if (isMobile) {
+      const mobileBase = mobileKeyboardActive
+        ? 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
+        : `calc(var(--chat-composer-height, 96px) + ${MOBILE_TAB_BAR_OFFSET})`
+      return {
+        paddingBottom: `calc(${mobileBase} + var(--safe-b) + 16px)`,
+      }
+    }
     return {
       paddingBottom:
-        terminalPanelInset > 0 ? `${terminalPanelInset + 16}px` : '16px',
+        terminalPanelInset > 0
+          ? `${terminalPanelInset + 16}px`
+          : '16px',
     }
-  }, [terminalPanelInset])
+  }, [isMobile, mobileKeyboardActive, terminalPanelInset])
 
   const shouldRedirectToNew =
     !isNewChat &&
@@ -1077,6 +1102,13 @@ export function ChatScreen({
     )
   }, [gatewayError, handleGatewayRefetch, showErrorNotice])
 
+  const mobileHeaderStatus: 'connected' | 'connecting' | 'disconnected' =
+    connectionState === 'connected'
+      ? 'connected'
+      : gatewayStatusQuery.data?.ok === false || gatewayStatusQuery.isError
+        ? 'disconnected'
+        : 'connecting'
+
   return (
     <div
       className={cn(
@@ -1090,7 +1122,7 @@ export function ChatScreen({
           compact
             ? 'flex flex-col w-full'
             : isMobile
-              ? 'relative'
+              ? 'flex flex-col'
               : 'grid grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)]',
         )}
       >
@@ -1104,7 +1136,7 @@ export function ChatScreen({
 
         <main
           className={cn(
-            'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
+            'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
             !compact && isAgentViewOpen ? 'min-[1024px]:mr-80' : 'mr-0',
           )}
           style={{
@@ -1117,8 +1149,7 @@ export function ChatScreen({
             <ChatHeader
               activeTitle={activeTitle}
               wrapperRef={headerRef}
-              showSidebarButton={isMobile}
-              onOpenSidebar={handleOpenSidebar}
+              onOpenSessions={() => setSessionsOpen(true)}
               showFileExplorerButton={!isMobile}
               fileExplorerCollapsed={fileExplorerCollapsed}
               onToggleFileExplorer={handleToggleFileExplorer}
@@ -1127,7 +1158,7 @@ export function ChatScreen({
             />
           )}
 
-          <ContextBar compact={compact} />
+          {!isMobile || compact ? <ContextBar compact={compact} /> : null}
 
           {gatewayNotice && <div className="sticky top-0 z-20 px-4 py-2">{gatewayNotice}</div>}
 
@@ -1153,11 +1184,13 @@ export function ChatScreen({
               pinGroupMinHeight={pinGroupMinHeight}
               headerHeight={headerHeight}
               contentStyle={stableContentStyle}
-              bottomOffset={terminalPanelInset}
+              bottomOffset={isMobile ? mobileScrollBottomOffset : terminalPanelInset}
+              keyboardInset={mobileKeyboardInset}
               isStreaming={derivedStreamingInfo.isStreaming}
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
               streamingText={realtimeStreamingText || undefined}
               streamingThinking={realtimeStreamingThinking || undefined}
+              hideSystemMessages={isMobile}
             />
           )}
           {showComposer ? (
@@ -1189,6 +1222,23 @@ export function ChatScreen({
           onSwitch={handleSwitchModel}
           onDismiss={dismiss}
           onDismissForSession={dismissForSession}
+        />
+      )}
+
+      {isMobile && (
+        <MobileSessionsPanel
+          open={sessionsOpen}
+          onClose={() => setSessionsOpen(false)}
+          sessions={sessions}
+          activeFriendlyId={activeFriendlyId}
+          onSelectSession={(friendlyId) => {
+            setSessionsOpen(false)
+            void navigate({ to: '/chat/$sessionKey', params: { sessionKey: friendlyId } })
+          }}
+          onNewChat={() => {
+            setSessionsOpen(false)
+            void navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })
+          }}
         />
       )}
     </div>

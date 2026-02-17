@@ -42,6 +42,7 @@ type FileExplorerSidebarProps = {
   onToggle: () => void
   onInsertReference: (reference: string) => void
   hidden?: boolean
+  className?: string
 }
 
 type ContextMenuState = {
@@ -118,6 +119,7 @@ export function FileExplorerSidebar({
   onToggle,
   onInsertReference,
   hidden = false,
+  className,
 }: FileExplorerSidebarProps) {
   const [entries, setEntries] = useState<Array<FileEntry>>([])
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
@@ -373,6 +375,7 @@ export function FileExplorerSidebar({
         collapsed
           ? 'w-0 opacity-0 pointer-events-none'
           : 'w-[260px] opacity-100',
+        className,
       )}
     >
       <div className="flex items-center justify-between h-12 px-3 border-b border-primary-200">

@@ -4,7 +4,7 @@
   "description": "The Full-Stack Command Center for OpenClaw",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#fafaf9",
   "theme_color": "#f97316",
   "categories": ["productivity", "utilities"],
   "icons": [

@@ -116,8 +116,10 @@ type ChatMessageListProps = {
   streamingText?: string
   streamingThinking?: string
   isStreaming?: boolean
-  bottomOffset?: number
+  bottomOffset?: number | string
+  keyboardInset?: number
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
+  hideSystemMessages?: boolean
 }
 
 function ChatMessageListComponent({
@@ -139,7 +141,9 @@ function ChatMessageListComponent({
   streamingThinking,
   isStreaming = false,
   bottomOffset = 0,
+  keyboardInset = 0,
   activeToolCalls = [],
+  hideSystemMessages = false,
 }: ChatMessageListProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
   const lastUserRef = useRef<HTMLDivElement | null>(null)
@@ -159,6 +163,7 @@ function ChatMessageListComponent({
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false)
   const [messageSearchValue, setMessageSearchValue] = useState('')
   const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(0)
+  const keyboardInsetRef = useRef(keyboardInset)
   const [scrollMetrics] = useState({
     scrollTop: 0,
     scrollHeight: 0,
@@ -226,6 +231,7 @@ function ChatMessageListComponent({
         if (cleanedText.length === 0) return false
 
         const isSystemPrefixed = /^System:/i.test(rawText)
+        if (hideSystemMessages && isSystemPrefixed) return false
         if (!isSystemPrefixed) return true
 
         const normalizedText = cleanedText.toLowerCase()
@@ -264,7 +270,7 @@ function ChatMessageListComponent({
       seenUserFingerprints.set(fingerprint, timestamp)
       return true
     })
-  }, [messages])
+  }, [hideSystemMessages, messages])
 
   const normalizedMessageSearch = useMemo(
     function getNormalizedMessageSearch() {
@@ -753,12 +759,37 @@ function ChatMessageListComponent({
     [scrollToBottom],
   )
 
+  useEffect(() => {
+    const previousInset = keyboardInsetRef.current
+    keyboardInsetRef.current = keyboardInset
+
+    if (keyboardInset <= previousInset || keyboardInset <= 0) return
+    if (!isNearBottomRef.current) return
+
+    let frameOne = 0
+    let frameTwo = 0
+    frameOne = window.requestAnimationFrame(() => {
+      frameTwo = window.requestAnimationFrame(() => {
+        scrollToBottom('auto')
+      })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frameOne)
+      window.cancelAnimationFrame(frameTwo)
+    }
+  }, [keyboardInset, scrollToBottom])
+
   const scrollToBottomOverlay = useMemo(() => {
     const isVisible = !isNearBottom && displayMessages.length > 0
+    const overlayBottom =
+      typeof bottomOffset === 'number'
+        ? `${bottomOffset + 24}px`
+        : `calc(${bottomOffset} + 24px)`
     return (
       <div
         className="pointer-events-none absolute left-1/2 z-40 -translate-x-1/2"
-        style={{ bottom: `${bottomOffset + 24}px` }}
+        style={{ bottom: overlayBottom }}
       >
         <ScrollToBottomButton
           isVisible={isVisible}
@@ -778,7 +809,7 @@ function ChatMessageListComponent({
   return (
     // mt-2 is to fix the prompt-input cut off
     <ChatContainerRoot
-      className="flex-1 min-h-0"
+      className="flex-1 min-h-0 overflow-y-auto"
       stickToBottom={stickToBottomRef.current}
       onUserScroll={handleUserScroll}
       overlay={scrollToBottomOverlay}
@@ -1148,7 +1179,10 @@ function areChatMessageListEqual(
     prev.streamingText === next.streamingText &&
     prev.streamingThinking === next.streamingThinking &&
     prev.isStreaming === next.isStreaming &&
-    prev.activeToolCalls === next.activeToolCalls
+    prev.bottomOffset === next.bottomOffset &&
+    prev.keyboardInset === next.keyboardInset &&
+    prev.activeToolCalls === next.activeToolCalls &&
+    prev.hideSystemMessages === next.hideSystemMessages
   )
 }
 

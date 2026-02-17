@@ -35,17 +35,19 @@ export function AgentsScreen() {
   const agents = query.data?.agents || []
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-primary-200">
+    <div className="flex h-full min-h-0 flex-col overflow-x-hidden">
+      <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-[15px] font-semibold text-ink">Agents</h1>
+          <h1 className="text-sm font-semibold text-ink md:text-[15px]">
+            Agents
+          </h1>
           {query.isFetching && !query.isLoading ? (
             <span className="text-[10px] text-primary-500 animate-pulse">
               syncing…
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {lastUpdated ? (
             <span className="text-[10px] text-primary-500">
               Updated {lastUpdated}
@@ -57,7 +59,7 @@ export function AgentsScreen() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-6 py-4">
+      <div className="flex-1 overflow-auto px-3 pt-3 pb-24 md:px-6 md:pt-4 md:pb-0">
         {query.isLoading ? (
           <div className="flex items-center justify-center h-32">
             <div className="flex items-center gap-2 text-primary-500">
@@ -94,7 +96,7 @@ export function AgentsScreen() {
         ) : (
           <>
             {/* Config summary */}
-            <div className="flex gap-6 mb-6 text-[13px]">
+            <div className="mb-4 grid gap-3 text-[13px] sm:grid-cols-2 lg:mb-6 lg:grid-cols-3 lg:gap-6">
               <div>
                 <span className="text-[11px] font-medium text-primary-500 uppercase tracking-wider">
                   Default Agent

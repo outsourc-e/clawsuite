@@ -7,7 +7,7 @@ import { DashboardGlassCard } from './dashboard-glass-card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-type InstalledSkill = {
+export type InstalledSkill = {
   id: string
   name: string
   description: string
@@ -50,7 +50,7 @@ function normalizeSkill(
   }
 }
 
-async function fetchInstalledSkills(): Promise<Array<InstalledSkill>> {
+export async function fetchInstalledSkills(): Promise<Array<InstalledSkill>> {
   try {
     const response = await fetch(
       '/api/skills?tab=installed&limit=12&summary=search',
@@ -103,7 +103,7 @@ export function SkillsWidget({
       }
       draggable={draggable}
       onRemove={onRemove}
-      className="h-full rounded-xl border-primary-200 p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-medium [&_h2]:normal-case [&_h2]:text-ink [&_h2]:text-balance"
+      className="h-full rounded-xl border-primary-200 p-3.5 md:p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-medium [&_h2]:normal-case [&_h2]:text-ink [&_h2]:text-balance"
     >
       {skillsQuery.isLoading && skills.length === 0 ? (
         <div className="flex h-28 items-center justify-center gap-3 rounded-lg border border-primary-200 bg-primary-100/50">
@@ -128,12 +128,13 @@ export function SkillsWidget({
               <article
                 key={skill.id}
                 className={cn(
-                  'rounded-lg border border-primary-200 px-3 py-2.5',
+                  index >= 3 && 'hidden md:block',
+                  'rounded-lg border border-primary-200 px-2.5 py-2 md:px-3 md:py-2.5',
                   index % 2 === 0 ? 'bg-primary-50/90' : 'bg-primary-100/55',
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <p className="line-clamp-1 text-sm font-medium text-ink text-balance">
+                  <p className="line-clamp-1 text-xs md:text-sm font-medium text-ink text-balance">
                     {skill.name}
                   </p>
                   <span
@@ -147,7 +148,7 @@ export function SkillsWidget({
                     {skill.enabled ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
-                <p className="mt-1 line-clamp-2 text-sm text-primary-600 text-pretty">
+                <p className="mt-1 line-clamp-1 md:line-clamp-2 text-xs md:text-sm text-primary-600 text-pretty">
                   {skill.description}
                 </p>
               </article>

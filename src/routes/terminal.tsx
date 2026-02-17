@@ -49,10 +49,10 @@ function TerminalRoute() {
   }
 
   return (
-    <div className="h-screen bg-surface text-primary-900">
+    <div className="box-border h-full min-h-0 overflow-hidden bg-surface pb-24 text-primary-900 md:pb-0">
       <Suspense
         fallback={
-          <div className="flex h-screen items-center justify-center text-xs text-primary-500">
+          <div className="flex h-full min-h-0 items-center justify-center text-xs text-primary-500">
             Loading terminal…
           </div>
         }

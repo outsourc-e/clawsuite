@@ -2,9 +2,9 @@ import { memo, useCallback, useEffect, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
-  Menu01Icon,
   ReloadIcon,
 } from '@hugeicons/core-free-icons'
+import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { Button } from '@/components/ui/button'
 import { UsageMeter } from '@/components/usage-meter'
 import {
@@ -27,8 +27,7 @@ function formatSyncAge(updatedAt: number): string {
 type ChatHeaderProps = {
   activeTitle: string
   wrapperRef?: React.Ref<HTMLDivElement>
-  showSidebarButton?: boolean
-  onOpenSidebar?: () => void
+  onOpenSessions?: () => void
   showFileExplorerButton?: boolean
   fileExplorerCollapsed?: boolean
   onToggleFileExplorer?: () => void
@@ -41,8 +40,7 @@ type ChatHeaderProps = {
 function ChatHeaderComponent({
   activeTitle,
   wrapperRef,
-  showSidebarButton = false,
-  onOpenSidebar,
+  onOpenSessions,
   showFileExplorerButton = false,
   fileExplorerCollapsed = true,
   onToggleFileExplorer,
@@ -51,6 +49,7 @@ function ChatHeaderComponent({
 }: ChatHeaderProps) {
   const [syncLabel, setSyncLabel] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     if (dataUpdatedAt <= 0) return
@@ -59,6 +58,14 @@ function ChatHeaderComponent({
     const id = setInterval(update, 5000)
     return () => clearInterval(id)
   }, [dataUpdatedAt])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
 
@@ -69,22 +76,69 @@ function ChatHeaderComponent({
     setTimeout(() => setIsRefreshing(false), 600)
   }, [onRefresh])
 
+  if (isMobile) {
+    return (
+      <div
+        ref={wrapperRef}
+        className="shrink-0 border-b border-primary-200 px-4 h-12 flex items-center justify-between bg-surface"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenSessions}
+            className="shrink-0 rounded-lg transition-transform active:scale-95"
+            aria-label="Open sessions"
+          >
+            <OpenClawStudioIcon className="size-8 rounded-lg" />
+          </button>
+          <div className="truncate text-sm font-semibold tracking-tight text-ink">
+            ClawSuite
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {syncLabel ? (
+            <span
+              className={cn(
+                'text-[11px] tabular-nums transition-colors',
+                isStale ? 'text-amber-500' : 'text-primary-400',
+              )}
+              title={
+                dataUpdatedAt > 0
+                  ? `Last synced: ${new Date(dataUpdatedAt).toLocaleTimeString()}`
+                  : undefined
+              }
+            >
+              {isStale ? '⚠ ' : ''}
+              {syncLabel}
+            </span>
+          ) : null}
+          {onRefresh ? (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={handleRefresh}
+              className="h-10 w-10 text-primary-500 hover:bg-primary-100 hover:text-primary-700"
+              aria-label="Refresh chat"
+            >
+              <HugeiconsIcon
+                icon={ReloadIcon}
+                size={20}
+                strokeWidth={1.5}
+                className={cn(isRefreshing && 'animate-spin')}
+              />
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       ref={wrapperRef}
       className="shrink-0 border-b border-primary-200 px-4 h-12 flex items-center bg-surface"
     >
-      {showSidebarButton ? (
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          onClick={onOpenSidebar}
-          className="mr-2 text-primary-800 hover:bg-primary-100"
-          aria-label="Open sidebar"
-        >
-          <HugeiconsIcon icon={Menu01Icon} size={20} strokeWidth={1.5} />
-        </Button>
-      ) : null}
       {showFileExplorerButton ? (
         <TooltipProvider>
           <TooltipRoot>
@@ -114,7 +168,7 @@ function ChatHeaderComponent({
         </TooltipProvider>
       ) : null}
       <div
-        className="text-sm font-medium flex-1 text-balance"
+        className="min-w-0 flex-1 truncate text-sm font-medium text-balance"
         suppressHydrationWarning
       >
         {activeTitle}

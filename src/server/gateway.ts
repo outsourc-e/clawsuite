@@ -107,7 +107,9 @@ const HEARTBEAT_TIMEOUT_MS = 20000
 const HANDSHAKE_TIMEOUT_MS = 15000
 
 export function getGatewayConfig() {
-  const url = process.env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+  // Check if browser set a custom gateway URL (for network/mobile access)
+  const browserUrl = typeof window !== 'undefined' ? (window as any).__GATEWAY_URL__ : undefined
+  const url = browserUrl || process.env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
   const token = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim() || ''
   const password = process.env.CLAWDBOT_GATEWAY_PASSWORD?.trim() || ''
 

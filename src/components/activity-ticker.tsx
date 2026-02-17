@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { MouseEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 
 const TIPS = [
@@ -37,6 +38,10 @@ export function ActivityTicker() {
     Math.floor(Math.random() * TIPS.length),
   )
   const [fading, setFading] = useState(false)
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('clawsuite-ticker-dismissed') === 'true'
+  })
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -49,11 +54,19 @@ export function ActivityTicker() {
     return () => clearInterval(interval)
   }, [])
 
+  const handleDismiss = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    setDismissed(true)
+    localStorage.setItem('clawsuite-ticker-dismissed', 'true')
+  }
+
+  if (dismissed) return null
+
   const tip = TIPS[index]
 
   return (
     <div
-      className="mb-4 flex h-9 cursor-pointer items-center overflow-hidden rounded-xl border border-primary-200 bg-primary-50/80 px-4 shadow-sm transition-colors hover:bg-primary-100/80 dark:border-primary-800 dark:bg-primary-900/60 dark:hover:bg-primary-800/60"
+      className="mb-4 flex h-8 cursor-pointer items-center overflow-hidden rounded-xl border border-primary-200 bg-primary-50/80 px-3 shadow-sm transition-colors hover:bg-primary-100/80 dark:border-primary-800 dark:bg-primary-900/60 dark:hover:bg-primary-800/60 md:h-9 md:px-4"
       onClick={() => void navigate({ to: '/activity' })}
       role="button"
       tabIndex={0}
@@ -63,11 +76,19 @@ export function ActivityTicker() {
       }}
     >
       <span
-        className={`flex items-center gap-2 text-xs text-primary-600 transition-opacity duration-400 dark:text-primary-400 ${fading ? 'opacity-0' : 'opacity-100'}`}
+        className={`flex min-w-0 items-center gap-2 text-[11px] text-primary-600 transition-opacity duration-400 dark:text-primary-400 md:text-xs ${fading ? 'opacity-0' : 'opacity-100'}`}
       >
         <span>{tip.emoji}</span>
-        <span>{tip.text}</span>
+        <span className="truncate">{tip.text}</span>
       </span>
+      <button
+        type="button"
+        onClick={handleDismiss}
+        className="ml-auto p-1 text-primary-400 transition-colors hover:text-primary-600"
+        aria-label="Dismiss"
+      >
+        <span className="text-xs leading-none">×</span>
+      </button>
     </div>
   )
 }

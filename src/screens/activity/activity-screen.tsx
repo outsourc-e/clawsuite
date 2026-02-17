@@ -213,11 +213,11 @@ export function ActivityScreen() {
   )
 
   return (
-    <main className="h-full overflow-y-auto bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
+    <main className="h-full overflow-y-auto bg-surface px-4 pt-6 pb-24 text-primary-900 md:px-6 md:pt-8 md:pb-0">
       <div className="mx-auto flex w-full max-w-4xl flex-col">
-        <header className="mb-4 flex flex-wrap items-center gap-2.5">
+        <header className="mb-3 flex flex-wrap items-center gap-2.5 md:mb-4">
           <HugeiconsIcon icon={Activity01Icon} size={20} strokeWidth={1.5} />
-          <h1 className="text-2xl font-medium text-primary-900 text-balance md:text-3xl">
+          <h1 className="text-xl font-medium text-primary-900 text-balance md:text-3xl">
             Activity Log
           </h1>
           <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-100/80 px-2 py-0.5 text-xs text-primary-700 tabular-nums">

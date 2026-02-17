@@ -61,19 +61,22 @@ export function ChannelsScreen() {
   const channels = query.data?.channels || {}
   const labels = query.data?.channelLabels || {}
   const detailLabels = query.data?.channelDetailLabels || {}
+  const channelEntries = Object.entries(channels)
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-primary-200">
+    <div className="flex h-full min-h-0 flex-col overflow-x-hidden">
+      <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-[15px] font-semibold text-ink">Channels</h1>
+          <h1 className="text-sm font-semibold text-ink md:text-[15px]">
+            Channels
+          </h1>
           {query.isFetching && !query.isLoading ? (
             <span className="text-[10px] text-primary-500 animate-pulse">
               syncing…
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {lastUpdated ? (
             <span className="text-[10px] text-primary-500">
               Updated {lastUpdated}
@@ -85,7 +88,7 @@ export function ChannelsScreen() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-6 py-4">
+      <div className="flex-1 overflow-auto px-3 pt-3 pb-24 md:px-6 md:pt-4 md:pb-0">
         {query.isLoading ? (
           <div className="flex items-center justify-center h-32">
             <div className="flex items-center gap-2 text-primary-500">
@@ -119,47 +122,25 @@ export function ChannelsScreen() {
               Retry
             </button>
           </div>
-        ) : Object.keys(channels).length === 0 ? (
+        ) : channelEntries.length === 0 ? (
           <EmptyState
             icon={Chat01Icon}
             title="No channels configured"
             description="Connect Telegram, Discord, or other messaging platforms in settings."
           />
         ) : (
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="border-b border-primary-200 text-left">
-                <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                  Channel
-                </th>
-                <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                  Mode
-                </th>
-                <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                  Last Started
-                </th>
-                <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                  Error
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(channels).map(([key, ch]) => (
-                <tr
+          <>
+            <div className="space-y-3 md:hidden">
+              {channelEntries.map(([key, ch]) => (
+                <article
                   key={key}
-                  className="border-b border-primary-100 hover:bg-primary-50 transition-colors"
+                  className="rounded-xl border border-primary-200 bg-primary-50/70 p-3"
                 >
-                  <td className="py-3 font-medium text-ink">
-                    {labels[key] || key}
-                  </td>
-                  <td className="py-3">
-                    <span className="inline-flex items-center gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-medium text-ink">
+                      {labels[key] || key}
+                    </h2>
+                    <span className="inline-flex items-center gap-1.5 text-xs">
                       <StatusDot running={ch.running} />
                       <span
                         className={
@@ -169,21 +150,96 @@ export function ChannelsScreen() {
                         {ch.running ? 'Running' : 'Stopped'}
                       </span>
                     </span>
-                  </td>
-                  <td className="py-3 text-primary-600">{ch.mode || '—'}</td>
-                  <td className="py-3 text-primary-600">
-                    {detailLabels[key] || '—'}
-                  </td>
-                  <td className="py-3 text-primary-600">
-                    {formatTime(ch.lastStartAt)}
-                  </td>
-                  <td className="py-3 text-red-600 text-xs">
-                    {ch.lastError || '—'}
-                  </td>
-                </tr>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5">
+                      <dt className="text-primary-500">Mode</dt>
+                      <dd className="truncate text-primary-700">
+                        {ch.mode || '—'}
+                      </dd>
+                    </div>
+                    <div className="rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5">
+                      <dt className="text-primary-500">Type</dt>
+                      <dd className="truncate text-primary-700">
+                        {detailLabels[key] || '—'}
+                      </dd>
+                    </div>
+                    <div className="col-span-2 rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5">
+                      <dt className="text-primary-500">Last started</dt>
+                      <dd className="text-primary-700">
+                        {formatTime(ch.lastStartAt)}
+                      </dd>
+                    </div>
+                    <div className="col-span-2 rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5">
+                      <dt className="text-primary-500">Error</dt>
+                      <dd className="text-red-600">{ch.lastError || '—'}</dd>
+                    </div>
+                  </dl>
+                </article>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[760px] text-[13px]">
+                <thead>
+                  <tr className="border-b border-primary-200 text-left">
+                    <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
+                      Channel
+                    </th>
+                    <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
+                      Mode
+                    </th>
+                    <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
+                      Last Started
+                    </th>
+                    <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
+                      Error
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {channelEntries.map(([key, ch]) => (
+                    <tr
+                      key={key}
+                      className="border-b border-primary-100 transition-colors hover:bg-primary-50"
+                    >
+                      <td className="py-3 font-medium text-ink">
+                        {labels[key] || key}
+                      </td>
+                      <td className="py-3">
+                        <span className="inline-flex items-center gap-1.5">
+                          <StatusDot running={ch.running} />
+                          <span
+                            className={
+                              ch.running ? 'text-emerald-700' : 'text-red-600'
+                            }
+                          >
+                            {ch.running ? 'Running' : 'Stopped'}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="py-3 text-primary-600">{ch.mode || '—'}</td>
+                      <td className="py-3 text-primary-600">
+                        {detailLabels[key] || '—'}
+                      </td>
+                      <td className="py-3 text-primary-600">
+                        {formatTime(ch.lastStartAt)}
+                      </td>
+                      <td className="py-3 text-xs text-red-600">
+                        {ch.lastError || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -25,7 +25,7 @@ import {
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
@@ -177,7 +177,7 @@ function NavItem({
 }) {
   const cls = cn(
     buttonVariants({ variant: 'ghost', size: 'sm' }),
-    'w-full h-auto gap-2.5 py-2',
+    'w-full h-auto min-h-11 gap-2.5 py-2 md:min-h-0',
     isCollapsed ? 'justify-center px-0' : 'justify-start px-3',
     item.active
       ? 'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15'
@@ -220,6 +220,10 @@ function NavItem({
     </AnimatePresence>
   )
 
+  const handleSelect = () => {
+    onSelectSession?.()
+  }
+
   if (item.kind === 'link') {
     if (isCollapsed) {
       return (
@@ -229,7 +233,7 @@ function NavItem({
               render={
                 <Link
                   to={item.to!}
-                  onMouseUp={onSelectSession}
+                  onClick={handleSelect}
                   className={cls}
                   data-tour={item.dataTour}
                 >
@@ -245,7 +249,7 @@ function NavItem({
     return (
       <Link
         to={item.to!}
-        onMouseUp={onSelectSession}
+        onClick={handleSelect}
         className={cls}
         data-tour={item.dataTour}
       >
@@ -265,8 +269,10 @@ function NavItem({
                 disabled={item.disabled}
                 variant="ghost"
                 size="sm"
-                onClick={item.onClick}
-                onMouseUp={onSelectSession}
+                onClick={() => {
+                  item.onClick?.()
+                  handleSelect()
+                }}
                 className={cls}
                 data-tour={item.dataTour}
               >
@@ -285,8 +291,10 @@ function NavItem({
       disabled={item.disabled}
       variant="ghost"
       size="sm"
-      onClick={item.onClick}
-      onMouseUp={onSelectSession}
+      onClick={() => {
+        item.onClick?.()
+        handleSelect()
+      }}
       className={cls}
       data-tour={item.dataTour}
     >
@@ -605,6 +613,10 @@ function ChatSidebarComponent({
     'openclaw-sidebar-suite-expanded',
     true,
   )
+  const [systemExpanded, toggleSystem] = usePersistedBool(
+    'openclaw-sidebar-system-expanded',
+    false,
+  )
   const [gatewayExpanded, toggleGateway] = usePersistedBool(
     'openclaw-sidebar-gateway-expanded',
     false,
@@ -620,6 +632,9 @@ function ChatSidebarComponent({
   const [deleteFriendlyId, setDeleteFriendlyId] = useState<string | null>(null)
   const [deleteSessionTitle, setDeleteSessionTitle] = useState('')
   const [providersOpen, setProvidersOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const sidebarRef = useRef<HTMLElement | null>(null)
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
 
   function handleOpenRename(session: SessionMeta) {
     setRenameSessionKey(session.key)
@@ -664,10 +679,56 @@ function ChatSidebarComponent({
     setDeleteFriendlyId(null)
   }
 
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
   const asideProps = {
-    className:
+    className: cn(
       'border-r border-primary-200 h-full overflow-hidden bg-primary-50 dark:bg-primary-100 flex flex-col',
+      isMobile && 'fixed inset-y-0 left-0 z-50 shadow-2xl',
+      isMobile && isCollapsed && 'pointer-events-none',
+    ),
   }
+
+  useEffect(() => {
+    if (!isMobile || isCollapsed) return
+    const node = sidebarRef.current
+    if (!node) return
+
+    const SWIPE_CLOSE_PX = 64
+    const MAX_VERTICAL_DRIFT_PX = 72
+
+    function handleTouchStart(event: TouchEvent) {
+      if (event.touches.length !== 1) return
+      const touch = event.touches[0]
+      swipeStartRef.current = { x: touch.clientX, y: touch.clientY }
+    }
+
+    function handleTouchEnd(event: TouchEvent) {
+      const start = swipeStartRef.current
+      swipeStartRef.current = null
+      if (!start || event.changedTouches.length !== 1) return
+      const touch = event.changedTouches[0]
+      const dx = touch.clientX - start.x
+      const dy = touch.clientY - start.y
+      if (Math.abs(dy) > MAX_VERTICAL_DRIFT_PX) return
+      if (dx <= -SWIPE_CLOSE_PX) {
+        onToggleCollapse()
+      }
+    }
+
+    node.addEventListener('touchstart', handleTouchStart, { passive: true })
+    node.addEventListener('touchend', handleTouchEnd, { passive: true })
+    return () => {
+      node.removeEventListener('touchstart', handleTouchStart)
+      node.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [isCollapsed, isMobile, onToggleCollapse])
 
   useEffect(() => {
     function handleOpenSettingsFromSearch() {
@@ -828,16 +889,38 @@ function ChatSidebarComponent({
   ]
 
   // Auto-expand sections if any child route is active
+  const mobileSystemLabels = [
+    'Files',
+    'Memory',
+    'Tasks',
+    'Terminal',
+    'Browser',
+    'Cron Jobs',
+    'Logs',
+    'Debug',
+  ]
+  const mobileSecondarySuite = mobileSystemLabels
+    .map((label) => suiteItems.find((item) => item.label === label))
+    .filter((item): item is NavItemDef => Boolean(item))
   const isAnySuiteActive = suiteItems.some((i) => i.active)
+  const isAnySystemActive = mobileSecondarySuite.some((item) => item.active)
   const isAnyGatewayActive = gatewayItems.some((i) => i.active)
 
   return (
     <motion.aside
+      ref={(node) => {
+        sidebarRef.current = node
+      }}
       initial={false}
-      animate={{ width: isCollapsed ? 48 : 300 }}
-      transition={transition}
-      className={asideProps.className}
+      animate={{
+        width: isCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
+      }}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
       data-tour="sidebar-container"
+      style={isMobile ? { maxWidth: 360 } : undefined}
+      aria-hidden={isMobile && isCollapsed ? true : undefined}
+      {...(isMobile && isCollapsed ? { inert: '' as unknown as boolean } : {})}
     >
       {/* ── Header ──────────────────────────────────────────────────── */}
       <motion.div
@@ -945,26 +1028,50 @@ function ChatSidebarComponent({
       {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
         {/* Navigation sections */}
-        <div className="shrink-0 space-y-0.5 px-2">
-          {/* SUITE */}
-          <SectionLabel
-            label="Suite"
-            isCollapsed={isCollapsed}
-            transition={transition}
-            collapsible
-            expanded={suiteExpanded || isAnySuiteActive}
-            onToggle={toggleSuite}
-            navigateTo={suiteNav}
-          />
-          <CollapsibleSection
-            expanded={suiteExpanded || isAnySuiteActive || isCollapsed}
-            items={suiteItems}
-            isCollapsed={isCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
+        <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
+          {!isMobile && (
+            <>
+              {/* SUITE */}
+              <SectionLabel
+                label="Suite"
+                isCollapsed={isCollapsed}
+                transition={transition}
+                collapsible
+                expanded={suiteExpanded || isAnySuiteActive}
+                onToggle={toggleSuite}
+                navigateTo={suiteNav}
+              />
+              <CollapsibleSection
+                expanded={suiteExpanded || isAnySuiteActive || isCollapsed}
+                items={suiteItems}
+                isCollapsed={isCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+            </>
+          )}
 
-          {/* GATEWAY (collapsible) */}
+          {isMobile && mobileSecondarySuite.length > 0 && (
+            <>
+              <SectionLabel
+                label="System"
+                isCollapsed={isCollapsed}
+                transition={transition}
+                collapsible
+                expanded={systemExpanded || isAnySystemActive}
+                onToggle={toggleSystem}
+              />
+              <CollapsibleSection
+                expanded={systemExpanded || isAnySystemActive || isCollapsed}
+                items={mobileSecondarySuite}
+                isCollapsed={isCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+            </>
+          )}
+
+          {/* GATEWAY */}
           <SectionLabel
             label="Gateway"
             isCollapsed={isCollapsed}
@@ -984,7 +1091,12 @@ function ChatSidebarComponent({
         </div>
 
         {/* Sessions list */}
-        <div className="shrink-0 border-t border-primary-200/60 mt-1">
+        <div
+          className={cn(
+            'shrink-0 border-t border-primary-200/60 mt-1',
+            isMobile && 'order-1',
+          )}
+        >
           <AnimatePresence initial={false}>
             {!isCollapsed && (
               <motion.div

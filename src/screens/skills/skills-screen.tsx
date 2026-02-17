@@ -265,21 +265,23 @@ export function SkillsScreen() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-surface text-ink">
+    <div className="h-full overflow-y-auto bg-surface pb-24 text-ink md:pb-8">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium uppercase text-primary-500 tabular-nums">
-                ClawSuite Marketplace
-              </p>
-              <h1 className="text-2xl font-medium text-ink text-balance sm:text-3xl">
-                Skills Browser
-              </h1>
-              <p className="text-sm text-primary-500 text-pretty sm:text-base">
-                Discover, install, and manage skills across your local workspace
-                and ClawHub registry.
-              </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="space-y-1 md:space-y-1.5">
+                <p className="text-[10px] font-medium uppercase text-primary-500 tabular-nums md:text-xs">
+                  ClawSuite Marketplace
+                </p>
+                <h1 className="text-xl font-medium text-ink text-balance md:text-2xl lg:text-3xl">
+                  Skills Browser
+                </h1>
+                <p className="line-clamp-1 text-xs text-primary-500 text-pretty md:line-clamp-none md:text-sm lg:text-base">
+                  Discover, install, and manage skills across your local
+                  workspace and ClawHub registry.
+                </p>
+              </div>
             </div>
           </div>
         </header>
@@ -288,16 +290,16 @@ export function SkillsScreen() {
           <Tabs value={tab} onValueChange={handleTabChange}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <TabsList
-                className="rounded-xl border border-primary-200 bg-primary-100/60 p-1"
+                className="w-full overflow-x-auto rounded-xl border border-primary-200 bg-primary-100/60 p-1 scrollbar-none sm:w-auto"
                 variant="default"
               >
-                <TabsTab value="installed" className="min-w-[132px]">
-                  Installed Skills
+                <TabsTab value="installed" className="min-w-0 shrink-0 px-3 text-xs sm:min-w-[132px] sm:text-sm">
+                  Installed
                 </TabsTab>
-                <TabsTab value="marketplace" className="min-w-[168px]">
-                  ClawHub Marketplace
+                <TabsTab value="marketplace" className="min-w-0 shrink-0 px-3 text-xs sm:min-w-[168px] sm:text-sm">
+                  Marketplace
                 </TabsTab>
-                <TabsTab value="featured" className="min-w-[120px]">
+                <TabsTab value="featured" className="min-w-0 shrink-0 px-3 text-xs sm:min-w-[120px] sm:text-sm">
                   Featured
                 </TabsTab>
               </TabsList>
@@ -306,8 +308,8 @@ export function SkillsScreen() {
                 <input
                   value={searchInput}
                   onChange={(event) => handleSearchChange(event.target.value)}
-                  placeholder="Search by name, tags, or description"
-                  className="h-9 min-w-[220px] rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
+                  placeholder="Search skills..."
+                  className="h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px] sm:w-auto"
                 />
 
                 {tab === 'marketplace' ? (
@@ -399,25 +401,27 @@ export function SkillsScreen() {
         </section>
 
         {tab !== 'featured' ? (
-          <footer className="flex items-center justify-between rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-2.5 text-sm text-primary-500 tabular-nums">
+          <footer className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-2.5 text-xs text-primary-500 tabular-nums sm:text-sm">
             <span>
-              {(skillsQuery.data?.total || 0).toLocaleString()} total skills
+              {(skillsQuery.data?.total || 0).toLocaleString()} skills
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm"
                 disabled={page <= 1 || skillsQuery.isPending}
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
-                Previous
+                Prev
               </Button>
-              <span className="min-w-[82px] text-center">
+              <span className="min-w-[50px] text-center sm:min-w-[82px]">
                 {page} / {totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm"
                 disabled={page >= totalPages || skillsQuery.isPending}
                 onClick={() =>
                   setPage((current) => Math.min(totalPages, current + 1))
@@ -782,35 +786,40 @@ function SkillsGrid({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18 }}
-              className="flex min-h-[220px] flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
+              className="flex flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-3 shadow-sm backdrop-blur-sm md:min-h-[220px] md:p-4"
             >
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <div className="space-y-1">
-                  <p className="text-xl leading-none">{skill.icon}</p>
-                  <h3 className="line-clamp-1 text-base font-medium text-ink text-balance">
-                    {skill.name}
-                  </h3>
-                  <p className="line-clamp-1 text-xs text-primary-500">
+              {/* Header: icon + name + badge */}
+              <div className="mb-1.5 flex items-start gap-2.5 md:mb-2">
+                <span className="mt-0.5 text-2xl leading-none md:text-xl">{skill.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="line-clamp-1 text-sm font-medium text-ink md:text-base">
+                      {skill.name}
+                    </h3>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-md border text-[10px] px-1.5 py-0 md:px-2 md:py-0.5 md:text-xs tabular-nums',
+                        skill.installed
+                          ? 'border-primary/40 bg-primary/15 text-primary'
+                          : 'border-primary-200 bg-primary-100/60 text-primary-500',
+                      )}
+                    >
+                      {skill.installed ? 'Installed' : 'Available'}
+                    </span>
+                  </div>
+                  <p className="line-clamp-1 text-[11px] text-primary-500 md:text-xs">
                     by {skill.author}
                   </p>
                 </div>
-                <span
-                  className={cn(
-                    'rounded-md border px-2 py-0.5 text-xs tabular-nums',
-                    skill.installed
-                      ? 'border-primary/40 bg-primary/15 text-primary'
-                      : 'border-primary-200 bg-primary-100/60 text-primary-500',
-                  )}
-                >
-                  {skill.installed ? 'Installed' : 'Available'}
-                </span>
               </div>
 
-              <p className="line-clamp-3 min-h-[58px] text-sm text-primary-500 text-pretty">
+              {/* Description: 1 line mobile, 3 lines desktop */}
+              <p className="line-clamp-1 text-xs text-primary-500 md:line-clamp-3 md:min-h-[58px] md:text-sm">
                 {skill.description}
               </p>
 
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {/* Tags: hidden on mobile, shown on desktop */}
+              <div className="mt-2 hidden flex-wrap items-center gap-1.5 md:flex">
                 {skill.builtin && (
                   <span className="rounded-md border border-accent-300 bg-accent-100/50 px-2 py-0.5 text-xs font-medium text-accent-600">
                     Built-in
@@ -830,10 +839,12 @@ function SkillsGrid({
                 ))}
               </div>
 
-              <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+              {/* Actions row */}
+              <div className="mt-2 flex items-center justify-between gap-2 md:mt-auto md:pt-3">
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-8 text-xs md:h-9 md:text-sm"
                   onClick={() => onOpenDetails(skill)}
                 >
                   Details
@@ -842,7 +853,7 @@ function SkillsGrid({
                 {tab === 'installed' ? (
                   <div className="flex items-center gap-2">
                     {!skill.builtin && (
-                      <div className="flex items-center gap-1.5 text-xs text-primary-500">
+                      <div className="flex items-center gap-1.5 text-[11px] text-primary-500 md:text-xs">
                         <Switch
                           checked={skill.enabled}
                           disabled={isActing}
@@ -851,13 +862,14 @@ function SkillsGrid({
                           }
                           aria-label={`Toggle ${skill.name}`}
                         />
-                        {skill.enabled ? 'Enabled' : 'Disabled'}
+                        <span className="hidden sm:inline">{skill.enabled ? 'Enabled' : 'Disabled'}</span>
                       </div>
                     )}
                     {!skill.builtin && (
                       <Button
                         variant="outline"
                         size="sm"
+                        className="h-8 text-xs md:h-9 md:text-sm"
                         disabled={isActing}
                         onClick={() => onUninstall(skill.id)}
                       >
@@ -869,6 +881,7 @@ function SkillsGrid({
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-8 text-xs md:h-9 md:text-sm"
                     disabled={isActing}
                     onClick={() => onUninstall(skill.id)}
                   >
@@ -877,6 +890,7 @@ function SkillsGrid({
                 ) : (
                   <Button
                     size="sm"
+                    className="h-8 text-xs md:h-9 md:text-sm"
                     disabled={isActing}
                     onClick={() => onInstall(skill.id)}
                   >
