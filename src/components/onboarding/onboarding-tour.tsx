@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Joyride, { CallBackProps, STATUS, Step, Styles } from 'react-joyride'
+import Joyride, { CallBackProps, STATUS, Styles } from 'react-joyride'
 import { tourSteps } from './tour-steps'
 import { useSettingsStore } from '@/hooks/use-settings'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
@@ -134,12 +134,6 @@ export function OnboardingTour() {
       right: 8,
       opacity: 0.6,
       transition: 'all 0.2s ease',
-    },
-    tooltipClose: {
-      width: 24,
-      height: 24,
-      top: 8,
-      right: 8,
     },
     spotlight: {
       borderRadius: 8,

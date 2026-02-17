@@ -8,12 +8,11 @@ import {
   Sun02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import {
   type MouseEvent,
   type ReactNode,
-  type TouchEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -219,7 +218,6 @@ function formatModelName(raw: string): string {
 
 export function DashboardScreen() {
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const [gridLayouts, setGridLayouts] = useState<ResponsiveLayouts>(loadLayouts)
   const [dashSettingsOpen, setDashSettingsOpen] = useState(false)
   const [overflowOpen, setOverflowOpen] = useState(false)
@@ -355,26 +353,6 @@ export function DashboardScreen() {
     staleTime: 60_000,
     refetchInterval: 60_000,
   })
-
-  const handleRefreshAll = useCallback(
-    async function handleRefreshAll() {
-      await Promise.allSettled([
-        sessionsQuery.refetch(),
-        gatewayStatusQuery.refetch(),
-        sessionStatusQuery.refetch(),
-        heroCostQuery.refetch(),
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
-        queryClient.invalidateQueries({ queryKey: chatQueryKeys.sessions }),
-      ])
-    },
-    [
-      gatewayStatusQuery,
-      heroCostQuery,
-      queryClient,
-      sessionStatusQuery,
-      sessionsQuery,
-    ],
-  )
 
   const systemStatus = useMemo(
     function buildSystemStatus() {

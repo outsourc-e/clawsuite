@@ -494,8 +494,6 @@ function usePersistedBool(key: string, defaultValue: boolean) {
 function ChatSidebarComponent({
   sessions,
   activeFriendlyId,
-  creatingSession,
-  onCreateSession,
   isCollapsed,
   onToggleCollapse,
   onSelectSession,
@@ -508,11 +506,7 @@ function ChatSidebarComponent({
   const {
     settingsOpen,
     setSettingsOpen,
-    pathsLoading,
-    pathsError,
-    paths,
     handleOpenSettings,
-    closeSettings,
   } = useSidebarSettings()
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const profileAvatarDataUrl = useChatSettingsStore(

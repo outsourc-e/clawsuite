@@ -119,7 +119,6 @@ function SettingsRoute() {
   const [connectionStatus, setConnectionStatus] = useState<
     'idle' | 'testing' | 'connected' | 'failed'
   >('idle')
-  const [isMobile, setIsMobile] = useState(false)
 
   // Phase 4.2: Fetch models for preferred model dropdowns
   const [availableModels, setAvailableModels] = useState<
@@ -150,14 +149,6 @@ function SettingsRoute() {
       }
     }
     void fetchModels()
-  }, [])
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)')
-    const update = () => setIsMobile(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
   }, [])
 
   async function handleTestConnection() {

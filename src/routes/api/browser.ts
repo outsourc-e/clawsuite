@@ -4,7 +4,6 @@ import {
   launchBrowser,
   closeBrowser,
   navigate,
-  clickAt,
   typeText,
   pressKey,
   goBack,

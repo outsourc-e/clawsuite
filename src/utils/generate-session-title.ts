@@ -9,15 +9,6 @@ type SessionCategory =
   | 'analysis'
   | 'chat'
 
-const CATEGORY_EMOJI: Record<SessionCategory, string> = {
-  coding: '🔧',
-  research: '🔍',
-  config: '⚙️',
-  creative: '🎨',
-  analysis: '📊',
-  chat: '💬',
-}
-
 const CATEGORY_KEYWORDS: Record<
   Exclude<SessionCategory, 'chat'>,
   Array<string>
@@ -248,54 +239,6 @@ const ACTION_PATTERNS: Array<{ pattern: RegExp; verb: string }> = [
   },
   { pattern: /\b(?:explain|explaining|walkthrough)\b/, verb: 'Explain' },
 ]
-
-const ACTION_TOKENS = new Set([
-  'add',
-  'analyze',
-  'analyse',
-  'analysis',
-  'brainstorm',
-  'build',
-  'cleanup',
-  'compare',
-  'config',
-  'configuration',
-  'configure',
-  'create',
-  'debug',
-  'deploy',
-  'diagnose',
-  'draft',
-  'error',
-  'errors',
-  'evaluate',
-  'explain',
-  'find',
-  'fix',
-  'implement',
-  'install',
-  'investigate',
-  'lookup',
-  'name',
-  'optimize',
-  'optimise',
-  'performance',
-  'refactor',
-  'research',
-  'resolve',
-  'review',
-  'search',
-  'setup',
-  'summarize',
-  'summarise',
-  'summary',
-  'test',
-  'update',
-  'upgrade',
-  'validate',
-  'verify',
-  'write',
-])
 
 const CATEGORY_DEFAULT_ACTION: Record<SessionCategory, string> = {
   coding: 'Fix',

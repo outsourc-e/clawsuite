@@ -19,6 +19,22 @@ const DISMISS_KEY = 'openclaw-update-dismissed-version'
 const AUTO_UPDATE_KEY = 'openclaw-auto-update'
 const CHECK_INTERVAL_MS = 30 * 60 * 1000
 
+function shouldShowUpdateBanner(
+  data:
+    | {
+        updateAvailable: boolean
+        latestVersion: string
+      }
+    | null
+    | undefined,
+  phase: UpdatePhase,
+  dismissed: string | null,
+): boolean {
+  return Boolean(data?.updateAvailable) &&
+    phase !== 'done' &&
+    dismissed !== data?.latestVersion
+}
+
 export function OpenClawUpdateNotifier() {
   const queryClient = useQueryClient()
   const [dismissed, setDismissed] = useState<string | null>(null)
@@ -58,10 +74,7 @@ export function OpenClawUpdateNotifier() {
     }
   }, [autoUpdate, data?.updateAvailable])
 
-  const visible =
-    data?.updateAvailable &&
-    phase !== 'done' &&
-    dismissed !== data.latestVersion
+  const visible = shouldShowUpdateBanner(data, phase, dismissed)
 
   function handleDismiss() {
     if (data?.latestVersion) {

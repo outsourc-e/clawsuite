@@ -8,12 +8,6 @@ import {
   PinIcon,
   StopIcon,
 } from '@hugeicons/core-free-icons'
-import {
-  TooltipContent,
-  TooltipProvider,
-  TooltipRoot,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
@@ -484,7 +478,6 @@ function ChatComposerComponent({
   )
 
   const modelsUnavailable = modelsQuery.isError
-  const noModelsAvailable = modelsQuery.isSuccess && modelOptions.length === 0
   const isModelSwitcherDisabled =
     disabled || modelsQuery.isLoading || modelSwitchMutation.isPending
   const currentModel = currentModelQuery.data ?? ''

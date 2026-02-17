@@ -306,7 +306,6 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
     // Find messages in realtime that aren't in history yet
     const newRealtimeMessages = realtimeMessages.filter((rtMsg) => {
-      const rtTimestamp = getMessageTimestamp(rtMsg)
       const rtId = (rtMsg as { id?: string }).id
       const rtText = extractTextFromContent(rtMsg.content)
 
@@ -353,27 +352,4 @@ function extractTextFromContent(
     .map((c) => c.text)
     .join('\n')
     .trim()
-}
-
-function getMessageTimestamp(message: GatewayMessage): number {
-  const candidates = [
-    (message as any).timestamp,
-    (message as any).createdAt,
-    (message as any).created_at,
-    (message as any).time,
-    (message as any).ts,
-  ]
-
-  for (const candidate of candidates) {
-    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-      if (candidate < 1_000_000_000_000) return candidate * 1000
-      return candidate
-    }
-    if (typeof candidate === 'string') {
-      const parsed = Date.parse(candidate)
-      if (!Number.isNaN(parsed)) return parsed
-    }
-  }
-
-  return 0
 }

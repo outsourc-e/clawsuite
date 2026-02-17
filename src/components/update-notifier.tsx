@@ -3,11 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  ArrowDown01Icon,
   Cancel01Icon,
   Tick01Icon,
   Loading03Icon,
-  GitCommitIcon,
   SparklesIcon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'

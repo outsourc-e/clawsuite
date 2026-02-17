@@ -746,7 +746,7 @@ function SkillsGrid({
   }
 
   if (skills.length === 0) {
-    const isMarketplace = tab === 'marketplace' || tab === 'featured'
+    const isMarketplace = tab === 'marketplace'
     return (
       <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-8 text-center">
         <p className="text-sm font-medium text-primary-700">

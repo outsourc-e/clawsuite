@@ -21,7 +21,6 @@ export function useGatewayChatStream(
   options: UseGatewayChatStreamOptions = {},
 ) {
   const {
-    sessionKey,
     enabled = true,
     onUserMessage,
     onChunk,

@@ -32,7 +32,6 @@ function buildUpsertParams(
 ) {
   const name = readString(body.name)
   const schedule = readString(body.schedule)
-  const description = readString(body.description)
   const payload = body.payload
   const deliveryConfig = body.deliveryConfig
 

@@ -6,11 +6,9 @@ import {
   AiChat02Icon,
   SentIcon,
   ComputerTerminal01Icon,
-  ArrowRight01Icon,
 } from '@hugeicons/core-free-icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
 type BrowserState = {
@@ -154,16 +152,6 @@ export function LocalBrowser() {
         `**${pageTitle || 'Untitled'}** — [${pageUrl}](${pageUrl})`,
         `**Task:** ${instruction}`,
       ].join('\n')
-      // Full context goes as system-level detail (not shown as chat text)
-      const systemContext = JSON.stringify({
-        _browserHandoff: true,
-        url: pageUrl,
-        title: pageTitle,
-        task: instruction,
-        pageContent: pageText,
-        browserApi:
-          'POST http://localhost:9223 — actions: navigate(url), click(x,y), type(text), press(key), scroll(direction), back, forward, refresh, content, screenshot',
-      })
 
       // Send clean message + hidden context
       const fullMessage = `${contextMsg}\n\n<details><summary>Page context</summary>\n\n${pageText.slice(0, 1500)}\n\n</details>\n\nBrowser API: \`POST http://localhost:9223\` with \`{ action, ...params }\``

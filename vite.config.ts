@@ -10,7 +10,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, loadEnv } from 'vite'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 
-const config = defineConfig(({ mode, isSsrBuild }) => {
+const config = defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const gatewayUrl = env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
 
@@ -95,7 +95,6 @@ const config = defineConfig(({ mode, isSsrBuild }) => {
         name: 'client-process-env',
         enforce: 'pre',
         transform(code, _id) {
-          // @ts-expect-error environment exists on plugin context in Vite 6
           const envName = this.environment?.name
           if (envName !== 'client') return null
           if (!code.includes('process.env') && !code.includes('process.platform')) return null

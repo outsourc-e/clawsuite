@@ -162,18 +162,9 @@ function AgentSwarmRoute() {
   const { sessions, isConnected, error, startPolling, stopPolling } =
     useSwarmStore()
   const [viewMode, setViewMode] = useState<ViewMode>('office')
-  const [isMobile, setIsMobile] = useState(false)
 
   // Sound notifications for agent events
   useSounds({ autoPlay: true })
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)')
-    const update = () => setIsMobile(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
 
   useEffect(() => {
     startPolling(5000)
@@ -199,7 +190,9 @@ function AgentSwarmRoute() {
         <header className="mb-6 rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3 sm:gap-4">
-              <OrchestratorAvatar size={48} className="shrink-0 sm:size-14" />
+              <div className="shrink-0 sm:size-14">
+                <OrchestratorAvatar size={48} />
+              </div>
               <div className="min-w-0">
                 <h1 className="text-lg font-semibold text-primary-900 sm:text-2xl">
                   Agent Hub

@@ -12,8 +12,6 @@ type BrowserStatusResponse = {
   message: string
 }
 
-type UnknownRecord = Record<string, unknown>
-
 const PLACEHOLDER_TEXT = 'Browser available when agents browse'
 const NO_SESSION_TEXT = 'No active browser session'
 
@@ -24,32 +22,8 @@ const FALLBACK_STATUS: BrowserStatusResponse = {
   message: PLACEHOLDER_TEXT,
 }
 
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === 'object' && value !== null
-}
-
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
-}
-
-function readBoolean(value: unknown): boolean {
-  return typeof value === 'boolean' ? value : false
-}
-
-function normalizeStatusPayload(payload: unknown): BrowserStatusResponse {
-  if (!isRecord(payload)) return FALLBACK_STATUS
-
-  const active = readBoolean(payload.active)
-  const url = readString(payload.url)
-  const screenshotUrl = readString(payload.screenshotUrl)
-  const message = readString(payload.message) || PLACEHOLDER_TEXT
-
-  return {
-    active,
-    url,
-    screenshotUrl,
-    message,
-  }
 }
 
 async function fetchBrowserStatus(): Promise<BrowserStatusResponse> {
