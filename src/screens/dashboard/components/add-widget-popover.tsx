@@ -13,12 +13,14 @@ type AddWidgetPopoverProps = {
   visibleIds: WidgetId[]
   onAdd: (id: WidgetId) => void
   buttonClassName?: string
+  compact?: boolean
 }
 
 export function AddWidgetPopover({
   visibleIds,
   onAdd,
   buttonClassName,
+  compact,
 }: AddWidgetPopoverProps) {
   const [open, setOpen] = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
@@ -54,8 +56,8 @@ export function AddWidgetPopover({
         title="Widgets"
         disabled={hiddenWidgets.length === 0}
       >
-        <HugeiconsIcon icon={Add01Icon} size={13} strokeWidth={1.5} />
-        <span>Widgets</span>
+        <HugeiconsIcon icon={Add01Icon} size={compact ? 16 : 13} strokeWidth={1.5} />
+        {!compact ? <span>Widgets</span> : null}
       </button>
 
       {open ? (

@@ -901,6 +901,7 @@ export function DashboardScreen() {
                 <AddWidgetPopover
                   visibleIds={visibleIds}
                   onAdd={addWidget}
+                  compact
                   buttonClassName="size-8 !px-0 !py-0 justify-center rounded-full border border-primary-200 bg-primary-50 text-primary-500"
                 />
                 <button
@@ -917,15 +918,17 @@ export function DashboardScreen() {
                 >
                   <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.6} />
                 </button>
-                <button
-                  type="button"
-                  onClick={handleResetLayout}
-                  className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-50 text-primary-500 transition-colors hover:text-primary-700"
-                  aria-label="Reset Layout"
-                  title="Reset Layout"
-                >
-                  <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.5} />
-                </button>
+                {mobileEditMode ? (
+                  <button
+                    type="button"
+                    onClick={handleResetLayout}
+                    className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-50 text-primary-500 transition-colors hover:text-primary-700"
+                    aria-label="Reset Layout"
+                    title="Reset Layout"
+                  >
+                    <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.5} />
+                  </button>
+                ) : null}
               </>
             ) : (
               <>
