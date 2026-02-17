@@ -237,12 +237,33 @@ function PromptInputTextarea({
     onKeyDown?.(e)
   }
 
+  /**
+   * iOS Safari fix: onPointerDown ensures the textarea gets focus even when
+   * tapped from deep scroll positions or after the keyboard was recently dismissed.
+   * Without this, iOS sometimes swallows the tap and the keyboard never opens.
+   */
+  function handlePointerDown(e: React.PointerEvent<HTMLTextAreaElement>) {
+    // Only on touch devices; avoid interfering with mouse selection
+    if (e.pointerType !== 'touch') return
+    const el = e.currentTarget
+    // Use rAF to let the browser process the touch event first
+    requestAnimationFrame(() => {
+      try {
+        el.focus({ preventScroll: true })
+      } catch {
+        el.focus()
+      }
+    })
+    props.onPointerDown?.(e)
+  }
+
   return (
     <textarea
       ref={handleRef}
       value={value}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
+      onPointerDown={handlePointerDown}
       className={cn(
         'text-primary-950 min-h-[28px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 pl-4 pr-1 py-2 md:py-0 text-[15px] placeholder:text-primary-500',
         className,

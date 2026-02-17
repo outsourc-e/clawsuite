@@ -3,6 +3,8 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const OPEN_THRESHOLD = 24
 const CLOSE_THRESHOLD = 12
+/** Debounce before declaring keyboard closed (ms). Prevents flicker on iOS blur→refocus. */
+const CLOSE_DEBOUNCE_MS = 200
 
 export function useMobileKeyboard() {
   const setMobileKeyboardInset = useWorkspaceStore((s) => s.setMobileKeyboardInset)
@@ -12,6 +14,7 @@ export function useMobileKeyboard() {
   const lastVvhRef = useRef<number | null>(null)
   const lastKbInsetRef = useRef<number | null>(null)
   const lastKeyboardOpenRef = useRef<boolean | null>(null)
+  const closeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const vv = window.visualViewport
@@ -32,8 +35,28 @@ export function useMobileKeyboard() {
 
     const applyKeyboardState = (open: boolean) => {
       if (lastKeyboardOpenRef.current === open) return
-      lastKeyboardOpenRef.current = open
-      setMobileKeyboardOpen(open)
+
+      if (!open) {
+        // Debounce close to prevent flicker on iOS blur→refocus
+        if (closeDebounceRef.current) return // already pending
+        closeDebounceRef.current = setTimeout(() => {
+          closeDebounceRef.current = null
+          // Re-check: if viewport shrank again during debounce, stay open
+          const currentInset = lastKbInsetRef.current ?? 0
+          if (currentInset > CLOSE_THRESHOLD) return
+          lastKeyboardOpenRef.current = false
+          setMobileKeyboardOpen(false)
+        }, CLOSE_DEBOUNCE_MS)
+        return
+      }
+
+      // Opening — cancel any pending close and apply immediately
+      if (closeDebounceRef.current) {
+        clearTimeout(closeDebounceRef.current)
+        closeDebounceRef.current = null
+      }
+      lastKeyboardOpenRef.current = true
+      setMobileKeyboardOpen(true)
     }
 
     let frameId: number | null = null
@@ -88,6 +111,9 @@ export function useMobileKeyboard() {
       window.removeEventListener('resize', scheduleUpdate)
       if (frameId !== null) {
         window.cancelAnimationFrame(frameId)
+      }
+      if (closeDebounceRef.current) {
+        clearTimeout(closeDebounceRef.current)
       }
     }
   }, [setMobileKeyboardInset, setMobileKeyboardOpen])

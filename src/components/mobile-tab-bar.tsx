@@ -13,6 +13,14 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 /** Height constant for consistent bottom insets on mobile routes with tab bar */
 export const MOBILE_TAB_BAR_OFFSET = '3.75rem'
 
+/**
+ * Z-index layer map (documented for maintainability):
+ *   z-40  — tab bar (below everything interactive)
+ *   z-50  — chat composer input area
+ *   z-60  — quick menus, modal sheets, overlays
+ *   z-70  — composer wrapper (fixed on mobile)
+ */
+
 type TabItem = {
   id: string
   label: string
@@ -63,15 +71,19 @@ export function MobileTabBar() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
+  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
-  const hideForChat = isChatRoute && mobileKeyboardInset > 0
+
+  // Hide tab bar when keyboard is open OR composer is focused (iOS reports focus before viewport resize)
+  const keyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
+  const hideTabBar = isChatRoute && keyboardActive
 
   return (
     <nav
       className={cn(
-        'fixed inset-x-0 bottom-0 z-[60] isolate bg-primary-50/95 pb-[var(--safe-b)] md:hidden transition-all duration-200',
-        hideForChat
+        'fixed inset-x-0 bottom-0 z-40 isolate bg-primary-50/95 pb-[var(--safe-b)] md:hidden transition-all duration-200',
+        hideTabBar
           ? 'translate-y-[110%] opacity-0 pointer-events-none'
           : 'translate-y-0 opacity-100',
       )}

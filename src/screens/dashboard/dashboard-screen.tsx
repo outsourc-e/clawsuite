@@ -766,32 +766,41 @@ export function DashboardScreen() {
                 ) : (
                   <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
                 )}
-                <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex min-w-0 items-center gap-2">
                   <h1 className="text-sm font-semibold text-ink text-balance md:text-base truncate">
-                    {isMobile ? 'ClawSuite' : 'ClawSuite'}
+                    ClawSuite
                   </h1>
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                      systemStatus.gateway.connected
-                        ? 'border-emerald-200 bg-emerald-100/70 text-emerald-700'
-                        : 'border-red-200 bg-red-100/80 text-red-700',
-                    )}
-                  >
+                  {isMobile ? (
+                    /* Mobile: simple status dot — tooltip via title */
                     <span
                       className={cn(
-                        'size-1.5 shrink-0 rounded-full',
+                        'size-2 shrink-0 rounded-full',
                         systemStatus.gateway.connected
                           ? 'bg-emerald-500'
                           : 'bg-red-500',
                       )}
+                      title={systemStatus.gateway.connected ? 'Connected' : 'Disconnected'}
                     />
-                    <span className="hidden sm:inline">
-                      {systemStatus.gateway.connected
-                        ? 'Connected'
-                        : 'Disconnected'}
+                  ) : (
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                        systemStatus.gateway.connected
+                          ? 'border-emerald-200 bg-emerald-100/70 text-emerald-700'
+                          : 'border-red-200 bg-red-100/80 text-red-700',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'size-1.5 shrink-0 rounded-full',
+                          systemStatus.gateway.connected
+                            ? 'bg-emerald-500'
+                            : 'bg-red-500',
+                        )}
+                      />
+                      {systemStatus.gateway.connected ? 'Connected' : 'Disconnected'}
                     </span>
-                  </span>
+                  )}
                 </div>
               </div>
 
@@ -853,9 +862,10 @@ export function DashboardScreen() {
             {isMobile ? (
               <div className="mt-1.5 border-t border-primary-200/60 pt-1.5">
                 <p className="text-[13px] font-medium text-ink">Welcome back</p>
-                <p className="text-[11px] text-primary-400">
+                <p className="text-[11px] text-primary-400 truncate">
+                  {systemStatus.currentModel !== '—' ? `${systemStatus.currentModel} • ` : ''}
                   {systemStatus.totalSessions} sessions • {systemStatus.activeAgents}{' '}
-                  agents • updated {greetingUpdatedText}
+                  agents • {greetingUpdatedText}
                 </p>
               </div>
             ) : null}
