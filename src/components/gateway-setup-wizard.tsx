@@ -72,7 +72,7 @@ function GatewayStepContent() {
             className="h-10"
           />
           <p className="mt-1 text-xs text-primary-500">
-            Default: ws://127.0.0.1:18789 for local OpenClaw
+            Default: ws://127.0.0.1:18789 for local OpenClaw (18790 for nanobot)
           </p>
         </div>
 
@@ -81,12 +81,13 @@ function GatewayStepContent() {
             htmlFor="gateway-token"
             className="mb-1.5 block text-sm font-medium text-primary-900"
           >
-            Gateway Token
+            Gateway Token{' '}
+            <span className="font-normal text-primary-400">(optional)</span>
           </label>
           <Input
             id="gateway-token"
             type="password"
-            placeholder="Paste your gateway token..."
+            placeholder="Leave empty if no token is set"
             value={gatewayToken}
             onChange={(e) => setGatewayToken(e.target.value)}
             className="h-10"

@@ -1,16 +1,20 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 const TOUR_STORAGE_KEY = 'clawsuite-onboarding-completed'
 
 export function useOnboardingTour() {
-  const [tourCompleted, setTourCompleted] = useState(() => {
-    if (typeof window === 'undefined') return false
+  // Always initialize as false to match server render — read localStorage in useEffect
+  const [tourCompleted, setTourCompleted] = useState(false)
+
+  useEffect(() => {
     try {
-      return localStorage.getItem(TOUR_STORAGE_KEY) === 'true'
+      if (localStorage.getItem(TOUR_STORAGE_KEY) === 'true') {
+        setTourCompleted(true)
+      }
     } catch {
-      return false
+      // ignore
     }
-  })
+  }, [])
 
   const resetTour = useCallback(() => {
     try {

@@ -17,14 +17,19 @@ const ACCENT_COLORS = {
 }
 
 export function OnboardingTour() {
+  const [mounted, setMounted] = useState(false)
   const [run, setRun] = useState(false)
   const accentColor = useSettingsStore((state) => state.settings.accentColor)
   const resolvedTheme = useResolvedTheme()
   const isDark = resolvedTheme === 'dark'
 
+  // Wait for client-side mount before doing anything — prevents SSR hydration errors
   useEffect(() => {
-    // Check if user has completed tour
-    if (typeof window === 'undefined') return
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
 
     try {
       const hasCompletedTour = localStorage.getItem(TOUR_STORAGE_KEY)
@@ -52,7 +57,10 @@ export function OnboardingTour() {
     } catch {
       // ignore localStorage errors
     }
-  }, [])
+  }, [mounted])
+
+  // Don't render Joyride at all during SSR — prevents localStorage/DOM errors
+  if (!mounted) return null
 
   const handleJoyrideCallback = (data: CallBackProps) => {
     const { status } = data
@@ -85,13 +93,14 @@ export function OnboardingTour() {
       padding: 20,
     },
     tooltipContainer: {
-      textAlign: 'left',
+      textAlign: 'center',
     },
     tooltipTitle: {
       fontSize: 16,
       fontWeight: 600,
       marginBottom: 8,
       color: isDark ? '#f9fafb' : '#111827',
+      textAlign: 'center',
     },
     tooltipContent: {
       padding: '8px 0',

@@ -113,12 +113,8 @@ export function getGatewayConfig() {
   const token = process.env.CLAWDBOT_GATEWAY_TOKEN?.trim() || ''
   const password = process.env.CLAWDBOT_GATEWAY_PASSWORD?.trim() || ''
 
-  // For a minimal dashboard we require shared auth, otherwise we'd need a device identity signature.
-  if (!token && !password) {
-    throw new Error(
-      'Missing gateway auth. Set CLAWDBOT_GATEWAY_TOKEN (recommended) or CLAWDBOT_GATEWAY_PASSWORD in the server environment.',
-    )
-  }
+  // Allow connecting without shared auth — device identity signature handles authentication.
+  // Some gateways (e.g. nanobot) run without a token by default.
 
   return { url, token, password }
 }
