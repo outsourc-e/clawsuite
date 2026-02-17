@@ -1385,9 +1385,11 @@ function AvatarPicker({
 
 type OrchestratorAvatarProps = {
   size?: number
+  /** When true, hides tooltip, edit pencil, and picker — just the avatar + state dot */
+  compact?: boolean
 }
 
-function OrchestratorAvatarComponent({ size = 48 }: OrchestratorAvatarProps) {
+function OrchestratorAvatarComponent({ size = 48, compact = false }: OrchestratorAvatarProps) {
   const { state, label } = useOrchestratorState()
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>(getStoredAvatar)
   const [showPicker, setShowPicker] = useState(false)
@@ -1406,6 +1408,26 @@ function OrchestratorAvatarComponent({ size = 48 }: OrchestratorAvatarProps) {
   }, [])
 
   const tooltipText = useMemo(() => `⚡ Aurora — ${label}`, [label])
+
+  if (compact) {
+    return (
+      <div
+        className="relative flex items-center justify-center rounded-full"
+        style={{ width: size + 4, height: size + 4 }}
+      >
+        <Renderer state={state} size={size} />
+        <span
+          className="absolute bottom-0 right-0 block rounded-full border-2 border-surface"
+          style={{
+            width: Math.max(6, size / 6),
+            height: Math.max(6, size / 6),
+            backgroundColor: dotColor,
+            transition: 'background-color 300ms ease',
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="relative flex flex-col items-center gap-1">

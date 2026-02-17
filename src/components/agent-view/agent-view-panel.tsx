@@ -310,6 +310,7 @@ export function AgentViewPanel() {
   }, [startGatewayPoll, stopGatewayPoll])
 
   const {
+    isOpen,
     isDesktop,
     panelVisible,
     showFloatingToggle,
@@ -1030,7 +1031,143 @@ export function AgentViewPanel() {
             <ScrollAreaCorner />
           </ScrollAreaRoot>
         </motion.aside>
-      ) : null}
+      ) : (
+        /* Mobile: slide-up sheet */
+        <AnimatePresence>
+          {isOpen ? (
+            <>
+              <motion.div
+                key="agent-sheet-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 z-[80] bg-black/40 backdrop-blur-sm"
+                onClick={() => setOpen(false)}
+              />
+              <motion.div
+                key="agent-sheet"
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="fixed inset-x-0 bottom-0 z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-primary-300/70 bg-primary-100/95 backdrop-blur-xl"
+              >
+                {/* Drag handle */}
+                <div className="sticky top-0 z-10 flex justify-center bg-primary-100/95 pt-2 pb-1 backdrop-blur-xl">
+                  <div className="h-1 w-10 rounded-full bg-primary-400/50" />
+                </div>
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-primary-300/70 px-4 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums',
+                        activeCount > 0
+                          ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700'
+                          : 'border-primary-300/70 bg-primary-200/50 text-primary-700',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'size-1.5 rounded-full',
+                          activeCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-primary-400/50',
+                        )}
+                      />
+                      {activeCount}
+                    </span>
+                  </div>
+                  <h2 className="text-sm font-semibold text-primary-900">Agent Hub</h2>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg p-1.5 text-primary-500 hover:bg-primary-200"
+                    aria-label="Close"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+                {/* Content — same as desktop sidebar */}
+                <div className="space-y-3 p-3">
+                  <OrchestratorCard compact={viewMode === 'compact'} />
+                  <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
+                    <div className="mb-1 flex justify-center">
+                      <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
+                        Swarm
+                      </span>
+                    </div>
+                    <div className="mb-1 flex items-center justify-between px-1">
+                      <p className="text-[10px] text-primary-600 tabular-nums">
+                        {isLoading
+                          ? 'syncing...'
+                          : activeNodes.length === 0 && queuedNodes.length === 0
+                            ? 'No subagents'
+                            : `${activeNodes.length} active · ${queuedNodes.length} queued`}
+                      </p>
+                    </div>
+                    {activeNodes.length > 0 ? (
+                      <div className="space-y-1.5 p-1">
+                        {activeNodes.map((node) => (
+                          <div key={node.id} className="rounded-xl border border-primary-300/70 bg-primary-100 p-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-primary-900 truncate">{node.name}</span>
+                              <span className="text-[10px] text-primary-500 tabular-nums">{node.statusBubble.text}</span>
+                            </div>
+                            <p className="mt-0.5 text-[10px] text-primary-600 line-clamp-2">{node.task}</p>
+                            <div className="mt-1 flex items-center justify-between">
+                              <span className="text-[10px] text-primary-500 tabular-nums">{formatRuntimeLabel(node.runtimeSeconds)}</span>
+                              <button
+                                type="button"
+                                onClick={() => killAgent(node.id)}
+                                className="text-[10px] text-red-500 hover:text-red-700 font-medium"
+                              >
+                                Kill
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
+                  {historyAgents.length > 0 ? (
+                    <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
+                      <button
+                        type="button"
+                        onClick={() => setHistoryOpen(!historyOpen)}
+                        className="flex w-full items-center justify-between text-[11px] font-medium text-primary-700"
+                      >
+                        <span>History ({historyAgents.length})</span>
+                        <span>{historyOpen ? '▾' : '▸'}</span>
+                      </button>
+                      {historyOpen ? (
+                        <div className="mt-1.5 space-y-1">
+                          {historyAgents.map((agent) => (
+                            <div key={agent.id} className="flex items-center justify-between rounded-lg bg-primary-100/60 px-2 py-1.5">
+                              <div className="min-w-0">
+                                <span className="text-[11px] font-medium text-primary-800 truncate block">{agent.name}</span>
+                                <span className="text-[10px] text-primary-500">{agent.status}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedAgentChat({ sessionKey: agent.id, agentName: agent.name, statusLabel: agent.status })}
+                                className="text-[10px] text-accent-600 hover:text-accent-800 font-medium"
+                              >
+                                View
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </section>
+                  ) : null}
+                </div>
+              </motion.div>
+            </>
+          ) : null}
+        </AnimatePresence>
+      )}
 
       <AnimatePresence>
         {showFloatingToggle ? (

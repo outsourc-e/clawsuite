@@ -1,4 +1,5 @@
 import { Step } from 'react-joyride'
+import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 
 export const tourSteps: Step[] = [
   // Step 1: Welcome
@@ -7,21 +8,11 @@ export const tourSteps: Step[] = [
     placement: 'center',
     title: 'Welcome to ClawSuite! 👋',
     content: (
-      <div style={{ textAlign: 'center' }}>
-        <img 
-          src="/logo-final.svg" 
-          alt="ClawSuite" 
-          style={{ 
-            height: '48px', 
-            marginBottom: '16px',
-            display: 'block',
-            marginLeft: 'auto',
-            marginRight: 'auto'
-          }} 
-        />
-        <div style={{ textAlign: 'left' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+        <OpenClawStudioIcon className="size-12 rounded-xl shadow-sm" />
+        <p style={{ textAlign: 'center', margin: 0 }}>
           Your AI-powered command center for managing agents, chats, files, and more. Let&apos;s take a quick tour!
-        </div>
+        </p>
       </div>
     ),
     disableBeacon: true,

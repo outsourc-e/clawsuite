@@ -1,13 +1,15 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  ArrowUp02Icon,
   Chat01Icon,
   Home01Icon,
   PuzzleIcon,
   Settings01Icon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
-import { useLayoutEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
+import type { TouchEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -74,13 +76,49 @@ export function MobileTabBar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
   const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
+  const setMobileKeyboardOpen = useWorkspaceStore((s) => s.setMobileKeyboardOpen)
+  const setMobileKeyboardInset = useWorkspaceStore((s) => s.setMobileKeyboardInset)
+  const setMobileComposerFocused = useWorkspaceStore(
+    (s) => s.setMobileComposerFocused,
+  )
   const navRef = useRef<HTMLElement>(null)
+  const indicatorTouchStartYRef = useRef<number | null>(null)
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
   // Hide tab bar when keyboard is open OR composer is focused (iOS reports focus before viewport resize)
   const keyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const hideTabBar = isChatRoute && keyboardActive
+
+  const revealTabBar = useCallback(() => {
+    const activeElement = document.activeElement
+    if (activeElement instanceof HTMLElement) {
+      activeElement.blur()
+    }
+    setMobileComposerFocused(false)
+    setMobileKeyboardOpen(false)
+    setMobileKeyboardInset(0)
+  }, [setMobileComposerFocused, setMobileKeyboardInset, setMobileKeyboardOpen])
+
+  const handleIndicatorTouchStart = useCallback(
+    (event: TouchEvent<HTMLButtonElement>) => {
+      indicatorTouchStartYRef.current = event.touches[0]?.clientY ?? null
+    },
+    [],
+  )
+
+  const handleIndicatorTouchEnd = useCallback(
+    (event: TouchEvent<HTMLButtonElement>) => {
+      const startY = indicatorTouchStartYRef.current
+      indicatorTouchStartYRef.current = null
+      if (startY === null) return
+      const endY = event.changedTouches[0]?.clientY ?? startY
+      if (startY - endY > 12) {
+        revealTabBar()
+      }
+    },
+    [revealTabBar],
+  )
 
   useLayoutEffect(() => {
     const root = document.documentElement
@@ -96,65 +134,79 @@ export function MobileTabBar() {
   }, [])
 
   return (
-    <nav
-      ref={navRef}
-      className={cn(
-        'fixed inset-x-0 bottom-0 z-40 isolate border-t border-primary-200/40 bg-primary-50/95 pb-[var(--safe-b)] md:hidden transition-all duration-200',
-        hideTabBar
-          ? 'translate-y-[110%] opacity-0 pointer-events-none'
-          : 'translate-y-0 opacity-100',
-      )}
-      aria-label="Mobile navigation"
-    >
-      <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-primary-200/60 px-1 py-1.5 shadow-[0_2px_20px_rgba(0,0,0,0.08)]">
-        {TABS.map((tab) => {
-          const isActive = tab.match(pathname)
-          const isCenterChat = tab.id === 'chat'
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                hapticTap()
-                void navigate({ to: tab.to })
-              }}
-              aria-current={isActive ? 'page' : undefined}
-              className={cn(
-                'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[10px] font-medium transition-transform duration-150 active:scale-90',
-                isCenterChat ? '-translate-y-1.5' : '',
-              )}
-            >
-              <span
+    <>
+      <nav
+        ref={navRef}
+        className={cn(
+          'fixed inset-x-0 bottom-0 z-40 isolate border-t border-primary-200/40 bg-primary-50/95 pb-[var(--safe-b)] md:hidden transition-all duration-200',
+          hideTabBar
+            ? 'translate-y-[110%] opacity-0 pointer-events-none'
+            : 'translate-y-0 opacity-100',
+        )}
+        aria-label="Mobile navigation"
+      >
+        <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-primary-200/60 px-1 py-1.5 shadow-[0_2px_20px_rgba(0,0,0,0.08)]">
+          {TABS.map((tab) => {
+            const isActive = tab.match(pathname)
+            const isCenterChat = tab.id === 'chat'
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  hapticTap()
+                  void navigate({ to: tab.to })
+                }}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'flex items-center justify-center rounded-full transition-all duration-150',
-                  isCenterChat
-                    ? cn(
-                        'size-10 bg-accent-500 text-white shadow-sm',
-                        isActive && 'ring-1 ring-accent-300/30 shadow-sm',
-                      )
-                    : isActive
-                      ? 'size-7 bg-accent-500/15 text-accent-600'
-                      : 'size-7 text-primary-400',
+                  'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[10px] font-medium transition-transform duration-150 active:scale-90',
+                  isCenterChat ? '-translate-y-1.5' : '',
                 )}
               >
-                <HugeiconsIcon
-                  icon={tab.icon}
-                  size={isCenterChat ? 20 : 17}
-                  strokeWidth={isCenterChat ? 1.8 : isActive ? 2 : 1.6}
-                />
-              </span>
-              <span
-                className={cn(
-                  'leading-tight',
-                  isActive ? 'text-accent-600' : 'text-primary-400',
-                )}
-              >
-                {tab.label}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </nav>
+                <span
+                  className={cn(
+                    'flex items-center justify-center rounded-full transition-all duration-150',
+                    isCenterChat
+                      ? cn(
+                          'size-10 bg-accent-500 text-white shadow-sm',
+                          isActive && 'ring-1 ring-accent-300/30 shadow-sm',
+                        )
+                      : isActive
+                        ? 'size-7 bg-accent-500/15 text-accent-600'
+                        : 'size-7 text-primary-400',
+                  )}
+                >
+                  <HugeiconsIcon
+                    icon={tab.icon}
+                    size={isCenterChat ? 20 : 17}
+                    strokeWidth={isCenterChat ? 1.8 : isActive ? 2 : 1.6}
+                  />
+                </span>
+                <span
+                  className={cn(
+                    'leading-tight',
+                    isActive ? 'text-accent-600' : 'text-primary-400',
+                  )}
+                >
+                  {tab.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </nav>
+      {hideTabBar ? (
+        <button
+          type="button"
+          onClick={revealTabBar}
+          onTouchStart={handleIndicatorTouchStart}
+          onTouchEnd={handleIndicatorTouchEnd}
+          className="fixed bottom-[calc(var(--safe-b)+0.3rem)] left-1/2 z-50 -translate-x-1/2 rounded-full border border-primary-200/70 bg-surface/75 px-2.5 py-1 text-primary-500 shadow-sm backdrop-blur-sm transition-colors hover:bg-surface/90 md:hidden"
+          aria-label="Show navigation bar"
+        >
+          <HugeiconsIcon icon={ArrowUp02Icon} size={14} strokeWidth={1.8} />
+        </button>
+      ) : null}
+    </>
   )
 }

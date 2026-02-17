@@ -5,6 +5,7 @@ import {
   ReloadIcon,
 } from '@hugeicons/core-free-icons'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
+import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { Button } from '@/components/ui/button'
 import { UsageMeter } from '@/components/usage-meter'
 import {
@@ -85,6 +86,14 @@ type ChatHeaderProps = {
   dataUpdatedAt?: number
   /** Callback to manually refresh history */
   onRefresh?: () => void
+  /** Current model id/name for compact mobile status */
+  agentModel?: string
+  /** Whether agent connection is healthy */
+  agentConnected?: boolean
+  /** Open agent details panel on mobile status tap */
+  onOpenAgentDetails?: () => void
+  /** Pull-to-refresh offset in px — header slides down */
+  pullOffset?: number
 }
 
 function ChatHeaderComponent({
@@ -96,6 +105,10 @@ function ChatHeaderComponent({
   onToggleFileExplorer,
   dataUpdatedAt = 0,
   onRefresh,
+  agentModel: _agentModel = '',
+  agentConnected = true,
+  onOpenAgentDetails,
+  pullOffset = 0,
 }: ChatHeaderProps) {
   const [syncLabel, setSyncLabel] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -119,6 +132,7 @@ function ChatHeaderComponent({
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
   const mobileTitle = formatMobileSessionTitle(activeTitle)
+  void _agentModel; void agentConnected // kept for prop compat
 
   const handleRefresh = useCallback(() => {
     if (!onRefresh) return
@@ -127,11 +141,20 @@ function ChatHeaderComponent({
     setTimeout(() => setIsRefreshing(false), 600)
   }, [onRefresh])
 
+  const handleOpenAgentDetails = useCallback(() => {
+    if (onOpenAgentDetails) {
+      onOpenAgentDetails()
+      return
+    }
+    window.dispatchEvent(new CustomEvent('clawsuite:chat-agent-details'))
+  }, [onOpenAgentDetails])
+
   if (isMobile) {
     return (
       <div
         ref={wrapperRef}
-        className="shrink-0 border-b border-primary-200 px-4 h-12 flex items-center justify-between bg-surface"
+        className="shrink-0 border-b border-primary-200 px-4 h-12 flex items-center justify-between bg-surface transition-transform"
+        style={pullOffset > 0 ? { transform: `translateY(${pullOffset}px)` } : undefined}
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
@@ -148,38 +171,14 @@ function ChatHeaderComponent({
         </div>
 
         <div className="ml-2 flex shrink-0 items-center gap-1">
-          {syncLabel ? (
-            <span
-              className={cn(
-                'text-[11px] tabular-nums transition-colors',
-                isStale ? 'text-amber-500' : 'text-primary-400',
-              )}
-              title={
-                dataUpdatedAt > 0
-                  ? `Last synced: ${new Date(dataUpdatedAt).toLocaleTimeString()}`
-                  : undefined
-              }
-            >
-              {isStale ? '⚠ ' : ''}
-              {syncLabel}
-            </span>
-          ) : null}
-          {onRefresh ? (
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              onClick={handleRefresh}
-              className="h-8 w-8 text-primary-500 hover:bg-primary-100 hover:text-primary-700"
-              aria-label="Refresh chat"
-            >
-              <HugeiconsIcon
-                icon={ReloadIcon}
-                size={20}
-                strokeWidth={1.5}
-                className={cn(isRefreshing && 'animate-spin')}
-              />
-            </Button>
-          ) : null}
+          <button
+            type="button"
+            onClick={handleOpenAgentDetails}
+            className="relative rounded-full transition-transform active:scale-90"
+            aria-label="Open agent details"
+          >
+            <OrchestratorAvatar size={28} compact />
+          </button>
         </div>
       </div>
     )
