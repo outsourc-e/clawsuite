@@ -6,7 +6,14 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Responsive as ResponsiveGridLayout } from 'react-grid-layout/legacy'
 
 import 'react-grid-layout/css/styles.css'
@@ -23,13 +30,15 @@ import {
 } from './constants/grid-config'
 import { AgentStatusWidget } from './components/agent-status-widget'
 import { ActivityLogWidget } from './components/activity-log-widget'
+import { CollapsibleWidget } from './components/collapsible-widget'
 import { HeroMetricsRow } from './components/hero-metrics-row'
+import { NowCard } from './components/now-card'
 import { NotificationsWidget } from './components/notifications-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
-import { SkillsWidget } from './components/skills-widget'
+import { SkillsWidget, fetchInstalledSkills } from './components/skills-widget'
 // SystemInfoWidget removed — not useful enough for dashboard real estate
 import { TasksWidget } from './components/tasks-widget'
-import { UsageMeterWidget } from './components/usage-meter-widget'
+import { UsageMeterWidget, fetchUsage } from './components/usage-meter-widget'
 import { AddWidgetPopover } from './components/add-widget-popover'
 import { ActivityTicker } from '@/components/activity-ticker'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
@@ -45,6 +54,7 @@ import {
   fetchGatewayStatus,
   fetchSessions,
 } from '@/screens/chat/chat-queries'
+import { fetchCronJobs } from '@/lib/cron-api'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
 
@@ -60,6 +70,88 @@ type SessionStatusPayload = {
       recent?: Array<{ age?: number; model?: string; percentUsed?: number }>
     }
   }
+}
+
+type DashboardCostSummaryPayload = {
+  ok?: boolean
+  cost?: {
+    timeseries?: Array<{
+      date?: string
+      amount?: number | string
+    }>
+  }
+}
+
+function readNumeric(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
+function toLocalDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatUpdatedAgo(checkedAtIso: string, nowMs: number): string {
+  const timestamp = Date.parse(checkedAtIso)
+  if (Number.isNaN(timestamp)) return 'just now'
+
+  const elapsedSeconds = Math.max(0, Math.floor((nowMs - timestamp) / 1000))
+  if (elapsedSeconds < 45) return 'just now'
+  if (elapsedSeconds < 3600) return `${Math.floor(elapsedSeconds / 60)}m ago`
+  if (elapsedSeconds < 86_400) return `${Math.floor(elapsedSeconds / 3600)}h ago`
+  return `${Math.floor(elapsedSeconds / 86_400)}d ago`
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+function formatTokenCount(amount: number): string {
+  return new Intl.NumberFormat().format(Math.max(0, Math.round(amount)))
+}
+
+function toTaskSummaryStatus(
+  job: Awaited<ReturnType<typeof fetchCronJobs>>[number],
+): 'backlog' | 'in_progress' | 'review' | 'done' {
+  if (!job.enabled) return 'backlog'
+  const status = job.lastRun?.status
+  if (status === 'running' || status === 'queued') return 'in_progress'
+  if (status === 'error') return 'review'
+  if (status === 'success') return 'done'
+  return 'backlog'
+}
+
+async function fetchCostTimeseries(): Promise<
+  Array<{ date: string; amount: number }>
+> {
+  const response = await fetch('/api/cost')
+  if (!response.ok) throw new Error('Unable to load cost summary')
+  const payload = (await response.json()) as DashboardCostSummaryPayload
+  if (!payload.ok || !payload.cost) throw new Error('Unable to load cost summary')
+
+  const rows = Array.isArray(payload.cost.timeseries) ? payload.cost.timeseries : []
+  return rows
+    .map(function mapCostPoint(point) {
+      return {
+        date: typeof point.date === 'string' ? point.date : '',
+        amount: readNumeric(point.amount),
+      }
+    })
+    .filter(function hasDate(point) {
+      return point.date.length > 0
+    })
 }
 
 async function fetchSessionStatus(): Promise<SessionStatusPayload> {
@@ -128,6 +220,11 @@ export function DashboardScreen() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  const [mobileTipDismissed, setMobileTipDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('dashboard-tip-dismissed') === 'true'
+  })
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)')
@@ -135,6 +232,11 @@ export function DashboardScreen() {
     update()
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNowMs(Date.now()), 60_000)
+    return () => window.clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -191,6 +293,35 @@ export function DashboardScreen() {
   const heroCostQuery = useQuery({
     queryKey: ['dashboard', 'hero-cost'],
     queryFn: fetchHeroCost,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+
+  const cronJobsQuery = useQuery({
+    queryKey: ['cron', 'jobs'],
+    queryFn: fetchCronJobs,
+    retry: false,
+    refetchInterval: 30_000,
+  })
+
+  const skillsSummaryQuery = useQuery({
+    queryKey: ['dashboard', 'skills'],
+    queryFn: fetchInstalledSkills,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+
+  const usageSummaryQuery = useQuery({
+    queryKey: ['dashboard', 'usage'],
+    queryFn: fetchUsage,
+    retry: false,
+    refetchInterval: 30_000,
+  })
+
+  const costTimeseriesQuery = useQuery({
+    queryKey: ['dashboard', 'cost-timeseries'],
+    queryFn: fetchCostTimeseries,
+    retry: false,
     staleTime: 60_000,
     refetchInterval: 60_000,
   })
@@ -261,11 +392,103 @@ export function DashboardScreen() {
     [gatewayStatusQuery.data?.ok, sessionsQuery.data, sessionStatusQuery.data],
   )
 
+  const taskSummary = useMemo(
+    function buildTaskSummary() {
+      const jobs = Array.isArray(cronJobsQuery.data) ? cronJobsQuery.data : []
+      const counts = {
+        backlog: 0,
+        inProgress: 0,
+        done: 0,
+      }
+
+      for (const job of jobs) {
+        const status = toTaskSummaryStatus(job)
+        if (status === 'backlog') counts.backlog += 1
+        if (status === 'in_progress') counts.inProgress += 1
+        if (status === 'done') counts.done += 1
+      }
+
+      return counts
+    },
+    [cronJobsQuery.data],
+  )
+
+  const enabledSkillsCount = useMemo(
+    function countEnabledSkills() {
+      const skills = Array.isArray(skillsSummaryQuery.data)
+        ? skillsSummaryQuery.data
+        : []
+      return skills.filter((skill) => skill.enabled).length
+    },
+    [skillsSummaryQuery.data],
+  )
+
+  const usageSummary = useMemo(
+    function buildUsageSummary() {
+      const usage = usageSummaryQuery.data
+      if (usageSummaryQuery.isError || usage?.kind === 'error' || usage?.kind === 'unavailable') {
+        return {
+          state: 'error' as const,
+          text: 'Usage unavailable',
+          tokensToday: 0,
+          todayCost: 0,
+        }
+      }
+
+      if (!usage || usage.kind !== 'ok') {
+        return {
+          state: 'loading' as const,
+          text: 'Usage: loading…',
+          tokensToday: 0,
+          todayCost: 0,
+        }
+      }
+
+      const tokensToday = usage.data.totalUsage
+      const todayDateKey = toLocalDateKey(new Date(nowMs))
+      const timeseries = Array.isArray(costTimeseriesQuery.data)
+        ? costTimeseriesQuery.data
+        : []
+      const todayPoint =
+        timeseries.find((point) => point.date.startsWith(todayDateKey)) ??
+        timeseries[timeseries.length - 1]
+      const todayCost = todayPoint ? Math.max(0, todayPoint.amount) : 0
+
+      return {
+        state: 'ok' as const,
+        text: `Usage: ${formatCurrency(todayCost)} today • ${formatTokenCount(tokensToday)} tokens`,
+        tokensToday,
+        todayCost,
+      }
+    },
+    [costTimeseriesQuery.data, nowMs, usageSummaryQuery.data, usageSummaryQuery.isError],
+  )
+
+  const greetingUpdatedText = useMemo(
+    function buildGreetingUpdatedText() {
+      return formatUpdatedAgo(systemStatus.gateway.checkedAtIso, nowMs)
+    },
+    [nowMs, systemStatus.gateway.checkedAtIso],
+  )
+
+  const dismissMobileTip = useCallback(function dismissMobileTip() {
+    setMobileTipDismissed(true)
+    localStorage.setItem('dashboard-tip-dismissed', 'true')
+  }, [])
+
+  const retryUsageSummary = useCallback(
+    function retryUsageSummary(event?: MouseEvent<HTMLButtonElement>) {
+      event?.stopPropagation()
+      void Promise.allSettled([usageSummaryQuery.refetch(), costTimeseriesQuery.refetch()])
+    },
+    [costTimeseriesQuery, usageSummaryQuery],
+  )
+
   return (
     <>
-      <main className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-3 pt-4 pb-24 text-primary-900 md:px-6 md:pt-8 md:pb-8">
+      <main className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-3 pt-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8">
         <section className="mx-auto w-full max-w-[1600px]">
-          <header className="relative z-20 mb-4 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm md:mb-5 md:px-5 md:py-3">
+          <header className="relative z-20 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm md:mb-5 md:px-5 md:py-3">
             <div className="flex items-center justify-between gap-3">
               {/* Left: Logo + name + status */}
               <div className="flex min-w-0 items-center gap-2.5">
@@ -352,8 +575,42 @@ export function DashboardScreen() {
             </div>
           </header>
 
-          {/* Activity ticker — real-time event stream */}
-          <ActivityTicker />
+          <div className="px-4 py-2 md:hidden">
+            <p className="text-sm font-medium text-ink">Welcome back</p>
+            <p className="text-xs text-primary-400">
+              {systemStatus.totalSessions} sessions • {systemStatus.activeAgents}{' '}
+              agents • updated {greetingUpdatedText}
+            </p>
+          </div>
+
+          <NowCard
+            className="mb-3"
+            gatewayConnected={systemStatus.gateway.connected}
+            activeAgents={systemStatus.activeAgents}
+            activeTasks={taskSummary.inProgress}
+          />
+
+          {!mobileTipDismissed ? (
+            <div className="mb-3 px-1 md:hidden">
+              <div className="flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50/90 px-3 py-1.5 text-[11px] shadow-sm">
+                <span className="line-clamp-1 text-primary-600">
+                  Tip: Live system updates are available in Activity.
+                </span>
+                <button
+                  type="button"
+                  onClick={dismissMobileTip}
+                  className="ml-auto shrink-0 rounded-full border border-primary-200 bg-primary-100/80 px-2 py-0.5 text-[10px] font-medium text-primary-600 transition-colors hover:bg-primary-100"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Activity ticker — keep full banner behavior on desktop */}
+          <div className="hidden md:block">
+            <ActivityTicker />
+          </div>
 
           <HeroMetricsRow
             totalSessions={systemStatus.totalSessions}
@@ -365,7 +622,7 @@ export function DashboardScreen() {
           />
 
           {/* Inline widget controls — belongs with the grid, not the header */}
-          <div className="mb-4 flex items-center justify-center md:justify-end gap-2">
+          <div className="mb-3 flex items-center justify-center gap-2 md:justify-end">
             <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
             <button
               type="button"
@@ -384,19 +641,61 @@ export function DashboardScreen() {
               <div className="space-y-3">
                 {visibleIds.includes('skills') ? (
                   <div key="skills" className="w-full">
-                    <SkillsWidget onRemove={() => removeWidget('skills')} />
+                    <CollapsibleWidget
+                      title="Skills"
+                      summary={`Skills: ${enabledSkillsCount} enabled`}
+                      defaultOpen={false}
+                    >
+                      <SkillsWidget onRemove={() => removeWidget('skills')} />
+                    </CollapsibleWidget>
                   </div>
                 ) : null}
                 {visibleIds.includes('usage-meter') ? (
                   <div key="usage-meter" className="w-full">
-                    <UsageMeterWidget
-                      onRemove={() => removeWidget('usage-meter')}
-                    />
+                    <CollapsibleWidget
+                      title="Usage Meter"
+                      summary={usageSummary.text}
+                      defaultOpen={false}
+                      action={
+                        usageSummary.state === 'error' ? (
+                          <button
+                            type="button"
+                            onClick={retryUsageSummary}
+                            className="rounded-md border border-red-200 bg-red-50/80 px-1.5 py-0.5 text-[10px] font-medium text-red-700 transition-colors hover:bg-red-100"
+                          >
+                            Retry
+                          </button>
+                        ) : null
+                      }
+                    >
+                      {usageSummary.state === 'error' ? (
+                        <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-700">
+                          <p className="font-medium">Usage unavailable</p>
+                          <button
+                            type="button"
+                            onClick={retryUsageSummary}
+                            className="mt-2 rounded-md border border-red-200 bg-red-100/80 px-2 py-1 text-xs font-medium transition-colors hover:bg-red-100"
+                          >
+                            Retry
+                          </button>
+                        </div>
+                      ) : (
+                        <UsageMeterWidget
+                          onRemove={() => removeWidget('usage-meter')}
+                        />
+                      )}
+                    </CollapsibleWidget>
                   </div>
                 ) : null}
                 {visibleIds.includes('tasks') ? (
                   <div key="tasks" className="w-full">
-                    <TasksWidget onRemove={() => removeWidget('tasks')} />
+                    <CollapsibleWidget
+                      title="Tasks"
+                      summary={`Tasks: ${taskSummary.backlog} backlog • ${taskSummary.inProgress} in progress • ${taskSummary.done} done`}
+                      defaultOpen
+                    >
+                      <TasksWidget onRemove={() => removeWidget('tasks')} />
+                    </CollapsibleWidget>
                   </div>
                 ) : null}
                 {visibleIds.includes('agent-status') ? (

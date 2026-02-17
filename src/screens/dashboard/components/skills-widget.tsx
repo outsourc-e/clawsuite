@@ -2,12 +2,12 @@ import { ArrowRight01Icon, Wrench01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-type InstalledSkill = {
+export type InstalledSkill = {
   id: string
   name: string
   description: string
@@ -50,7 +50,7 @@ function normalizeSkill(
   }
 }
 
-async function fetchInstalledSkills(): Promise<Array<InstalledSkill>> {
+export async function fetchInstalledSkills(): Promise<Array<InstalledSkill>> {
   try {
     const response = await fetch(
       '/api/skills?tab=installed&limit=12&summary=search',
@@ -76,7 +76,6 @@ export function SkillsWidget({
   onRemove,
 }: SkillsWidgetProps) {
   const navigate = useNavigate()
-  const [isMobile, setIsMobile] = useState(false)
   const skillsQuery = useQuery({
     queryKey: ['dashboard', 'skills'],
     queryFn: fetchInstalledSkills,
@@ -84,20 +83,12 @@ export function SkillsWidget({
     refetchInterval: 60_000,
   })
 
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)')
-    const update = () => setIsMobile(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
-
   const skills = useMemo(
     function resolveSkills() {
       const source = Array.isArray(skillsQuery.data) ? skillsQuery.data : []
-      return source.slice(0, isMobile ? 3 : 6)
+      return source.slice(0, 6)
     },
-    [isMobile, skillsQuery.data],
+    [skillsQuery.data],
   )
 
   return (
@@ -112,7 +103,7 @@ export function SkillsWidget({
       }
       draggable={draggable}
       onRemove={onRemove}
-      className="h-full rounded-xl border-primary-200 p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-medium [&_h2]:normal-case [&_h2]:text-ink [&_h2]:text-balance"
+      className="h-full rounded-xl border-primary-200 p-3.5 md:p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-medium [&_h2]:normal-case [&_h2]:text-ink [&_h2]:text-balance"
     >
       {skillsQuery.isLoading && skills.length === 0 ? (
         <div className="flex h-28 items-center justify-center gap-3 rounded-lg border border-primary-200 bg-primary-100/50">
@@ -137,6 +128,7 @@ export function SkillsWidget({
               <article
                 key={skill.id}
                 className={cn(
+                  index >= 3 && 'hidden md:block',
                   'rounded-lg border border-primary-200 px-2.5 py-2 md:px-3 md:py-2.5',
                   index % 2 === 0 ? 'bg-primary-50/90' : 'bg-primary-100/55',
                 )}

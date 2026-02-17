@@ -44,7 +44,7 @@ type ProviderUsage = {
   percentUsed?: number
 }
 
-type UsageMeterData = {
+export type UsageMeterData = {
   usagePercent?: number
   totalCost: number
   totalDirectCost: number
@@ -61,7 +61,7 @@ type UsageApiResponse = {
   error?: unknown
 }
 
-type UsageQueryResult =
+export type UsageQueryResult =
   | { kind: 'ok'; data: UsageMeterData }
   | { kind: 'unavailable'; message: string }
   | { kind: 'error'; message: string }
@@ -181,7 +181,7 @@ function parseErrorMessage(payload: UsageApiResponse): string {
   return message.length > 0 ? message : 'Usage unavailable'
 }
 
-async function fetchUsage(): Promise<UsageQueryResult> {
+export async function fetchUsage(): Promise<UsageQueryResult> {
   try {
     const response = await fetch('/api/usage')
     const payload = (await response
@@ -304,7 +304,7 @@ export function UsageMeterWidget({
       icon={ChartLineData02Icon}
       draggable={draggable}
       onRemove={onRemove}
-      className="h-full rounded-xl border-primary-200 p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:normal-case [&_h2]:text-ink"
+      className="h-full rounded-xl border-primary-200 p-3.5 md:p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:normal-case [&_h2]:text-ink"
       titleAccessory={
         <div className="flex items-center gap-1">
           <div className="flex items-center gap-0.5 rounded-full border border-primary-200 bg-primary-100/70 p-0.5 text-[10px]">
