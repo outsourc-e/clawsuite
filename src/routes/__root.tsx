@@ -138,7 +138,8 @@ export const Route = createRootRoute({
       },
       {
         rel: 'apple-touch-icon',
-        href: '/clawsuite-icon-192.png',
+        href: '/apple-touch-icon.png',
+        sizes: '180x180',
       },
     ],
   }),

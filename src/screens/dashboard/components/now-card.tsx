@@ -74,13 +74,30 @@ async function fetchNowCardActivity(): Promise<{
 }
 
 /** Sanitize event detail — strip raw JSON payloads that leak from gateway */
+function toFriendlyAgentName(agentId: string): string {
+  const segments = agentId.split(':').filter(Boolean)
+  const suffix = segments[segments.length - 1] ?? agentId
+  if (suffix.length === 0) return agentId
+  return `${suffix.charAt(0).toUpperCase()}${suffix.slice(1)}`
+}
+
+function formatAgentNames(text: string): string {
+  return text.replace(
+    /\bagent:[a-z0-9_-]+(?::[a-z0-9_-]+)+\b/gi,
+    toFriendlyAgentName,
+  )
+}
+
 function sanitizeDetail(text: string): string {
   const trimmed = text.trim()
   // If it looks like raw JSON, don't show it
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) return ''
+  const withFriendlyAgentName = formatAgentNames(trimmed)
   // Truncate overly long details
-  if (trimmed.length > 120) return `${trimmed.slice(0, 117)}…`
-  return trimmed
+  if (withFriendlyAgentName.length > 120) {
+    return `${withFriendlyAgentName.slice(0, 117)}…`
+  }
+  return withFriendlyAgentName
 }
 
 function toRelativeTime(timestamp: number): string {
@@ -166,7 +183,7 @@ export function NowCard({
 
       <p className="mt-2 line-clamp-1 text-sm font-medium text-ink">
         {latestEvent
-          ? `${sanitizeDetail(latestEvent.detail ?? '') || latestEvent.title} • ${toRelativeTime(latestEvent.timestamp)}`
+          ? `${sanitizeDetail(latestEvent.detail ?? '') || sanitizeDetail(latestEvent.title)} • ${toRelativeTime(latestEvent.timestamp)}`
           : 'No recent activity yet'}
       </p>
 

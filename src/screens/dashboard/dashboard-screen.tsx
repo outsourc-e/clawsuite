@@ -533,6 +533,7 @@ export function DashboardScreen() {
       localStorage.setItem('clawsuite-logo-tip-seen', 'true')
     } catch {}
   }, [])
+  const shouldShowLogoTip = isMobile && showLogoTip
 
   const handleLogoTap = useCallback(function handleLogoTap() {
     markLogoTipSeen()
@@ -880,7 +881,7 @@ export function DashboardScreen() {
                     aria-label="Open quick menu"
                   >
                     <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
-                    {showLogoTip ? (
+                    {shouldShowLogoTip ? (
                       <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duratrion-300">
                         <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md ">
                           <button

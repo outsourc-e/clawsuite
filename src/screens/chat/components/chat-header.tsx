@@ -15,6 +15,56 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
+function toTitleCase(value: string): string {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function formatMobileSessionTitle(rawTitle: string): string {
+  const title = rawTitle.trim()
+  if (!title) return 'New Chat'
+
+  const normalized = title.toLowerCase()
+
+  // Agent session patterns
+  if (normalized === 'agent:main:main' || normalized === 'agent:main') {
+    return 'Main Chat'
+  }
+  const parts = title.split(':').map((part) => part.trim()).filter(Boolean)
+  if (
+    parts.length >= 2 &&
+    parts[0].toLowerCase() === 'agent' &&
+    parts[1].length > 0
+  ) {
+    const candidate = parts[parts.length - 1]
+    if (candidate.toLowerCase() === 'main') return 'Main Chat'
+    return `${toTitleCase(candidate)} Chat`
+  }
+
+  // Common system prompts → friendly names
+  if (normalized.startsWith('read heartbeat')) return 'Main Chat'
+  if (normalized.startsWith('generate daily')) return 'Daily Brief'
+  if (normalized.startsWith('morning check')) return 'Morning Check-in'
+
+  // If it looks like a command/prompt (starts with a verb + long), summarize it
+  const MAX_LEN = 20
+  if (title.length > MAX_LEN) {
+    // Extract first few meaningful words
+    const words = title.split(/\s+/)
+    let result = ''
+    for (const word of words) {
+      if ((result + ' ' + word).trim().length > MAX_LEN) break
+      result = (result + ' ' + word).trim()
+    }
+    return result.length > 0 ? `${result}…` : `${title.slice(0, MAX_LEN)}…`
+  }
+
+  return title
+}
+
 function formatSyncAge(updatedAt: number): string {
   if (updatedAt <= 0) return ''
   const seconds = Math.round((Date.now() - updatedAt) / 1000)
@@ -68,6 +118,7 @@ function ChatHeaderComponent({
   }, [])
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
+  const mobileTitle = formatMobileSessionTitle(activeTitle)
 
   const handleRefresh = useCallback(() => {
     if (!onRefresh) return
@@ -82,7 +133,7 @@ function ChatHeaderComponent({
         ref={wrapperRef}
         className="shrink-0 border-b border-primary-200 px-4 h-12 flex items-center justify-between bg-surface"
       >
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             type="button"
             onClick={onOpenSessions}
@@ -91,12 +142,12 @@ function ChatHeaderComponent({
           >
             <OpenClawStudioIcon className="size-8 rounded-lg" />
           </button>
-          <div className="truncate text-sm font-semibold tracking-tight text-ink">
-            ClawSuite
+          <div className="min-w-0 max-w-[45vw] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold tracking-tight text-ink">
+            {mobileTitle}
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="ml-2 flex shrink-0 items-center gap-1">
           {syncLabel ? (
             <span
               className={cn(
@@ -118,7 +169,7 @@ function ChatHeaderComponent({
               size="icon-sm"
               variant="ghost"
               onClick={handleRefresh}
-              className="h-10 w-10 text-primary-500 hover:bg-primary-100 hover:text-primary-700"
+              className="h-8 w-8 text-primary-500 hover:bg-primary-100 hover:text-primary-700"
               aria-label="Refresh chat"
             >
               <HugeiconsIcon

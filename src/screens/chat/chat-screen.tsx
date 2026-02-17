@@ -1158,7 +1158,7 @@ export function ChatScreen({
             />
           )}
 
-          {!isMobile || compact ? <ContextBar compact={compact} /> : null}
+          <ContextBar compact={compact} />
 
           {gatewayNotice && <div className="sticky top-0 z-20 px-4 py-2">{gatewayNotice}</div>}
 

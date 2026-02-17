@@ -2,7 +2,7 @@ import { ArrowRight01Icon, Task01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import type { CronJob } from '@/components/cron-manager/cron-types'
 import type { TaskPriority, TaskStatus } from '@/stores/task-store'
@@ -124,6 +124,16 @@ function MiniColumn({
 
 export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
   const navigate = useNavigate()
+  const [isMobileViewport, setIsMobileViewport] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setIsMobileViewport(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
   const cronJobsQuery = useQuery({
     queryKey: ['cron', 'jobs'],
     queryFn: fetchCronJobs,
@@ -141,19 +151,32 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
     [cronJobsQuery.data],
   )
 
-  const byStatus = STATUS_ORDER.reduce(
-    (acc, status) => {
-      acc[status] = tasks
-        .filter((t) => t.status === status)
-        .sort((a, b) => {
-          return (
-            PRIORITY_ORDER.indexOf(a.priority) -
-            PRIORITY_ORDER.indexOf(b.priority)
-          )
-        })
-      return acc
-    },
-    {} as Record<TaskStatus, Array<DashboardTask>>,
+  const byStatus = useMemo(
+    () =>
+      STATUS_ORDER.reduce(
+        (acc, status) => {
+          acc[status] = tasks
+            .filter((t) => t.status === status)
+            .sort((a, b) => {
+              return (
+                PRIORITY_ORDER.indexOf(a.priority) -
+                PRIORITY_ORDER.indexOf(b.priority)
+              )
+            })
+          return acc
+        },
+        {} as Record<TaskStatus, Array<DashboardTask>>,
+      ),
+    [tasks],
+  )
+
+  const statusesToRender = useMemo(
+    () =>
+      STATUS_ORDER.filter((status) => {
+        if (!isMobileViewport) return true
+        return byStatus[status].length > 0
+      }),
+    [byStatus, isMobileViewport],
   )
 
   const activeCount = tasks.filter((t) => t.status !== 'done').length
@@ -217,11 +240,22 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {STATUS_ORDER.map((status) => (
-          <MiniColumn key={status} status={status} tasks={byStatus[status]} />
-        ))}
-      </div>
+      {statusesToRender.length > 0 ? (
+        <div
+          className={cn(
+            'grid gap-3 xl:grid-cols-4',
+            isMobileViewport
+              ? statusesToRender.length <= 1
+                ? 'grid-cols-1'
+                : 'grid-cols-2'
+              : 'grid-cols-2',
+          )}
+        >
+          {statusesToRender.map((status) => (
+            <MiniColumn key={status} status={status} tasks={byStatus[status]} />
+          ))}
+        </div>
+      ) : null}
 
       <div className="mt-3 flex justify-end">
         <button

@@ -884,7 +884,7 @@ function ChatMessageListComponent({
           </div>
         </div>
       )}
-      <ChatContainerContent className="pt-6" style={contentStyle}>
+      <ChatContainerContent className="pt-4 md:pt-6" style={contentStyle}>
         {notice && noticePosition === 'start' ? notice : null}
         {showToolOnlyNotice ? (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -955,7 +955,7 @@ function ChatMessageListComponent({
             {/* // Keep the last exchange pinned without extra tail gap. // Account
             for space-y-6 (24px) when pinning. */}
             <div
-              className="my-3 flex flex-col gap-3"
+              className="my-2 flex flex-col gap-2 md:my-3 md:gap-3"
               style={{ minHeight: `${Math.max(0, pinGroupMinHeight - 12)}px` }}
             >
               {displayMessages
@@ -1036,7 +1036,7 @@ function ChatMessageListComponent({
         )}
         {showTypingIndicator || (isStreaming && activeToolCalls.length > 0) ? (
           <div
-            className="flex flex-col gap-1.5 py-2 px-1 animate-in fade-in duration-300"
+            className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
             role="status"
             aria-live="polite"
           >
@@ -1080,12 +1080,12 @@ function getMessageSpacingClass(
   const currentRole = messages[index]?.role ?? 'assistant'
   const previousRole = messages[index - 1]?.role ?? 'assistant'
   if (currentRole === previousRole) {
-    return 'mt-1.5'
+    return 'mt-1 md:mt-1.5'
   }
   if (currentRole === 'assistant') {
-    return 'mt-2.5'
+    return 'mt-2 md:mt-2.5'
   }
-  return 'mt-2.5'
+  return 'mt-2 md:mt-2.5'
 }
 
 function getToolGroupClass(

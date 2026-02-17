@@ -519,7 +519,7 @@ function MessageItemComponent({
       }
       className={cn(
         'group flex flex-col',
-        hasText || hasAttachments ? 'gap-1' : 'gap-0',
+        hasText || hasAttachments ? 'gap-0.5 md:gap-1' : 'gap-0',
         wrapperClassName,
         isUser ? 'items-end' : 'items-start',
         !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',
@@ -583,7 +583,7 @@ function MessageItemComponent({
       )}
       {(hasText || hasAttachments || hasInlineImages || effectiveIsStreaming) &&
         !(message as any).__isNarration && (
-          <Message className={cn(isUser ? 'flex-row-reverse' : '')}>
+          <Message className={cn('gap-2 md:gap-3', isUser ? 'flex-row-reverse' : '')}>
             {isUser ? (
               <UserAvatar
                 size={24}
@@ -601,7 +601,7 @@ function MessageItemComponent({
                 '',
                 !isUser
                   ? 'bg-transparent w-full'
-                  : 'bg-primary-100 max-w-[75%] rounded-2xl px-4 py-2.5',
+                  : 'bg-primary-100 max-w-[75%] rounded-2xl px-3 py-2 md:px-4 md:py-2.5',
                 isQueued && isUser && !isFailed && 'opacity-70',
                 isFailed && isUser && 'bg-red-50/50 border border-red-300',
                 bubbleClassName,

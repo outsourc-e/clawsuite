@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import {
   Add01Icon,
   ArrowDown01Icon,
@@ -327,6 +328,7 @@ function ChatComposerComponent({
     [],
   )
   const [isDraggingOver, setIsDraggingOver] = useState(false)
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -1002,7 +1004,7 @@ function ChatComposerComponent({
     () => {
       const tabBarOffset = keyboardOrFocusActive
         ? '0px'
-        : 'var(--mobile-tab-bar-offset)'
+        : 'max(0px, calc(var(--mobile-tab-bar-offset) - 0.375rem))'
       const mobileTranslate = `translateY(calc(-1 * (${tabBarOffset} + var(--kb-inset, 0px))))`
       return {
         maxWidth: 'min(768px, 100%)',
@@ -1021,7 +1023,7 @@ function ChatComposerComponent({
         isMobileViewport
           ? 'fixed inset-x-0 bottom-0 z-[70] transition-transform duration-200'
           : 'relative z-40 shrink-0',
-        'pb-[max(var(--safe-b),0.25rem)] md:pb-[calc(var(--safe-b)+0.75rem)]',
+        'pb-[max(var(--safe-b),0px)] md:pb-[calc(var(--safe-b)+0.75rem)]',
         'md:bg-surface/95 md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
       )}
       style={composerWrapperStyle}
@@ -1065,13 +1067,18 @@ function ChatComposerComponent({
             <div className="flex flex-wrap gap-3">
               {attachments.map((attachment) => (
                 <div key={attachment.id} className="group relative w-28">
-                  <div className="aspect-square overflow-hidden rounded-xl border border-primary-200 bg-primary-50">
+                  <button
+                    type="button"
+                    className="aspect-square w-full overflow-hidden rounded-xl border border-primary-200 bg-primary-50"
+                    onClick={() => setPreviewImage({ url: attachment.previewUrl, name: attachment.name || 'Attached image' })}
+                    aria-label={`Preview ${attachment.name || 'image'}`}
+                  >
                     <img
                       src={attachment.previewUrl}
                       alt={attachment.name || 'Attached image'}
                       className="h-full w-full object-cover"
                     />
-                  </div>
+                  </button>
                   <button
                     type="button"
                     aria-label="Remove image attachment"
@@ -1080,7 +1087,7 @@ function ChatComposerComponent({
                       event.stopPropagation()
                       handleRemoveAttachment(attachment.id)
                     }}
-                    className="absolute right-1 top-1 z-10 inline-flex size-6 items-center justify-center rounded-full bg-primary-900/80 text-primary-50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                    className="absolute right-1 top-1 z-10 inline-flex size-6 items-center justify-center rounded-full bg-primary-900/80 text-primary-50 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100 focus-visible:opacity-100"
                   >
                     <HugeiconsIcon
                       icon={Cancel01Icon}
@@ -1121,8 +1128,8 @@ function ChatComposerComponent({
           }}
           className="min-h-[44px]"
         />
-        <PromptInputActions className="justify-between px-3">
-          <div className="flex items-center gap-1">
+        <PromptInputActions className="justify-between px-1.5 md:px-3 gap-0.5 md:gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-0 md:gap-1">
             <PromptInputAction tooltip="Add attachment">
               <Button
                 size="icon-sm"
@@ -1153,7 +1160,7 @@ function ChatComposerComponent({
               </PromptInputAction>
             )}
             <div
-              className="relative ml-1 flex items-center gap-2"
+              className="relative ml-0.5 md:ml-1 flex min-w-0 items-center gap-1 md:gap-2"
               ref={modelSelectorRef}
             >
               <button
@@ -1164,7 +1171,7 @@ function ChatComposerComponent({
                   setIsModelMenuOpen((prev) => !prev)
                 }}
                 className={cn(
-                  'inline-flex h-7 items-center gap-1 rounded-full bg-primary-100/70 px-2.5 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 hover:text-primary-800',
+                  'inline-flex h-7 max-w-[8rem] items-center gap-0.5 rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 md:gap-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 hover:text-primary-800',
                   isModelSwitcherDisabled &&
                     'cursor-not-allowed opacity-50',
                 )}
@@ -1176,7 +1183,7 @@ function ChatComposerComponent({
                 disabled={isModelSwitcherDisabled}
                 title={currentModel || modelAvailabilityLabel || 'Select model'}
               >
-                <span className="max-w-[12rem] truncate">
+                <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
                   {modelButtonLabel}
                 </span>
                 <HugeiconsIcon
@@ -1187,14 +1194,14 @@ function ChatComposerComponent({
                 />
               </button>
               {modelAvailabilityLabel ? (
-                <span className="text-xs text-primary-500 text-pretty">
+                <span className="hidden text-xs text-primary-500 text-pretty md:inline">
                   {modelAvailabilityLabel}
                 </span>
               ) : null}
               {modelNotice ? (
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1 text-xs text-pretty',
+                    'hidden md:inline-flex items-center gap-1 text-xs text-pretty',
                     modelNotice.tone === 'error'
                       ? 'text-primary-700'
                       : 'text-primary-500',
@@ -1429,7 +1436,7 @@ function ChatComposerComponent({
             />
             */}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="ml-1 flex shrink-0 items-center gap-0.5 md:gap-1">
             {voiceInput.isSupported || voiceRecorder.isSupported ? (
               <PromptInputAction
                 tooltip={
@@ -1505,6 +1512,32 @@ function ChatComposerComponent({
           </div>
         </PromptInputActions>
       </PromptInput>
+
+      {/* Fullscreen image preview overlay — portaled to body to escape stacking context */}
+      {previewImage && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+          role="dialog"
+          aria-label="Image preview"
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 z-10 inline-flex size-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 active:bg-white/40 transition-colors"
+            onClick={(e) => { e.stopPropagation(); setPreviewImage(null) }}
+            aria-label="Close preview"
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={24} strokeWidth={2} />
+          </button>
+          <img
+            src={previewImage.url}
+            alt={previewImage.name}
+            className="max-h-[85vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }
