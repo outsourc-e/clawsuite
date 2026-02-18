@@ -1,21 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  AlertDiamondIcon,
-  ArrowTurnBackwardIcon,
-  BotIcon,
-} from '@hugeicons/core-free-icons'
-import { EmptyState } from '@/components/empty-state'
 import {
   AgentRegistryCard,
   type AgentRegistryCardData,
   type AgentRegistryStatus,
 } from '@/components/agent-view/agent-registry-card'
 import { AgentStreamPanel } from '@/components/agent-view/agent-stream-panel'
+import { IsometricOffice } from '@/components/agent-swarm/isometric-office'
+import { ActivityPanel } from '@/components/agent-swarm/activity-panel'
 import { toggleAgentPause } from '@/lib/gateway-api'
 import { toast } from '@/components/ui/toast'
+import { cn } from '@/lib/utils'
+import type { SwarmSession } from '@/stores/agent-swarm-store'
+import { AgentHubLayout } from './agent-hub-layout'
 
 type AgentGatewayEntry = {
   id?: string
@@ -61,6 +59,8 @@ type AgentRuntime = AgentRegistryCardData & {
   matchedSessions: Array<SessionEntry>
 }
 
+type HubView = 'mission' | 'office'
+
 const CATEGORY_ORDER = ['Core', 'Coding', 'System', 'Integrations'] as const
 
 const STATUS_SORT_ORDER: Record<AgentRegistryStatus, number> = {
@@ -83,6 +83,22 @@ const RUNNING_STATUSES = new Set([
 const PAUSED_STATUSES = new Set(['paused', 'pause', 'suspended'])
 
 const ACTIVE_HEARTBEAT_MS = 30_000
+
+const THINKING_STATUSES = new Set(['thinking', 'reasoning'])
+
+const ERROR_STATUSES = new Set(['error', 'errored'])
+
+const FAILED_STATUSES = new Set(['failed', 'cancelled', 'canceled', 'killed'])
+
+const COMPLETE_STATUSES = new Set([
+  'complete',
+  'completed',
+  'success',
+  'succeeded',
+  'done',
+])
+
+const IDLE_STATUSES = new Set(['idle', 'waiting', 'sleeping', 'paused'])
 
 // TODO: Replace with gateway-backed config once a dedicated agent registry schema is available.
 const FALLBACK_AGENT_REGISTRY: Array<AgentDefinition> = [
@@ -134,6 +150,72 @@ function readTimestamp(value: unknown): number {
     if (!Number.isNaN(parsed)) return parsed
   }
   return 0
+}
+
+function readNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  return undefined
+}
+
+function deriveOfficeStatus(
+  status: string,
+  staleness: number,
+  totalTokens: number,
+): SwarmSession['swarmStatus'] {
+  if (THINKING_STATUSES.has(status)) return 'thinking'
+  if (ERROR_STATUSES.has(status)) return 'error'
+  if (FAILED_STATUSES.has(status)) return 'failed'
+  if (COMPLETE_STATUSES.has(status)) return 'complete'
+  if (IDLE_STATUSES.has(status)) return 'idle'
+  if (RUNNING_STATUSES.has(status)) return 'running'
+
+  if (totalTokens > 0 && staleness > 30_000) return 'complete'
+  if (totalTokens === 0 && staleness > 60_000) return 'idle'
+  return 'running'
+}
+
+function toOfficeSession(session: SessionEntry): SwarmSession {
+  const record = session as Record<string, unknown>
+  const usageRaw = record.usage
+  const usage =
+    usageRaw && typeof usageRaw === 'object' && !Array.isArray(usageRaw)
+      ? (usageRaw as Record<string, unknown>)
+      : null
+
+  const updatedAt = readTimestamp(session.updatedAt) || Date.now()
+  const staleness = Math.max(0, Date.now() - updatedAt)
+  const totalTokens =
+    readNumber(usage?.totalTokens) ??
+    readNumber(record.totalTokens) ??
+    readNumber(record.tokenCount) ??
+    0
+
+  const normalizedStatus = normalizeToken(readString(session.status))
+
+  return {
+    ...record,
+    key: readString(session.key) || undefined,
+    friendlyId: readString(session.friendlyId) || undefined,
+    label: readString(session.label) || readString(session.displayName) || undefined,
+    title: readString(session.title) || undefined,
+    derivedTitle: readString(session.derivedTitle) || undefined,
+    task: readString(session.task) || undefined,
+    status: normalizedStatus || 'running',
+    updatedAt,
+    tokenCount: readNumber(record.tokenCount) ?? totalTokens,
+    totalTokens,
+    cost: readNumber(record.cost) ?? readNumber(usage?.cost) ?? 0,
+    usage: {
+      ...(usage ?? {}),
+      totalTokens,
+      promptTokens: readNumber(usage?.promptTokens) ?? readNumber(record.inputTokens) ?? 0,
+      completionTokens:
+        readNumber(usage?.completionTokens) ?? readNumber(record.outputTokens) ?? 0,
+      cost: readNumber(usage?.cost) ?? readNumber(record.cost) ?? 0,
+    },
+    swarmStatus: deriveOfficeStatus(normalizedStatus, staleness, totalTokens),
+    staleness,
+  } satisfies SwarmSession
 }
 
 function normalizeToken(value: string): string {
@@ -469,6 +551,7 @@ export function AgentsScreen() {
   >({})
   const [historyAgentId, setHistoryAgentId] = useState<string | null>(null)
   const [streamingAgentKey, setStreamingAgentKey] = useState<string | null>(null)
+  const [hubView, setHubView] = useState<HubView>('mission')
 
   const agentsQuery = useQuery({
     queryKey: ['gateway', 'agents'],
@@ -622,6 +705,11 @@ export function AgentsScreen() {
     [historyAgentId, runtimeAgents],
   )
 
+  const officeSessions = useMemo(() => {
+    const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
+    return sessions.map((session) => toOfficeSession(session))
+  }, [sessionsQuery.data])
+
   async function spawnSessionForAgent(
     agent: AgentRegistryCardData,
   ): Promise<{ sessionKey: string; friendlyId: string } | null> {
@@ -708,17 +796,6 @@ export function AgentsScreen() {
 
   function handleStreamTap(agent: AgentRegistryCardData) {
     const sessionKey = readString(agent.sessionKey)
-    if (!sessionKey) {
-      toast('Spawn agent first', { type: 'warning' })
-      return
-    }
-    setStreamingAgentKey(sessionKey)
-  }
-
-  function handleStreamTapByAgentId(agentId: string) {
-    const runtimeAgent =
-      runtimeAgents.find((candidate) => candidate.id === agentId) ?? null
-    const sessionKey = readString(runtimeAgent?.sessionKey)
     if (!sessionKey) {
       toast('Spawn agent first', { type: 'warning' })
       return
@@ -822,8 +899,6 @@ export function AgentsScreen() {
     ? new Date(agentsQuery.dataUpdatedAt).toLocaleTimeString()
     : null
 
-  const desktopAgents = agentsQuery.data?.agents || []
-
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-x-hidden md:hidden">
@@ -925,8 +1000,34 @@ export function AgentsScreen() {
         <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-semibold text-ink md:text-[15px]">
-              Agents
+              Agent Hub
             </h1>
+            <div className="hidden md:flex items-center gap-1 rounded-lg bg-primary-100 p-0.5">
+              <button
+                type="button"
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                  hubView === 'mission'
+                    ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+                    : 'text-primary-500 hover:text-primary-700',
+                )}
+                onClick={() => setHubView('mission')}
+              >
+                Mission Control
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                  hubView === 'office'
+                    ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+                    : 'text-primary-500 hover:text-primary-700',
+                )}
+                onClick={() => setHubView('office')}
+              >
+                Office
+              </button>
+            </div>
             {agentsQuery.isFetching && !agentsQuery.isLoading ? (
               <span className="text-[10px] text-primary-500 animate-pulse">
                 syncing...
@@ -945,110 +1046,31 @@ export function AgentsScreen() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto px-3 pt-3 pb-24 md:px-6 md:pt-4 md:pb-0">
-          {agentsQuery.isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="flex items-center gap-2 text-primary-500">
-                <div className="size-4 border-2 border-primary-300 border-t-primary-600 rounded-full animate-spin" />
-                <span className="text-sm">Connecting to gateway...</span>
-              </div>
-            </div>
-          ) : agentsQuery.isError ? (
-            <div className="flex flex-col items-center justify-center h-32 gap-3">
-              <HugeiconsIcon
-                icon={AlertDiamondIcon}
-                size={24}
-                strokeWidth={1.5}
-                className="text-red-500"
-              />
-              <p className="text-sm text-primary-600">
-                {agentsQuery.error instanceof Error
-                  ? agentsQuery.error.message
-                  : 'Failed to fetch'}
-              </p>
-              <button
-                type="button"
-                onClick={() => agentsQuery.refetch()}
-                className="inline-flex items-center gap-1.5 rounded-md border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-100"
-              >
-                <HugeiconsIcon
-                  icon={ArrowTurnBackwardIcon}
-                  size={14}
-                  strokeWidth={1.5}
-                />
-                Retry
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="mb-4 grid gap-3 text-[13px] sm:grid-cols-2 lg:mb-6 lg:grid-cols-3 lg:gap-6">
-                <div>
-                  <span className="text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                    Default Agent
-                  </span>
-                  <p className="font-medium text-ink mt-0.5">
-                    {agentsQuery.data?.defaultId || '-'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                    Main Key
-                  </span>
-                  <p className="font-medium text-ink mt-0.5">
-                    {agentsQuery.data?.mainKey || '-'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                    Scope
-                  </span>
-                  <p className="font-medium text-ink mt-0.5">
-                    {agentsQuery.data?.scope || '-'}
-                  </p>
-                </div>
-              </div>
+        {usingFallbackRegistry ? (
+          <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
+            Gateway registry unavailable. Showing fallback definitions.
+          </div>
+        ) : null}
 
-              {desktopAgents.length === 0 ? (
-                <EmptyState
-                  icon={BotIcon}
-                  title="No agents detected"
-                  description="Start a conversation and let the AI orchestrate sub-agents."
-                />
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {desktopAgents.map((agent) => {
-                    const isDefault = agent.id === agentsQuery.data?.defaultId
-                    const normalizedId = normalizeToken(readString(agent.id))
-                    return (
-                      <button
-                        type="button"
-                        key={agent.id}
-                        onClick={() => handleStreamTapByAgentId(normalizedId)}
-                        className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                          isDefault
-                            ? 'border-accent-300 bg-accent-50/50'
-                            : 'border-primary-200 hover:bg-primary-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-[13px] text-ink">
-                            {agent.name || agent.id}
-                          </span>
-                          {isDefault ? (
-                            <span className="text-[10px] font-medium bg-accent-100 text-accent-700 px-1.5 py-0.5 rounded">
-                              default
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="text-[11px] text-primary-500 mt-1 font-mono">
-                          {agent.id}
-                        </p>
-                      </button>
-                    )
-                  })}
+        <div className="flex-1 min-h-0">
+          {hubView === 'mission' ? (
+            <AgentHubLayout
+              agents={runtimeAgents}
+              onAddAgent={() => {
+                void navigate({ to: '/settings' })
+              }}
+            />
+          ) : (
+            <div className="h-full overflow-auto p-3 md:p-4">
+              <div className="flex h-full min-h-[460px] flex-col gap-3 md:flex-row">
+                <div className="h-[260px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[7]">
+                  <IsometricOffice sessions={officeSessions} />
                 </div>
-              )}
-            </>
+                <div className="h-[320px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[3]">
+                  <ActivityPanel sessions={officeSessions} />
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
