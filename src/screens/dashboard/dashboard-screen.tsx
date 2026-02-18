@@ -425,8 +425,19 @@ export function DashboardScreen() {
           ? Math.floor((Date.now() - firstActivity) / 1000)
           : 0
 
-      const totalSessions = ssSessions.length || sessions.length
-      const activeAgents = ssSessions.length || sessions.length
+      // Filter to active sessions (updated in last 24h)
+      const oneDayAgo = Date.now() - 86_400_000
+      const activeSessions = ssSessions.filter(
+        (s) => typeof s.updatedAt === 'number' && s.updatedAt > oneDayAgo,
+      )
+      const totalSessions = activeSessions.length || sessions.length
+      // Count unique agent IDs among active sessions
+      const uniqueAgentIds = new Set(
+        activeSessions
+          .map((s) => s.agentId ?? s.key)
+          .filter(Boolean) as string[],
+      )
+      const activeAgents = uniqueAgentIds.size || totalSessions
 
       return {
         gateway: {

@@ -23,6 +23,7 @@ export type UsageMeterData = {
   totalInputOutput: number
   totalCached: number
   providers: Array<ProviderUsage>
+  sessionCount?: number
 }
 
 type UsageApiResponse = {
@@ -155,36 +156,86 @@ function parseUsagePayload(payload: unknown): UsageMeterData {
   }
 }
 
-function parseErrorMessage(payload: UsageApiResponse): string {
-  const message = readString(payload.error)
-  return message.length > 0 ? message : 'Usage unavailable'
-}
-
 export async function fetchUsage(): Promise<UsageQueryResult> {
   try {
-    const response = await fetch('/api/usage')
-    const payload = (await response
-      .json()
-      .catch(() => ({}))) as UsageApiResponse
+    // Fetch both lifetime usage and today's session-status in parallel
+    const [usageRes, ssRes] = await Promise.all([
+      fetch('/api/usage').catch(() => null),
+      fetch('/api/session-status').catch(() => null),
+    ])
 
-    if (response.status === 501 || payload.unavailable) {
+    const usagePayload = usageRes
+      ? ((await usageRes.json().catch(() => ({}))) as UsageApiResponse)
+      : ({} as UsageApiResponse)
+
+    if (usageRes?.status === 501 || usagePayload.unavailable) {
       return {
         kind: 'unavailable',
         message: 'Unavailable on this Gateway version',
       }
     }
 
-    if (!response.ok || payload.ok === false) {
-      return {
-        kind: 'error',
-        message: parseErrorMessage(payload),
+    // Parse lifetime data
+    const data = usagePayload.usage
+      ? parseUsagePayload(usagePayload.usage)
+      : parseUsagePayload({})
+
+    // Overlay today's data from session-status if available
+    if (ssRes?.ok) {
+      const ssPayload = (await ssRes.json().catch(() => ({}))) as Record<
+        string,
+        unknown
+      >
+      const payload = (ssPayload.payload ?? ssPayload) as Record<
+        string,
+        unknown
+      >
+      const dailyCost = readNumber(payload.dailyCost ?? payload.costUsd)
+      const dailyTokens = readNumber(payload.totalTokens)
+      const sessions = Array.isArray(payload.sessions)
+        ? (payload.sessions as Array<Record<string, unknown>>)
+        : []
+      const oneDayAgo = Date.now() - 86_400_000
+      const activeSessions = sessions.filter(
+        (s) =>
+          typeof s.updatedAt === 'number' && (s.updatedAt as number) > oneDayAgo,
+      )
+
+      // Override with today's data — this is what matters
+      if (dailyCost > 0) data.totalCost = dailyCost
+      if (dailyTokens > 0) data.totalUsage = dailyTokens
+
+      // Build provider breakdown from models array if available
+      const models = payload.models as
+        | Array<Record<string, unknown>>
+        | undefined
+      if (models && models.length > 0) {
+        data.providers = models.map((m) => ({
+          provider: readString(m.provider),
+          total:
+            readNumber(m.inputTokens) +
+            readNumber(m.outputTokens),
+          inputOutput:
+            readNumber(m.inputTokens) +
+            readNumber(m.outputTokens),
+          cached: 0,
+          cost: readNumber(m.costUsd),
+          directCost: readNumber(m.costUsd),
+          percentUsed: undefined,
+        }))
       }
+
+      // Set usage percentage based on daily budget
+      const dailyBudget = getMonthlyBudget() / 30
+      data.usagePercent =
+        dailyCost > 0 ? (dailyCost / dailyBudget) * 100 : undefined
+      data.usageLimit = undefined
+
+      // Store active session count for display
+      data.sessionCount = activeSessions.length
     }
 
-    return {
-      kind: 'ok',
-      data: parseUsagePayload(payload.usage),
-    }
+    return { kind: 'ok', data }
   } catch (error) {
     return {
       kind: 'error',
@@ -316,7 +367,7 @@ export function UsageMeterWidget({
   return (
     <WidgetShell
       size="medium"
-      title="Usage Meter"
+      title="Usage Today"
       icon={ChartLineData02Icon}
       action={
         <div className="hidden items-center gap-0.5 rounded-full border border-primary-200 bg-primary-100/70 p-0.5 text-[10px] md:inline-flex">
