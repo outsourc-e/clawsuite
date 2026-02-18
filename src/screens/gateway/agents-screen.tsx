@@ -60,6 +60,10 @@ type AgentRuntime = AgentRegistryCardData & {
 }
 
 type HubView = 'mission' | 'office' | 'cards'
+type AgentsScreenVariant = 'mission-control' | 'registry'
+type AgentsScreenProps = {
+  variant?: AgentsScreenVariant
+}
 
 const CATEGORY_ORDER = ['Core', 'Coding', 'System', 'Integrations'] as const
 
@@ -539,8 +543,9 @@ async function readResponseError(response: Response): Promise<string> {
   return response.statusText || `HTTP ${response.status}`
 }
 
-export function AgentsScreen() {
+export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps) {
   const navigate = useNavigate()
+  const missionControlEnabled = variant === 'mission-control'
   const [optimisticPausedByAgentId, setOptimisticPausedByAgentId] = useState<
     Record<string, boolean>
   >({})
@@ -551,7 +556,15 @@ export function AgentsScreen() {
   >({})
   const [historyAgentId, setHistoryAgentId] = useState<string | null>(null)
   const [streamingAgentKey, setStreamingAgentKey] = useState<string | null>(null)
-  const [hubView, setHubView] = useState<HubView>('mission')
+  const [hubView, setHubView] = useState<HubView>(
+    missionControlEnabled ? 'mission' : 'cards',
+  )
+
+  useEffect(() => {
+    if (missionControlEnabled) return
+    if (hubView === 'cards') return
+    setHubView('cards')
+  }, [hubView, missionControlEnabled])
 
   useEffect(() => {
     if (hubView !== 'mission') return
@@ -1028,46 +1041,52 @@ export function AgentsScreen() {
         <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-semibold text-ink md:text-[15px]">
-              ClawSuite
+              {missionControlEnabled ? 'ClawSuite' : 'Gateway Agents'}
             </h1>
-            <div className="hidden md:flex items-center gap-1 rounded-lg bg-primary-100 p-0.5">
-              <button
-                type="button"
-                className={cn(
-                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                  hubView === 'mission'
-                    ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-                    : 'text-primary-500 hover:text-primary-700',
-                )}
-                onClick={() => setHubView('mission')}
-              >
-                Mission Control
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                  hubView === 'office'
-                    ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-                    : 'text-primary-500 hover:text-primary-700',
-                )}
-                onClick={() => setHubView('office')}
-              >
-                Office
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                  hubView === 'cards'
-                    ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-                    : 'text-primary-500 hover:text-primary-700',
-                )}
-                onClick={() => setHubView('cards')}
-              >
-                Cards
-              </button>
-            </div>
+            {missionControlEnabled ? (
+              <div className="hidden md:flex items-center gap-1 rounded-lg bg-primary-100 p-0.5">
+                <button
+                  type="button"
+                  className={cn(
+                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    hubView === 'mission'
+                      ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+                      : 'text-primary-500 hover:text-primary-700',
+                  )}
+                  onClick={() => setHubView('mission')}
+                >
+                  Mission Control
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    hubView === 'office'
+                      ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+                      : 'text-primary-500 hover:text-primary-700',
+                  )}
+                  onClick={() => setHubView('office')}
+                >
+                  Office
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    hubView === 'cards'
+                      ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+                      : 'text-primary-500 hover:text-primary-700',
+                  )}
+                  onClick={() => setHubView('cards')}
+                >
+                  Cards
+                </button>
+              </div>
+            ) : (
+              <span className="text-xs font-medium text-primary-500">
+                Registry
+              </span>
+            )}
             {agentsQuery.isFetching && !agentsQuery.isLoading ? (
               <span className="text-[10px] text-primary-500 animate-pulse">
                 syncing...
@@ -1093,14 +1112,14 @@ export function AgentsScreen() {
         ) : null}
 
         <div className="flex-1 min-h-0">
-          {hubView === 'mission' ? (
+          {missionControlEnabled && hubView === 'mission' ? (
             <AgentHubLayout
               agents={runtimeAgents}
               onAddAgent={() => {
                 toast('Coming soon', { type: 'info' })
               }}
             />
-          ) : hubView === 'office' ? (
+          ) : missionControlEnabled && hubView === 'office' ? (
             <div className="h-full overflow-auto p-3 md:p-4">
               <div className="flex h-full min-h-[460px] flex-col gap-3 md:flex-row">
                 <div className="h-[260px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[7]">

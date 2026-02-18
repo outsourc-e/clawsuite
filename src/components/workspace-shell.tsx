@@ -55,7 +55,10 @@ export function WorkspaceShell() {
   useMobileKeyboard()
 
   const [creatingSession, setCreatingSession] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 767px)').matches
+  })
 
   // Fetch actual auth status from server instead of hardcoding
   interface AuthStatus {
@@ -134,22 +137,25 @@ export function WorkspaceShell() {
     return () => media.removeEventListener('change', update)
   }, [])
 
-  // Auto-collapse sidebar on mobile
+  // Keep mobile sidebar state closed after resize and route changes.
   useEffect(() => {
-    if (isMobile) {
-      setSidebarCollapsed(true)
-    }
-  }, [isMobile, setSidebarCollapsed])
+    if (!isMobile) return
+    setSidebarCollapsed(true)
+  }, [isMobile, pathname, setSidebarCollapsed])
 
   // Listen for global sidebar toggle shortcut
   useEffect(() => {
     function handleToggleEvent() {
+      if (isMobile) {
+        setSidebarCollapsed(true)
+        return
+      }
       toggleSidebar()
     }
     window.addEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
     return () =>
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
-  }, [toggleSidebar])
+  }, [isMobile, setSidebarCollapsed, toggleSidebar])
 
   // Show loading indicator while checking auth
   if (!authState.checked) {
