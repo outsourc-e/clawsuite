@@ -285,6 +285,40 @@ code {
   }
 }
 
+/* Widget skeleton shimmer */
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-primary-200) 25%,
+    var(--color-primary-100) 50%,
+    var(--color-primary-200) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* iOS-style widget jiggle for edit mode */
+@keyframes wiggle {
+  0%,
+  100% {
+    rotate: -1.5deg;
+    translate: 0 0;
+  }
+  25% {
+    rotate: 1.5deg;
+    translate: 0.5px -0.5px;
+  }
+  75% {
+    rotate: -1deg;
+    translate: -0.5px 0.5px;
+  }
+}
+
+.animate-wiggle {
+  animation: wiggle 0.35s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+
 .chat-streaming-loader {
   display: inline-flex;
   margin-left: 0.25rem;
