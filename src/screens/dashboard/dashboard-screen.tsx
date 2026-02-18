@@ -57,17 +57,28 @@ import {
   useWidgetReorder,
 } from '@/hooks/use-widget-reorder'
 
+type SessionStatusSession = {
+  key?: string
+  label?: string
+  model?: string
+  updatedAt?: number
+  usage?: {
+    firstActivity?: number
+    lastActivity?: number
+    totalCost?: number
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
 type SessionStatusPayload = {
   ok?: boolean
   payload?: {
     model?: string
     currentModel?: string
     modelAlias?: string
-    sessions?: {
-      defaults?: { model?: string; contextTokens?: number }
-      count?: number
-      recent?: Array<{ age?: number; model?: string; percentUsed?: number }>
-    }
+    sessions?: Array<SessionStatusSession>
+    [key: string]: unknown
   }
 }
 
@@ -376,12 +387,12 @@ export function DashboardScreen() {
         ? sessionsQuery.data
         : []
       const ssPayloadRaw = sessionStatusQuery.data?.payload
-      const ssSessions: Array<Record<string, unknown>> = Array.isArray(ssPayloadRaw?.sessions)
-        ? ssPayloadRaw.sessions as Array<Record<string, unknown>>
+      const ssSessions = Array.isArray(ssPayloadRaw?.sessions)
+        ? ssPayloadRaw.sessions
         : []
 
       // Get active model from main session, fall back to gateway default
-      const mainSessionModel = (ssSessions[0]?.model as string) ?? ''
+      const mainSessionModel = ssSessions[0]?.model ?? ''
       const payloadModel = sessionStatusQuery.data?.payload?.model ?? ''
       const payloadCurrentModel =
         sessionStatusQuery.data?.payload?.currentModel ?? ''
@@ -396,12 +407,10 @@ export function DashboardScreen() {
       const currentModel = formatModelName(rawModel)
 
       // Derive uptime from session firstActivity or updatedAt (milliseconds → seconds)
-      const mainSessionAny = ssSessions[0] as Record<string, unknown> | undefined
-      const usageObj = mainSessionAny?.usage as Record<string, unknown> | undefined
+      const mainSession = ssSessions[0]
       const firstActivity: number | undefined =
-        (usageObj?.firstActivity as number | undefined) ??
-        (mainSessionAny?.createdAt as number | undefined) ??
-        (mainSessionAny?.updatedAt as number | undefined) ??
+        mainSession?.usage?.firstActivity ??
+        mainSession?.updatedAt ??
         undefined
       const uptimeSeconds =
         typeof firstActivity === 'number' && firstActivity > 0
