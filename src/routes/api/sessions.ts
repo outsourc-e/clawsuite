@@ -99,7 +99,9 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.label === 'string' ? body.label.trim() : ''
           const label = requestedLabel || undefined
 
-          const friendlyId = randomUUID()
+          const requestedFriendlyId =
+            typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
+          const friendlyId = requestedFriendlyId || randomUUID()
 
           const params: Record<string, unknown> = { key: friendlyId }
           if (label) params.label = label
