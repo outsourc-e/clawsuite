@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { ActivityEvent } from '@/types/activity-event'
 import { useActivityEvents } from '@/screens/activity/use-activity-events'
+import { formatModelName } from '../lib/formatters'
 import { cn } from '@/lib/utils'
 
 type ActivityLogWidgetProps = {
@@ -60,41 +61,9 @@ function toFriendlySource(source?: string): string {
   return tail.charAt(0).toUpperCase() + tail.slice(1)
 }
 
-function formatModelName(raw: string): string {
-  if (!raw) return 'Unknown model'
-  // Strip provider prefix (e.g. "anthropic/claude-opus-4-6" → "claude-opus-4-6")
-  const stripped = raw.includes('/') ? raw.split('/').pop()! : raw
-  const lower = stripped.toLowerCase()
-  if (lower.includes('opus')) {
-    const match = stripped.match(/opus[- _]?(\d+)[- _.]?(\d+)/i)
-    return match ? `Opus ${match[1]}.${match[2]}` : 'Opus'
-  }
-  if (lower.includes('sonnet')) {
-    const match = stripped.match(/sonnet[- _]?(\d+)[- _.]?(\d+)/i)
-    return match ? `Sonnet ${match[1]}.${match[2]}` : 'Sonnet'
-  }
-  if (lower.includes('gemini')) {
-    const match = stripped.match(/gemini[- _]?(\d+)[- _.]?(\d+)[- _]?(flash|pro|ultra)?/i)
-    if (match) {
-      const suffix = match[3] ? ` ${match[3].charAt(0).toUpperCase()}${match[3].slice(1)}` : ''
-      return `Gemini ${match[1]}.${match[2]}${suffix}`
-    }
-    return 'Gemini'
-  }
-  if (lower.includes('codex')) {
-    const match = stripped.match(/(\d+)[- _.]?(\d+)[- _]?codex/i)
-    return match ? `Codex ${match[1]}.${match[2]}` : 'Codex'
-  }
-  if (lower.includes('gpt')) {
-    const match = stripped.match(/gpt[- _]?(\d+)[- _.]?(\d+)?/i)
-    return match ? `GPT-${match[1]}${match[2] ? '.' + match[2] : ''}` : stripped.replace('gpt-', 'GPT-')
-  }
-  if (lower === 'delivery-mirror') return 'Mirror'
-  if (lower.includes('kimi')) return 'Kimi K2.5'
-  // Fallback: clean up dashes/underscores
-  return stripped.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
+// formatModelName and formatRelativeTime imported from ../lib/formatters
 
+/** Compact time format for activity log items (shorter than standard relative time) */
 function formatRelativeTime(timestamp: number): string {
   const diffMs = Math.max(0, Date.now() - timestamp)
   const seconds = Math.floor(diffMs / 1000)

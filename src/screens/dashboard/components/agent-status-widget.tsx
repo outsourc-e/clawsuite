@@ -1,3 +1,9 @@
+// @deprecated — Use SquadStatusWidget instead. This widget is no longer
+// included in the dashboard composition but is preserved for reference.
+// See src/screens/dashboard/components/squad-status-widget.tsx
+//
+// formatModelShort below will be migrated to use lib/formatters when this
+// widget is eventually removed.
 import { UserGroupIcon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'

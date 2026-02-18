@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
+import { formatModelName } from '../lib/formatters'
 import { cn } from '@/lib/utils'
 
 type SquadStatusWidgetProps = { editMode?: boolean }
@@ -39,20 +40,10 @@ function formatRelativeTime(timestamp: number, now: number): string {
   const hours = Math.floor(minutes / 60)
   return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`
 }
+// formatModelShort uses canonical formatModelName from formatters
 function formatModelShort(modelRaw: string): string {
   if (!modelRaw) return '—'
-  const raw = modelRaw.includes('/') ? modelRaw.split('/').pop() ?? modelRaw : modelRaw
-  const lower = raw.toLowerCase()
-  const opus = lower.match(/opus[- ]?(\d+)[- ]?(\d+)/)
-  if (opus) return `Opus ${opus[1]}.${opus[2]}`
-  if (lower.includes('opus')) return 'Opus'
-  const sonnet = lower.match(/sonnet[- ]?(\d+)[- ]?(\d+)/)
-  if (sonnet) return `Sonnet ${sonnet[1]}.${sonnet[2]}`
-  if (lower.includes('sonnet')) return 'Sonnet'
-  if (lower.includes('haiku')) return 'Haiku'
-  if (lower.includes('codex')) return 'Codex'
-  if (lower.includes('gpt')) return raw.replace(/gpt-/gi, 'GPT-')
-  return raw
+  return formatModelName(modelRaw)
 }
 function deriveStatus(session: Record<string, unknown>, now: number): AgentStatus {
   const statusText = readString(session.status).toLowerCase()
