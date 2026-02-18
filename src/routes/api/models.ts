@@ -4,6 +4,7 @@ import { gatewayRpc } from '../../server/gateway'
 import {
   getConfiguredModelIds,
   getConfiguredProviderNames,
+  getConfiguredModelsFromConfig,
 } from '../../server/providers'
 
 type ModelsListGatewayResponse = {
@@ -13,6 +14,7 @@ type ModelsListGatewayResponse = {
 type ModelEntry = {
   provider?: string
   id?: string
+  name?: string
   [key: string]: unknown
 }
 
@@ -48,6 +50,15 @@ export const Route = createFileRoute('/api/models')({
 
             return true
           })
+
+          // Merge in any models from config that the gateway didn't auto-discover
+          const discoveredIds = new Set(filteredModels.map((m) => (m as ModelEntry).id))
+          const configModels = getConfiguredModelsFromConfig()
+          for (const cm of configModels) {
+            if (!discoveredIds.has(cm.id)) {
+              filteredModels.push(cm)
+            }
+          }
 
           return json({
             ok: true,

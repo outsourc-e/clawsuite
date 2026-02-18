@@ -7,7 +7,7 @@ type GatewayConfig = {
     profiles?: Record<string, { provider?: string }>
   }
   models?: {
-    providers?: Record<string, { models?: Array<{ id?: string }> }>
+    providers?: Record<string, { models?: Array<{ id?: string; name?: string; reasoning?: boolean; input?: string[]; contextWindow?: number; cost?: Record<string, number> }> }>
   }
   agents?: {
     defaults?: {
@@ -161,5 +161,52 @@ export function getConfiguredModelIds(): Set<string> {
         console.error('Failed to read Gateway config for model IDs:', error)
     }
     return new Set()
+  }
+}
+
+type ConfigModelEntry = {
+  id: string
+  name?: string
+  provider?: string
+  reasoning?: boolean
+  input?: string[]
+  contextWindow?: number
+}
+
+/**
+ * Read model entries directly from the config file (models.providers.*.models[]).
+ * These are models the user explicitly configured — they should always appear
+ * in the model switcher even if the gateway's auto-discovery doesn't return them.
+ */
+export function getConfiguredModelsFromConfig(): ConfigModelEntry[] {
+  const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
+
+  try {
+    const raw = fs.readFileSync(configPath, 'utf8')
+    const config = JSON.parse(raw) as GatewayConfig
+    const results: ConfigModelEntry[] = []
+
+    if (config.models?.providers) {
+      for (const [providerName, providerConfig] of Object.entries(config.models.providers)) {
+        if (providerConfig.models) {
+          for (const model of providerConfig.models) {
+            if (model.id) {
+              results.push({
+                id: model.id,
+                name: model.name || model.id,
+                provider: providerName,
+                reasoning: model.reasoning,
+                input: model.input,
+                contextWindow: model.contextWindow,
+              })
+            }
+          }
+        }
+      }
+    }
+
+    return results
+  } catch {
+    return []
   }
 }
