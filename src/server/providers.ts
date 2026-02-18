@@ -22,6 +22,18 @@ type GatewayConfig = {
 
 let cachedProviderNames: Array<string> | null = null
 let cachedModelIds: Set<string> | null = null
+let cacheTimestamp = 0
+const CACHE_TTL_MS = 30_000 // 30 seconds — auto-refresh model list
+
+function isCacheStale(): boolean {
+  return Date.now() - cacheTimestamp > CACHE_TTL_MS
+}
+
+export function invalidateCache(): void {
+  cachedProviderNames = null
+  cachedModelIds = null
+  cacheTimestamp = 0
+}
 
 /**
  * Extract provider name from auth profile key.
@@ -53,7 +65,7 @@ function modelIdFromScopedKey(scoped: string): string | null {
  * Returns only provider names (e.g., ["anthropic", "openrouter"]), never secrets.
  */
 export function getConfiguredProviderNames(): Array<string> {
-  if (cachedProviderNames) return cachedProviderNames
+  if (cachedProviderNames && !isCacheStale()) return cachedProviderNames
 
   const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
 
@@ -71,6 +83,7 @@ export function getConfiguredProviderNames(): Array<string> {
     }
 
     cachedProviderNames = Array.from(providerNames).sort()
+    cacheTimestamp = Date.now()
     return cachedProviderNames
   } catch (error) {
     // Silently return empty when config doesn't exist (e.g. Docker containers)
@@ -95,7 +108,7 @@ export function getConfiguredProviders(): Array<string> {
  * Supports both legacy models.providers.*.models[] and newer agents.defaults.models keys.
  */
 export function getConfiguredModelIds(): Set<string> {
-  if (cachedModelIds) return cachedModelIds
+  if (cachedModelIds && !isCacheStale()) return cachedModelIds
 
   const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
 
@@ -139,6 +152,7 @@ export function getConfiguredModelIds(): Set<string> {
     }
 
     cachedModelIds = modelIds
+    cacheTimestamp = Date.now()
     return cachedModelIds
   } catch (error) {
     const code = (error as NodeJS.ErrnoException)?.code
