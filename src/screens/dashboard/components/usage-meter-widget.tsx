@@ -216,6 +216,19 @@ type UsageProgress = {
   max: number | null
 }
 
+const BUDGET_STORAGE_KEY = 'clawsuite-monthly-budget'
+const DEFAULT_MONTHLY_BUDGET = 500
+
+function getMonthlyBudget(): number {
+  if (typeof window === 'undefined') return DEFAULT_MONTHLY_BUDGET
+  const stored = window.localStorage.getItem(BUDGET_STORAGE_KEY)
+  if (stored) {
+    const parsed = Number(stored)
+    if (Number.isFinite(parsed) && parsed > 0) return parsed
+  }
+  return DEFAULT_MONTHLY_BUDGET
+}
+
 function resolveUsageProgress(data: UsageMeterData | null): UsageProgress {
   if (!data) {
     return {
@@ -245,6 +258,17 @@ function resolveUsageProgress(data: UsageMeterData | null): UsageProgress {
       percent: clampPercent((current / explicitMax) * 100),
       current,
       max: explicitMax,
+    }
+  }
+
+  // Fallback: compute percentage from cost against monthly budget
+  if (data.totalCost > 0) {
+    const budget = getMonthlyBudget()
+    const costPercent = clampPercent((data.totalCost / budget) * 100)
+    return {
+      percent: costPercent,
+      current,
+      max: null,
     }
   }
 

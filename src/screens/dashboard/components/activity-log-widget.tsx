@@ -62,18 +62,37 @@ function toFriendlySource(source?: string): string {
 
 function formatModelName(raw: string): string {
   if (!raw) return 'Unknown model'
-  const lower = raw.toLowerCase()
+  // Strip provider prefix (e.g. "anthropic/claude-opus-4-6" → "claude-opus-4-6")
+  const stripped = raw.includes('/') ? raw.split('/').pop()! : raw
+  const lower = stripped.toLowerCase()
   if (lower.includes('opus')) {
-    const match = raw.match(/opus[- ]?(\d+)[- ]?(\d+)/i)
+    const match = stripped.match(/opus[- _]?(\d+)[- _.]?(\d+)/i)
     return match ? `Opus ${match[1]}.${match[2]}` : 'Opus'
   }
   if (lower.includes('sonnet')) {
-    const match = raw.match(/sonnet[- ]?(\d+)[- ]?(\d+)/i)
+    const match = stripped.match(/sonnet[- _]?(\d+)[- _.]?(\d+)/i)
     return match ? `Sonnet ${match[1]}.${match[2]}` : 'Sonnet'
   }
-  if (lower.includes('gpt')) return raw.replace('gpt-', 'GPT-')
-  if (raw.includes('/')) return raw.split('/').pop() ?? raw
-  return raw
+  if (lower.includes('gemini')) {
+    const match = stripped.match(/gemini[- _]?(\d+)[- _.]?(\d+)[- _]?(flash|pro|ultra)?/i)
+    if (match) {
+      const suffix = match[3] ? ` ${match[3].charAt(0).toUpperCase()}${match[3].slice(1)}` : ''
+      return `Gemini ${match[1]}.${match[2]}${suffix}`
+    }
+    return 'Gemini'
+  }
+  if (lower.includes('codex')) {
+    const match = stripped.match(/(\d+)[- _.]?(\d+)[- _]?codex/i)
+    return match ? `Codex ${match[1]}.${match[2]}` : 'Codex'
+  }
+  if (lower.includes('gpt')) {
+    const match = stripped.match(/gpt[- _]?(\d+)[- _.]?(\d+)?/i)
+    return match ? `GPT-${match[1]}${match[2] ? '.' + match[2] : ''}` : stripped.replace('gpt-', 'GPT-')
+  }
+  if (lower === 'delivery-mirror') return 'Mirror'
+  if (lower.includes('kimi')) return 'Kimi K2.5'
+  // Fallback: clean up dashes/underscores
+  return stripped.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function formatRelativeTime(timestamp: number): string {

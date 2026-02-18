@@ -392,11 +392,20 @@ export function DashboardScreen() {
         ''
       const currentModel = formatModelName(rawModel)
 
-      // Derive uptime from main session age (milliseconds → seconds)
-      const mainSession = ssPayload?.recent?.[0]
-      const uptimeSeconds = mainSession?.age
-        ? Math.floor(mainSession.age / 1000)
-        : 0
+      // Derive uptime from session firstActivity or updatedAt (milliseconds → seconds)
+      const mainSessionRaw = ssPayload?.recent?.[0]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mainSessionAny = mainSessionRaw as any
+      const firstActivity: number | undefined =
+        mainSessionAny?.usage?.firstActivity ??
+        mainSessionAny?.firstActivity ??
+        mainSessionAny?.createdAt ??
+        mainSessionAny?.updatedAt ??
+        undefined
+      const uptimeSeconds =
+        typeof firstActivity === 'number' && firstActivity > 0
+          ? Math.floor((Date.now() - firstActivity) / 1000)
+          : 0
 
       const totalSessions = ssPayload?.count ?? sessions.length
       const activeAgents = ssPayload?.recent?.length ?? sessions.length
