@@ -19,6 +19,7 @@ export type AgentRegistryCardData = {
 type AgentRegistryCardProps = {
   agent: AgentRegistryCardData
   isSpawning?: boolean
+  onTap?: (agent: AgentRegistryCardData) => void
   onChat: (agent: AgentRegistryCardData) => void | Promise<void>
   onSpawn: (agent: AgentRegistryCardData) => void | Promise<void>
   onHistory: (agent: AgentRegistryCardData) => void
@@ -57,6 +58,7 @@ const CARD_GRADIENT_CLASS: Record<AgentRegistryCardData['color'], string> = {
 export function AgentRegistryCard({
   agent,
   isSpawning = false,
+  onTap,
   onChat,
   onSpawn,
   onHistory,
@@ -124,6 +126,18 @@ export function AgentRegistryCard({
 
   return (
     <article
+      onClick={(event) => {
+        if (!onTap) return
+        const target = event.target as HTMLElement | null
+        if (
+          target?.closest(
+            'button,a,input,textarea,select,[role="button"],[data-no-card-tap]',
+          )
+        ) {
+          return
+        }
+        onTap(agent)
+      }}
       className={`relative overflow-hidden rounded-2xl p-4 shadow-sm border border-white/20 ${CARD_GRADIENT_CLASS[agent.color]}`}
     >
       <div className="bg-white/40 dark:bg-neutral-900/20 backdrop-blur-md rounded-xl p-3">

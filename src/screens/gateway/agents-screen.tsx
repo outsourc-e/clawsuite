@@ -13,6 +13,7 @@ import {
   type AgentRegistryCardData,
   type AgentRegistryStatus,
 } from '@/components/agent-view/agent-registry-card'
+import { AgentStreamPanel } from '@/components/agent-view/agent-stream-panel'
 import { toggleAgentPause } from '@/lib/gateway-api'
 import { toast } from '@/components/ui/toast'
 
@@ -467,6 +468,7 @@ export function AgentsScreen() {
     Record<string, boolean>
   >({})
   const [historyAgentId, setHistoryAgentId] = useState<string | null>(null)
+  const [streamingAgentKey, setStreamingAgentKey] = useState<string | null>(null)
 
   const agentsQuery = useQuery({
     queryKey: ['gateway', 'agents'],
@@ -607,6 +609,14 @@ export function AgentsScreen() {
     })
   }, [runtimeAgents])
 
+  const streamingAgent = useMemo(
+    () =>
+      runtimeAgents.find(
+        (agent) => readString(agent.sessionKey) === readString(streamingAgentKey),
+      ) ?? null,
+    [runtimeAgents, streamingAgentKey],
+  )
+
   const selectedHistoryAgent = useMemo(
     () => runtimeAgents.find((agent) => agent.id === historyAgentId) ?? null,
     [historyAgentId, runtimeAgents],
@@ -694,6 +704,26 @@ export function AgentsScreen() {
 
   function handleHistory(agent: AgentRegistryCardData) {
     setHistoryAgentId(agent.id)
+  }
+
+  function handleStreamTap(agent: AgentRegistryCardData) {
+    const sessionKey = readString(agent.sessionKey)
+    if (!sessionKey) {
+      toast('Spawn agent first', { type: 'warning' })
+      return
+    }
+    setStreamingAgentKey(sessionKey)
+  }
+
+  function handleStreamTapByAgentId(agentId: string) {
+    const runtimeAgent =
+      runtimeAgents.find((candidate) => candidate.id === agentId) ?? null
+    const sessionKey = readString(runtimeAgent?.sessionKey)
+    if (!sessionKey) {
+      toast('Spawn agent first', { type: 'warning' })
+      return
+    }
+    setStreamingAgentKey(sessionKey)
   }
 
   async function handlePauseToggle(
@@ -875,6 +905,7 @@ export function AgentsScreen() {
                         key={agent.id}
                         agent={agent}
                         isSpawning={Boolean(spawningByAgentId[agent.id])}
+                        onTap={handleStreamTap}
                         onChat={handleChat}
                         onSpawn={handleSpawn}
                         onHistory={handleHistory}
@@ -987,10 +1018,13 @@ export function AgentsScreen() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {desktopAgents.map((agent) => {
                     const isDefault = agent.id === agentsQuery.data?.defaultId
+                    const normalizedId = normalizeToken(readString(agent.id))
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={agent.id}
-                        className={`rounded-lg border p-4 transition-colors ${
+                        onClick={() => handleStreamTapByAgentId(normalizedId)}
+                        className={`w-full rounded-lg border p-4 text-left transition-colors ${
                           isDefault
                             ? 'border-accent-300 bg-accent-50/50'
                             : 'border-primary-200 hover:bg-primary-50'
@@ -1009,7 +1043,7 @@ export function AgentsScreen() {
                         <p className="text-[11px] text-primary-500 mt-1 font-mono">
                           {agent.id}
                         </p>
-                      </div>
+                      </button>
                     )
                   })}
                 </div>
@@ -1018,6 +1052,15 @@ export function AgentsScreen() {
           )}
         </div>
       </div>
+
+      {streamingAgent ? (
+        <AgentStreamPanel
+          sessionKey={readString(streamingAgent.sessionKey)}
+          agentName={streamingAgent.name}
+          agentColor={streamingAgent.color}
+          onClose={() => setStreamingAgentKey(null)}
+        />
+      ) : null}
 
       {selectedHistoryAgent ? (
         <div className="fixed inset-0 z-[90] md:hidden">
