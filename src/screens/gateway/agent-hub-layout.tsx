@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId } from './components/team-panel'
-import { TaskBoard } from './components/task-board'
+import { TaskBoard, type HubTask, type TaskBoardRef } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
+import { emitFeedEvent } from './components/feed-event-bus'
+import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
 type AgentHubLayoutProps = {
@@ -36,6 +38,87 @@ function createMemberId(): string {
     return crypto.randomUUID()
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function createTaskId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().slice(0, 8)
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+}
+
+function cleanMissionSegment(value: string): string {
+  return value
+    .replace(/^\s*[-*+]\s*/, '')
+    .replace(/^\s*\d+\s*[.)-]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function extractMissionItems(goal: string): string[] {
+  const rawSegments = goal
+    .replace(/\r/g, '\n')
+    .replace(/[•●▪◦]/g, '\n')
+    .replace(/[.?!;]+/g, '\n')
+    .split('\n')
+    .flatMap((line) => line.split(/\s*,\s*|\s+\band\b\s+/gi))
+    .map(cleanMissionSegment)
+    .filter((segment) => segment.length > 5)
+
+  const uniqueSegments: string[] = []
+  const seen = new Set<string>()
+  rawSegments.forEach((segment) => {
+    const key = segment.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    uniqueSegments.push(segment)
+  })
+  return uniqueSegments
+}
+
+function parseMissionGoal(goal: string, teamMembers: TeamMember[]): HubTask[] {
+  const trimmedGoal = goal.trim()
+  if (!trimmedGoal) return []
+  const now = Date.now()
+  const tasks: HubTask[] = [
+    {
+      id: createTaskId(),
+      title: trimmedGoal,
+      description: '',
+      priority: 'high',
+      status: 'inbox',
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]
+
+  const segments = extractMissionItems(trimmedGoal)
+  if (segments.length <= 1) return tasks
+
+  const normalizedGoal = trimmedGoal.toLowerCase()
+  const subtasks = segments.filter((segment) => segment.toLowerCase() !== normalizedGoal)
+
+  subtasks.forEach((segment, index) => {
+    const member = teamMembers.length > 0 ? teamMembers[index % teamMembers.length] : undefined
+    const createdAt = now + index + 1
+    tasks.push({
+      id: createTaskId(),
+      title: segment,
+      description: '',
+      priority: 'normal',
+      status: member ? 'assigned' : 'inbox',
+      agentId: member?.id,
+      createdAt,
+      updatedAt: createdAt,
+    })
+  })
+
+  return tasks
+}
+
+function truncateMissionGoal(goal: string, max = 110): string {
+  if (goal.length <= max) return goal
+  return `${goal.slice(0, max - 1).trimEnd()}…`
 }
 
 function buildTeamFromTemplate(templateId: TeamTemplateId): TeamMember[] {
@@ -108,23 +191,19 @@ function readStoredTeam(): TeamMember[] {
 
 function suggestTemplate(goal: string): TeamTemplateId {
   const normalized = goal.toLowerCase()
-  if (
-    normalized.includes('code') ||
-    normalized.includes('build') ||
-    normalized.includes('debug') ||
-    normalized.includes('test')
-  ) {
+  const hasAny = (keywords: string[]) =>
+    keywords.some((keyword) => normalized.includes(keyword))
+
+  if (hasAny(['coding', 'code', 'dev', 'build', 'ship', 'fix', 'bug'])) {
     return 'coding'
   }
-  if (
-    normalized.includes('content') ||
-    normalized.includes('blog') ||
-    normalized.includes('copy') ||
-    normalized.includes('social')
-  ) {
+  if (hasAny(['research', 'analyze', 'investigate', 'report'])) {
+    return 'research'
+  }
+  if (hasAny(['write', 'content', 'blog', 'copy', 'edit'])) {
     return 'content'
   }
-  return 'research'
+  return 'coding'
 }
 
 function resolveActiveTemplate(team: TeamMember[]): TeamTemplateId | undefined {
@@ -139,6 +218,7 @@ function resolveActiveTemplate(team: TeamMember[]): TeamTemplateId | undefined {
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [missionActive, setMissionActive] = useState(false)
   const [missionGoal, setMissionGoal] = useState('')
+  const [activeMissionGoal, setActiveMissionGoal] = useState('')
   const [showNewMission, setShowNewMission] = useState(true)
   const [view, setView] = useState<'board' | 'timeline'>('board')
   const [missionState, setMissionState] = useState<'running' | 'paused' | 'stopped'>(
@@ -146,7 +226,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   )
   const [budgetLimit, setBudgetLimit] = useState('120000')
   const [autoAssign, setAutoAssign] = useState(true)
+  const [teamPanelFlash, setTeamPanelFlash] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string>()
+  const [boardTasks, setBoardTasks] = useState<Array<HubTask>>([])
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const stored = readStoredTeam()
     if (stored.length > 0) return stored
@@ -154,6 +236,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (runtimeTeam.length > 0) return runtimeTeam
     return buildTeamFromTemplate('research')
   })
+  const taskBoardRef = useRef<TaskBoardRef | null>(null)
+  const pendingMissionTasksRef = useRef<Array<HubTask>>([])
+  const teamPanelFlashTimerRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -176,6 +261,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (!exists) setSelectedAgentId(undefined)
   }, [selectedAgentId, team])
 
+  useEffect(
+    () => () => {
+      if (teamPanelFlashTimerRef.current !== undefined) {
+        window.clearTimeout(teamPanelFlashTimerRef.current)
+      }
+    },
+    [],
+  )
+
   const runtimeById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [
     agents,
   ])
@@ -197,11 +291,54 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     () => teamWithRuntimeStatus.map((member) => ({ id: member.id, name: member.name })),
     [teamWithRuntimeStatus],
   )
+  const agentTaskCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    boardTasks.forEach((task) => {
+      if (!task.agentId) return
+      counts[task.agentId] = (counts[task.agentId] ?? 0) + 1
+    })
+    return counts
+  }, [boardTasks])
   const activeTemplateId = useMemo(() => resolveActiveTemplate(team), [team])
+  const missionBadge = useMemo(() => {
+    if (missionState === 'paused') {
+      return {
+        label: 'Paused',
+        className: 'bg-amber-500 text-white',
+      }
+    }
+    if (missionState === 'stopped') {
+      return {
+        label: 'Stopped',
+        className: 'bg-red-500 text-white',
+      }
+    }
+    return {
+      label: 'Running',
+      className: 'bg-emerald-500 text-white',
+    }
+  }, [missionState])
+
+  const handleTaskBoardRef = useCallback((api: TaskBoardRef) => {
+    taskBoardRef.current = api
+    if (pendingMissionTasksRef.current.length === 0) return
+    api.addTasks(pendingMissionTasksRef.current)
+    pendingMissionTasksRef.current = []
+  }, [])
 
   function applyTemplate(templateId: TeamTemplateId) {
     setTeam(buildTeamFromTemplate(templateId))
     setSelectedAgentId(undefined)
+  }
+
+  function flashTeamPanel() {
+    setTeamPanelFlash(true)
+    if (teamPanelFlashTimerRef.current !== undefined) {
+      window.clearTimeout(teamPanelFlashTimerRef.current)
+    }
+    teamPanelFlashTimerRef.current = window.setTimeout(() => {
+      setTeamPanelFlash(false)
+    }, 750)
   }
 
   function handleAddAgent() {
@@ -218,15 +355,34 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }
 
   function handleAutoConfigure() {
-    applyTemplate(suggestTemplate(missionGoal))
+    const trimmedGoal = missionGoal.trim()
+    if (!trimmedGoal) return
+    applyTemplate(suggestTemplate(trimmedGoal))
+    flashTeamPanel()
   }
 
   function handleCreateMission() {
-    if (!missionGoal.trim()) return
+    const trimmedGoal = missionGoal.trim()
+    if (!trimmedGoal) return
+    const createdTasks = parseMissionGoal(trimmedGoal, teamWithRuntimeStatus)
+
     setMissionActive(true)
     setShowNewMission(false)
     setMissionState('running')
     setView('board')
+    setActiveMissionGoal(trimmedGoal)
+    emitFeedEvent({
+      type: 'mission_started',
+      message: `Mission started: ${trimmedGoal}`,
+    })
+    if (createdTasks.length > 0) {
+      if (missionActive && taskBoardRef.current) {
+        taskBoardRef.current.addTasks(createdTasks)
+      } else {
+        pendingMissionTasksRef.current = [...createdTasks, ...pendingMissionTasksRef.current]
+      }
+    }
+    toast(`Mission started with ${createdTasks.length} tasks`, { type: 'success' })
   }
 
   return (
@@ -274,10 +430,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <div className="w-[280px] shrink-0">
+        <div
+          className={cn(
+            'w-[280px] shrink-0 transition-colors',
+            teamPanelFlash && 'bg-emerald-50/70 dark:bg-emerald-900/10',
+          )}
+        >
           <TeamPanel
             team={teamWithRuntimeStatus}
             activeTemplateId={activeTemplateId}
+            agentTaskCounts={agentTaskCounts}
             onApplyTemplate={applyTemplate}
             onAddAgent={handleAddAgent}
             onUpdateAgent={(agentId, updates) => {
@@ -377,7 +539,29 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               </div>
             </div>
           ) : (
-            <TaskBoard agents={boardAgents} selectedAgentId={selectedAgentId} />
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-emerald-200 bg-emerald-50/40 px-4 py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/15">
+                <p className="truncate text-xs font-medium text-emerald-800 dark:text-emerald-200">
+                  Mission: {truncateMissionGoal(activeMissionGoal || missionGoal.trim())}
+                </p>
+                <span
+                  className={cn(
+                    'ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                    missionBadge.className,
+                  )}
+                >
+                  {missionBadge.label}
+                </span>
+              </div>
+              <div className="min-h-0 flex-1">
+                <TaskBoard
+                  agents={boardAgents}
+                  selectedAgentId={selectedAgentId}
+                  onRef={handleTaskBoardRef}
+                  onTasksChange={setBoardTasks}
+                />
+              </div>
+            </div>
           )}
         </div>
 
@@ -423,6 +607,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       setMissionState('stopped')
                       setMissionActive(false)
                       setShowNewMission(false)
+                      setActiveMissionGoal('')
+                      taskBoardRef.current = null
                     }}
                     className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
                   >

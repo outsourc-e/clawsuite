@@ -44,6 +44,7 @@ export type TeamMember = {
 type TeamPanelProps = {
   team: TeamMember[]
   activeTemplateId?: TeamTemplateId
+  agentTaskCounts?: Record<string, number>
   onApplyTemplate: (templateId: TeamTemplateId) => void
   onAddAgent: () => void
   onUpdateAgent: (
@@ -71,6 +72,7 @@ const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
 export function TeamPanel({
   team,
   activeTemplateId,
+  agentTaskCounts,
   onApplyTemplate,
   onAddAgent,
   onUpdateAgent,
@@ -150,6 +152,7 @@ export function TeamPanel({
           const statusColor = STATUS_COLOR[agent.status] ?? 'bg-primary-400'
           const expanded = expandedAgentId === agent.id
           const modelLabel = modelLabelById.get(agent.modelId) ?? 'Auto'
+          const taskCount = agentTaskCounts?.[agent.id] ?? 0
 
           return (
             <div
@@ -181,6 +184,9 @@ export function TeamPanel({
                     </span>
                     <span className="text-[10px] uppercase tracking-wide text-primary-500">
                       {agent.status}
+                    </span>
+                    <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-neutral-800 dark:text-neutral-300">
+                      {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
                     </span>
                   </div>
                 </div>

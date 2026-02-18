@@ -14,6 +14,7 @@ type SessionRecord = Record<string, unknown>
 type FeedRow = FeedEvent & { baseMessage: string, repeatCount: number }
 
 const TASK_TYPES = new Set<FeedEventType>([
+  'mission_started',
   'task_created',
   'task_moved',
   'task_completed',
@@ -30,6 +31,7 @@ const AGENT_TYPES = new Set<FeedEventType>([
 ])
 
 const EVENT_ICONS: Record<FeedEventType, string> = {
+  mission_started: '🚀',
   task_created: '🆕',
   task_moved: '🔀',
   task_completed: '✅',

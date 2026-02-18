@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { emitFeedEvent } from './feed-event-bus'
-type TaskBoardProps = { agents: Array<{ id: string; name: string }>; selectedAgentId?: string }
-type TaskPriority = 'urgent' | 'high' | 'normal' | 'low'
-type TaskStatus = 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
-type HubTask = {
+export type TaskPriority = 'urgent' | 'high' | 'normal' | 'low'
+export type TaskStatus = 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
+export type HubTask = {
   id: string
   title: string
   description: string
@@ -13,6 +12,13 @@ type HubTask = {
   agentId?: string
   createdAt: number
   updatedAt: number
+}
+export type TaskBoardRef = { addTasks: (tasks: Array<HubTask>) => void }
+type TaskBoardProps = {
+  agents: Array<{ id: string; name: string }>
+  selectedAgentId?: string
+  onRef?: (ref: TaskBoardRef) => void
+  onTasksChange?: (tasks: Array<HubTask>) => void
 }
 const STORAGE_KEY = 'clawsuite:hub-tasks'
 const COLUMNS: Array<{ key: TaskStatus; label: string }> = [
@@ -74,22 +80,56 @@ function createTaskId(): string {
 function statusLabel(status: TaskStatus): string {
   return COLUMNS.find((column) => column.key === status)?.label ?? status
 }
-export function TaskBoard({ agents, selectedAgentId }: TaskBoardProps) {
+export function TaskBoard({ agents, selectedAgentId, onRef, onTasksChange }: TaskBoardProps) {
   const [tasks, setTasks] = useState<Array<HubTask>>([])
   const [hydrated, setHydrated] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
   const [form, setForm] = useState({ title: '', description: '', priority: 'normal' as TaskPriority, agentId: selectedAgentId ?? '' })
+  const tasksRef = useRef<Array<HubTask>>([])
   useEffect(() => {
     setTasks(loadTasks())
     setHydrated(true)
   }, [])
   useEffect(() => {
+    tasksRef.current = tasks
+  }, [tasks])
+  useEffect(() => {
     if (!hydrated || typeof window === 'undefined') return
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
   }, [tasks, hydrated])
+  useEffect(() => {
+    onTasksChange?.(tasks)
+  }, [onTasksChange, tasks])
   const agentNameById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents])
+  const addTasks = useCallback((incomingTasks: Array<HubTask>) => {
+    if (incomingTasks.length === 0) return
+    const existingIds = new Set(tasksRef.current.map((task) => task.id))
+    const nextTasks = incomingTasks.filter((task) => !existingIds.has(task.id))
+    if (nextTasks.length === 0) return
+    setTasks((previous) => [...nextTasks, ...previous])
+    nextTasks.forEach((task) => {
+      emitFeedEvent({
+        type: 'task_created',
+        message: `Task created: ${task.title}`,
+        taskTitle: task.title,
+        agentName: task.agentId ? agentNameById.get(task.agentId) : undefined,
+      })
+      if (task.agentId) {
+        const agentName = agentNameById.get(task.agentId) ?? task.agentId
+        emitFeedEvent({
+          type: 'task_assigned',
+          message: `Assigned to ${agentName}`,
+          taskTitle: task.title,
+          agentName,
+        })
+      }
+    })
+  }, [agentNameById])
+  useEffect(() => {
+    onRef?.({ addTasks })
+  }, [addTasks, onRef])
   const selectedAgentName = selectedAgentId ? agentNameById.get(selectedAgentId) ?? selectedAgentId : undefined
   const tasksByColumn = useMemo(() => {
     const grouped: Record<TaskStatus, Array<HubTask>> = { inbox: [], assigned: [], in_progress: [], review: [], done: [] }

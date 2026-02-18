@@ -1,4 +1,5 @@
 export type FeedEventType =
+  | 'mission_started'
   | 'task_created' | 'task_moved' | 'task_completed' | 'task_assigned'
   | 'agent_active' | 'agent_idle' | 'agent_paused' | 'agent_spawned' | 'agent_killed'
   | 'gateway_health' | 'system'
