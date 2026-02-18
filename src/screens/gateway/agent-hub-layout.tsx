@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId } from './components/team-panel'
-import { TaskBoard, type HubTask, type TaskBoardRef } from './components/task-board'
+import { TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
 import { emitFeedEvent } from './components/feed-event-bus'
 import { toast } from '@/components/ui/toast'
@@ -47,23 +47,36 @@ function createTaskId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
+function capitalizeFirst(value: string): string {
+  if (!value) return value
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function wordCount(value: string): number {
+  return value.split(/\s+/).filter(Boolean).length
+}
+
 function cleanMissionSegment(value: string): string {
-  return value
+  const normalized = value
     .replace(/^\s*[-*+]\s*/, '')
     .replace(/^\s*\d+\s*[.)-]\s*/, '')
+    .replace(/[.]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+  return capitalizeFirst(normalized)
 }
 
 function extractMissionItems(goal: string): string[] {
   const rawSegments = goal
     .replace(/\r/g, '\n')
     .replace(/[•●▪◦]/g, '\n')
-    .replace(/[.?!;]+/g, '\n')
+    .replace(/^\s*[-*]\s+/gm, '')
+    .replace(/\b\d+\.\s+/g, '\n')
+    .replace(/[.?!;]+\s*/g, '\n')
     .split('\n')
-    .flatMap((line) => line.split(/\s*,\s*|\s+\band\b\s+/gi))
+    .flatMap((line) => line.split(/,\s+|\s+\band\b\s+/gi))
     .map(cleanMissionSegment)
-    .filter((segment) => segment.length > 5)
+    .filter((segment) => segment.length > 0 && wordCount(segment) >= 3)
 
   const uniqueSegments: string[] = []
   const seen = new Set<string>()
@@ -80,42 +93,29 @@ function parseMissionGoal(goal: string, teamMembers: TeamMember[]): HubTask[] {
   const trimmedGoal = goal.trim()
   if (!trimmedGoal) return []
   const now = Date.now()
-  const leadMember = teamMembers[0]
-  const tasks: HubTask[] = [
-    {
-      id: createTaskId(),
-      title: trimmedGoal,
-      description: '',
-      priority: 'high',
-      status: leadMember ? 'assigned' : 'inbox',
-      agentId: leadMember?.id,
-      createdAt: now,
-      updatedAt: now,
-    },
-  ]
-
   const segments = extractMissionItems(trimmedGoal)
-  if (segments.length <= 1) return tasks
+  const normalizedGoal = cleanMissionSegment(trimmedGoal)
+  const missionItems =
+    segments.length > 0
+      ? segments
+      : normalizedGoal
+        ? [normalizedGoal]
+        : []
 
-  const normalizedGoal = trimmedGoal.toLowerCase()
-  const subtasks = segments.filter((segment) => segment.toLowerCase() !== normalizedGoal)
-
-  subtasks.forEach((segment, index) => {
+  return missionItems.map((segment, index) => {
     const member = teamMembers.length > 0 ? teamMembers[index % teamMembers.length] : undefined
-    const createdAt = now + index + 1
-    tasks.push({
+    const createdAt = now + index
+    return {
       id: createTaskId(),
       title: segment,
       description: '',
-      priority: 'normal',
+      priority: index === 0 ? 'high' : 'normal',
       status: member ? 'assigned' : 'inbox',
       agentId: member?.id,
       createdAt,
       updatedAt: createdAt,
-    })
+    }
   })
-
-  return tasks
 }
 
 function truncateMissionGoal(goal: string, max = 110): string {
@@ -217,7 +217,65 @@ function resolveActiveTemplate(team: TeamMember[]): TeamTemplateId | undefined {
   })?.id
 }
 
-function TeamActivityStrip({ team, tasks }: { team: TeamMember[]; tasks: HubTask[] }) {
+type SessionRecord = Record<string, unknown>
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function readSessionId(session: SessionRecord): string {
+  return readString(session.key) || readString(session.friendlyId)
+}
+
+function readSessionName(session: SessionRecord): string {
+  return (
+    readString(session.label) ||
+    readString(session.displayName) ||
+    readString(session.title) ||
+    readString(session.friendlyId) ||
+    readString(session.key)
+  )
+}
+
+function readSessionLastMessage(session: SessionRecord): string {
+  const record =
+    session.lastMessage && typeof session.lastMessage === 'object' && !Array.isArray(session.lastMessage)
+      ? (session.lastMessage as Record<string, unknown>)
+      : null
+  if (!record) return ''
+  const directText = readString(record.text)
+  if (directText) return directText
+  const parts = Array.isArray(record.content) ? record.content : []
+  return parts
+    .map((part) => {
+      if (!part || typeof part !== 'object' || Array.isArray(part)) return ''
+      return readString((part as Record<string, unknown>).text)
+    })
+    .filter(Boolean)
+    .join(' ')
+}
+
+function readSessionActivityMarker(session: SessionRecord): string {
+  const updatedAtRaw =
+    typeof session.updatedAt === 'number' || typeof session.updatedAt === 'string'
+      ? String(session.updatedAt)
+      : ''
+  const lastMessage = readSessionLastMessage(session)
+  const status = readString(session.status)
+  return `${updatedAtRaw}|${status}|${lastMessage}`
+}
+
+function TeamActivityStrip({
+  team,
+  tasks,
+  selectedAgentId,
+  onSelectAgent,
+}: {
+  team: TeamMember[]
+  tasks: HubTask[]
+  selectedAgentId?: string
+  onSelectAgent?: (agentId: string) => void
+}) {
   return (
     <div className="flex items-center gap-4 overflow-x-auto border-b border-primary-100 bg-primary-50/50 px-5 py-2 dark:border-neutral-800 dark:bg-neutral-900/30">
       {team.map((member) => {
@@ -225,9 +283,20 @@ function TeamActivityStrip({ team, tasks }: { team: TeamMember[]; tasks: HubTask
           (task) => task.agentId === member.id && task.status !== 'done',
         )
         const isActive = Boolean(assignedTask)
+        const isSelected = selectedAgentId === member.id
 
         return (
-          <div key={member.id} className="flex min-w-0 items-center gap-2">
+          <button
+            key={member.id}
+            type="button"
+            onClick={() => onSelectAgent?.(member.id)}
+            className={cn(
+              'flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors',
+              isSelected
+                ? 'bg-accent-100/80 dark:bg-accent-900/20'
+                : 'hover:bg-primary-100/80 dark:hover:bg-neutral-800/60',
+            )}
+          >
             <span className="relative inline-flex size-2.5 shrink-0">
               {isActive ? (
                 <span className="absolute inset-0 rounded-full bg-emerald-400/70 animate-ping" />
@@ -245,9 +314,51 @@ function TeamActivityStrip({ team, tasks }: { team: TeamMember[]; tasks: HubTask
             <span className="max-w-[180px] truncate text-[10px] text-primary-500 dark:text-neutral-400">
               {assignedTask ? `Working on: ${assignedTask.title}` : 'Idle'}
             </span>
-          </div>
+          </button>
         )
       })}
+    </div>
+  )
+}
+
+function AgentOutputPanel({ agentName, tasks, onClose }: {
+  agentName: string
+  tasks: HubTask[]
+  onClose: () => void
+}) {
+  return (
+    <div className="border-t border-primary-200 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-primary-900 dark:text-neutral-100">{agentName} Output</h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs text-primary-400 transition-colors hover:text-primary-600 dark:hover:text-neutral-200"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="space-y-2">
+        {tasks.length === 0 ? (
+          <p className="text-[11px] text-primary-500 dark:text-neutral-400">No dispatched tasks yet.</p>
+        ) : (
+          tasks.map((task) => (
+            <div key={task.id} className="rounded-lg bg-primary-50 px-3 py-2 dark:bg-neutral-800/80">
+              <div className="flex items-center gap-2">
+                <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
+                <span className="text-xs font-medium text-primary-700 dark:text-neutral-100">{task.title}</span>
+              </div>
+              <p className="mt-1 text-[10px] text-primary-400">
+                {task.status === 'in_progress' ? 'Working...' : task.status === 'done' ? 'Completed' : 'Queued'}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="mt-3 min-h-[80px] rounded-lg bg-neutral-900 p-3 font-mono text-[11px] text-green-400">
+        <p>$ Dispatching to {agentName}...</p>
+        <p className="animate-pulse">▊</p>
+      </div>
     </div>
   )
 }
@@ -265,8 +376,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [autoAssign, setAutoAssign] = useState(true)
   const [teamPanelFlash, setTeamPanelFlash] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string>()
+  const [selectedOutputAgentId, setSelectedOutputAgentId] = useState<string>()
   const [boardTasks, setBoardTasks] = useState<Array<HubTask>>([])
   const [missionTasks, setMissionTasks] = useState<Array<HubTask>>([])
+  const [dispatchedTaskIdsByAgent, setDispatchedTaskIdsByAgent] = useState<Record<string, Array<string>>>({})
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const stored = readStoredTeam()
     if (stored.length > 0) return stored
@@ -276,6 +389,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   })
   const taskBoardRef = useRef<TaskBoardRef | null>(null)
   const teamPanelFlashTimerRef = useRef<number | undefined>(undefined)
+  const pendingTaskMovesRef = useRef<Array<{ taskIds: Array<string>; status: TaskStatus }>>([])
+  const sessionActivityRef = useRef<Map<string, string>>(new Map())
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -297,6 +412,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const exists = team.some((member) => member.id === selectedAgentId)
     if (!exists) setSelectedAgentId(undefined)
   }, [selectedAgentId, team])
+
+  useEffect(() => {
+    if (!selectedOutputAgentId) return
+    const exists = team.some((member) => member.id === selectedOutputAgentId)
+    if (!exists) setSelectedOutputAgentId(undefined)
+  }, [selectedOutputAgentId, team])
 
   useEffect(
     () => () => {
@@ -355,14 +476,185 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       className: 'bg-emerald-500 text-white',
     }
   }, [missionState])
+  const teamById = useMemo(
+    () => new Map(teamWithRuntimeStatus.map((member) => [member.id, member])),
+    [teamWithRuntimeStatus],
+  )
+  const selectedOutputTasks = useMemo(() => {
+    if (!selectedOutputAgentId) return []
+    const taskSource = boardTasks.length > 0 ? boardTasks : missionTasks
+    const dispatchedTaskIds = dispatchedTaskIdsByAgent[selectedOutputAgentId]
+    if (!dispatchedTaskIds || dispatchedTaskIds.length === 0) {
+      return taskSource.filter((task) => task.agentId === selectedOutputAgentId)
+    }
+
+    const dispatchedSet = new Set(dispatchedTaskIds)
+    return taskSource.filter(
+      (task) => task.agentId === selectedOutputAgentId && dispatchedSet.has(task.id),
+    )
+  }, [boardTasks, dispatchedTaskIdsByAgent, missionTasks, selectedOutputAgentId])
+  const selectedOutputAgentName = selectedOutputAgentId
+    ? teamById.get(selectedOutputAgentId)?.name ?? selectedOutputAgentId
+    : ''
+
+  const moveTasksToStatus = useCallback((taskIds: Array<string>, status: TaskStatus) => {
+    if (taskIds.length === 0) return
+    const uniqueTaskIds = Array.from(new Set(taskIds))
+    const ids = new Set(uniqueTaskIds)
+
+    setMissionTasks((previous) =>
+      previous.map((task) => {
+        if (!ids.has(task.id) || task.status === status) return task
+        return { ...task, status, updatedAt: Date.now() }
+      }),
+    )
+
+    const boardApi = taskBoardRef.current
+    if (boardApi) {
+      boardApi.moveTasks(uniqueTaskIds, status)
+      return
+    }
+
+    pendingTaskMovesRef.current.push({ taskIds: uniqueTaskIds, status })
+  }, [])
 
   const handleTaskBoardRef = useCallback((api: TaskBoardRef) => {
     taskBoardRef.current = api
+    if (pendingTaskMovesRef.current.length === 0) return
+    pendingTaskMovesRef.current.forEach((entry) => {
+      api.moveTasks(entry.taskIds, entry.status)
+    })
+    pendingTaskMovesRef.current = []
   }, [])
+
+  const handleAgentSelection = useCallback((agentId?: string) => {
+    setSelectedAgentId(agentId)
+    setSelectedOutputAgentId(agentId)
+  }, [])
+
+  const executeMission = useCallback(async (
+    tasks: Array<HubTask>,
+    teamMembers: Array<TeamMember>,
+    missionGoalValue: string,
+  ) => {
+    const tasksByAgent = new Map<string, Array<HubTask>>()
+    for (const task of tasks) {
+      if (!task.agentId) continue
+      const existing = tasksByAgent.get(task.agentId) || []
+      existing.push(task)
+      tasksByAgent.set(task.agentId, existing)
+    }
+
+    for (const [agentId, agentTasks] of tasksByAgent) {
+      const member = teamMembers.find((entry) => entry.id === agentId)
+      const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
+      const message = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
+
+      try {
+        const response = await fetch('/api/sessions/send', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ sessionKey: 'main', message }),
+        })
+
+        if (!response.ok) {
+          const payload = (await response
+            .json()
+            .catch(() => ({}))) as Record<string, unknown>
+          const errorMessage =
+            readString(payload.error) || readString(payload.message) || `HTTP ${response.status}`
+          throw new Error(errorMessage)
+        }
+
+        const taskIds = agentTasks.map((task) => task.id)
+        setDispatchedTaskIdsByAgent((previous) => ({
+          ...previous,
+          [agentId]: taskIds,
+        }))
+        moveTasksToStatus(taskIds, 'in_progress')
+
+        agentTasks.forEach((task) => {
+          emitFeedEvent({
+            type: 'agent_active',
+            message: `${member?.name || agentId} started working on: ${task.title}`,
+            agentName: member?.name,
+            taskTitle: task.title,
+          })
+        })
+      } catch (error) {
+        emitFeedEvent({
+          type: 'system',
+          message: `Failed to dispatch to ${member?.name || agentId}: ${error instanceof Error ? error.message : String(error)}`,
+        })
+      }
+    }
+  }, [moveTasksToStatus])
+
+  useEffect(() => {
+    if (!missionActive || missionState !== 'running') {
+      sessionActivityRef.current = new Map()
+      return
+    }
+
+    let cancelled = false
+    async function pollSessionsActivity() {
+      try {
+        const response = await fetch('/api/sessions')
+        if (!response.ok) return
+
+        const payload = (await response
+          .json()
+          .catch(() => ({}))) as { sessions?: Array<SessionRecord> }
+        const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
+        const previousMarkers = sessionActivityRef.current
+        const nextMarkers = new Map<string, string>()
+
+        sessions.forEach((session) => {
+          const sessionId = readSessionId(session)
+          if (!sessionId) return
+
+          const marker = readSessionActivityMarker(session)
+          const previous = previousMarkers.get(sessionId)
+          const name = readSessionName(session) || sessionId
+
+          nextMarkers.set(sessionId, marker)
+          if (!previous || previous === marker) return
+
+          const lastMessage = readSessionLastMessage(session)
+          const summary = lastMessage
+            ? `Output: ${truncateMissionGoal(lastMessage, 80)}`
+            : 'Session activity detected'
+
+          emitFeedEvent({
+            type: 'agent_active',
+            message: `${name} update: ${summary}`,
+            agentName: name,
+          })
+        })
+
+        if (!cancelled) {
+          sessionActivityRef.current = nextMarkers
+        }
+      } catch {
+        // Ignore polling errors; mission dispatch and local events still work.
+      }
+    }
+
+    void pollSessionsActivity()
+    const interval = window.setInterval(() => {
+      void pollSessionsActivity()
+    }, 5_000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [missionActive, missionState])
 
   function applyTemplate(templateId: TeamTemplateId) {
     setTeam(buildTeamFromTemplate(templateId))
     setSelectedAgentId(undefined)
+    setSelectedOutputAgentId(undefined)
   }
 
   function flashTeamPanel() {
@@ -399,18 +691,30 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const trimmedGoal = missionGoal.trim()
     if (!trimmedGoal) return
     const createdTasks = parseMissionGoal(trimmedGoal, teamWithRuntimeStatus)
+    if (createdTasks.length === 0) {
+      toast('Could not parse actionable tasks from mission goal', { type: 'error' })
+      return
+    }
 
+    const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
     setMissionActive(true)
     setShowNewMission(false)
     setMissionState('running')
     setView('board')
     setActiveMissionGoal(trimmedGoal)
     setMissionTasks(createdTasks)
+    setDispatchedTaskIdsByAgent({})
+    setSelectedOutputAgentId(firstAssignedAgentId)
+    sessionActivityRef.current = new Map()
     emitFeedEvent({
       type: 'mission_started',
       message: `Mission started: ${trimmedGoal}`,
     })
     toast(`Mission started with ${createdTasks.length} tasks`, { type: 'success' })
+
+    window.setTimeout(() => {
+      void executeMission(createdTasks, teamWithRuntimeStatus, trimmedGoal)
+    }, 0)
   }
 
   return (
@@ -477,7 +781,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 ),
               )
             }}
-            onSelectAgent={setSelectedAgentId}
+            onSelectAgent={handleAgentSelection}
           />
         </div>
 
@@ -582,7 +886,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </span>
               </div>
               {missionActive ? (
-                <TeamActivityStrip team={teamWithRuntimeStatus} tasks={boardTasks} />
+                <TeamActivityStrip
+                  team={teamWithRuntimeStatus}
+                  tasks={boardTasks}
+                  selectedAgentId={selectedOutputAgentId}
+                  onSelectAgent={handleAgentSelection}
+                />
               ) : null}
               <div className="min-h-0 flex-1">
                 <TaskBoard
@@ -601,6 +910,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           <div className="min-h-0 flex-1 overflow-hidden">
             <LiveFeedPanel />
           </div>
+          {missionActive && selectedOutputAgentId ? (
+            <AgentOutputPanel
+              agentName={selectedOutputAgentName}
+              tasks={selectedOutputTasks}
+              onClose={() => setSelectedOutputAgentId(undefined)}
+            />
+          ) : null}
 
           <div className="border-t border-primary-200 px-4 py-3">
             {missionActive ? (
@@ -641,6 +957,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       setShowNewMission(false)
                       setActiveMissionGoal('')
                       setMissionTasks([])
+                      setDispatchedTaskIdsByAgent({})
+                      setSelectedOutputAgentId(undefined)
+                      pendingTaskMovesRef.current = []
+                      sessionActivityRef.current = new Map()
                       taskBoardRef.current = null
                     }}
                     className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"

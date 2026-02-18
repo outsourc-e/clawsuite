@@ -13,7 +13,10 @@ export type HubTask = {
   createdAt: number
   updatedAt: number
 }
-export type TaskBoardRef = { addTasks: (tasks: Array<HubTask>) => void }
+export type TaskBoardRef = {
+  addTasks: (tasks: Array<HubTask>) => void
+  moveTasks: (taskIds: Array<string>, status: TaskStatus) => void
+}
 type TaskBoardProps = {
   agents: Array<{ id: string; name: string }>
   initialTasks?: Array<HubTask>
@@ -147,13 +150,48 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
       }
     })
   }, [agentNameById])
+  const moveTasks = useCallback((taskIds: Array<string>, nextStatus: TaskStatus) => {
+    if (taskIds.length === 0) return
+    const ids = new Set(taskIds)
+    const existingTasks = tasksRef.current
+    const now = Date.now()
+    const movedTasks: Array<HubTask> = []
+
+    const nextTasks = existingTasks.map((task) => {
+      if (!ids.has(task.id) || task.status === nextStatus) return task
+      movedTasks.push(task)
+      return { ...task, status: nextStatus, updatedAt: now }
+    })
+
+    if (movedTasks.length === 0) return
+    tasksRef.current = nextTasks
+    setTasks(nextTasks)
+
+    movedTasks.forEach((task) => {
+      const agentName = task.agentId ? agentNameById.get(task.agentId) : undefined
+      emitFeedEvent({
+        type: 'task_moved',
+        message: `${task.title} moved ${statusLabel(task.status)} -> ${statusLabel(nextStatus)}`,
+        taskTitle: task.title,
+        agentName,
+      })
+      if (nextStatus === 'done') {
+        emitFeedEvent({
+          type: 'task_completed',
+          message: `Task completed: ${task.title}`,
+          taskTitle: task.title,
+          agentName,
+        })
+      }
+    })
+  }, [agentNameById])
   useEffect(() => {
     if (!initialTasks || initialTasks.length === 0) return
     addTasks(initialTasks)
   }, [addTasks, initialTasks])
   useEffect(() => {
-    onRef?.({ addTasks })
-  }, [addTasks, onRef])
+    onRef?.({ addTasks, moveTasks })
+  }, [addTasks, moveTasks, onRef])
   const selectedAgentName = selectedAgentId ? agentNameById.get(selectedAgentId) ?? selectedAgentId : undefined
   const tasksByColumn = useMemo(() => {
     const grouped: Record<TaskStatus, Array<HubTask>> = { inbox: [], assigned: [], in_progress: [], review: [], done: [] }
@@ -202,25 +240,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
     closeCreateForm()
   }
   function moveTask(taskId: string, nextStatus: TaskStatus) {
-    const existing = tasks.find((task) => task.id === taskId)
-    if (!existing || existing.status === nextStatus) return
-    const movedTask: HubTask = { ...existing, status: nextStatus, updatedAt: Date.now() }
-    setTasks((previous) => previous.map((task) => (task.id === taskId ? movedTask : task)))
-    const agentName = movedTask.agentId ? agentNameById.get(movedTask.agentId) : undefined
-    emitFeedEvent({
-      type: 'task_moved',
-      message: `${movedTask.title} moved ${statusLabel(existing.status)} -> ${statusLabel(nextStatus)}`,
-      taskTitle: movedTask.title,
-      agentName,
-    })
-    if (nextStatus === 'done') {
-      emitFeedEvent({
-        type: 'task_completed',
-        message: `Task completed: ${movedTask.title}`,
-        taskTitle: movedTask.title,
-        agentName,
-      })
-    }
+    moveTasks([taskId], nextStatus)
   }
   return (
     <div className="flex h-full flex-col">
