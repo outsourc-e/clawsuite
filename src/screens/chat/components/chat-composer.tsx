@@ -1333,8 +1333,8 @@ function ChatComposerComponent({
                       {/* Phase 4.2: Pinned models section */}
                       {(pinnedModels.length > 0 ||
                         unavailablePinnedModels.length > 0) && (
-                        <div className="mb-2 border-t border-gray-200 bg-gray-50 py-2">
-                          <div className="mb-1.5 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                        <div className="mb-2 border-t border-neutral-200 bg-neutral-50 py-2">
+                          <div className="mb-1.5 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
                             <HugeiconsIcon
                               icon={PinIcon}
                               size={14}
@@ -1361,9 +1361,9 @@ function ChatComposerComponent({
                                     handleModelSelect(option.value)
                                   }}
                                   className={cn(
-                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50',
+                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50',
                                     optionActive &&
-                                      'border-l-2 border-orange-500 bg-gray-100 text-gray-900',
+                                      'border-l-2 border-orange-500 bg-neutral-100 text-neutral-900',
                                   )}
                                   role="option"
                                   aria-selected={optionActive}
@@ -1404,7 +1404,7 @@ function ChatComposerComponent({
                               key={modelId}
                               className="group relative flex items-center"
                             >
-                              <div className="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-400 opacity-60">
+                              <div className="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-400 opacity-60">
                                 <span className="flex-1 truncate font-medium">
                                   {modelId}
                                 </span>
@@ -1432,7 +1432,7 @@ function ChatComposerComponent({
                       {/* Regular models grouped by provider */}
                       {unpinnedGroupedModels.map(([provider, models]) => (
                         <div key={provider} className="mb-2 last:mb-0">
-                          <div className="border-t border-gray-100 px-3 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+                          <div className="border-t border-neutral-100 px-3 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-400">
                             {provider}
                           </div>
                           {models.map((option) => {
@@ -1453,9 +1453,9 @@ function ChatComposerComponent({
                                     handleModelSelect(option.value)
                                   }}
                                   className={cn(
-                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50',
+                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50',
                                     optionActive &&
-                                      'border-l-2 border-orange-500 bg-gray-100 text-gray-900',
+                                      'border-l-2 border-orange-500 bg-neutral-100 text-neutral-900',
                                   )}
                                   role="option"
                                   aria-selected={optionActive}
@@ -1477,7 +1477,7 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-3 rounded px-1 text-xs leading-none text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-orange-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-orange-300 group-hover:opacity-100"
+                                  className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 hover:text-orange-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-orange-300 group-hover:opacity-100"
                                   aria-label={`Pin ${option.label}`}
                                   title="Pin"
                                 >

@@ -93,7 +93,7 @@ export function WidgetShell({
         // Base glass card
         'group relative flex flex-col overflow-hidden rounded-2xl',
         'border border-white/30 dark:border-white/10',
-        'bg-white/60 dark:bg-neutral-900/50 md:dark:bg-gray-900/60 backdrop-blur-md',
+        'bg-white/60 dark:bg-neutral-900/50 md:dark:bg-neutral-900/60 backdrop-blur-md',
         'shadow-sm transition-shadow',
         // Size
         SIZE_STYLES[size],
@@ -187,14 +187,14 @@ function WidgetSkeleton({ size }: { size: WidgetSize }) {
     <div className="flex h-full flex-col gap-2 pt-1">
       <div
         className={cn(
-          'animate-shimmer rounded-lg bg-gray-200/65 dark:bg-gray-700/50',
+          'animate-shimmer rounded-lg bg-neutral-200/65 dark:bg-neutral-700/50',
           size === 'small' ? 'h-8' : 'h-10',
         )}
       />
       {size !== 'small' ? (
         <>
-          <div className="h-3 w-3/4 animate-shimmer rounded bg-gray-200/55 dark:bg-gray-700/45" />
-          <div className="h-3 w-1/2 animate-shimmer rounded bg-gray-200/45 dark:bg-gray-700/35" />
+          <div className="h-3 w-3/4 animate-shimmer rounded bg-neutral-200/55 dark:bg-neutral-700/45" />
+          <div className="h-3 w-1/2 animate-shimmer rounded bg-neutral-200/45 dark:bg-neutral-700/35" />
         </>
       ) : null}
     </div>

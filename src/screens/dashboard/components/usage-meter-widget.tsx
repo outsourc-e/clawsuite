@@ -397,7 +397,7 @@ export function UsageMeterWidget({
               <p className="mt-1 text-xs text-primary-500">Usage</p>
             </div>
 
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200/80 dark:bg-gray-700/70">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200/80 dark:bg-neutral-700/70">
               {usageProgress.percent === null ? (
                 <div className="h-1.5 w-full rounded-full bg-[repeating-linear-gradient(45deg,rgba(251,146,60,0.2),rgba(251,146,60,0.2)_8px,rgba(251,146,60,0.4)_8px,rgba(251,146,60,0.4)_16px)]" />
               ) : (

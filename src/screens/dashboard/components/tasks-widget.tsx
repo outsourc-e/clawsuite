@@ -44,7 +44,7 @@ function priorityBadgeClass(priority: TaskPriority): string {
   if (priority === 'P0') return 'bg-red-100/80 text-red-700'
   if (priority === 'P1') return 'bg-amber-100/80 text-amber-700'
   if (priority === 'P2') return 'bg-primary-200/65 text-primary-700'
-  return 'bg-gray-100/80 text-gray-600'
+  return 'bg-neutral-100/80 text-neutral-600'
 }
 
 function mobilePriorityBadgeClass(priority: TaskPriority): string {
@@ -57,7 +57,7 @@ function mobilePriorityBadgeClass(priority: TaskPriority): string {
 function statusDotClass(status: TaskStatus): string {
   if (status === 'in_progress' || status === 'review') return 'bg-amber-500'
   if (status === 'done') return 'bg-emerald-500'
-  return 'bg-gray-400'
+  return 'bg-neutral-400'
 }
 
 function truncateTaskTitle(title: string): string {

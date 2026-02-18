@@ -83,6 +83,8 @@ type MetricCardProps = {
   trendPct?: number
   trendLabel?: string
   accent: MetricAccent
+  description: string
+  rawValue?: string
   onPress: () => void
   anchorRef: RefObject<HTMLButtonElement | null>
 }
@@ -93,6 +95,8 @@ function MetricCard({
   trendPct,
   trendLabel,
   accent,
+  description,
+  rawValue,
   onPress,
   anchorRef,
 }: MetricCardProps) {
@@ -108,6 +112,7 @@ function MetricCard({
         MOBILE_ACCENT_BORDER[accent],
       )}
       aria-label={`${label} details`}
+      aria-description={`${description}${rawValue ? ` Raw value: ${rawValue}` : ''}`}
     >
       <p className="text-[11px] font-medium tracking-wide text-neutral-500 dark:text-neutral-400">
         {label}
@@ -117,16 +122,16 @@ function MetricCard({
         {formatMetricValue(value)}
       </p>
 
-      <div className="mt-2 flex items-end justify-between gap-2">
+      <div className="mt-2 flex items-end gap-2">
         {trend ? (
           <p className={cn('truncate text-xs font-medium', trend.className)}>
             {trend.label}
             {trendLabel ? ` ${trendLabel}` : ''}
           </p>
-        ) : (
-          <span />
-        )}
-        <span className="text-lg leading-none text-neutral-400 dark:text-neutral-500">›</span>
+        ) : null}
+        <span className="ml-auto text-lg leading-none text-neutral-400 dark:text-neutral-500">
+          ›
+        </span>
       </div>
     </button>
   )
@@ -181,6 +186,7 @@ export function MetricsWidget({
 
   const displayValue = isError ? '—' : value
   const rawMetricValue = rawValue ?? formatMetricValue(value)
+  const metricDescription = description
 
   return (
     <>
@@ -191,6 +197,8 @@ export function MetricsWidget({
           trendPct={trendPct}
           trendLabel={trendLabel}
           accent={accent}
+          description={metricDescription}
+          rawValue={rawMetricValue}
           onPress={openMobilePopover}
           anchorRef={cardRef}
         />
@@ -219,7 +227,7 @@ export function MetricsWidget({
                 {title}
               </p>
               <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
-                {description}
+                {metricDescription}
               </p>
               <p className="mt-3 text-sm text-neutral-700 dark:text-neutral-200">
                 Raw value: <span className="font-medium">{rawMetricValue}</span>

@@ -84,7 +84,7 @@ function ThemeToggleMini() {
         document.documentElement.classList.toggle('dark', next)
         localStorage.setItem('theme', next ? 'dark' : 'light')
       }}
-      className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-gray-300 transition-colors"
+      className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={16} strokeWidth={1.5} />
@@ -352,7 +352,7 @@ function SectionLabel({
   if (isCollapsed) return null
 
   const labelContent = (
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-gray-400 select-none">
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 select-none">
       {label}
     </span>
   )
@@ -367,7 +367,7 @@ function SectionLabel({
         {navigateTo ? (
           <Link
             to={navigateTo}
-            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-gray-400 hover:text-primary-700 dark:hover:text-gray-200 select-none transition-colors"
+            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
           >
             {label}
           </Link>
@@ -403,7 +403,7 @@ function SectionLabel({
       {navigateTo ? (
         <Link
           to={navigateTo}
-          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-gray-400 hover:text-primary-700 dark:hover:text-gray-200 select-none transition-colors"
+          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
         >
           {label}
         </Link>
@@ -1122,7 +1122,7 @@ function ChatSidebarComponent({
       {/* end scrollable body */}
 
       {/* ── Footer with User Menu ─────────────────────────────────── */}
-      <div className="px-2 py-2.5 border-t border-primary-200 bg-primary-100/80 dark:bg-gray-900 shrink-0">
+      <div className="px-2 py-2.5 border-t border-primary-200 bg-primary-100/80 dark:bg-neutral-900 shrink-0">
         {/* User card + actions */}
         <div className={cn(
           'flex items-center rounded-lg transition-colors',
@@ -1133,7 +1133,7 @@ function ChatSidebarComponent({
             <MenuTrigger
               data-tour="settings"
               className={cn(
-                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200/70 dark:hover:bg-gray-800 flex-1 min-w-0',
+                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200/70 dark:hover:bg-neutral-800 flex-1 min-w-0',
                 isCollapsed ? 'justify-center px-0' : 'px-1.5',
               )}
             >
@@ -1151,7 +1151,7 @@ function ChatSidebarComponent({
                     transition={transition}
                     className="flex-1 min-w-0 flex items-center gap-1.5"
                   >
-                    <span className="block truncate text-sm font-medium text-primary-900 dark:text-gray-100">
+                    <span className="block truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
                       {profileDisplayName}
                     </span>
                     <GatewayStatusDot />
@@ -1174,7 +1174,7 @@ function ChatSidebarComponent({
                   />
                   Settings
                 </span>
-                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-gray-400 font-mono">
+                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-neutral-400 font-mono">
                   {mod},
                 </kbd>
               </MenuItem>
@@ -1188,7 +1188,7 @@ function ChatSidebarComponent({
                   <HugeiconsIcon icon={ApiIcon} size={20} strokeWidth={1.5} />
                   Providers
                 </span>
-                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-gray-400 font-mono">
+                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-neutral-400 font-mono">
                   {mod}P
                 </kbd>
               </MenuItem>
@@ -1201,7 +1201,7 @@ function ChatSidebarComponent({
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
-                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-gray-300 transition-colors"
+                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
                 aria-label="Settings"
               >
                 <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
