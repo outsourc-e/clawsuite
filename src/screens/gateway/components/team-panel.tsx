@@ -43,6 +43,7 @@ export type TeamMember = {
 
 type TeamPanelProps = {
   team: TeamMember[]
+  activeTemplateId?: TeamTemplateId
   onApplyTemplate: (templateId: TeamTemplateId) => void
   onAddAgent: () => void
   onUpdateAgent: (
@@ -59,8 +60,17 @@ const STATUS_COLOR: Record<string, string> = {
   paused: 'bg-red-500',
 }
 
+const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
+  auto: 'bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200',
+  opus: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  codex: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  flash: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+}
+
 export function TeamPanel({
   team,
+  activeTemplateId,
   onApplyTemplate,
   onAddAgent,
   onUpdateAgent,
@@ -92,7 +102,7 @@ export function TeamPanel({
 
   return (
     <div className="flex h-full flex-col border-r border-primary-200 bg-primary-50/40 dark:bg-neutral-900/20">
-      <div className="border-b border-primary-200 px-3 py-3">
+      <div className="border-b border-primary-200 px-3 pb-3 pt-2">
         <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
           Team Setup
         </h2>
@@ -103,7 +113,11 @@ export function TeamPanel({
               key={template.id}
               type="button"
               onClick={() => onApplyTemplate(template.id)}
-              className="flex w-full items-center justify-between rounded-lg border border-primary-200 bg-white px-2.5 py-2 text-left transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+              className={cn(
+                'flex w-full cursor-pointer items-center justify-between rounded-lg border border-primary-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-accent-400 hover:bg-accent-50/50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-accent-700 dark:hover:bg-accent-950/10',
+                activeTemplateId === template.id &&
+                  'border-accent-400 bg-accent-50/60 dark:border-accent-700 dark:bg-accent-950/10',
+              )}
             >
               <span className="text-xs font-medium text-primary-800 dark:text-neutral-100">
                 {template.icon} {template.name}
@@ -153,11 +167,16 @@ export function TeamPanel({
               >
                 <span className={cn('mt-1 size-2.5 shrink-0 rounded-full', statusColor)} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
+                  <p className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
                     {agent.name}
                   </p>
                   <div className="mt-1 flex items-center gap-1.5">
-                    <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary-700 dark:bg-neutral-800 dark:text-neutral-300">
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                        MODEL_BADGE_COLOR[agent.modelId],
+                      )}
+                    >
                       {modelLabel}
                     </span>
                     <span className="text-[10px] uppercase tracking-wide text-primary-500">
@@ -165,6 +184,15 @@ export function TeamPanel({
                     </span>
                   </div>
                 </div>
+                <span
+                  aria-hidden
+                  className={cn(
+                    'mt-0.5 shrink-0 text-sm text-primary-400 transition-transform',
+                    expanded && 'rotate-90 text-accent-500',
+                  )}
+                >
+                  ›
+                </span>
               </button>
 
               {expanded ? (
@@ -213,13 +241,14 @@ export function TeamPanel({
         })}
       </div>
 
-      <div className="border-t border-primary-200 px-3 py-3">
+      <div className="px-2 pb-3">
         <button
           type="button"
           onClick={onAddAgent}
-          className="inline-flex w-full items-center justify-center rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-primary-300 py-2.5 text-xs font-semibold text-primary-500 transition-colors hover:border-accent-400 hover:text-accent-600 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:text-accent-300"
         >
-          + Add Agent
+          <span aria-hidden>+</span>
+          <span>Add Agent</span>
         </button>
       </div>
     </div>

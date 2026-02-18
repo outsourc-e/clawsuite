@@ -11,6 +11,7 @@ const FILTERS = ['All', 'Tasks', 'Agents'] as const
 type FilterTab = (typeof FILTERS)[number]
 
 type SessionRecord = Record<string, unknown>
+type FeedRow = FeedEvent & { baseMessage: string, repeatCount: number }
 
 const TASK_TYPES = new Set<FeedEventType>([
   'task_created',
@@ -78,11 +79,39 @@ function timeAgo(timestamp: number, now: number): string {
 
 export function LiveFeedPanel() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('All')
-  const [events, setEvents] = useState<Array<FeedEvent>>([])
+  const [events, setEvents] = useState<Array<FeedRow>>([])
   const [clock, setClock] = useState(Date.now())
   const previousSessionsRef = useRef<Map<string, string> | null>(null)
 
-  useEffect(() => onFeedEvent((event) => setEvents((prev) => [event, ...prev].slice(0, 50))), [])
+  useEffect(
+    () =>
+      onFeedEvent((event) =>
+        setEvents((previous) => {
+          const latest = previous[0]
+          if (
+            latest &&
+            latest.type === event.type &&
+            latest.baseMessage === event.message
+          ) {
+            return [
+              {
+                ...latest,
+                agentName: event.agentName ?? latest.agentName,
+                timestamp: event.timestamp,
+                repeatCount: latest.repeatCount + 1,
+              },
+              ...previous.slice(1),
+            ].slice(0, 50)
+          }
+
+          return [
+            { ...event, baseMessage: event.message, repeatCount: 1 },
+            ...previous,
+          ].slice(0, 50)
+        }),
+      ),
+    [],
+  )
 
   useEffect(() => {
     const tick = window.setInterval(() => setClock(Date.now()), 30_000)
@@ -150,7 +179,7 @@ export function LiveFeedPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-primary-200 px-3 py-3">
+      <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3">
         <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">Live Feed</h2>
         <span className="flex items-center gap-1 text-[11px] text-emerald-600">
           <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
@@ -158,7 +187,7 @@ export function LiveFeedPanel() {
         </span>
       </div>
 
-      <div className="flex gap-1 border-b border-primary-100 px-3 py-2">
+      <div className="flex gap-1 border-b border-primary-100 px-4 py-3">
         {FILTERS.map((tab) => (
           <button
             key={tab}
@@ -176,27 +205,33 @@ export function LiveFeedPanel() {
         ))}
       </div>
 
-      <div className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
+      <div className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
         {visibleEvents.length === 0 ? (
           <p className="py-8 text-center text-[11px] text-primary-400">Listening for events...</p>
         ) : (
-          visibleEvents.map((event) => (
-            <div
-              key={event.id}
-              className="flex items-start gap-2 rounded-lg border border-primary-200/70 bg-white/80 px-2.5 py-2 dark:border-neutral-800 dark:bg-neutral-900/70"
-            >
-              <span className="mt-0.5 text-sm" aria-hidden>
-                {EVENT_ICONS[event.type] ?? '•'}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-primary-900 dark:text-neutral-100">{event.message}</p>
-                {event.agentName ? (
-                  <p className="truncate text-[10px] text-primary-500 dark:text-neutral-400">{event.agentName}</p>
-                ) : null}
+          visibleEvents.map((event) => {
+            const message = event.repeatCount > 1
+              ? `${event.baseMessage} (x${event.repeatCount})`
+              : event.baseMessage
+
+            return (
+              <div
+                key={event.id}
+                className="flex items-start gap-2 rounded-lg border border-primary-200/70 bg-white/80 px-2.5 py-2 dark:border-neutral-800 dark:bg-neutral-900/70"
+              >
+                <span className="mt-0.5 text-sm" aria-hidden>
+                  {EVENT_ICONS[event.type] ?? '•'}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-medium text-primary-900 dark:text-neutral-100">{message}</p>
+                  {event.agentName ? (
+                    <p className="truncate text-[10px] text-primary-500 dark:text-neutral-400">{event.agentName}</p>
+                  ) : null}
+                </div>
+                <span className="shrink-0 text-[10px] text-primary-400">{timeAgo(event.timestamp, clock)}</span>
               </div>
-              <span className="shrink-0 text-[10px] text-primary-400">{timeAgo(event.timestamp, clock)}</span>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>

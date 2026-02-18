@@ -127,6 +127,15 @@ function suggestTemplate(goal: string): TeamTemplateId {
   return 'research'
 }
 
+function resolveActiveTemplate(team: TeamMember[]): TeamTemplateId | undefined {
+  return TEAM_TEMPLATES.find((template) => {
+    if (team.length !== template.agents.length) return false
+    return template.agents.every((agentName) =>
+      team.some((member) => member.id === `${template.id}-${agentName}`),
+    )
+  })?.id
+}
+
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [missionActive, setMissionActive] = useState(false)
   const [missionGoal, setMissionGoal] = useState('')
@@ -188,6 +197,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     () => teamWithRuntimeStatus.map((member) => ({ id: member.id, name: member.name })),
     [teamWithRuntimeStatus],
   )
+  const activeTemplateId = useMemo(() => resolveActiveTemplate(team), [team])
 
   function applyTemplate(templateId: TeamTemplateId) {
     setTeam(buildTeamFromTemplate(templateId))
@@ -229,45 +239,37 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           <p className="text-xs text-primary-500">Mission Control</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-primary-200 bg-white p-0.5 dark:border-neutral-700 dark:bg-neutral-900">
-            <button
-              type="button"
-              className={cn(
-                'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                view === 'board'
-                  ? 'bg-primary-100 text-primary-800 dark:bg-neutral-800 dark:text-neutral-100'
-                  : 'text-primary-500 hover:text-primary-700',
-              )}
-              onClick={() => setView('board')}
-            >
-              Board
-            </button>
-            <button
-              type="button"
-              className={cn(
-                'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                view === 'timeline'
-                  ? 'bg-primary-100 text-primary-800 dark:bg-neutral-800 dark:text-neutral-100'
-                  : 'text-primary-500 hover:text-primary-700',
-              )}
-              onClick={() => setView('timeline')}
-            >
-              Timeline
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setMissionActive(false)
-              setShowNewMission(true)
-              setMissionState('stopped')
-            }}
-            className="inline-flex items-center rounded-lg bg-accent-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-600"
-          >
-            + New Mission
-          </button>
+        <div className="flex min-h-[30px] items-center">
+          {missionActive ? (
+            <div className="flex items-center rounded-lg border border-primary-200 bg-white p-0.5 dark:border-neutral-700 dark:bg-neutral-900">
+              <button
+                type="button"
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  view === 'board'
+                    ? 'bg-primary-100 text-primary-800 dark:bg-neutral-800 dark:text-neutral-100'
+                    : 'text-primary-500 hover:text-primary-700',
+                )}
+                onClick={() => setView('board')}
+              >
+                Board
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  view === 'timeline'
+                    ? 'bg-primary-100 text-primary-800 dark:bg-neutral-800 dark:text-neutral-100'
+                    : 'text-primary-500 hover:text-primary-700',
+                )}
+                onClick={() => setView('timeline')}
+              >
+                Timeline
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-primary-400">Agent Hub · Mission Control</p>
+          )}
         </div>
       </div>
 
@@ -275,6 +277,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div className="w-[280px] shrink-0">
           <TeamPanel
             team={teamWithRuntimeStatus}
+            activeTemplateId={activeTemplateId}
             onApplyTemplate={applyTemplate}
             onAddAgent={handleAddAgent}
             onUpdateAgent={(agentId, updates) => {
@@ -291,8 +294,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div className="min-w-0 flex-1 overflow-hidden border-l border-primary-200">
           {!missionActive ? (
             showNewMission ? (
-              <div className="flex h-full items-center justify-center px-6 py-8">
-                <div className="w-full max-w-2xl rounded-2xl border border-primary-200 bg-white/80 p-7 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/70">
+              <div className="flex h-full items-center justify-center px-8 py-6">
+                <div className="w-full max-w-2xl rounded-2xl border border-primary-200 bg-white/80 px-8 py-6 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/70">
+                  <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-xs text-primary-400">
+                    <span className="rounded-full bg-primary-100 px-2 py-0.5">
+                      1. Choose a team template
+                    </span>
+                    <span className="text-primary-300">→</span>
+                    <span className="rounded-full bg-primary-100 px-2 py-0.5">
+                      2. Describe your mission
+                    </span>
+                    <span className="text-primary-300">→</span>
+                    <span className="rounded-full bg-primary-100 px-2 py-0.5">3. Launch</span>
+                  </div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-500">
                     No Active Mission
                   </p>
@@ -316,9 +330,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         type="button"
                         onClick={handleAutoConfigure}
                         disabled={!missionGoal.trim()}
-                        className="rounded-lg border border-primary-200 bg-primary-100 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                        className="rounded-lg border border-accent-400 px-4 py-2 text-xs font-medium text-accent-600 transition-colors hover:bg-accent-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Auto-configure
+                        ✨ Auto-configure
                       </button>
                       <button
                         type="button"
@@ -372,78 +386,84 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <LiveFeedPanel />
           </div>
 
-          <div className="border-t border-primary-200 px-3 py-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-500">
-              Mission Controls
-            </h3>
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setMissionState('running')}
-                className={cn(
-                  'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
-                  missionState === 'running'
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
-                )}
-              >
-                Start
-              </button>
-              <button
-                type="button"
-                onClick={() => setMissionState('paused')}
-                className={cn(
-                  'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
-                  missionState === 'paused'
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
-                )}
-              >
-                Pause
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMissionState('stopped')
-                  setMissionActive(false)
-                  setShowNewMission(false)
-                }}
-                className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
-              >
-                Stop
-              </button>
-            </div>
+          <div className="border-t border-primary-200 px-4 py-3">
+            {missionActive ? (
+              <>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                  Mission Controls
+                </h3>
+                <div className="mt-2 grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setMissionState('running')}
+                    className={cn(
+                      'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
+                      missionState === 'running'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
+                    )}
+                  >
+                    Start
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMissionState('paused')}
+                    className={cn(
+                      'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
+                      missionState === 'paused'
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
+                    )}
+                  >
+                    Pause
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMissionState('stopped')
+                      setMissionActive(false)
+                      setShowNewMission(false)
+                    }}
+                    className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
+                  >
+                    Stop
+                  </button>
+                </div>
 
-            <label className="mt-3 block">
-              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                Budget Limit (max tokens)
-              </span>
-              <input
-                type="number"
-                min={0}
-                value={budgetLimit}
-                onChange={(event) => setBudgetLimit(event.target.value)}
-                className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-              />
-            </label>
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                    Budget Limit (max tokens)
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={budgetLimit}
+                    onChange={(event) => setBudgetLimit(event.target.value)}
+                    className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                  />
+                </label>
 
-            <button
-              type="button"
-              onClick={() => setAutoAssign((current) => !current)}
-              className="mt-2 flex w-full items-center justify-between rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
-            >
-              <span>Auto-assign tasks</span>
-              <span
-                className={cn(
-                  'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                  autoAssign
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                    : 'bg-primary-100 text-primary-600 dark:bg-neutral-700 dark:text-neutral-300',
-                )}
-              >
-                {autoAssign ? 'On' : 'Off'}
-              </span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setAutoAssign((current) => !current)}
+                  className="mt-2 flex w-full items-center justify-between rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                >
+                  <span>Auto-assign tasks</span>
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                      autoAssign
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                        : 'bg-primary-100 text-primary-600 dark:bg-neutral-700 dark:text-neutral-300',
+                    )}
+                  >
+                    {autoAssign ? 'On' : 'Off'}
+                  </span>
+                </button>
+              </>
+            ) : (
+              <p className="text-xs text-primary-400">Start a mission to see controls here</p>
+            )}
           </div>
         </div>
       </div>
