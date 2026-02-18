@@ -33,6 +33,7 @@ import { SkillsWidget, fetchInstalledSkills } from './components/skills-widget'
 // SystemInfoWidget removed — not useful enough for dashboard real estate
 import { TasksWidget } from './components/tasks-widget'
 import { UsageMeterWidget, fetchUsage } from './components/usage-meter-widget'
+import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
 import { WidgetGrid, type WidgetGridItem } from './components/widget-grid'
 import { ActivityTicker } from '@/components/activity-ticker'
@@ -1218,7 +1219,45 @@ export function DashboardScreen() {
             </div>
           ) : null}
 
-          {!isMobile ? <WidgetGrid items={metricItems} className="mb-3 md:mb-4" /> : null}
+          {!isMobile ? (
+            <div className="mb-3 md:mb-4">
+              <SystemGlance
+                sessions={systemStatus.totalSessions}
+                activeAgents={systemStatus.activeAgents}
+                costToday={heroCostQuery.data ?? '—'}
+                uptimeFormatted={formatUptime(systemStatus.uptimeSeconds)}
+                updatedAgo={systemStatus.uptimeSeconds > 0 ? `${Math.floor(systemStatus.uptimeSeconds / 60)}m ago` : 'just now'}
+                healthStatus={
+                  !systemStatus.gateway.connected
+                    ? 'offline'
+                    : systemStatus.uptimeSeconds <= 0
+                      ? 'warning'
+                      : 'healthy'
+                }
+                gatewayConnected={systemStatus.gateway.connected}
+                sessionPercent={
+                  systemStatus.totalSessions > 0
+                    ? Math.min(100, (systemStatus.totalSessions / 10) * 100)
+                    : undefined
+                }
+                costPercent={
+                  heroCostQuery.data && heroCostQuery.data !== '—'
+                    ? Math.min(100, (parseFloat(heroCostQuery.data.replace('$', '').replace(',', '')) / (500 / 30)) * 100)
+                    : undefined
+                }
+                providers={
+                  sessionStatusQuery.data?.payload?.models
+                    ? (sessionStatusQuery.data.payload.models as Array<Record<string, unknown>>).map((m) => ({
+                        name: String(m.provider ?? m.model ?? ''),
+                        cost: Number(m.costUsd ?? 0),
+                        tokens: Number(m.inputTokens ?? 0) + Number(m.outputTokens ?? 0),
+                      }))
+                    : []
+                }
+                currentModel={systemStatus.currentModel}
+              />
+            </div>
+          ) : null}
 
           {/* Inline widget controls — desktop only (mobile controls are in header) */}
           {!isMobile && (
