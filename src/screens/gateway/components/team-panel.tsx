@@ -45,6 +45,7 @@ type TeamPanelProps = {
   team: TeamMember[]
   activeTemplateId?: TeamTemplateId
   agentTaskCounts?: Record<string, number>
+  spawnState?: Record<string, 'idle' | 'spawning' | 'ready' | 'error'>
   onApplyTemplate: (templateId: TeamTemplateId) => void
   onAddAgent: () => void
   onUpdateAgent: (
@@ -73,6 +74,7 @@ export function TeamPanel({
   team,
   activeTemplateId,
   agentTaskCounts,
+  spawnState,
   onApplyTemplate,
   onAddAgent,
   onUpdateAgent,
@@ -149,7 +151,16 @@ export function TeamPanel({
         ) : null}
 
         {team.map((agent) => {
-          const statusColor = STATUS_COLOR[agent.status] ?? 'bg-primary-400'
+          const agentSpawnStatus = spawnState?.[agent.id]
+          const statusColor =
+            agentSpawnStatus === 'spawning'
+              ? 'bg-amber-400'
+              : agentSpawnStatus === 'ready'
+                ? 'bg-emerald-500'
+                : agentSpawnStatus === 'error'
+                  ? 'bg-red-500'
+                  : (STATUS_COLOR[agent.status] ?? 'bg-primary-400')
+          const isSpawning = agentSpawnStatus === 'spawning'
           const expanded = expandedAgentId === agent.id
           const modelLabel = modelLabelById.get(agent.modelId) ?? 'Auto'
           const taskCount = agentTaskCounts?.[agent.id] ?? 0
@@ -168,7 +179,12 @@ export function TeamPanel({
                 onClick={() => handleToggleAgent(agent.id)}
                 className="flex w-full items-start gap-2 text-left"
               >
-                <span className={cn('mt-1 size-2.5 shrink-0 rounded-full', statusColor)} />
+                <span className="relative mt-1 inline-flex size-2.5 shrink-0">
+                  {isSpawning ? (
+                    <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/70" />
+                  ) : null}
+                  <span className={cn('relative inline-flex size-2.5 rounded-full', statusColor)} />
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
                     {agent.name}

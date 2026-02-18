@@ -380,6 +380,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [boardTasks, setBoardTasks] = useState<Array<HubTask>>([])
   const [missionTasks, setMissionTasks] = useState<Array<HubTask>>([])
   const [dispatchedTaskIdsByAgent, setDispatchedTaskIdsByAgent] = useState<Record<string, Array<string>>>({})
+  const [agentSessionMap, setAgentSessionMap] = useState<Record<string, string>>(() => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const stored = window.localStorage.getItem('clawsuite:hub-agent-sessions')
+      return stored ? (JSON.parse(stored) as Record<string, string>) : {}
+    } catch {
+      return {}
+    }
+  })
+  const [spawnState, setSpawnState] = useState<Record<string, 'idle' | 'spawning' | 'ready' | 'error'>>({})
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const stored = readStoredTeam()
     if (stored.length > 0) return stored
@@ -391,11 +401,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const teamPanelFlashTimerRef = useRef<number | undefined>(undefined)
   const pendingTaskMovesRef = useRef<Array<{ taskIds: Array<string>; status: TaskStatus }>>([])
   const sessionActivityRef = useRef<Map<string, string>>(new Map())
+  const dispatchingRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(team))
   }, [team])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('clawsuite:hub-agent-sessions', JSON.stringify(agentSessionMap))
+  }, [agentSessionMap])
 
   useEffect(() => {
     if (team.length > 0) return
@@ -532,11 +548,76 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setSelectedOutputAgentId(agentId)
   }, [])
 
+  const spawnAgentSession = useCallback(async (member: TeamMember): Promise<string> => {
+    const suffix = Math.random().toString(36).slice(2, 8)
+    const baseName = member.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const friendlyId = `hub-${baseName}-${suffix}`
+    const label = `Mission: ${member.name}`
+
+    const response = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ friendlyId, label }),
+    })
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
+      throw new Error(
+        readString(payload.error) || readString(payload.message) || `Spawn failed: HTTP ${response.status}`,
+      )
+    }
+
+    const data = (await response.json()) as Record<string, unknown>
+    const sessionKey = readString(data.sessionKey)
+    if (!sessionKey) throw new Error('No sessionKey in spawn response')
+    return sessionKey
+  }, [])
+
+  const ensureAgentSessions = useCallback(async (teamMembers: TeamMember[]): Promise<Record<string, string>> => {
+    const currentMap = { ...agentSessionMap }
+    const spawnPromises: Array<Promise<void>> = []
+
+    for (const member of teamMembers) {
+      if (currentMap[member.id]) continue
+
+      setSpawnState((prev) => ({ ...prev, [member.id]: 'spawning' }))
+
+      spawnPromises.push(
+        spawnAgentSession(member)
+          .then((sessionKey) => {
+            currentMap[member.id] = sessionKey
+            setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
+            emitFeedEvent({
+              type: 'agent_spawned',
+              message: `${member.name} session created`,
+              agentName: member.name,
+            })
+          })
+          .catch((err: unknown) => {
+            setSpawnState((prev) => ({ ...prev, [member.id]: 'error' }))
+            emitFeedEvent({
+              type: 'system',
+              message: `Failed to spawn ${member.name}: ${err instanceof Error ? err.message : String(err)}`,
+              agentName: member.name,
+            })
+          }),
+      )
+    }
+
+    await Promise.allSettled(spawnPromises)
+    setAgentSessionMap(currentMap)
+    return currentMap
+  }, [agentSessionMap, spawnAgentSession])
+
   const executeMission = useCallback(async (
     tasks: Array<HubTask>,
     teamMembers: Array<TeamMember>,
     missionGoalValue: string,
   ) => {
+    // STEP A: Ensure all agents have isolated gateway sessions
+    const sessionMap = await ensureAgentSessions(teamMembers)
+
+    // STEP B: Group tasks by agent
     const tasksByAgent = new Map<string, Array<HubTask>>()
     for (const task of tasks) {
       if (!task.agentId) continue
@@ -545,7 +626,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       tasksByAgent.set(task.agentId, existing)
     }
 
+    // STEP C: Dispatch to per-agent sessions
     for (const [agentId, agentTasks] of tasksByAgent) {
+      const sessionKey = sessionMap[agentId]
+      if (!sessionKey) {
+        emitFeedEvent({
+          type: 'system',
+          message: `No session for agent ${agentId} — skipping dispatch`,
+        })
+        continue
+      }
+
       const member = teamMembers.find((entry) => entry.id === agentId)
       const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
       const message = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
@@ -554,7 +645,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         const response = await fetch('/api/sessions/send', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionKey: 'main', message }),
+          body: JSON.stringify({ sessionKey, message }),
         })
 
         if (!response.ok) {
@@ -588,7 +679,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         })
       }
     }
-  }, [moveTasksToStatus])
+  }, [ensureAgentSessions, moveTasksToStatus])
 
   useEffect(() => {
     if (!missionActive || missionState !== 'running') {
@@ -688,6 +779,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }
 
   function handleCreateMission() {
+    if (dispatchingRef.current) return
     const trimmedGoal = missionGoal.trim()
     if (!trimmedGoal) return
     const createdTasks = parseMissionGoal(trimmedGoal, teamWithRuntimeStatus)
@@ -696,6 +788,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       return
     }
 
+    dispatchingRef.current = true
     const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
     setMissionActive(true)
     setShowNewMission(false)
@@ -713,7 +806,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     toast(`Mission started with ${createdTasks.length} tasks`, { type: 'success' })
 
     window.setTimeout(() => {
-      void executeMission(createdTasks, teamWithRuntimeStatus, trimmedGoal)
+      void executeMission(createdTasks, teamWithRuntimeStatus, trimmedGoal).finally(() => {
+        dispatchingRef.current = false
+      })
     }, 0)
   }
 
@@ -772,6 +867,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             team={teamWithRuntimeStatus}
             activeTemplateId={activeTemplateId}
             agentTaskCounts={agentTaskCounts}
+            spawnState={spawnState}
             onApplyTemplate={applyTemplate}
             onAddAgent={handleAddAgent}
             onUpdateAgent={(agentId, updates) => {
@@ -952,6 +1048,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <button
                     type="button"
                     onClick={() => {
+                      // Best-effort cleanup of per-agent sessions
+                      Object.values(agentSessionMap).forEach((sessionKey) => {
+                        fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
+                          method: 'DELETE',
+                        }).catch(() => {})
+                      })
+                      setAgentSessionMap({})
+                      setSpawnState({})
+                      if (typeof window !== 'undefined') {
+                        window.localStorage.removeItem('clawsuite:hub-agent-sessions')
+                      }
                       setMissionState('stopped')
                       setMissionActive(false)
                       setShowNewMission(false)
@@ -959,6 +1066,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       setMissionTasks([])
                       setDispatchedTaskIdsByAgent({})
                       setSelectedOutputAgentId(undefined)
+                      dispatchingRef.current = false
                       pendingTaskMovesRef.current = []
                       sessionActivityRef.current = new Map()
                       taskBoardRef.current = null
