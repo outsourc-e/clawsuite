@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 type SquadStatusWidgetProps = { editMode?: boolean }
 type SessionsApiResponse = { sessions?: Array<Record<string, unknown>> }
 type AgentStatus = 'active' | 'idle' | 'available' | 'paused'
-type SquadAgentRow = { id: string; name: string; status: AgentStatus; taskPreview: string; timeAgo: string; modelShort: string; updatedAt: number }
+type SquadAgentRow = { id: string; name: string; status: AgentStatus; taskPreview: string; timeAgo: string; modelShort: string; updatedAt: number; tokens: number }
 
 const STATUS_LABEL: Record<AgentStatus, string> = { active: 'Active', idle: 'Idle', available: 'Available', paused: 'Paused' }
 const STATUS_DOT: Record<AgentStatus, string> = { active: 'bg-emerald-500', idle: 'bg-yellow-500', available: 'bg-neutral-400', paused: 'bg-red-500' }
@@ -75,6 +75,18 @@ function extractModel(session: Record<string, unknown>): string {
   const details = lastMessage?.details && typeof lastMessage.details === 'object' ? (lastMessage.details as Record<string, unknown>) : null
   return readString(details?.model) || readString(details?.agentModel)
 }
+function extractTokens(session: Record<string, unknown>): number {
+  const usage = session.usage && typeof session.usage === 'object' ? (session.usage as Record<string, unknown>) : {}
+  const total = usage.totalTokens ?? usage.total ?? session.totalTokens
+  if (typeof total === 'number' && total > 0) return total
+  return 0
+}
+function formatTokenCompact(n: number): string {
+  if (n <= 0) return ''
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return n.toString()
+}
 
 export function SquadStatusWidget({ editMode }: SquadStatusWidgetProps) {
   const navigate = useNavigate()
@@ -103,6 +115,7 @@ export function SquadStatusWidget({ editMode }: SquadStatusWidgetProps) {
           timeAgo: formatRelativeTime(updatedAt, now),
           modelShort: formatModelShort(extractModel(session)),
           updatedAt,
+          tokens: extractTokens(session),
         }
       })
       .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -139,6 +152,9 @@ export function SquadStatusWidget({ editMode }: SquadStatusWidgetProps) {
               </div>
               <p className="hidden max-w-[120px] truncate text-[11px] italic text-neutral-500 sm:block">{agent.taskPreview || '—'}</p>
               <span className="shrink-0 text-[11px] text-neutral-400 tabular-nums">{agent.timeAgo}</span>
+              {agent.tokens > 0 && (
+                <span className="shrink-0 text-[10px] tabular-nums text-neutral-400">{formatTokenCompact(agent.tokens)}</span>
+              )}
               <span className="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{agent.modelShort}</span>
             </div>
           ))}

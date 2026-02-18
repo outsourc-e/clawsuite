@@ -11,15 +11,15 @@ type RingProps = {
 function getRingColor(percent: number): string {
   if (percent >= 90) return 'stroke-red-500'
   if (percent >= 70) return 'stroke-amber-500'
-  if (percent >= 40) return 'stroke-emerald-500'
-  return 'stroke-cyan-500'
+  if (percent >= 40) return 'stroke-cyan-500'
+  return 'stroke-emerald-500'
 }
 
 function getRingBg(percent: number): string {
   if (percent >= 90) return 'stroke-red-500/15'
   if (percent >= 70) return 'stroke-amber-500/15'
-  if (percent >= 40) return 'stroke-emerald-500/15'
-  return 'stroke-cyan-500/15'
+  if (percent >= 40) return 'stroke-cyan-500/15'
+  return 'stroke-emerald-500/15'
 }
 
 export function PercentRing({

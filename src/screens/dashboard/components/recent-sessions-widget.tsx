@@ -82,19 +82,23 @@ export function RecentSessionsWidget({
     function buildRecentSessions() {
       const rows = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
 
-      return [...rows]
-        .sort(function sortByMostRecent(a, b) {
-          return toSessionUpdatedAt(b) - toSessionUpdatedAt(a)
-        })
-        .slice(0, 5)
-        .map(function mapSession(session): RecentSession {
-          return {
-            friendlyId: session.friendlyId,
-            title: toSessionTitle(session),
-            preview: toSessionPreview(session),
-            updatedAt: toSessionUpdatedAt(session),
-          }
-        })
+      const sorted = [...rows].sort(function sortByMostRecent(a, b) {
+        return toSessionUpdatedAt(b) - toSessionUpdatedAt(a)
+      })
+
+      // Prefer sessions active in the last 24h; fall back to all if none qualify
+      const oneDayAgo = Date.now() - 86_400_000
+      const recentRows = sorted.filter((s) => toSessionUpdatedAt(s) > oneDayAgo)
+      const displayRows = recentRows.length > 0 ? recentRows : sorted
+
+      return displayRows.slice(0, 5).map(function mapSession(session): RecentSession {
+        return {
+          friendlyId: session.friendlyId,
+          title: toSessionTitle(session),
+          preview: toSessionPreview(session),
+          updatedAt: toSessionUpdatedAt(session),
+        }
+      })
     },
     [sessionsQuery.data],
   )
@@ -108,7 +112,7 @@ export function RecentSessionsWidget({
       icon={Clock01Icon}
       titleAccessory={
         <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-100/70 px-2 py-0.5 text-[11px] font-medium text-primary-500 tabular-nums">
-          {sessions.length}
+          {sessions.length} active
         </span>
       }
       draggable={draggable}

@@ -9,8 +9,8 @@ type SystemGlanceProps = {
   updatedAgo: string
   healthStatus: 'healthy' | 'warning' | 'critical' | 'offline'
   gatewayConnected: boolean
+  /** Context usage % from API (e.g. 47.3) — shown as SESSION ring */
   sessionPercent?: number
-  costPercent?: number
   providers?: Array<{ name: string; cost: number; tokens: number }>
   currentModel?: string
 }
@@ -30,7 +30,6 @@ export function SystemGlance({
   healthStatus,
   gatewayConnected,
   sessionPercent,
-  costPercent,
   providers = [],
   currentModel,
 }: SystemGlanceProps) {
@@ -97,20 +96,19 @@ export function SystemGlance({
         )}
       </div>
 
-      {/* Main stat grid — 2 rings + health */}
+      {/* Main stat grid — SESSION ring + COST text + AGENTS */}
       <div className="grid grid-cols-3 gap-3">
         <StatBlock
-          label="SESSION"
-          value={sessions}
+          label="CONTEXT"
+          value={sessionPercent !== undefined ? `${Math.round(sessionPercent)}%` : sessions}
           percent={sessionPercent}
           badge={healthStatus}
-          sublabel={`${sessions} active`}
+          sublabel={`${sessions} sessions`}
         />
         <StatBlock
           label="COST"
           value={costToday}
-          percent={costPercent}
-          sublabel={costToday}
+          sublabel="today"
         />
         <StatBlock
           label="AGENTS"
@@ -134,7 +132,7 @@ export function SystemGlance({
         </div>
       </div>
 
-      {/* Provider cost breakdown (when filtered) */}
+      {/* Provider cost breakdown (when filtered or always when has data) */}
       {filteredProviders.length > 0 && (
         <div className="space-y-1.5">
           {filteredProviders.map((p) => (

@@ -147,6 +147,17 @@ function formatUptime(seconds: number): string {
   return `${minutes}m`
 }
 
+function formatUpdatedAgo(timestampMs: number): string {
+  if (timestampMs <= 0) return 'just now'
+  const seconds = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000))
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
 function normalizeTimestamp(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value > 1_000_000_000_000 ? value : value * 1000
@@ -415,22 +426,35 @@ export function DashboardScreen() {
         ''
       const currentModel = formatModelName(rawModel)
 
-      // Derive uptime from session firstActivity or updatedAt (milliseconds → seconds)
+      // Derive uptime from payload startDate, session firstActivity, or updatedAt
+      // normalizeTimestamp handles both ms and s epoch values
       const mainSession = ssSessions[0]
-      const firstActivity: number | undefined =
+      const firstActivityRaw =
+        ssPayloadRaw?.startDate ??
         mainSession?.usage?.firstActivity ??
-        mainSession?.updatedAt ??
-        undefined
+        mainSession?.updatedAt
+      const firstActivityMs = normalizeTimestamp(firstActivityRaw)
       const uptimeSeconds =
-        typeof firstActivity === 'number' && firstActivity > 0
-          ? Math.floor((Date.now() - firstActivity) / 1000)
+        firstActivityMs > 0
+          ? Math.max(0, Math.floor((Date.now() - firstActivityMs) / 1000))
           : 0
+
+      // Extract context usage percent from API (e.g. 47.3)
+      const contextPercentRaw = ssPayloadRaw?.contextPercent
+      const contextPercent =
+        typeof contextPercentRaw === 'number' && Number.isFinite(contextPercentRaw)
+          ? Math.max(0, Math.min(100, contextPercentRaw))
+          : undefined
+
+      // Extract last-update timestamp from payload for "Updated X ago"
+      const updatedAtMs = normalizeTimestamp(ssPayloadRaw?.updatedAt)
 
       // Filter to active sessions (updated in last 24h)
       const oneDayAgo = Date.now() - 86_400_000
-      const activeSessions = ssSessions.filter(
-        (s) => typeof s.updatedAt === 'number' && s.updatedAt > oneDayAgo,
-      )
+      const activeSessions = ssSessions.filter((s) => {
+        const ts = normalizeTimestamp(s.updatedAt)
+        return ts > oneDayAgo
+      })
       const totalSessions = activeSessions.length || sessions.length
       // Count unique agent IDs among active sessions
       const uniqueAgentIds = new Set(
@@ -449,9 +473,11 @@ export function DashboardScreen() {
         currentModel,
         totalSessions,
         activeAgents,
+        contextPercent,
+        updatedAtMs,
       }
     },
-    [gatewayStatusQuery.data?.ok, sessionsQuery.data, sessionStatusQuery.data],
+    [gatewayStatusQuery.data?.ok, gatewayStatusQuery.isError, sessionsQuery.data, sessionStatusQuery.data],
   )
 
   const taskSummary = useMemo(
@@ -1226,7 +1252,7 @@ export function DashboardScreen() {
                 activeAgents={systemStatus.activeAgents}
                 costToday={heroCostQuery.data ?? '—'}
                 uptimeFormatted={formatUptime(systemStatus.uptimeSeconds)}
-                updatedAgo={systemStatus.uptimeSeconds > 0 ? `${Math.floor(systemStatus.uptimeSeconds / 60)}m ago` : 'just now'}
+                updatedAgo={formatUpdatedAgo(systemStatus.updatedAtMs)}
                 healthStatus={
                   !systemStatus.gateway.connected
                     ? 'offline'
@@ -1235,23 +1261,16 @@ export function DashboardScreen() {
                       : 'healthy'
                 }
                 gatewayConnected={systemStatus.gateway.connected}
-                sessionPercent={
-                  systemStatus.totalSessions > 0
-                    ? Math.min(100, (systemStatus.totalSessions / 10) * 100)
-                    : undefined
-                }
-                costPercent={
-                  heroCostQuery.data && heroCostQuery.data !== '—'
-                    ? Math.min(100, (parseFloat(heroCostQuery.data.replace('$', '').replace(',', '')) / (500 / 30)) * 100)
-                    : undefined
-                }
+                sessionPercent={systemStatus.contextPercent}
                 providers={
-                  sessionStatusQuery.data?.payload?.models
-                    ? (sessionStatusQuery.data.payload.models as Array<Record<string, unknown>>).map((m) => ({
-                        name: String(m.provider ?? m.model ?? ''),
-                        cost: Number(m.costUsd ?? 0),
-                        tokens: Number(m.inputTokens ?? 0) + Number(m.outputTokens ?? 0),
-                      }))
+                  Array.isArray(sessionStatusQuery.data?.payload?.models)
+                    ? (sessionStatusQuery.data!.payload!.models as Array<Record<string, unknown>>)
+                        .filter((m) => m.provider || m.model)
+                        .map((m) => ({
+                          name: String(m.provider ?? m.model ?? ''),
+                          cost: Number(m.costUsd ?? 0),
+                          tokens: Number(m.inputTokens ?? 0) + Number(m.outputTokens ?? 0),
+                        }))
                     : []
                 }
                 currentModel={systemStatus.currentModel}

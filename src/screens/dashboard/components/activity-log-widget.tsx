@@ -161,12 +161,13 @@ function parseKnownJsonEvent(event: ActivityEvent): ActivityPreviewRow | null {
   }
 
   if (event.type === 'session' || parsedEventType.includes('session')) {
+    const modelLabel = parsedModel ? formatModelName(parsedModel) : ''
     return {
       id: event.id,
       icon: '•',
       iconClassName: 'text-primary-500',
       sourceLabel: summarySource,
-      summary: `Session started: ${formatModelName(parsedModel || 'Unknown model')}`,
+      summary: modelLabel ? `Session started: ${modelLabel}` : 'Session started',
       timestamp: event.timestamp,
     }
   }
