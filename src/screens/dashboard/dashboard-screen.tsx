@@ -375,10 +375,13 @@ export function DashboardScreen() {
       const sessions = Array.isArray(sessionsQuery.data)
         ? sessionsQuery.data
         : []
-      const ssPayload = sessionStatusQuery.data?.payload?.sessions
+      const ssPayloadRaw = sessionStatusQuery.data?.payload
+      const ssSessions: Array<Record<string, unknown>> = Array.isArray(ssPayloadRaw?.sessions)
+        ? ssPayloadRaw.sessions as Array<Record<string, unknown>>
+        : []
 
       // Get active model from main session, fall back to gateway default
-      const mainSessionModel = ssPayload?.recent?.[0]?.model ?? ''
+      const mainSessionModel = (ssSessions[0]?.model as string) ?? ''
       const payloadModel = sessionStatusQuery.data?.payload?.model ?? ''
       const payloadCurrentModel =
         sessionStatusQuery.data?.payload?.currentModel ?? ''
@@ -388,27 +391,25 @@ export function DashboardScreen() {
         payloadModel ||
         payloadCurrentModel ||
         payloadAlias ||
-        ssPayload?.defaults?.model ||
+        (ssPayloadRaw?.model as string) ||
         ''
       const currentModel = formatModelName(rawModel)
 
       // Derive uptime from session firstActivity or updatedAt (milliseconds → seconds)
-      const mainSessionRaw = ssPayload?.recent?.[0]
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mainSessionAny = mainSessionRaw as any
+      const mainSessionAny = ssSessions[0] as Record<string, unknown> | undefined
+      const usageObj = mainSessionAny?.usage as Record<string, unknown> | undefined
       const firstActivity: number | undefined =
-        mainSessionAny?.usage?.firstActivity ??
-        mainSessionAny?.firstActivity ??
-        mainSessionAny?.createdAt ??
-        mainSessionAny?.updatedAt ??
+        (usageObj?.firstActivity as number | undefined) ??
+        (mainSessionAny?.createdAt as number | undefined) ??
+        (mainSessionAny?.updatedAt as number | undefined) ??
         undefined
       const uptimeSeconds =
         typeof firstActivity === 'number' && firstActivity > 0
           ? Math.floor((Date.now() - firstActivity) / 1000)
           : 0
 
-      const totalSessions = ssPayload?.count ?? sessions.length
-      const activeAgents = ssPayload?.recent?.length ?? sessions.length
+      const totalSessions = ssSessions.length || sessions.length
+      const activeAgents = ssSessions.length || sessions.length
 
       return {
         gateway: {
