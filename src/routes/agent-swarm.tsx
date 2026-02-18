@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Rocket01Icon } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
@@ -57,6 +58,10 @@ const statusConfig = {
   error: { color: 'bg-red-500', pulse: false, label: 'Error' },
 } as const
 
+type SessionPayload = {
+  sessions?: Array<Record<string, unknown>>
+}
+
 function formatTokens(n?: number): string {
   if (!n) return '0'
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -76,6 +81,108 @@ function formatAge(staleness: number): string {
   if (minutes < 60) return `${minutes}m ago`
   const hours = Math.floor(minutes / 60)
   return `${hours}h ago`
+}
+
+function readString(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return value.trim()
+}
+
+function readNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  return undefined
+}
+
+function readTimestamp(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 1_000_000_000_000 ? value * 1000 : value
+  }
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value)
+    if (!Number.isNaN(parsed)) return parsed
+  }
+  return Date.now()
+}
+
+function deriveSwarmStatus(
+  status: string,
+  staleness: number,
+  totalTokens: number,
+): SwarmSession['swarmStatus'] {
+  if (['thinking', 'reasoning'].includes(status)) return 'thinking'
+  if (['error', 'errored'].includes(status)) return 'error'
+  if (['failed', 'cancelled', 'canceled', 'killed'].includes(status))
+    return 'failed'
+  if (
+    ['complete', 'completed', 'success', 'succeeded', 'done'].includes(status)
+  ) {
+    return 'complete'
+  }
+  if (['idle', 'waiting', 'sleeping', 'paused'].includes(status)) return 'idle'
+  if (['running', 'active', 'processing', 'streaming'].includes(status)) {
+    return 'running'
+  }
+
+  if (totalTokens > 0 && staleness > 30_000) return 'complete'
+  if (totalTokens === 0 && staleness > 60_000) return 'idle'
+  return 'running'
+}
+
+function toSwarmSessionFromGateway(
+  session: Record<string, unknown>,
+): SwarmSession {
+  const updatedAt = readTimestamp(session.updatedAt)
+  const staleness = Math.max(0, Date.now() - updatedAt)
+  const usage =
+    session.usage && typeof session.usage === 'object'
+      ? (session.usage as Record<string, unknown>)
+      : null
+  const totalTokens =
+    readNumber(usage?.totalTokens) ??
+    readNumber(session.totalTokens) ??
+    readNumber(session.tokenCount) ??
+    0
+  const inputTokens =
+    readNumber(session.inputTokens) ?? readNumber(usage?.promptTokens) ?? 0
+  const outputTokens =
+    readNumber(session.outputTokens) ?? readNumber(usage?.completionTokens) ?? 0
+  const status = readString(session.status).toLowerCase()
+  const swarmStatus = deriveSwarmStatus(status, staleness, totalTokens)
+  const key = readString(session.key)
+  const friendlyId = readString(session.friendlyId)
+  const label = readString(session.label) || readString(session.displayName)
+  const lastMessagePreview = readString(session.lastMessagePreview)
+  const normalizedStatus = status || 'active'
+  const model = readString(session.model)
+
+  return {
+    ...session,
+    key: key || undefined,
+    friendlyId: friendlyId || undefined,
+    label: label || undefined,
+    status: normalizedStatus,
+    model: model || undefined,
+    updatedAt,
+    tokenCount: readNumber(session.tokenCount) ?? totalTokens,
+    totalTokens,
+    usage: {
+      ...(usage ?? {}),
+      totalTokens,
+      promptTokens: readNumber(usage?.promptTokens) ?? inputTokens,
+      completionTokens: readNumber(usage?.completionTokens) ?? outputTokens,
+      cost: readNumber(usage?.cost) ?? readNumber(session.cost) ?? 0,
+    },
+    cost: readNumber(session.cost) ?? readNumber(usage?.cost) ?? 0,
+    inputTokens,
+    outputTokens,
+    lastMessagePreview: lastMessagePreview || undefined,
+    swarmStatus,
+    staleness,
+  }
+}
+
+function sessionIdentity(session: Pick<SwarmSession, 'key' | 'friendlyId'>): string {
+  return session.key || session.friendlyId || ''
 }
 
 function SessionCard({ session }: { session: SwarmSession }) {
@@ -159,9 +266,20 @@ type ViewMode = 'office' | 'cards'
 
 function AgentSwarmRoute() {
   usePageTitle('Agent Hub')
-  const { sessions, isConnected, error, startPolling, stopPolling } =
+  const { sessions: swarmSessions, isConnected, error, startPolling, stopPolling } =
     useSwarmStore()
   const [viewMode, setViewMode] = useState<ViewMode>('office')
+
+  const sessionsQuery = useQuery({
+    queryKey: ['agent-hub', 'sessions'],
+    queryFn: async () => {
+      const res = await fetch('/api/sessions')
+      if (!res.ok) return [] as Array<Record<string, unknown>>
+      const payload = (await res.json()) as SessionPayload
+      return Array.isArray(payload.sessions) ? payload.sessions : []
+    },
+    refetchInterval: 10_000,
+  })
 
   // Sound notifications for agent events
   useSounds({ autoPlay: true })
@@ -171,10 +289,28 @@ function AgentSwarmRoute() {
     return () => stopPolling()
   }, [startPolling, stopPolling])
 
-  const activeSessions = sessions.filter(
+  const gatewaySessions = sessionsQuery.data ?? []
+  const gatewayAsSwarm = useMemo(
+    () => gatewaySessions.map(toSwarmSessionFromGateway),
+    [gatewaySessions],
+  )
+
+  const mergedSessions = useMemo(() => {
+    const swarmKeys = new Set(
+      swarmSessions.map(sessionIdentity).filter((key) => key.length > 0),
+    )
+    const gatewayOnly = gatewayAsSwarm.filter((session) => {
+      const key = sessionIdentity(session)
+      if (!key) return true
+      return !swarmKeys.has(key)
+    })
+    return [...swarmSessions, ...gatewayOnly]
+  }, [swarmSessions, gatewayAsSwarm])
+
+  const activeSessions = mergedSessions.filter(
     (s) => s.swarmStatus === 'running' || s.swarmStatus === 'thinking',
   )
-  const otherSessions = sessions.filter(
+  const otherSessions = mergedSessions.filter(
     (s) => s.swarmStatus !== 'running' && s.swarmStatus !== 'thinking',
   )
 
@@ -256,15 +392,15 @@ function AgentSwarmRoute() {
           )}
 
           {/* Quick Stats */}
-          {sessions.length > 0 && (
+          {mergedSessions.length > 0 && (
             <div className="mt-4 flex gap-4 text-xs text-primary-600">
               <span className="font-medium">
-                {sessions.length} total sessions
+                {mergedSessions.length} total sessions
               </span>
               <span>{activeSessions.length} active</span>
               <span>
                 {formatTokens(
-                  sessions.reduce(
+                  mergedSessions.reduce(
                     (sum, s) =>
                       sum + (s.usage?.totalTokens ?? s.totalTokens ?? 0),
                     0,
@@ -281,17 +417,17 @@ function AgentSwarmRoute() {
           <div className="mb-6 flex flex-col gap-3 md:h-[550px] md:flex-row">
             {/* Office */}
             <div className="h-[250px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[7]">
-              <IsometricOffice sessions={sessions} />
+              <IsometricOffice sessions={mergedSessions} />
             </div>
             {/* Activity Panel */}
             <div className="h-[300px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[3]">
-              <ActivityPanel sessions={sessions} />
+              <ActivityPanel sessions={mergedSessions} />
             </div>
           </div>
         )}
 
         {/* Card View */}
-        {viewMode === 'cards' && sessions.length > 0 && (
+        {viewMode === 'cards' && mergedSessions.length > 0 && (
           <div className="space-y-6">
             {/* Active Sessions */}
             {activeSessions.length > 0 && (
@@ -334,7 +470,7 @@ function AgentSwarmRoute() {
         )}
 
         {/* Empty state — cards mode only */}
-        {viewMode === 'cards' && sessions.length === 0 && (
+        {viewMode === 'cards' && mergedSessions.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-primary-200 bg-primary-50/60 px-6 py-16 text-center">
             <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-primary-100 text-primary-500">
               <HugeiconsIcon icon={Rocket01Icon} size={32} strokeWidth={1.5} />
