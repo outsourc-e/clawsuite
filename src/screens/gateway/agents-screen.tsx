@@ -553,6 +553,12 @@ export function AgentsScreen() {
   const [streamingAgentKey, setStreamingAgentKey] = useState<string | null>(null)
   const [hubView, setHubView] = useState<HubView>('mission')
 
+  useEffect(() => {
+    if (hubView !== 'mission') return
+    if (!streamingAgentKey) return
+    setStreamingAgentKey(null)
+  }, [hubView, streamingAgentKey])
+
   const agentsQuery = useQuery({
     queryKey: ['gateway', 'agents'],
     queryFn: async () => {
@@ -599,7 +605,29 @@ export function AgentsScreen() {
   const usingFallbackRegistry =
     !agentsQuery.isLoading && parsedDefinitions === null
 
-  const registryDefinitions = parsedDefinitions ?? FALLBACK_AGENT_REGISTRY
+  const registryDefinitions = useMemo(() => {
+    const merged = new Map<string, AgentDefinition>()
+
+    FALLBACK_AGENT_REGISTRY.forEach((definition) => {
+      merged.set(definition.id, definition)
+    })
+
+    ;(parsedDefinitions ?? []).forEach((definition) => {
+      const existing = merged.get(definition.id)
+      if (!existing) {
+        merged.set(definition.id, definition)
+        return
+      }
+
+      merged.set(definition.id, {
+        ...existing,
+        ...definition,
+        aliases: dedupe([...existing.aliases, ...definition.aliases]),
+      })
+    })
+
+    return Array.from(merged.values())
+  }, [parsedDefinitions])
 
   const runtimeAgents = useMemo(() => {
     const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
@@ -905,7 +933,7 @@ export function AgentsScreen() {
         <div className="border-b border-primary-200 px-3 py-2">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-sm font-semibold text-ink">Agent Hub</h1>
+              <h1 className="text-sm font-semibold text-ink">ClawSuite</h1>
               <p className="text-[11px] text-primary-500">Registry</p>
             </div>
             <div className="flex items-center gap-2">
@@ -1000,7 +1028,7 @@ export function AgentsScreen() {
         <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-semibold text-ink md:text-[15px]">
-              Agent Hub
+              ClawSuite
             </h1>
             <div className="hidden md:flex items-center gap-1 rounded-lg bg-primary-100 p-0.5">
               <button
@@ -1142,7 +1170,7 @@ export function AgentsScreen() {
         </div>
       </div>
 
-      {streamingAgent ? (
+      {hubView !== 'mission' && streamingAgent ? (
         <AgentStreamPanel
           sessionKey={readString(streamingAgent.sessionKey)}
           agentName={streamingAgent.name}

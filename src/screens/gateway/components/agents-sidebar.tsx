@@ -64,7 +64,7 @@ export function AgentsSidebar({
       <div className="border-b border-primary-200 px-3 py-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
-            Squad
+            Agents
           </h2>
           <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[11px] font-medium text-primary-600 dark:bg-neutral-800 dark:text-neutral-300">
             {agents.length}

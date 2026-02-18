@@ -160,32 +160,41 @@ export function TaskBoard({ agents, selectedAgentId }: TaskBoardProps) {
   }
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3">
+      <div className="border-b border-primary-200 px-4 py-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">Tasks</h2>
           <p className="truncate text-[11px] text-primary-500">
             {selectedAgentName ? `Focused agent: ${selectedAgentName}` : 'Showing all agents'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => (isCreating ? closeCreateForm() : openCreateForm())}
-          className="inline-flex items-center gap-1 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-accent-600"
-        >
-          {isCreating ? 'Cancel' : '+ New Task'}
-        </button>
       </div>
       <div className="min-h-0 flex-1 overflow-x-auto px-4 py-3">
-        <div className="flex h-full min-w-max gap-3">
+        <div className="flex h-full w-full gap-3">
           {COLUMNS.map((column) => {
             const columnTasks = tasksByColumn[column.key]
             return (
-              <div key={column.key} className="w-64 shrink-0">
-                <div className="mb-2 flex items-center justify-between">
+              <div key={column.key} className="min-w-[200px] max-w-[240px] flex-1">
+                <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-500">{column.label}</h3>
-                  <span className="rounded-full bg-primary-100 px-1.5 text-[10px] text-primary-500 dark:bg-neutral-800 dark:text-neutral-300">
-                    {columnTasks.length}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {column.key === 'inbox' ? (
+                      <button
+                        type="button"
+                        onClick={() => (isCreating ? closeCreateForm() : openCreateForm())}
+                        className={cn(
+                          'inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors',
+                          isCreating
+                            ? 'bg-primary-200 text-primary-700 hover:bg-primary-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600'
+                            : 'bg-accent-500 text-white hover:bg-accent-600',
+                        )}
+                      >
+                        {isCreating ? 'Cancel' : '+ New Task'}
+                      </button>
+                    ) : null}
+                    <span className="rounded-full bg-primary-100 px-1.5 text-[10px] text-primary-500 dark:bg-neutral-800 dark:text-neutral-300">
+                      {columnTasks.length}
+                    </span>
+                  </div>
                 </div>
                 <div
                   onDragOver={(event) => {

@@ -29,7 +29,7 @@ export function AgentHubLayout({ agents, onAddAgent }: AgentHubLayoutProps) {
   )
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="relative isolate flex h-full min-h-0">
       <div className="w-60 shrink-0 overflow-y-auto border-r border-primary-200">
         <AgentsSidebar
           agents={agents}
@@ -43,11 +43,11 @@ export function AgentHubLayout({ agents, onAddAgent }: AgentHubLayoutProps) {
         />
       </div>
 
-      <div className="min-w-0 flex-1 overflow-x-auto overflow-y-auto">
+      <div className="relative z-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto">
         <TaskBoard agents={taskBoardAgents} selectedAgentId={selectedAgentId} />
       </div>
 
-      <div className="w-72 shrink-0 overflow-y-auto border-l border-primary-200">
+      <div className="relative z-10 w-72 shrink-0 overflow-y-auto border-l border-primary-200">
         <LiveFeedPanel />
       </div>
     </div>
