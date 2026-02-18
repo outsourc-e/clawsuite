@@ -28,6 +28,11 @@ import {
   PromptInputActions,
   PromptInputTextarea,
 } from '@/components/prompt-kit/prompt-input'
+import {
+  SlashCommandMenu,
+  type SlashCommandDefinition,
+  type SlashCommandMenuHandle,
+} from '@/components/slash-command-menu'
 import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
@@ -205,6 +210,15 @@ function toDraftStorageKey(sessionKey?: string): string {
   return `clawsuite-draft-${normalizeDraftSessionKey(sessionKey)}`
 }
 
+function readSlashCommandQuery(inputValue: string): string | null {
+  if (!inputValue.startsWith('/')) return null
+  const newlineIndex = inputValue.indexOf('\n')
+  const firstLine =
+    newlineIndex === -1 ? inputValue : inputValue.slice(0, newlineIndex)
+  if (/\s/.test(firstLine.slice(1))) return null
+  return firstLine.slice(1)
+}
+
 function isSameModel(option: ModelOption, currentModel: string): boolean {
   const normalizedCurrent = currentModel.trim().toLowerCase()
   if (!normalizedCurrent) return false
@@ -329,8 +343,10 @@ function ChatComposerComponent({
     return window.matchMedia('(max-width: 767px)').matches
   })
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
+  const [isSlashMenuDismissed, setIsSlashMenuDismissed] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
+  const slashMenuRef = useRef<SlashCommandMenuHandle | null>(null)
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const dragCounterRef = useRef(0)
   const shouldRefocusAfterSendRef = useRef(false)
@@ -637,6 +653,7 @@ function ChatComposerComponent({
 
   const handleValueChange = useCallback(
     function handleValueChange(nextValue: string) {
+      setIsSlashMenuDismissed(false)
       setValue(nextValue)
       persistDraft(nextValue)
     },
@@ -644,6 +661,7 @@ function ChatComposerComponent({
   )
 
   const reset = useCallback(() => {
+    setIsSlashMenuDismissed(false)
     setValue('')
     clearDraft()
     setAttachments([])
@@ -653,6 +671,7 @@ function ChatComposerComponent({
 
   const setComposerValue = useCallback(
     (nextValue: string) => {
+      setIsSlashMenuDismissed(false)
       setValue(nextValue)
       persistDraft(nextValue)
       focusPrompt()
@@ -670,6 +689,7 @@ function ChatComposerComponent({
 
   const insertText = useCallback(
     (text: string) => {
+      setIsSlashMenuDismissed(false)
       setValue((prev) => {
         const nextValue = prev.trim().length > 0 ? `${prev}\n${text}` : text
         persistDraft(nextValue)
@@ -850,6 +870,9 @@ function ChatComposerComponent({
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
     : 'Ask anything... (⌘↵ to send)'
+  const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
+  const isSlashMenuOpen =
+    slashCommandQuery !== null && !disabled && !isSlashMenuDismissed
 
   const handleClearDraft = useCallback(() => {
     reset()
@@ -978,6 +1001,53 @@ function ChatComposerComponent({
     [addAttachments],
   )
 
+  const handleSelectSlashCommand = useCallback(
+    function handleSelectSlashCommand(command: SlashCommandDefinition) {
+      const nextValue = `${command.command} `
+      setIsSlashMenuDismissed(false)
+      setValue(nextValue)
+      persistDraft(nextValue)
+      focusPrompt()
+    },
+    [focusPrompt, persistDraft],
+  )
+
+  const handleDismissSlashMenu = useCallback(() => {
+    setIsSlashMenuDismissed(true)
+  }, [])
+
+  const handlePromptSubmit = useCallback(() => {
+    if (isSlashMenuOpen) {
+      const applied = slashMenuRef.current?.selectActive() ?? false
+      if (!applied) {
+        setIsSlashMenuDismissed(true)
+      }
+      return
+    }
+    handleSubmit()
+  }, [handleSubmit, isSlashMenuOpen])
+
+  const handlePromptKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (!isSlashMenuOpen) return
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        slashMenuRef.current?.moveSelection(1)
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        slashMenuRef.current?.moveSelection(-1)
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        handleDismissSlashMenu()
+      }
+    },
+    [handleDismissSlashMenu, isSlashMenuOpen],
+  )
+
   // Combine internal ref with external wrapperRef
   const setWrapperRefs = useCallback(
     (node: HTMLDivElement | null) => {
@@ -1033,7 +1103,7 @@ function ChatComposerComponent({
       <PromptInput
         value={value}
         onValueChange={handleValueChange}
-        onSubmit={handleSubmit}
+        onSubmit={handlePromptSubmit}
         isLoading={isLoading}
         disabled={disabled}
         className={cn(
@@ -1049,6 +1119,13 @@ function ChatComposerComponent({
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
+        <SlashCommandMenu
+          ref={slashMenuRef}
+          open={isSlashMenuOpen}
+          query={slashCommandQuery ?? ''}
+          onSelect={handleSelectSlashCommand}
+        />
+
         {isDraggingOver ? (
           <div className="pointer-events-none absolute inset-1 z-20 flex items-center justify-center rounded-[18px] border-2 border-dashed border-primary-400 bg-primary-50/90 text-sm font-medium text-primary-700">
             Drop images to attach
@@ -1104,6 +1181,7 @@ function ChatComposerComponent({
           placeholder={promptPlaceholder}
           autoFocus
           inputRef={promptRef}
+          onKeyDown={handlePromptKeyDown}
           onFocus={() => {
             setMobileComposerFocused(true)
             // Keep fallback behavior for browsers without visualViewport.
