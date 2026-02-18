@@ -23,9 +23,9 @@ export function AgentHubLayout({ agents, onAddAgent }: AgentHubLayoutProps) {
     }
   }, [agents, selectedAgentId])
 
-  const selectedAgent = useMemo(
-    () => agents.find((agent) => agent.id === selectedAgentId),
-    [agents, selectedAgentId],
+  const taskBoardAgents = useMemo(
+    () => agents.map((agent) => ({ id: agent.id, name: agent.name })),
+    [agents],
   )
 
   return (
@@ -44,7 +44,7 @@ export function AgentHubLayout({ agents, onAddAgent }: AgentHubLayoutProps) {
       </div>
 
       <div className="min-w-0 flex-1 overflow-x-auto overflow-y-auto">
-        <TaskBoard selectedAgentName={selectedAgent?.name} />
+        <TaskBoard agents={taskBoardAgents} selectedAgentId={selectedAgentId} />
       </div>
 
       <div className="w-72 shrink-0 overflow-y-auto border-l border-primary-200">

@@ -59,7 +59,7 @@ type AgentRuntime = AgentRegistryCardData & {
   matchedSessions: Array<SessionEntry>
 }
 
-type HubView = 'mission' | 'office'
+type HubView = 'mission' | 'office' | 'cards'
 
 const CATEGORY_ORDER = ['Core', 'Coding', 'System', 'Integrations'] as const
 
@@ -1027,6 +1027,18 @@ export function AgentsScreen() {
               >
                 Office
               </button>
+              <button
+                type="button"
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                  hubView === 'cards'
+                    ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
+                    : 'text-primary-500 hover:text-primary-700',
+                )}
+                onClick={() => setHubView('cards')}
+              >
+                Cards
+              </button>
             </div>
             {agentsQuery.isFetching && !agentsQuery.isLoading ? (
               <span className="text-[10px] text-primary-500 animate-pulse">
@@ -1057,10 +1069,10 @@ export function AgentsScreen() {
             <AgentHubLayout
               agents={runtimeAgents}
               onAddAgent={() => {
-                void navigate({ to: '/settings' })
+                toast('Coming soon', { type: 'info' })
               }}
             />
-          ) : (
+          ) : hubView === 'office' ? (
             <div className="h-full overflow-auto p-3 md:p-4">
               <div className="flex h-full min-h-[460px] flex-col gap-3 md:flex-row">
                 <div className="h-[260px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[7]">
@@ -1070,6 +1082,61 @@ export function AgentsScreen() {
                   <ActivityPanel sessions={officeSessions} />
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="h-full overflow-auto px-6 py-4">
+              {registryDefinitions.length === 0 ? (
+                <div className="rounded-2xl bg-white/60 dark:bg-neutral-900/50 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-sm p-5">
+                  <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                    Add your first agent
+                  </h2>
+                  <ul className="mt-3 space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
+                    <li>Create an agent profile</li>
+                    <li>Connect a gateway</li>
+                    <li>Spawn your first session</li>
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigate({ to: '/settings' })
+                    }}
+                    className="mt-4 inline-flex h-9 items-center rounded-xl bg-accent-500 px-4 text-sm font-medium text-white shadow-sm hover:bg-accent-600"
+                  >
+                    Open Settings
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {groupedSections.map((section) => (
+                    <section key={section.category} className="space-y-2">
+                      <div className="flex items-center justify-between px-1">
+                        <h2 className="text-xs font-semibold tracking-wide text-neutral-500 dark:text-neutral-400">
+                          {section.category}
+                        </h2>
+                        <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                          {section.agents.length}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                        {section.agents.map((agent) => (
+                          <AgentRegistryCard
+                            key={agent.id}
+                            agent={agent}
+                            isSpawning={Boolean(spawningByAgentId[agent.id])}
+                            onTap={handleStreamTap}
+                            onChat={handleChat}
+                            onSpawn={handleSpawn}
+                            onHistory={handleHistory}
+                            onPauseToggle={handlePauseToggle}
+                            onKilled={handleKilled}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
