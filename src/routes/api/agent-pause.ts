@@ -30,7 +30,6 @@ export const Route = createFileRoute('/api/agent-pause')({
           }
 
           await gatewayRpc('cron.update', {
-            sessionKey,
             jobId: sessionKey,
             patch: { enabled: !pause },
           })

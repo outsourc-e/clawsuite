@@ -30,9 +30,13 @@ export const Route = createFileRoute('/api/agent-steer')({
             )
           }
 
-          await gatewayRpc('sessions.send', {
+          const { randomUUID } = await import('node:crypto')
+          await gatewayRpc('chat.send', {
             sessionKey,
-            message,
+            message: `[System Directive] ${message}`,
+            deliver: false,
+            timeoutMs: 30_000,
+            idempotencyKey: randomUUID(),
           })
 
           return json({ ok: true })

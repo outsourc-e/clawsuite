@@ -21,7 +21,7 @@ export const Route = createFileRoute('/api/agent-kill')({
             )
           }
 
-          await gatewayRpc('sessions.delete', { sessionKey })
+          await gatewayRpc('sessions.delete', { key: sessionKey })
 
           return json({ ok: true })
         } catch (err) {
