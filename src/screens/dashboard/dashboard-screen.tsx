@@ -22,7 +22,7 @@ import {
   useMemo,
   useState,
 } from 'react'
-import { AgentStatusWidget } from './components/agent-status-widget'
+import { SquadStatusWidget } from './components/squad-status-widget'
 import { ActivityLogWidget } from './components/activity-log-widget'
 import { CollapsibleWidget } from './components/collapsible-widget'
 import { MetricsWidget } from './components/metrics-widget'
@@ -745,7 +745,7 @@ export function DashboardScreen() {
           items.push({
             id: widgetId,
             size: 'medium',
-            node: <AgentStatusWidget onRemove={() => removeWidget('agent-status')} />,
+            node: <SquadStatusWidget />,
           })
           continue
         }
@@ -821,7 +821,7 @@ export function DashboardScreen() {
             label: 'Agents',
             content: (
               <div className="w-full">
-                <AgentStatusWidget onRemove={() => removeWidget('agent-status')} />
+                <SquadStatusWidget />
               </div>
             ),
           })
