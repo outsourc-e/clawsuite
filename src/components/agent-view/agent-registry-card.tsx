@@ -153,7 +153,7 @@ export function AgentRegistryCard({
               aria-label={`${agent.name} controls`}
               aria-expanded={menuOpen}
             >
-              ...
+              ⋯
             </button>
 
             {menuOpen ? (

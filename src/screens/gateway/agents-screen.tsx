@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -461,6 +461,8 @@ export function AgentsScreen() {
   const [optimisticPausedByAgentId, setOptimisticPausedByAgentId] = useState<
     Record<string, boolean>
   >({})
+  const [optimisticPausedByControlKey, setOptimisticPausedByControlKey] =
+    useState<Record<string, boolean>>({})
   const [spawningByAgentId, setSpawningByAgentId] = useState<
     Record<string, boolean>
   >({})
@@ -490,6 +492,19 @@ export function AgentsScreen() {
     refetchInterval: 10_000,
     retry: false,
   })
+
+  useEffect(() => {
+    if (!sessionsQuery.isSuccess) return
+
+    setOptimisticPausedByAgentId((previous) => {
+      if (Object.keys(previous).length === 0) return previous
+      return {}
+    })
+    setOptimisticPausedByControlKey((previous) => {
+      if (Object.keys(previous).length === 0) return previous
+      return {}
+    })
+  }, [sessionsQuery.dataUpdatedAt, sessionsQuery.isSuccess])
 
   const parsedDefinitions = useMemo(
     () => parseAgentDefinitions(agentsQuery.data),
@@ -526,11 +541,18 @@ export function AgentsScreen() {
         optimisticPausedByAgentId,
         definition.id,
       )
-      const pausedOverride = hasOverride
-        ? optimisticPausedByAgentId[definition.id]
-        : undefined
-
       const sessionKey = readString(primarySession?.key)
+      const controlKey = sessionKey || definition.id
+      const hasControlOverride = Object.prototype.hasOwnProperty.call(
+        optimisticPausedByControlKey,
+        controlKey,
+      )
+      const pausedOverride = hasControlOverride
+        ? optimisticPausedByControlKey[controlKey]
+        : hasOverride
+          ? optimisticPausedByAgentId[definition.id]
+          : undefined
+
       const friendlyId = getSessionFriendlyId(primarySession)
       const status = deriveAgentStatus(primarySession, pausedOverride)
 
@@ -543,11 +565,16 @@ export function AgentsScreen() {
         status,
         sessionKey: sessionKey || undefined,
         friendlyId: friendlyId || undefined,
-        controlKey: sessionKey || definition.id,
+        controlKey,
         matchedSessions,
       } satisfies AgentRuntime
     })
-  }, [registryDefinitions, sessionsQuery.data, optimisticPausedByAgentId])
+  }, [
+    registryDefinitions,
+    sessionsQuery.data,
+    optimisticPausedByAgentId,
+    optimisticPausedByControlKey,
+  ])
 
   const groupedSections = useMemo(() => {
     const grouped = new Map<string, Array<AgentRuntime>>()
@@ -684,10 +711,19 @@ export function AgentsScreen() {
       agent.id,
     )
     const previousValue = optimisticPausedByAgentId[agent.id]
+    const hadControlPrevious = Object.prototype.hasOwnProperty.call(
+      optimisticPausedByControlKey,
+      controlKey,
+    )
+    const previousControlValue = optimisticPausedByControlKey[controlKey]
 
     setOptimisticPausedByAgentId((previous) => ({
       ...previous,
       [agent.id]: nextPaused,
+    }))
+    setOptimisticPausedByControlKey((previous) => ({
+      ...previous,
+      [controlKey]: nextPaused,
     }))
 
     try {
@@ -698,6 +734,10 @@ export function AgentsScreen() {
       setOptimisticPausedByAgentId((previous) => ({
         ...previous,
         [agent.id]: paused,
+      }))
+      setOptimisticPausedByControlKey((previous) => ({
+        ...previous,
+        [controlKey]: paused,
       }))
 
       toast(`${agent.name} ${paused ? 'paused' : 'resumed'}`, {
@@ -714,6 +754,15 @@ export function AgentsScreen() {
         }
         return next
       })
+      setOptimisticPausedByControlKey((previous) => {
+        const next = { ...previous }
+        if (hadControlPrevious) {
+          next[controlKey] = previousControlValue
+        } else {
+          delete next[controlKey]
+        }
+        return next
+      })
 
       const message =
         error instanceof Error
@@ -727,6 +776,13 @@ export function AgentsScreen() {
     setOptimisticPausedByAgentId((previous) => {
       const next = { ...previous }
       delete next[agent.id]
+      return next
+    })
+    setOptimisticPausedByControlKey((previous) => {
+      const controlKey = readString(agent.controlKey)
+      if (!controlKey) return previous
+      const next = { ...previous }
+      delete next[controlKey]
       return next
     })
     void sessionsQuery.refetch()
