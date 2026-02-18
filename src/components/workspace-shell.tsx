@@ -87,6 +87,8 @@ export function WorkspaceShell() {
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const showDesktopSidebarBackdrop =
+    !isMobile && !isOnChatRoute && !sidebarCollapsed
 
   // Sessions query — shared across sidebar and chat
   const sessionsQuery = useQuery({
@@ -184,20 +186,22 @@ export function WorkspaceShell() {
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
           {!isMobile && (
-            <ChatSidebar
-              sessions={sessions}
-              activeFriendlyId={activeFriendlyId}
-              creatingSession={creatingSession}
-              onCreateSession={startNewChat}
-              isCollapsed={sidebarCollapsed}
-              onToggleCollapse={toggleSidebar}
-              onSelectSession={handleSelectSession}
-              onActiveSessionDelete={handleActiveSessionDelete}
-              sessionsLoading={sessionsLoading}
-              sessionsFetching={sessionsFetching}
-              sessionsError={sessionsError}
-              onRetrySessions={refetchSessions}
-            />
+            <div className="relative z-30">
+              <ChatSidebar
+                sessions={sessions}
+                activeFriendlyId={activeFriendlyId}
+                creatingSession={creatingSession}
+                onCreateSession={startNewChat}
+                isCollapsed={sidebarCollapsed}
+                onToggleCollapse={toggleSidebar}
+                onSelectSession={handleSelectSession}
+                onActiveSessionDelete={handleActiveSessionDelete}
+                sessionsLoading={sessionsLoading}
+                sessionsFetching={sessionsFetching}
+                sessionsError={sessionsError}
+                onRetrySessions={refetchSessions}
+              />
+            </div>
           )}
 
           {/* Main content area — renders the matched route */}
@@ -223,6 +227,15 @@ export function WorkspaceShell() {
 
         {/* Floating chat toggle — visible on non-chat routes */}
         {!isOnChatRoute && !isMobile && <ChatPanelToggle />}
+
+        {showDesktopSidebarBackdrop ? (
+          <button
+            type="button"
+            aria-label="Collapse navigation sidebar"
+            onClick={() => setSidebarCollapsed(true)}
+            className="fixed inset-0 z-10 bg-black/10 backdrop-blur-[1px]"
+          />
+        ) : null}
       </div>
 
       {isMobile ? <MobileTabBar /> : null}

@@ -955,6 +955,8 @@ function ChatSidebarComponent({
                   size="icon-sm"
                   variant="ghost"
                   aria-label={isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                  className="shrink-0"
+                  data-tour="sidebar-collapse-toggle"
                 >
                   {isCollapsed ? (
                     <OpenClawStudioIcon className="size-5 rounded-sm" />

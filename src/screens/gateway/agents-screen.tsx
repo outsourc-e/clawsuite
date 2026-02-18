@@ -7,12 +7,8 @@ import {
   type AgentRegistryStatus,
 } from '@/components/agent-view/agent-registry-card'
 import { AgentStreamPanel } from '@/components/agent-view/agent-stream-panel'
-import { IsometricOffice } from '@/components/agent-swarm/isometric-office'
-import { ActivityPanel } from '@/components/agent-swarm/activity-panel'
 import { toggleAgentPause } from '@/lib/gateway-api'
 import { toast } from '@/components/ui/toast'
-import { cn } from '@/lib/utils'
-import type { SwarmSession } from '@/stores/agent-swarm-store'
 import { AgentHubLayout } from './agent-hub-layout'
 
 type AgentGatewayEntry = {
@@ -59,7 +55,6 @@ type AgentRuntime = AgentRegistryCardData & {
   matchedSessions: Array<SessionEntry>
 }
 
-type HubView = 'mission' | 'office' | 'cards'
 type AgentsScreenVariant = 'mission-control' | 'registry'
 type AgentsScreenProps = {
   variant?: AgentsScreenVariant
@@ -87,22 +82,6 @@ const RUNNING_STATUSES = new Set([
 const PAUSED_STATUSES = new Set(['paused', 'pause', 'suspended'])
 
 const ACTIVE_HEARTBEAT_MS = 30_000
-
-const THINKING_STATUSES = new Set(['thinking', 'reasoning'])
-
-const ERROR_STATUSES = new Set(['error', 'errored'])
-
-const FAILED_STATUSES = new Set(['failed', 'cancelled', 'canceled', 'killed'])
-
-const COMPLETE_STATUSES = new Set([
-  'complete',
-  'completed',
-  'success',
-  'succeeded',
-  'done',
-])
-
-const IDLE_STATUSES = new Set(['idle', 'waiting', 'sleeping', 'paused'])
 
 // TODO: Replace with gateway-backed config once a dedicated agent registry schema is available.
 const FALLBACK_AGENT_REGISTRY: Array<AgentDefinition> = [
@@ -154,72 +133,6 @@ function readTimestamp(value: unknown): number {
     if (!Number.isNaN(parsed)) return parsed
   }
   return 0
-}
-
-function readNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  return undefined
-}
-
-function deriveOfficeStatus(
-  status: string,
-  staleness: number,
-  totalTokens: number,
-): SwarmSession['swarmStatus'] {
-  if (THINKING_STATUSES.has(status)) return 'thinking'
-  if (ERROR_STATUSES.has(status)) return 'error'
-  if (FAILED_STATUSES.has(status)) return 'failed'
-  if (COMPLETE_STATUSES.has(status)) return 'complete'
-  if (IDLE_STATUSES.has(status)) return 'idle'
-  if (RUNNING_STATUSES.has(status)) return 'running'
-
-  if (totalTokens > 0 && staleness > 30_000) return 'complete'
-  if (totalTokens === 0 && staleness > 60_000) return 'idle'
-  return 'running'
-}
-
-function toOfficeSession(session: SessionEntry): SwarmSession {
-  const record = session as Record<string, unknown>
-  const usageRaw = record.usage
-  const usage =
-    usageRaw && typeof usageRaw === 'object' && !Array.isArray(usageRaw)
-      ? (usageRaw as Record<string, unknown>)
-      : null
-
-  const updatedAt = readTimestamp(session.updatedAt) || Date.now()
-  const staleness = Math.max(0, Date.now() - updatedAt)
-  const totalTokens =
-    readNumber(usage?.totalTokens) ??
-    readNumber(record.totalTokens) ??
-    readNumber(record.tokenCount) ??
-    0
-
-  const normalizedStatus = normalizeToken(readString(session.status))
-
-  return {
-    ...record,
-    key: readString(session.key) || undefined,
-    friendlyId: readString(session.friendlyId) || undefined,
-    label: readString(session.label) || readString(session.displayName) || undefined,
-    title: readString(session.title) || undefined,
-    derivedTitle: readString(session.derivedTitle) || undefined,
-    task: readString(session.task) || undefined,
-    status: normalizedStatus || 'running',
-    updatedAt,
-    tokenCount: readNumber(record.tokenCount) ?? totalTokens,
-    totalTokens,
-    cost: readNumber(record.cost) ?? readNumber(usage?.cost) ?? 0,
-    usage: {
-      ...(usage ?? {}),
-      totalTokens,
-      promptTokens: readNumber(usage?.promptTokens) ?? readNumber(record.inputTokens) ?? 0,
-      completionTokens:
-        readNumber(usage?.completionTokens) ?? readNumber(record.outputTokens) ?? 0,
-      cost: readNumber(usage?.cost) ?? readNumber(record.cost) ?? 0,
-    },
-    swarmStatus: deriveOfficeStatus(normalizedStatus, staleness, totalTokens),
-    staleness,
-  } satisfies SwarmSession
 }
 
 function normalizeToken(value: string): string {
@@ -556,21 +469,12 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
   >({})
   const [historyAgentId, setHistoryAgentId] = useState<string | null>(null)
   const [streamingAgentKey, setStreamingAgentKey] = useState<string | null>(null)
-  const [hubView, setHubView] = useState<HubView>(
-    missionControlEnabled ? 'mission' : 'cards',
-  )
 
   useEffect(() => {
-    if (missionControlEnabled) return
-    if (hubView === 'cards') return
-    setHubView('cards')
-  }, [hubView, missionControlEnabled])
-
-  useEffect(() => {
-    if (hubView !== 'mission') return
-    if (!streamingAgentKey) return
-    setStreamingAgentKey(null)
-  }, [hubView, streamingAgentKey])
+    if (missionControlEnabled) {
+      setStreamingAgentKey(null)
+    }
+  }, [missionControlEnabled])
 
   const agentsQuery = useQuery({
     queryKey: ['gateway', 'agents'],
@@ -745,11 +649,6 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
     () => runtimeAgents.find((agent) => agent.id === historyAgentId) ?? null,
     [historyAgentId, runtimeAgents],
   )
-
-  const officeSessions = useMemo(() => {
-    const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
-    return sessions.map((session) => toOfficeSession(session))
-  }, [sessionsQuery.data])
 
   async function spawnSessionForAgent(
     agent: AgentRegistryCardData,
@@ -1038,158 +937,112 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
       </div>
 
       <div className="hidden h-full min-h-0 flex-col overflow-x-hidden md:flex">
-        <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold text-ink md:text-[15px]">
-              {missionControlEnabled ? 'ClawSuite' : 'Gateway Agents'}
-            </h1>
-            {missionControlEnabled ? (
-              <div className="hidden md:flex items-center gap-1 rounded-lg bg-primary-100 p-0.5">
-                <button
-                  type="button"
-                  className={cn(
-                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                    hubView === 'mission'
-                      ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-                      : 'text-primary-500 hover:text-primary-700',
-                  )}
-                  onClick={() => setHubView('mission')}
-                >
-                  Mission Control
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                    hubView === 'office'
-                      ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-                      : 'text-primary-500 hover:text-primary-700',
-                  )}
-                  onClick={() => setHubView('office')}
-                >
-                  Office
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                    hubView === 'cards'
-                      ? 'bg-white text-primary-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-                      : 'text-primary-500 hover:text-primary-700',
-                  )}
-                  onClick={() => setHubView('cards')}
-                >
-                  Cards
-                </button>
+        {missionControlEnabled ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            {usingFallbackRegistry ? (
+              <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
+                Gateway registry unavailable. Showing fallback definitions.
               </div>
-            ) : (
-              <span className="text-xs font-medium text-primary-500">
-                Registry
-              </span>
-            )}
-            {agentsQuery.isFetching && !agentsQuery.isLoading ? (
-              <span className="text-[10px] text-primary-500 animate-pulse">
-                syncing...
-              </span>
             ) : null}
+            <div className="min-h-0 flex-1">
+              <AgentHubLayout agents={runtimeAgents} />
+            </div>
           </div>
-          <div className="flex items-center gap-2 md:gap-3">
-            {lastUpdated ? (
-              <span className="text-[10px] text-primary-500">
-                Updated {lastUpdated}
-              </span>
-            ) : null}
-            <span
-              className={`inline-block size-2 rounded-full ${agentsQuery.isError ? 'bg-red-500' : agentsQuery.isSuccess ? 'bg-emerald-500' : 'bg-amber-500'}`}
-            />
-          </div>
-        </div>
-
-        {usingFallbackRegistry ? (
-          <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
-            Gateway registry unavailable. Showing fallback definitions.
-          </div>
-        ) : null}
-
-        <div className="flex-1 min-h-0">
-          {missionControlEnabled && hubView === 'mission' ? (
-            <AgentHubLayout
-              agents={runtimeAgents}
-              onAddAgent={() => {
-                toast('Coming soon', { type: 'info' })
-              }}
-            />
-          ) : missionControlEnabled && hubView === 'office' ? (
-            <div className="h-full overflow-auto p-3 md:p-4">
-              <div className="flex h-full min-h-[460px] flex-col gap-3 md:flex-row">
-                <div className="h-[260px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[7]">
-                  <IsometricOffice sessions={officeSessions} />
-                </div>
-                <div className="h-[320px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[3]">
-                  <ActivityPanel sessions={officeSessions} />
-                </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
+              <div className="flex items-center gap-3">
+                <h1 className="text-sm font-semibold text-ink md:text-[15px]">
+                  Gateway Agents
+                </h1>
+                <span className="text-xs font-medium text-primary-500">
+                  Registry
+                </span>
+                {agentsQuery.isFetching && !agentsQuery.isLoading ? (
+                  <span className="text-[10px] text-primary-500 animate-pulse">
+                    syncing...
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2 md:gap-3">
+                {lastUpdated ? (
+                  <span className="text-[10px] text-primary-500">
+                    Updated {lastUpdated}
+                  </span>
+                ) : null}
+                <span
+                  className={`inline-block size-2 rounded-full ${agentsQuery.isError ? 'bg-red-500' : agentsQuery.isSuccess ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                />
               </div>
             </div>
-          ) : (
-            <div className="h-full overflow-auto px-6 py-4">
-              {registryDefinitions.length === 0 ? (
-                <div className="rounded-2xl bg-white/60 dark:bg-neutral-900/50 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-sm p-5">
-                  <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
-                    Add your first agent
-                  </h2>
-                  <ul className="mt-3 space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
-                    <li>Create an agent profile</li>
-                    <li>Connect a gateway</li>
-                    <li>Spawn your first session</li>
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void navigate({ to: '/settings' })
-                    }}
-                    className="mt-4 inline-flex h-9 items-center rounded-xl bg-accent-500 px-4 text-sm font-medium text-white shadow-sm hover:bg-accent-600"
-                  >
-                    Open Settings
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {groupedSections.map((section) => (
-                    <section key={section.category} className="space-y-2">
-                      <div className="flex items-center justify-between px-1">
-                        <h2 className="text-xs font-semibold tracking-wide text-neutral-500 dark:text-neutral-400">
-                          {section.category}
-                        </h2>
-                        <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-                          {section.agents.length}
-                        </span>
-                      </div>
 
-                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                        {section.agents.map((agent) => (
-                          <AgentRegistryCard
-                            key={agent.id}
-                            agent={agent}
-                            isSpawning={Boolean(spawningByAgentId[agent.id])}
-                            onTap={handleStreamTap}
-                            onChat={handleChat}
-                            onSpawn={handleSpawn}
-                            onHistory={handleHistory}
-                            onPauseToggle={handlePauseToggle}
-                            onKilled={handleKilled}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              )}
+            {usingFallbackRegistry ? (
+              <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
+                Gateway registry unavailable. Showing fallback definitions.
+              </div>
+            ) : null}
+
+            <div className="flex-1 min-h-0">
+              <div className="h-full overflow-auto px-6 py-4">
+                {registryDefinitions.length === 0 ? (
+                  <div className="rounded-2xl bg-white/60 dark:bg-neutral-900/50 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-sm p-5">
+                    <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                      Add your first agent
+                    </h2>
+                    <ul className="mt-3 space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
+                      <li>Create an agent profile</li>
+                      <li>Connect a gateway</li>
+                      <li>Spawn your first session</li>
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigate({ to: '/settings' })
+                      }}
+                      className="mt-4 inline-flex h-9 items-center rounded-xl bg-accent-500 px-4 text-sm font-medium text-white shadow-sm hover:bg-accent-600"
+                    >
+                      Open Settings
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {groupedSections.map((section) => (
+                      <section key={section.category} className="space-y-2">
+                        <div className="flex items-center justify-between px-1">
+                          <h2 className="text-xs font-semibold tracking-wide text-neutral-500 dark:text-neutral-400">
+                            {section.category}
+                          </h2>
+                          <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                            {section.agents.length}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                          {section.agents.map((agent) => (
+                            <AgentRegistryCard
+                              key={agent.id}
+                              agent={agent}
+                              isSpawning={Boolean(spawningByAgentId[agent.id])}
+                              onTap={handleStreamTap}
+                              onChat={handleChat}
+                              onSpawn={handleSpawn}
+                              onHistory={handleHistory}
+                              onPauseToggle={handlePauseToggle}
+                              onKilled={handleKilled}
+                            />
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
-      {hubView !== 'mission' && streamingAgent ? (
+      {!missionControlEnabled && streamingAgent ? (
         <AgentStreamPanel
           sessionKey={readString(streamingAgent.sessionKey)}
           agentName={streamingAgent.name}
