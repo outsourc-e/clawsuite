@@ -102,6 +102,7 @@ type DashboardSignalChip = {
   id: string
   text: string
   severity: 'amber' | 'red'
+  dismissable?: boolean
 }
 
 // Pull-to-refresh constants removed
@@ -276,6 +277,13 @@ export function DashboardScreen() {
   const navigate = useNavigate()
   const [dashSettingsOpen, setDashSettingsOpen] = useState(false)
   const [overflowOpen, setOverflowOpen] = useState(false)
+  const [dismissedChips, setDismissedChips] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const stored = window.localStorage.getItem('clawsuite-dismissed-chips')
+      return stored ? new Set(JSON.parse(stored) as string[]) : new Set()
+    } catch { return new Set() }
+  })
   const { visibleIds, addWidget, removeWidget, resetVisible } =
     useVisibleWidgets()
   const { order: widgetOrder, moveWidget, resetOrder } = useWidgetReorder()
@@ -553,6 +561,7 @@ export function DashboardScreen() {
           id: 'high-spend',
           text: `⚠ High spend today: ${formatCurrency(usageSummary.todayCost)}`,
           severity: 'amber',
+          dismissable: true,
         })
       }
 
@@ -561,6 +570,7 @@ export function DashboardScreen() {
           id: 'stalled-agent',
           text: `⚠ Agent stalled: ${stalledAgentName}`,
           severity: 'red',
+          dismissable: true,
         })
       }
 
@@ -569,6 +579,7 @@ export function DashboardScreen() {
           id: 'context-pressure',
           text: `Memory pressure: ${contextUsagePercent}%`,
           severity: 'amber',
+          dismissable: true,
         })
       }
 
@@ -1156,19 +1167,41 @@ export function DashboardScreen() {
             <ActivityTicker />
           </div>
 
-          {!isMobile && dashboardSignalChips.length > 0 ? (
+          {!isMobile && dashboardSignalChips.filter((c) => !dismissedChips.has(c.id)).length > 0 ? (
             <div className="mb-3 flex flex-wrap gap-2">
-              {dashboardSignalChips.map((chip) => (
+              {dashboardSignalChips
+                .filter((c) => !dismissedChips.has(c.id))
+                .map((chip) => (
                 <span
                   key={chip.id}
                   className={cn(
-                    'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium',
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
                     chip.severity === 'red'
                       ? 'border-red-200 bg-red-100/75 text-red-700'
                       : 'border-amber-200 bg-amber-100/75 text-amber-700',
                   )}
                 >
                   {chip.text}
+                  {chip.dismissable && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDismissedChips((prev) => {
+                          const next = new Set(prev)
+                          next.add(chip.id)
+                          try { window.localStorage.setItem('clawsuite-dismissed-chips', JSON.stringify([...next])) } catch {}
+                          return next
+                        })
+                      }}
+                      className={cn(
+                        'ml-0.5 rounded-full p-0.5 transition-colors hover:bg-black/10',
+                        chip.severity === 'red' ? 'text-red-500 hover:text-red-800' : 'text-amber-500 hover:text-amber-800',
+                      )}
+                      aria-label={`Dismiss ${chip.text}`}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </span>
               ))}
             </div>
