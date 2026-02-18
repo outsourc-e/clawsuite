@@ -16,6 +16,7 @@ export type HubTask = {
 export type TaskBoardRef = { addTasks: (tasks: Array<HubTask>) => void }
 type TaskBoardProps = {
   agents: Array<{ id: string; name: string }>
+  initialTasks?: Array<HubTask>
   selectedAgentId?: string
   onRef?: (ref: TaskBoardRef) => void
   onTasksChange?: (tasks: Array<HubTask>) => void
@@ -44,6 +45,12 @@ function isTaskStatus(value: unknown): value is TaskStatus {
 function isTaskPriority(value: unknown): value is TaskPriority {
   return PRIORITIES.some((priority) => priority.key === value)
 }
+function normalizeTask(task: HubTask): HubTask {
+  if (task.agentId && task.status === 'inbox') {
+    return { ...task, status: 'assigned' }
+  }
+  return task
+}
 function toTask(value: unknown): HubTask | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const row = value as Record<string, unknown>
@@ -54,7 +61,16 @@ function toTask(value: unknown): HubTask | null {
   const updatedAt = typeof row.updatedAt === 'number' ? row.updatedAt : createdAt
   const agentId = typeof row.agentId === 'string' ? row.agentId : undefined
   if (!id || !title || !isTaskPriority(row.priority) || !isTaskStatus(row.status)) return null
-  return { id, title, description, priority: row.priority, status: row.status, agentId, createdAt, updatedAt }
+  return normalizeTask({
+    id,
+    title,
+    description,
+    priority: row.priority,
+    status: row.status,
+    agentId,
+    createdAt,
+    updatedAt,
+  })
 }
 function loadTasks(): Array<HubTask> {
   if (typeof window === 'undefined') return []
@@ -80,7 +96,7 @@ function createTaskId(): string {
 function statusLabel(status: TaskStatus): string {
   return COLUMNS.find((column) => column.key === status)?.label ?? status
 }
-export function TaskBoard({ agents, selectedAgentId, onRef, onTasksChange }: TaskBoardProps) {
+export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTasksChange }: TaskBoardProps) {
   const [tasks, setTasks] = useState<Array<HubTask>>([])
   const [hydrated, setHydrated] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -89,7 +105,9 @@ export function TaskBoard({ agents, selectedAgentId, onRef, onTasksChange }: Tas
   const [form, setForm] = useState({ title: '', description: '', priority: 'normal' as TaskPriority, agentId: selectedAgentId ?? '' })
   const tasksRef = useRef<Array<HubTask>>([])
   useEffect(() => {
-    setTasks(loadTasks())
+    const storedTasks = loadTasks()
+    tasksRef.current = storedTasks
+    setTasks(storedTasks)
     setHydrated(true)
   }, [])
   useEffect(() => {
@@ -105,9 +123,11 @@ export function TaskBoard({ agents, selectedAgentId, onRef, onTasksChange }: Tas
   const agentNameById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents])
   const addTasks = useCallback((incomingTasks: Array<HubTask>) => {
     if (incomingTasks.length === 0) return
+    const normalizedIncomingTasks = incomingTasks.map(normalizeTask)
     const existingIds = new Set(tasksRef.current.map((task) => task.id))
-    const nextTasks = incomingTasks.filter((task) => !existingIds.has(task.id))
+    const nextTasks = normalizedIncomingTasks.filter((task) => !existingIds.has(task.id))
     if (nextTasks.length === 0) return
+    tasksRef.current = [...nextTasks, ...tasksRef.current]
     setTasks((previous) => [...nextTasks, ...previous])
     nextTasks.forEach((task) => {
       emitFeedEvent({
@@ -127,6 +147,10 @@ export function TaskBoard({ agents, selectedAgentId, onRef, onTasksChange }: Tas
       }
     })
   }, [agentNameById])
+  useEffect(() => {
+    if (!initialTasks || initialTasks.length === 0) return
+    addTasks(initialTasks)
+  }, [addTasks, initialTasks])
   useEffect(() => {
     onRef?.({ addTasks })
   }, [addTasks, onRef])
