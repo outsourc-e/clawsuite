@@ -84,11 +84,12 @@ function sessionName(session: SessionRecord): string {
   )
 }
 
-function formatTimestamp(ts: number): string {
-  const d = new Date(ts)
-  return [d.getHours(), d.getMinutes(), d.getSeconds()]
-    .map((n) => String(n).padStart(2, '0'))
-    .join(':')
+function relativeTime(ts: number): string {
+  const s = Math.floor((Date.now() - ts) / 1000)
+  if (s < 10) return 'just now'
+  if (s < 60) return `${s}s ago`
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`
+  return `${Math.floor(s / 3600)}h ago`
 }
 
 export function LiveFeedPanel() {
@@ -274,7 +275,7 @@ export function LiveFeedPanel() {
 
                     {/* Timestamp */}
                     <span className="shrink-0 font-mono text-[9px] tabular-nums text-neutral-700">
-                      {formatTimestamp(event.timestamp)}
+                      {relativeTime(event.timestamp)}
                     </span>
                   </div>
                 )

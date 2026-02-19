@@ -2132,6 +2132,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setTeam(buildTeamFromTemplate(templateId))
     setSelectedAgentId(undefined)
     setSelectedOutputAgentId(undefined)
+    // Loop Lite always runs sequential — planner → coder → reviewer
+    if (templateId === 'loop-lite') {
+      setProcessType('sequential')
+    }
   }
 
   function flashTeamPanel() {
