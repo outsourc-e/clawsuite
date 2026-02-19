@@ -36,9 +36,10 @@ type AgentHubLayoutProps = {
 const TEAM_STORAGE_KEY = 'clawsuite:hub-team'
 
 const TEMPLATE_MODEL_SUGGESTIONS: Record<TeamTemplateId, Array<ModelPresetId>> = {
-  research: ['opus', 'sonnet', 'auto'],
-  coding: ['opus', 'codex', 'sonnet'],
-  content: ['opus', 'sonnet', 'flash'],
+  research:  ['opus', 'sonnet', 'auto'],
+  coding:    ['opus', 'codex', 'sonnet'],
+  content:   ['opus', 'sonnet', 'flash'],
+  'loop-lite': ['pc1-planner', 'pc1-coder', 'pc1-critic'],
 }
 
 const MODEL_IDS = new Set<string>(MODEL_PRESETS.map((preset) => preset.id))
@@ -408,9 +409,10 @@ function readSessionActivityMarker(session: SessionRecord): string {
 }
 
 const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
-  research: 'Research Team',
-  coding: 'Coding Sprint',
-  content: 'Content Pipeline',
+  research:    'Research Team',
+  coding:      'Coding Sprint',
+  content:     'Content Pipeline',
+  'loop-lite': 'Loop Lite',
 }
 
 // ── Agent accent colors (indexed per agent slot) ───────────────────────────────
@@ -956,6 +958,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
+  const [gatewayOk, setGatewayOk] = useState(true)
 
   // ── Approvals state ────────────────────────────────────────────────────────
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(() => loadApprovals())
@@ -1963,6 +1966,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         const response = await fetch('/api/sessions')
         if (!response.ok || cancelled) return
 
+        if (!cancelled) setGatewayOk(true)
+
         const payload = (await response
           .json()
           .catch(() => ({}))) as { sessions?: Array<SessionRecord> }
@@ -2108,6 +2113,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         }
       } catch {
         // Ignore polling errors; mission dispatch and local events still work.
+        setGatewayOk(false)
       }
     }
 
@@ -2735,6 +2741,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </button>
         </div>
       </div>
+
+      {/* ── Gateway health banner ─────────────────────────────────────────── */}
+      {!gatewayOk ? (
+        <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-4 py-1.5 text-xs text-red-600 dark:text-red-400">
+          ⚠️ Gateway disconnected — retrying…
+        </div>
+      ) : null}
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 overflow-hidden">

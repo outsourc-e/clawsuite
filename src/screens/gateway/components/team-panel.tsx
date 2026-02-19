@@ -36,6 +36,12 @@ export const TEAM_TEMPLATES = [
     agents: ['researcher', 'writer', 'editor'],
     icon: '📝',
   },
+  {
+    id: 'loop-lite',
+    name: 'Loop Lite 🔁',
+    agents: ['planner', 'coder', 'reviewer'],
+    icon: '🔁',
+  },
 ] as const
 
 export type ModelPresetId = (typeof MODEL_PRESETS)[number]['id']
