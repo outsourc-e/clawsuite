@@ -846,6 +846,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const friendlyId = `hub-${baseName}-${suffix}`
     const label = `Mission: ${member.name}`
 
+    // Check if a session with this label already exists — reuse it instead of
+    // trying to create a duplicate (gateway enforces unique labels).
+    try {
+      const listResp = await fetch('/api/sessions')
+      if (listResp.ok) {
+        const listData = (await listResp.json()) as { sessions?: Array<Record<string, unknown>> }
+        const existing = (listData.sessions ?? []).find(
+          (s) => typeof s.label === 'string' && s.label === label,
+        )
+        if (existing) {
+          const existingKey = readString(existing.key)
+          if (existingKey) return existingKey
+        }
+      }
+    } catch {
+      // If the lookup fails, fall through to normal spawn
+    }
+
     const modelString = MODEL_PRESET_MAP[member.modelId] ?? ''
     const requestBody: Record<string, string> = { friendlyId, label }
     if (modelString) requestBody.model = modelString
