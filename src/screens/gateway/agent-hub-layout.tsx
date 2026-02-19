@@ -1544,8 +1544,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const spawnAgentSession = useCallback(async (member: TeamMember): Promise<string> => {
     const suffix = Math.random().toString(36).slice(2, 8)
     const baseName = member.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const isPC1 = member.modelId.startsWith('pc1-')
     const friendlyId = `hub-${baseName}-${suffix}`
-    const label = `Mission: ${member.name}`
+    const label = isPC1 ? `[PC1] Mission: ${member.name}` : `Mission: ${member.name}`
 
     // Check if a session with this label already exists — reuse it instead of
     // trying to create a duplicate (gateway enforces unique labels).
@@ -1787,8 +1788,29 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     // Helper: build agent context prefix for dispatch messages
+    // Hardened system prompts per PC1 role — injected when modelId starts with 'pc1-'
+    const PC1_SYSTEM_PROMPTS: Partial<Record<ModelPresetId, string>> = {
+      'pc1-planner':
+        'You are a technical planner. Given a mission goal, produce a numbered implementation plan with clear, specific subtasks a developer can execute directly. Output ONLY the numbered list. No preamble, no explanation, no markdown headers.',
+      'pc1-coder':
+        'You are a TypeScript/React developer. Implement exactly what the plan says. Output ONLY code — no explanation, no prose, no markdown outside of code blocks. No new npm dependencies. Code must be production-ready.',
+      'pc1-critic':
+        'You are a senior code reviewer. Output ONLY a numbered patch list of specific fixes (file, line, what to change). If the code is production-ready with no issues, output exactly: LGTM — <one sentence reason>. Do not output reasoning or thinking.',
+      'pc1-fast':
+        'You are a concise assistant. Answer directly and briefly. No filler, no preamble.',
+      'pc1-heavy':
+        'You are a deep analyst. Think carefully, then output a structured, thorough analysis. Be specific and cite evidence from the provided context.',
+      'pc1-fmt':
+        'You are a formatter. Output ONLY valid, clean JSON or structured data matching the schema provided. No explanation, no prose.',
+    }
+
     function buildAgentContext(member: TeamMember): string {
+      const isPC1 = member.modelId.startsWith('pc1-')
+      const pc1Prompt = isPC1 ? PC1_SYSTEM_PROMPTS[member.modelId] : undefined
+
       const parts = [
+        // Inject hardened system prompt for PC1 models
+        pc1Prompt && `[System] ${pc1Prompt}`,
         member.roleDescription && `Role: ${member.roleDescription}`,
         member.goal && `Your goal: ${member.goal}`,
         member.backstory && `Background: ${member.backstory}`,

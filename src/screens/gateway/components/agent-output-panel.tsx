@@ -36,6 +36,12 @@ function parseSsePayload(raw: string): Record<string, unknown> | null {
   }
 }
 
+// Strip DeepSeek-R1 <think>...</think> reasoning blocks from displayed content.
+// Applied at render time only — raw content is preserved in state for streaming continuity.
+function stripThinkBlocks(content: string): string {
+  return content.replace(/<think>[\s\S]*?<\/think>/g, '').trimStart()
+}
+
 function truncateArgs(args: unknown, maxLength = 80): string {
   const raw = typeof args === 'string' ? args : JSON.stringify(args)
   if (!raw || raw === '{}' || raw === 'undefined') return ''
@@ -234,7 +240,7 @@ export function AgentOutputPanel({
                     key={`${msg.timestamp}-${index}`}
                     className="whitespace-pre-wrap text-neutral-100"
                   >
-                    {msg.content}
+                    {stripThinkBlocks(msg.content)}
                   </div>
                 ),
               )}
