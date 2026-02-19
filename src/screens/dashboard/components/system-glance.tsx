@@ -84,7 +84,6 @@ function StatItem({ label, value }: { label: string; value: string }) {
 export function SystemGlance(props: SystemGlanceProps) {
   const {
     sessions,
-    activeAgents,
     costToday,
     uptimeFormatted,
     updatedAgo,
@@ -124,7 +123,8 @@ export function SystemGlance(props: SystemGlanceProps) {
         </div>
       </div>
 
-      {/* Row 2: Three stat blocks — Memory ring | Cost | Agents */}
+      {/* Row 2: Three stat blocks — Memory ring | Cost | Model */}
+      {/* Note: Agents & Uptime are shown with detail in the metric cards row below */}
       <div className="grid grid-cols-3 gap-3">
         <StatBlock
           label="MEMORY"
@@ -138,9 +138,9 @@ export function SystemGlance(props: SystemGlanceProps) {
           sublabel="today"
         />
         <StatBlock
-          label="AGENTS"
-          value={activeAgents}
-          sublabel={`${activeAgents} running`}
+          label="MODEL"
+          value={currentModel || '—'}
+          sublabel="active"
         />
       </div>
 

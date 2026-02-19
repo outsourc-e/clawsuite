@@ -215,6 +215,10 @@ export function DashboardScreen() {
   // P0-A: always show a dollar value — never "—" for cost
   const costDisplay = formatMoney(dashboardData.todayCostUsd ?? 0)
 
+  // Metric card cost: use cost.today (session-status dailyBreakdown — same primary source as SystemGlance).
+  // todayCostUsd can be null while queries load; cost.today is always 0+ once available.
+  const metricCostDisplay = formatMoney(dashboardData.cost.today ?? 0)
+
   // B1: Uptime fallback — if formatted is "—", show "Active · last check Xm ago"
   const uptimeDisplay = useMemo(() => {
     if (dashboardData.uptime.formatted !== '—') return dashboardData.uptime.formatted
@@ -287,7 +291,7 @@ export function DashboardScreen() {
           node: (
             <MetricsWidget
               title="Cost Today"
-              value={costDisplay}
+              value={metricCostDisplay}
               subtitle="Today's spend"
               icon={ChartLineData02Icon}
               accent="emerald"
@@ -295,7 +299,7 @@ export function DashboardScreen() {
               trendLabel={dashboardData.cost.trend !== null ? 'vs prev day' : undefined}
               trendInverted
               description="Today's estimated spend from gateway cost telemetry."
-              rawValue={costDisplay}
+              rawValue={metricCostDisplay}
               chartData={costChartData}
               chartAccentClass="bg-emerald-500"
             />
@@ -320,6 +324,7 @@ export function DashboardScreen() {
     },
     [
       costDisplay,
+      metricCostDisplay,
       costChartData,
       sessionsChartData,
       dashboardData.agents.active,
@@ -847,6 +852,10 @@ export function DashboardScreen() {
                   ))}
                 </div>
               ) : null}
+
+              {/* 3. Metric cards row — Sessions · Active Agents · Cost Today · Uptime */}
+              {/* These complement SystemGlance: they add micro charts, trend pills & time-range selectors */}
+              <WidgetGrid items={metricItems} className="gap-4" />
 
               {/* D1: Widget edit controls — inline row above widgets */}
               <div className="flex items-center justify-end gap-2">
