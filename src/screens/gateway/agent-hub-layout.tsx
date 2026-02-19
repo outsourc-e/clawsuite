@@ -237,6 +237,8 @@ function buildTeamFromTemplate(templateId: TeamTemplateId): TeamMember[] {
     name: toTitleCase(agentName),
     modelId: modelSuggestions[index] ?? 'auto',
     roleDescription: `${toTitleCase(agentName)} lead for this mission`,
+    goal: '',
+    backstory: '',
     status: 'available',
   }))
 }
@@ -249,6 +251,8 @@ function buildTeamFromRuntime(
     name: agent.name,
     modelId: 'auto',
     roleDescription: agent.role,
+    goal: '',
+    backstory: '',
     status: agent.status || 'available',
   }))
 }
@@ -262,6 +266,8 @@ function toTeamMember(value: unknown): TeamMember | null {
   const status = typeof row.status === 'string' ? row.status.trim() : 'available'
   const roleDescription =
     typeof row.roleDescription === 'string' ? row.roleDescription : ''
+  const goal = typeof row.goal === 'string' ? row.goal : ''
+  const backstory = typeof row.backstory === 'string' ? row.backstory : ''
   const modelIdRaw = typeof row.modelId === 'string' ? row.modelId : 'auto'
   const modelId = MODEL_IDS.has(modelIdRaw)
     ? (modelIdRaw as ModelPresetId)
@@ -274,6 +280,8 @@ function toTeamMember(value: unknown): TeamMember | null {
     name,
     modelId,
     roleDescription,
+    goal,
+    backstory,
     status: status || 'available',
   }
 }
@@ -679,6 +687,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('office')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
+  const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
 
   // ── Existing state ──────────────────────────────────────────────────────────
   const [isMobileHub, setIsMobileHub] = useState(() =>
@@ -1340,6 +1349,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     tasks: Array<HubTask>,
     teamMembers: Array<TeamMember>,
     missionGoalValue: string,
+    mode: 'sequential' | 'hierarchical' | 'parallel' = 'parallel',
   ) => {
     // STEP A: Ensure all agents have isolated gateway sessions
     const sessionMap = await ensureAgentSessions(teamMembers)
@@ -1353,26 +1363,38 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       tasksByAgent.set(task.agentId, existing)
     }
 
-    // STEP C: Dispatch to per-agent sessions
-    for (const [agentId, agentTasks] of tasksByAgent) {
+    // Helper: build agent context prefix for dispatch messages
+    function buildAgentContext(member: TeamMember): string {
+      const parts = [
+        member.roleDescription && `Role: ${member.roleDescription}`,
+        member.goal && `Your goal: ${member.goal}`,
+        member.backstory && `Background: ${member.backstory}`,
+      ].filter(Boolean)
+      return parts.join('\n')
+    }
+
+    // Helper: send a message to an agent session and update task state
+    async function dispatchToAgent(
+      agentId: string,
+      agentTasks: Array<HubTask>,
+      messageText: string,
+    ): Promise<void> {
       const sessionKey = sessionMap[agentId]
       if (!sessionKey) {
         emitFeedEvent({
           type: 'system',
           message: `No session for agent ${agentId} — skipping dispatch`,
         })
-        continue
+        return
       }
 
       const member = teamMembers.find((entry) => entry.id === agentId)
-      const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
-      const message = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
 
       try {
         const response = await fetch('/api/sessions/send', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionKey, message }),
+          body: JSON.stringify({ sessionKey, message: messageText }),
         })
 
         if (!response.ok) {
@@ -1405,6 +1427,76 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           message: `Failed to dispatch to ${member?.name || agentId}: ${error instanceof Error ? error.message : String(error)}`,
         })
       }
+    }
+
+    // ── HIERARCHICAL mode ─────────────────────────────────────────────────
+    if (mode === 'hierarchical') {
+      const [leadMember, ...workerMembers] = teamMembers
+      if (!leadMember) return
+
+      const leadSessionKey = sessionMap[leadMember.id]
+      if (leadSessionKey) {
+        const leadContext = buildAgentContext(leadMember)
+        const teamList = workerMembers.map((m) => `- ${m.name} (${m.roleDescription})`).join('\n')
+        const leadBriefing = `You are the Lead Agent coordinating this mission.\n\nYour team:\n${teamList}\n\nMission Goal: ${missionGoalValue}\n\nYour job: Break down the goal into clear subtasks, delegate them to your team members by name, and synthesize the final result. Start by outlining the plan.`
+        const leadMessage = [leadContext, leadBriefing].filter(Boolean).join('\n\n')
+
+        const leadTasks = tasksByAgent.get(leadMember.id) ?? []
+        const effectiveLeadTasks = leadTasks.length > 0 ? leadTasks : [{
+          id: createTaskId(),
+          title: `Lead: ${missionGoalValue}`,
+          description: '',
+          priority: 'high' as const,
+          status: 'assigned' as const,
+          agentId: leadMember.id,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }]
+        await dispatchToAgent(leadMember.id, effectiveLeadTasks, leadMessage)
+
+        // Dispatch to workers with delegation prefix
+        for (const worker of workerMembers) {
+          const workerTasks = tasksByAgent.get(worker.id)
+          if (!workerTasks || workerTasks.length === 0) continue
+          const workerContext = buildAgentContext(worker)
+          const taskList = workerTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
+          const delegationPrefix = `Delegated by ${leadMember.name}:`
+          const workerBody = `${delegationPrefix}\n\nMission Task Assignment for ${worker.name}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
+          const workerMessage = [workerContext, workerBody].filter(Boolean).join('\n\n')
+          await dispatchToAgent(worker.id, workerTasks, workerMessage)
+        }
+      }
+      return
+    }
+
+    // ── SEQUENTIAL mode ───────────────────────────────────────────────────
+    if (mode === 'sequential') {
+      const agentEntries = Array.from(tasksByAgent.entries())
+      for (let i = 0; i < agentEntries.length; i++) {
+        const [agentId, agentTasks] = agentEntries[i]
+        const member = teamMembers.find((entry) => entry.id === agentId)
+        const agentContext = member ? buildAgentContext(member) : ''
+        const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
+        const body = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
+        const message = [agentContext, body].filter(Boolean).join('\n\n')
+        await dispatchToAgent(agentId, agentTasks, message)
+
+        // Stagger: wait 30 seconds between agents (except after the last one)
+        if (i < agentEntries.length - 1) {
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 30_000))
+        }
+      }
+      return
+    }
+
+    // ── PARALLEL mode (default) ────────────────────────────────────────────
+    for (const [agentId, agentTasks] of tasksByAgent) {
+      const member = teamMembers.find((entry) => entry.id === agentId)
+      const agentContext = member ? buildAgentContext(member) : ''
+      const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
+      const body = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
+      const message = [agentContext, body].filter(Boolean).join('\n\n')
+      await dispatchToAgent(agentId, agentTasks, message)
     }
   }, [ensureAgentSessions, moveTasksToStatus])
 
@@ -1584,6 +1676,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         name: `Agent ${previous.length + 1}`,
         modelId: 'auto',
         roleDescription: '',
+        goal: '',
+        backstory: '',
         status: 'available',
       },
     ])
@@ -1627,7 +1721,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     toast(`Mission started with ${createdTasks.length} tasks`, { type: 'success' })
 
     window.setTimeout(() => {
-      void executeMission(createdTasks, teamWithRuntimeStatus, trimmedGoal).finally(() => {
+      void executeMission(createdTasks, teamWithRuntimeStatus, trimmedGoal, processType).finally(() => {
         dispatchingRef.current = false
       })
     }, 0)
@@ -1727,6 +1821,37 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           </span>
                         </p>
                       ) : null}
+
+                      {/* Process Type selector */}
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary-500">
+                          Process Type
+                        </p>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {(
+                            [
+                              { id: 'sequential', label: 'Sequential', tip: 'A → B → C, tasks flow one at a time' },
+                              { id: 'hierarchical', label: 'Hierarchical', tip: 'Lead agent coordinates workers' },
+                              { id: 'parallel', label: 'Parallel', tip: 'All agents work simultaneously' },
+                            ] as const
+                          ).map((option) => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              title={option.tip}
+                              onClick={() => setProcessType(option.id)}
+                              className={cn(
+                                'rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors',
+                                processType === option.id
+                                  ? 'border-accent-400 bg-accent-50 text-accent-700 dark:border-accent-600 dark:bg-accent-950/30 dark:text-accent-300'
+                                  : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-600',
+                              )}
+                            >
+                              {processType === option.id ? '● ' : '○ '}{option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
                       <div className="flex items-center justify-center gap-2">
                         <button

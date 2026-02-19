@@ -39,6 +39,8 @@ export type TeamMember = {
   name: string
   modelId: ModelPresetId
   roleDescription: string
+  goal: string        // What this agent is trying to achieve
+  backstory: string   // Persona/context that shapes agent behavior
   status: string
 }
 
@@ -63,7 +65,7 @@ type TeamPanelProps = {
   onAddAgent: () => void
   onUpdateAgent: (
     agentId: string,
-    updates: Partial<Pick<TeamMember, 'modelId' | 'roleDescription'>>,
+    updates: Partial<Pick<TeamMember, 'modelId' | 'roleDescription' | 'goal' | 'backstory'>>,
   ) => void
   onSelectAgent?: (agentId?: string) => void
 }
@@ -341,6 +343,40 @@ export function TeamPanel({
                       }}
                       rows={3}
                       placeholder="Define responsibilities and deliverables"
+                      className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                      Goal
+                    </span>
+                    <textarea
+                      value={agent.goal}
+                      onChange={(event) => {
+                        onUpdateAgent(agent.id, {
+                          goal: event.target.value,
+                        })
+                      }}
+                      rows={3}
+                      placeholder="e.g. Find the most actionable competitive insights"
+                      className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                      Backstory
+                    </span>
+                    <textarea
+                      value={agent.backstory}
+                      onChange={(event) => {
+                        onUpdateAgent(agent.id, {
+                          backstory: event.target.value,
+                        })
+                      }}
+                      rows={3}
+                      placeholder="e.g. You have 10 years of experience in competitive intelligence..."
                       className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                     />
                   </label>
