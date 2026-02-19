@@ -41,11 +41,20 @@ export type TeamMember = {
   status: string
 }
 
+export type AgentSessionStatusEntry = {
+  status: 'active' | 'idle' | 'stopped' | 'error'
+  lastSeen: number
+  lastMessage?: string
+}
+
 type TeamPanelProps = {
   team: TeamMember[]
   activeTemplateId?: TeamTemplateId
   agentTaskCounts?: Record<string, number>
   spawnState?: Record<string, 'idle' | 'spawning' | 'ready' | 'error'>
+  agentSessionStatus?: Record<string, AgentSessionStatusEntry>
+  agentSessionMap?: Record<string, string>
+  onRetrySpawn?: (member: TeamMember) => void
   onApplyTemplate: (templateId: TeamTemplateId) => void
   onAddAgent: () => void
   onUpdateAgent: (
@@ -53,13 +62,6 @@ type TeamPanelProps = {
     updates: Partial<Pick<TeamMember, 'modelId' | 'roleDescription'>>,
   ) => void
   onSelectAgent?: (agentId?: string) => void
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  active: 'bg-emerald-500',
-  idle: 'bg-amber-500',
-  available: 'bg-primary-400',
-  paused: 'bg-red-500',
 }
 
 const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
@@ -70,11 +72,43 @@ const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
   flash: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
 }
 
+type SessionDotState = 'active' | 'idle' | 'stale' | 'dead' | 'spawning' | 'none'
+
+const DOT_COLOR: Record<SessionDotState, string> = {
+  active: 'bg-emerald-500',
+  idle: 'bg-emerald-500',
+  stale: 'bg-amber-400',
+  dead: 'bg-red-500',
+  spawning: 'bg-amber-400',
+  none: 'bg-neutral-300 dark:bg-neutral-600',
+}
+
+function resolveSessionDotState(
+  sessionStatus: AgentSessionStatusEntry | undefined,
+  spawnStatus: 'idle' | 'spawning' | 'ready' | 'error' | undefined,
+  hasSession: boolean,
+): SessionDotState {
+  if (spawnStatus === 'spawning') return 'spawning'
+  if (!hasSession) {
+    // No session yet — treat spawn error as dead, otherwise none
+    return spawnStatus === 'error' ? 'dead' : 'none'
+  }
+  if (!sessionStatus) return 'none'
+  if (sessionStatus.status === 'error' || sessionStatus.status === 'stopped') return 'dead'
+  const ageMs = Date.now() - sessionStatus.lastSeen
+  if (ageMs < 30_000) return 'active'
+  if (ageMs < 300_000) return 'idle'
+  return 'stale'
+}
+
 export function TeamPanel({
   team,
   activeTemplateId,
   agentTaskCounts,
   spawnState,
+  agentSessionStatus,
+  agentSessionMap,
+  onRetrySpawn,
   onApplyTemplate,
   onAddAgent,
   onUpdateAgent,
@@ -152,73 +186,110 @@ export function TeamPanel({
 
         {team.map((agent) => {
           const agentSpawnStatus = spawnState?.[agent.id]
-          const statusColor =
-            agentSpawnStatus === 'spawning'
-              ? 'bg-amber-400'
-              : agentSpawnStatus === 'ready'
-                ? 'bg-emerald-500'
-                : agentSpawnStatus === 'error'
-                  ? 'bg-red-500'
-                  : (STATUS_COLOR[agent.status] ?? 'bg-primary-400')
-          const isSpawning = agentSpawnStatus === 'spawning'
+          const agentSessionEntry = agentSessionStatus?.[agent.id]
+          const agentSessionKey = agentSessionMap?.[agent.id]
+          const dotState = resolveSessionDotState(
+            agentSessionEntry,
+            agentSpawnStatus,
+            Boolean(agentSessionKey),
+          )
+          const dotColorClass = DOT_COLOR[dotState]
+          const showPulse = dotState === 'active' || dotState === 'spawning'
+          const showRetry = dotState === 'dead' && Boolean(onRetrySpawn)
           const expanded = expandedAgentId === agent.id
           const modelLabel = modelLabelById.get(agent.modelId) ?? 'Auto'
           const taskCount = agentTaskCounts?.[agent.id] ?? 0
+          const cardTitle = agentSessionKey ? `Session: ${agentSessionKey}` : undefined
 
           return (
             <div
               key={agent.id}
+              title={cardTitle}
               className={cn(
                 'rounded-xl border border-primary-200 bg-white/90 p-2 shadow-sm transition-colors dark:border-neutral-700 dark:bg-neutral-900/70',
                 expanded &&
                   'border-accent-300 dark:border-accent-700 bg-accent-50/60 dark:bg-accent-950/10',
               )}
             >
-              <button
-                type="button"
-                onClick={() => handleToggleAgent(agent.id)}
-                className="flex w-full items-start gap-2 text-left"
-              >
-                <span className="relative mt-1 inline-flex size-2.5 shrink-0">
-                  {isSpawning ? (
-                    <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/70" />
-                  ) : null}
-                  <span className={cn('relative inline-flex size-2.5 rounded-full', statusColor)} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                    {agent.name}
-                  </p>
-                  <div className="mt-1 flex items-center gap-1.5">
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                        MODEL_BADGE_COLOR[agent.modelId],
-                      )}
-                    >
-                      {modelLabel}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-wide text-primary-500">
-                      {agent.status}
-                    </span>
-                    <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-neutral-800 dark:text-neutral-300">
-                      {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
-                    </span>
-                  </div>
-                </div>
-                <span
-                  aria-hidden
-                  className={cn(
-                    'mt-0.5 shrink-0 text-sm text-primary-400 transition-transform',
-                    expanded && 'rotate-90 text-accent-500',
-                  )}
+              {/* Header row: toggle button + optional retry button */}
+              <div className="flex items-start">
+                <button
+                  type="button"
+                  onClick={() => handleToggleAgent(agent.id)}
+                  className="flex min-w-0 flex-1 items-start gap-2 text-left"
                 >
-                  ›
-                </span>
-              </button>
+                  {/* Status dot */}
+                  <span className="relative mt-1 inline-flex size-2.5 shrink-0">
+                    {showPulse ? (
+                      <span
+                        className={cn(
+                          'absolute inset-0 animate-ping rounded-full',
+                          dotState === 'spawning' ? 'bg-amber-400/70' : 'bg-emerald-400/70',
+                        )}
+                      />
+                    ) : null}
+                    <span className={cn('relative inline-flex size-2.5 rounded-full', dotColorClass)} />
+                  </span>
+
+                  {/* Name + badges */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                      {agent.name}
+                    </p>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                          MODEL_BADGE_COLOR[agent.modelId],
+                        )}
+                      >
+                        {modelLabel}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wide text-primary-500">
+                        {agent.status}
+                      </span>
+                      <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-neutral-800 dark:text-neutral-300">
+                        {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Expand arrow */}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'mt-0.5 shrink-0 text-sm text-primary-400 transition-transform',
+                      expanded && 'rotate-90 text-accent-500',
+                    )}
+                  >
+                    ›
+                  </span>
+                </button>
+
+                {/* Retry spawn button — only shown when session is dead/error */}
+                {showRetry ? (
+                  <button
+                    type="button"
+                    title="Retry spawn"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onRetrySpawn?.(agent)
+                    }}
+                    className="ml-1 mt-0.5 shrink-0 rounded p-0.5 text-sm leading-none text-red-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-red-500 dark:hover:bg-red-950/20 dark:hover:text-red-400"
+                  >
+                    ↻
+                  </button>
+                ) : null}
+              </div>
 
               {expanded ? (
                 <div className="mt-2 space-y-2 border-t border-primary-200 pt-2 dark:border-neutral-700">
+                  {agentSessionEntry?.lastMessage ? (
+                    <p className="truncate text-[10px] italic text-primary-400 dark:text-neutral-500">
+                      {agentSessionEntry.lastMessage}
+                    </p>
+                  ) : null}
+
                   <label className="block">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
                       Model

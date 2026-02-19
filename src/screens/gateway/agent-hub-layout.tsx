@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId } from './components/team-panel'
+import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
 import { TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
 import { AgentOutputPanel } from './components/agent-output-panel'
@@ -350,6 +350,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
   })
   const [spawnState, setSpawnState] = useState<Record<string, 'idle' | 'spawning' | 'ready' | 'error'>>({})
+  const [agentSessionStatus, setAgentSessionStatus] = useState<Record<string, AgentSessionStatusEntry>>({})
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const stored = readStoredTeam()
     if (stored.length > 0) return stored
@@ -533,6 +534,31 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return sessionKey
   }, [])
 
+  const handleRetrySpawn = useCallback(async (member: TeamMember): Promise<void> => {
+    setSpawnState((prev) => ({ ...prev, [member.id]: 'spawning' }))
+    try {
+      const sessionKey = await spawnAgentSession(member)
+      setAgentSessionMap((prev) => ({ ...prev, [member.id]: sessionKey }))
+      setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
+      setAgentSessionStatus((prev) => ({
+        ...prev,
+        [member.id]: { status: 'idle', lastSeen: Date.now() },
+      }))
+      emitFeedEvent({
+        type: 'agent_spawned',
+        message: `${member.name} session re-created`,
+        agentName: member.name,
+      })
+    } catch (err) {
+      setSpawnState((prev) => ({ ...prev, [member.id]: 'error' }))
+      emitFeedEvent({
+        type: 'system',
+        message: `Failed to re-spawn ${member.name}: ${err instanceof Error ? err.message : String(err)}`,
+        agentName: member.name,
+      })
+    }
+  }, [spawnAgentSession])
+
   const ensureAgentSessions = useCallback(async (teamMembers: TeamMember[]): Promise<Record<string, string>> => {
     const currentMap = { ...agentSessionMap }
     const spawnPromises: Array<Promise<void>> = []
@@ -642,65 +668,156 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }, [ensureAgentSessions, moveTasksToStatus])
 
   useEffect(() => {
-    if (!missionActive || missionState !== 'running') {
+    const isMissionRunning = missionActive && missionState === 'running'
+
+    // Reset activity markers when mission is not running
+    if (!isMissionRunning) {
       sessionActivityRef.current = new Map()
-      return
+    }
+
+    const hasSessions = Object.keys(agentSessionMap).length > 0
+
+    // Only poll when we have sessions to roster or an active mission
+    if (!hasSessions && !isMissionRunning) return
+
+    // Build reverse lookup: sessionKey → agentId
+    const sessionKeyToAgentId = new Map<string, string>()
+    for (const [agentId, sessionKey] of Object.entries(agentSessionMap)) {
+      if (sessionKey) sessionKeyToAgentId.set(sessionKey, agentId)
     }
 
     let cancelled = false
-    async function pollSessionsActivity() {
+
+    async function pollSessions() {
       try {
         const response = await fetch('/api/sessions')
-        if (!response.ok) return
+        if (!response.ok || cancelled) return
 
         const payload = (await response
           .json()
           .catch(() => ({}))) as { sessions?: Array<SessionRecord> }
         const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
-        const previousMarkers = sessionActivityRef.current
-        const nextMarkers = new Map<string, string>()
+        const now = Date.now()
 
-        sessions.forEach((session) => {
-          const sessionId = readSessionId(session)
-          if (!sessionId) return
+        // ── Session Roster Tracking ───────────────────────────────────────────
+        if (hasSessions) {
+          const seenAgentIds = new Set<string>()
 
-          const marker = readSessionActivityMarker(session)
-          const previous = previousMarkers.get(sessionId)
-          const name = readSessionName(session) || sessionId
+          // Compute status for each matched session
+          const matchedEntries: Array<[string, AgentSessionStatusEntry]> = []
+          for (const session of sessions) {
+            const sessionKey = readSessionId(session)
+            if (!sessionKey) continue
+            const agentId = sessionKeyToAgentId.get(sessionKey)
+            if (!agentId) continue
 
-          nextMarkers.set(sessionId, marker)
-          if (!previous || previous === marker) return
+            seenAgentIds.add(agentId)
 
-          const lastMessage = readSessionLastMessage(session)
-          const summary = lastMessage
-            ? `Output: ${truncateMissionGoal(lastMessage, 80)}`
-            : 'Session activity detected'
+            const updatedAtRaw = session.updatedAt
+            const updatedAt =
+              typeof updatedAtRaw === 'number'
+                ? updatedAtRaw
+                : typeof updatedAtRaw === 'string'
+                  ? Date.parse(updatedAtRaw)
+                  : 0
+            const lastSeen = Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : now
+            const lastMessage = readSessionLastMessage(session) || undefined
+            const ageMs = now - lastSeen
+            const rawStatus = readString(session.status)
 
-          emitFeedEvent({
-            type: 'agent_active',
-            message: `${name} update: ${summary}`,
-            agentName: name,
-          })
-        })
+            let status: AgentSessionStatusEntry['status']
+            if (rawStatus === 'error') {
+              status = 'error'
+            } else if (ageMs < 30_000) {
+              status = 'active'
+            } else if (ageMs < 300_000) {
+              status = 'idle'
+            } else {
+              status = 'stopped'
+            }
 
-        if (!cancelled) {
-          sessionActivityRef.current = nextMarkers
+            matchedEntries.push([agentId, { status, lastSeen, ...(lastMessage ? { lastMessage } : {}) }])
+          }
+
+          if (!cancelled) {
+            setAgentSessionStatus((prev) => {
+              const next: Record<string, AgentSessionStatusEntry> = {}
+
+              // Apply matched sessions
+              for (const [agentId, entry] of matchedEntries) {
+                next[agentId] = entry
+              }
+
+              // Handle agents whose session key wasn't returned by the API
+              for (const agentId of Object.keys(agentSessionMap)) {
+                if (seenAgentIds.has(agentId)) continue
+                const existing = prev[agentId]
+                const lastSeen = existing?.lastSeen ?? now
+                const ageMs = now - lastSeen
+                // Grace period: keep existing status for up to 60s before marking stopped
+                if (!existing || ageMs > 60_000) {
+                  next[agentId] = {
+                    status: 'stopped',
+                    lastSeen,
+                    ...(existing?.lastMessage ? { lastMessage: existing.lastMessage } : {}),
+                  }
+                } else {
+                  next[agentId] = existing
+                }
+              }
+
+              return next
+            })
+          }
+        }
+
+        // ── Activity Feed Events (mission only) ───────────────────────────────
+        if (isMissionRunning) {
+          const previousMarkers = sessionActivityRef.current
+          const nextMarkers = new Map<string, string>()
+
+          for (const session of sessions) {
+            const sessionId = readSessionId(session)
+            if (!sessionId) continue
+
+            const marker = readSessionActivityMarker(session)
+            const previous = previousMarkers.get(sessionId)
+            const name = readSessionName(session) || sessionId
+
+            nextMarkers.set(sessionId, marker)
+            if (!previous || previous === marker) continue
+
+            const lastMessage = readSessionLastMessage(session)
+            const summary = lastMessage
+              ? `Output: ${truncateMissionGoal(lastMessage, 80)}`
+              : 'Session activity detected'
+
+            emitFeedEvent({
+              type: 'agent_active',
+              message: `${name} update: ${summary}`,
+              agentName: name,
+            })
+          }
+
+          if (!cancelled) {
+            sessionActivityRef.current = nextMarkers
+          }
         }
       } catch {
         // Ignore polling errors; mission dispatch and local events still work.
       }
     }
 
-    void pollSessionsActivity()
+    void pollSessions()
     const interval = window.setInterval(() => {
-      void pollSessionsActivity()
+      void pollSessions()
     }, 5_000)
 
     return () => {
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [missionActive, missionState])
+  }, [agentSessionMap, missionActive, missionState])
 
   function applyTemplate(templateId: TeamTemplateId) {
     setTeam(buildTeamFromTemplate(templateId))
@@ -828,6 +945,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             activeTemplateId={activeTemplateId}
             agentTaskCounts={agentTaskCounts}
             spawnState={spawnState}
+            agentSessionStatus={agentSessionStatus}
+            agentSessionMap={agentSessionMap}
+            onRetrySpawn={handleRetrySpawn}
             onApplyTemplate={applyTemplate}
             onAddAgent={handleAddAgent}
             onUpdateAgent={(agentId, updates) => {
@@ -1017,6 +1137,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       })
                       setAgentSessionMap({})
                       setSpawnState({})
+                      setAgentSessionStatus({})
                       if (typeof window !== 'undefined') {
                         window.localStorage.removeItem('clawsuite:hub-agent-sessions')
                       }
