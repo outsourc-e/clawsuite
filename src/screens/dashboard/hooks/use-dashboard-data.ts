@@ -242,6 +242,12 @@ export type DashboardData = {
     total: number
     enabled: number
   }
+  timeseries: {
+    /** Daily cost points — up to last 28 days, sorted ascending by date */
+    costByDay: Array<{ date: string; amount: number }>
+    /** Daily message counts aggregated across all sessions — up to last 28 days */
+    messagesByDay: Array<{ date: string; count: number }>
+  }
 }
 
 export type UseDashboardDataResult = {
@@ -572,6 +578,27 @@ export function useDashboardData(): UseDashboardDataResult {
       }
     }
 
+    // ── Timeseries ───────────────────────────────────────────────────────────
+    // Cost by day — from cost timeseries API (last 28 days)
+    const costByDay = points.slice(-28)
+
+    // Messages by day — aggregate dailyMessageCounts across all sessions
+    const messagesPerDayMap = new Map<string, number>()
+    for (const session of ssSessions) {
+      const msgCounts = Array.isArray(session.usage?.dailyMessageCounts)
+        ? session.usage.dailyMessageCounts
+        : []
+      for (const entry of msgCounts) {
+        const date = readString(entry.date)
+        if (!date) continue
+        messagesPerDayMap.set(date, (messagesPerDayMap.get(date) ?? 0) + readNumber(entry.total))
+      }
+    }
+    const messagesByDay = Array.from(messagesPerDayMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-28)
+      .map(([date, count]) => ({ date, count }))
+
     // ── Cron jobs ────────────────────────────────────────────────────────────
     const cronJobs = Array.isArray(cronJobsQuery.data) ? cronJobsQuery.data : []
     let cronInProgress = 0
@@ -702,6 +729,10 @@ export function useDashboardData(): UseDashboardDataResult {
       skills: {
         total: skills.length,
         enabled: enabledSkills,
+      },
+      timeseries: {
+        costByDay,
+        messagesByDay,
       },
     }
   }, [

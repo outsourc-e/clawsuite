@@ -1,5 +1,6 @@
 import { GlanceCard, HealthBadge, ProviderPill, StatBlock } from './glance-card'
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
 
 type SystemGlanceProps = {
   sessions: number
@@ -13,6 +14,8 @@ type SystemGlanceProps = {
   sessionPercent?: number
   providers?: Array<{ name: string; cost: number; tokens: number }>
   currentModel?: string
+  /** Compact single-row layout for mobile */
+  compact?: boolean
 }
 
 function formatCompact(n: number): string {
@@ -21,19 +24,90 @@ function formatCompact(n: number): string {
   return n.toString()
 }
 
-export function SystemGlance({
+// ─── Compact mobile variant ───────────────────────────────────────────────────
+
+function SystemGlanceCompact({
   sessions,
   activeAgents,
   costToday,
   uptimeFormatted,
-  updatedAgo,
   healthStatus,
   gatewayConnected,
   sessionPercent,
-  providers = [],
   currentModel,
 }: SystemGlanceProps) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/70 px-3 py-2 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-neutral-950/60">
+      {/* Health dot */}
+      <span
+        className={cn(
+          'size-2 shrink-0 rounded-full',
+          healthStatus === 'healthy' && 'animate-pulse bg-emerald-500',
+          healthStatus === 'warning' && 'bg-amber-500',
+          healthStatus === 'critical' && 'animate-pulse bg-red-500',
+          healthStatus === 'offline' && 'bg-neutral-400',
+        )}
+      />
+
+      {/* Stats */}
+      <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-0.5">
+        <StatItem label="Sessions" value={String(sessions)} />
+        <StatItem label="Agents" value={String(activeAgents)} />
+        <StatItem label="Cost" value={costToday} />
+        <StatItem label="Uptime" value={uptimeFormatted} />
+        {sessionPercent !== undefined ? (
+          <StatItem label="Ctx" value={`${Math.round(sessionPercent)}%`} />
+        ) : null}
+      </div>
+
+      {/* Model pill */}
+      {currentModel ? (
+        <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[9px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+          {currentModel}
+        </span>
+      ) : null}
+
+      {/* Connected badge */}
+      <HealthBadge status={gatewayConnected ? 'healthy' : 'offline'} />
+    </div>
+  )
+}
+
+function StatItem({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex items-baseline gap-1">
+      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">
+        {label}
+      </span>
+      <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">
+        {value}
+      </span>
+    </span>
+  )
+}
+
+// ─── Full desktop variant ─────────────────────────────────────────────────────
+
+export function SystemGlance(props: SystemGlanceProps) {
+  const {
+    sessions,
+    activeAgents,
+    costToday,
+    uptimeFormatted,
+    updatedAgo,
+    healthStatus,
+    gatewayConnected,
+    sessionPercent,
+    providers = [],
+    currentModel,
+    compact = false,
+  } = props
+
   const [activeProvider, setActiveProvider] = useState<string | null>(null)
+
+  if (compact) {
+    return <SystemGlanceCompact {...props} />
+  }
 
   const filteredProviders = activeProvider
     ? providers.filter((p) => p.name === activeProvider)

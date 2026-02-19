@@ -15,9 +15,11 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useNavigate } from '@tanstack/react-router'
 import {
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { SquadStatusWidget } from './components/squad-status-widget'
@@ -56,6 +58,67 @@ type MobileWidgetSection = {
   content: ReactNode
 }
 
+// ─── Pull-to-refresh hook ────────────────────────────────────────────────────
+
+function usePullToRefresh(
+  enabled: boolean,
+  onRefresh: () => void,
+  containerRef: RefObject<HTMLElement | null>,
+) {
+  const [isPulling, setIsPulling] = useState(false)
+  const [pullDistance, setPullDistance] = useState(0)
+  const startYRef = useRef(0)
+  const isPullingRef = useRef(false)
+  const THRESHOLD = 72
+
+  useEffect(() => {
+    if (!enabled) return
+    const container = containerRef.current
+    if (!container) return
+
+    function onTouchStart(e: TouchEvent) {
+      if (container!.scrollTop === 0 && e.touches[0]) {
+        startYRef.current = e.touches[0].clientY
+        isPullingRef.current = true
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (!isPullingRef.current || !e.touches[0]) return
+      const delta = e.touches[0].clientY - startYRef.current
+      if (delta > 0) {
+        setPullDistance(Math.min(delta, THRESHOLD * 1.5))
+        setIsPulling(delta > 10)
+      }
+    }
+
+    function onTouchEnd() {
+      if (!isPullingRef.current) return
+      const delta = pullDistance
+      isPullingRef.current = false
+      if (delta >= THRESHOLD) {
+        onRefresh()
+      }
+      setIsPulling(false)
+      setPullDistance(0)
+    }
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: true })
+    container.addEventListener('touchend', onTouchEnd)
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [enabled, onRefresh, containerRef, pullDistance])
+
+  return { isPulling, pullDistance, threshold: THRESHOLD }
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export function DashboardScreen() {
   const navigate = useNavigate()
   const [dashSettingsOpen, setDashSettingsOpen] = useState(false)
@@ -82,10 +145,19 @@ export function DashboardScreen() {
       return false
     }
   })
+  const mainScrollRef = useRef<HTMLElement>(null)
 
   // ── Dashboard data (single hook, all queries + computed values) ────────────
   const { data: dashboardData, refetch } = useDashboardData()
 
+  // ── Pull-to-refresh (mobile) ───────────────────────────────────────────────
+  const { isPulling, pullDistance, threshold } = usePullToRefresh(
+    isMobile,
+    refetch,
+    mainScrollRef,
+  )
+
+  // B5: Use md-breakpoint-consistent 767px (= Tailwind md − 1px)
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)')
     const update = () => setIsMobile(media.matches)
@@ -139,16 +211,43 @@ export function DashboardScreen() {
     return new Set(visibleIds)
   }, [visibleIds])
 
-  // Derived values from dashboard data
+  // ── Derived display values ─────────────────────────────────────────────────
+
   const costDisplay = dashboardData.cost.today > 0
     ? formatMoney(dashboardData.cost.today)
     : dashboardData.status === 'loading' ? '—' : '$0.00'
+
+  // B1: Uptime fallback — if formatted is "—", show "Active · last check Xm ago"
+  const uptimeDisplay = useMemo(() => {
+    if (dashboardData.uptime.formatted !== '—') return dashboardData.uptime.formatted
+    if (dashboardData.connection.connected && dashboardData.updatedAt > 0) {
+      return `Active · ${formatRelativeTime(dashboardData.updatedAt)}`
+    }
+    return dashboardData.connection.connected ? 'Active' : '—'
+  }, [dashboardData.uptime.formatted, dashboardData.connection.connected, dashboardData.updatedAt])
 
   const usageSummaryText = buildUsageSummaryText(dashboardData)
   const usageSummaryIsError = dashboardData.usageStatus === 'error' || dashboardData.usageStatus === 'unavailable'
 
   const visibleAlerts = dashboardData.alerts.filter((c) => !dismissedChips.has(c.id))
 
+  // Timeseries data for micro charts
+  const costChartData = useMemo(
+    () => dashboardData.timeseries.costByDay.map((p) => ({ date: p.date, value: p.amount })),
+    [dashboardData.timeseries.costByDay],
+  )
+  const sessionsChartData = useMemo(
+    () => dashboardData.timeseries.messagesByDay.map((p) => ({ date: p.date, value: p.count })),
+    [dashboardData.timeseries.messagesByDay],
+  )
+
+  const healthStatus = useMemo(() => {
+    if (!dashboardData.connection.connected) return 'offline' as const
+    if (dashboardData.uptime.seconds <= 0) return 'warning' as const
+    return 'healthy' as const
+  }, [dashboardData.connection.connected, dashboardData.uptime.seconds])
+
+  // ── Metric items (mobile card grid + desktop widget metrics row) ───────────
   const metricItems = useMemo<Array<WidgetGridItem>>(
     function buildMetricItems() {
       return [
@@ -164,6 +263,8 @@ export function DashboardScreen() {
               accent="cyan"
               description="Sessions active in the last 24 hours."
               rawValue={`${dashboardData.sessions.total} sessions`}
+              chartData={sessionsChartData}
+              chartAccentClass="bg-cyan-500"
             />
           ),
         },
@@ -196,8 +297,11 @@ export function DashboardScreen() {
               onRetry={refetch}
               trendPct={dashboardData.cost.trend ?? undefined}
               trendLabel={dashboardData.cost.trend !== null ? 'vs prev day' : undefined}
+              trendInverted
               description="Today's estimated spend from gateway cost telemetry."
               rawValue={costDisplay}
+              chartData={costChartData}
+              chartAccentClass="bg-emerald-500"
             />
           ),
         },
@@ -207,7 +311,7 @@ export function DashboardScreen() {
           node: (
             <MetricsWidget
               title="Uptime"
-              value={dashboardData.uptime.formatted}
+              value={uptimeDisplay}
               subtitle="Real session uptime"
               icon={Timer02Icon}
               accent="violet"
@@ -220,100 +324,38 @@ export function DashboardScreen() {
     },
     [
       costDisplay,
+      costChartData,
+      sessionsChartData,
       dashboardData.agents.active,
       dashboardData.agents.total,
       dashboardData.cost.trend,
       dashboardData.sessions.total,
       dashboardData.status,
-      dashboardData.uptime.formatted,
+      uptimeDisplay,
       dashboardData.uptime.seconds,
       refetch,
     ],
   )
 
-  const desktopWidgetItems = useMemo<Array<WidgetGridItem>>(
-    function buildDesktopWidgetItems() {
-      const items: Array<WidgetGridItem> = []
+  // ── Enterprise desktop layout ──────────────────────────────────────────────
+  // C2: SystemGlance → chips → Usage+Squad → Sessions+Tasks → Activity → Skills
 
-      for (const widgetId of visibleIds) {
-        if (widgetId === 'skills') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: <SkillsWidget onRemove={() => removeWidget('skills')} />,
-          })
-          continue
-        }
-
-        if (widgetId === 'usage-meter') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} />,
-          })
-          continue
-        }
-
-        if (widgetId === 'tasks') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: <TasksWidget onRemove={() => removeWidget('tasks')} />,
-          })
-          continue
-        }
-
-        if (widgetId === 'agent-status') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: <SquadStatusWidget />,
-          })
-          continue
-        }
-
-        if (widgetId === 'recent-sessions') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: (
-              <RecentSessionsWidget
-                onOpenSession={(sessionKey) =>
-                  navigate({
-                    to: '/chat/$sessionKey',
-                    params: { sessionKey },
-                  })
-                }
-                onRemove={() => removeWidget('recent-sessions')}
-              />
-            ),
-          })
-          continue
-        }
-
-        if (widgetId === 'notifications') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: <NotificationsWidget onRemove={() => removeWidget('notifications')} />,
-          })
-          continue
-        }
-
-        if (widgetId === 'activity-log') {
-          items.push({
-            id: widgetId,
-            size: 'large',
-            node: <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />,
-          })
-        }
+  const desktopLayout = useMemo(
+    function buildDesktopLayout() {
+      return {
+        showUsage: visibleWidgetSet.has('usage-meter'),
+        showSquad: visibleWidgetSet.has('agent-status'),
+        showSessions: visibleWidgetSet.has('recent-sessions'),
+        showTasks: visibleWidgetSet.has('tasks'),
+        showActivity: visibleWidgetSet.has('activity-log'),
+        showSkills: visibleWidgetSet.has('skills'),
+        showNotifications: visibleWidgetSet.has('notifications'),
       }
-
-      return items
     },
-    [navigate, removeWidget, visibleIds],
+    [visibleWidgetSet],
   )
 
+  // ── Mobile deep sections ────────────────────────────────────────────────────
   const mobileDeepSections = useMemo<Array<MobileWidgetSection>>(
     function buildMobileDeepSections() {
       const sections: Array<MobileWidgetSection> = []
@@ -487,12 +529,42 @@ export function DashboardScreen() {
     [mobileDeepSections, moveWidget, widgetOrder],
   )
 
+  // Pull-to-refresh indicator offset
+  const pullIndicatorStyle = isPulling
+    ? { transform: `translateY(${Math.min(pullDistance - 8, 48)}px)`, opacity: Math.min(pullDistance / threshold, 1) }
+    : undefined
+
   return (
     <>
       <main
+        ref={mainScrollRef as RefObject<HTMLElement>}
         className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-4 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8"
       >
+        {/* Pull-to-refresh indicator (mobile) */}
+        {isMobile && isPulling ? (
+          <div
+            className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 transition-all duration-150"
+            style={pullIndicatorStyle}
+            aria-hidden
+          >
+            <div className="flex items-center gap-1.5 rounded-full border border-primary-200 bg-white/90 px-3 py-1.5 shadow-md backdrop-blur-sm dark:border-neutral-700 dark:bg-neutral-900/90">
+              <span
+                className={cn(
+                  'size-3 rounded-full border-2 border-accent-500',
+                  pullDistance >= threshold
+                    ? 'border-t-transparent animate-spin'
+                    : 'opacity-50',
+                )}
+              />
+              <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">
+                {pullDistance >= threshold ? 'Release to refresh' : 'Pull to refresh'}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         <section className="mx-auto w-full max-w-[1600px]">
+          {/* ── Header ─────────────────────────────────────────────────────── */}
           <header className="relative z-20 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm md:mb-5 md:px-5 md:py-3">
             <div className="flex items-center justify-between gap-3">
               {/* Left: Logo + name + status */}
@@ -507,7 +579,7 @@ export function DashboardScreen() {
                     <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
                     {shouldShowLogoTip ? (
                       <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duratrion-300">
-                        <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md ">
+                        <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md">
                           <span
                             role="button"
                             tabIndex={0}
@@ -531,7 +603,6 @@ export function DashboardScreen() {
                     ClawSuite
                   </h1>
                   {isMobile ? (
-                    /* Mobile: simple status dot — tooltip via title */
                     <span
                       className={cn(
                         'size-2 shrink-0 rounded-full',
@@ -651,180 +722,224 @@ export function DashboardScreen() {
                 )}
               </div>
             </div>
-
           </header>
 
-          {/* Activity ticker — keep full banner behavior on desktop */}
+          {/* Activity ticker — desktop only */}
           <div className="hidden md:block">
             <ActivityTicker />
           </div>
 
-          {!isMobile && visibleAlerts.length > 0 ? (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {visibleAlerts.map((chip) => (
-                <span
-                  key={chip.id}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
-                    chip.severity === 'red'
-                      ? 'border-red-200 bg-red-100/75 text-red-700'
-                      : 'border-amber-200 bg-amber-100/75 text-amber-700',
-                  )}
-                >
-                  {chip.text}
-                  {chip.dismissable && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDismissedChips((prev) => {
-                          const next = new Set(prev)
-                          next.add(chip.id)
-                          try { window.localStorage.setItem('clawsuite-dismissed-chips', JSON.stringify([...next])) } catch {}
-                          return next
-                        })
-                      }}
-                      className={cn(
-                        'ml-0.5 rounded-full p-0.5 transition-colors hover:bg-black/10',
-                        chip.severity === 'red' ? 'text-red-500 hover:text-red-800' : 'text-amber-500 hover:text-amber-800',
-                      )}
-                      aria-label={`Dismiss ${chip.text}`}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </span>
-              ))}
-            </div>
-          ) : null}
-
-          {!isMobile ? (
-            <div className="mb-3 md:mb-4">
+          {/* ── Mobile layout ───────────────────────────────────────────────── */}
+          {isMobile ? (
+            <div className="flex flex-col gap-3">
+              {/* C1: SystemGlance compact on mobile */}
               <SystemGlance
+                compact
                 sessions={dashboardData.sessions.total}
                 activeAgents={dashboardData.agents.active || dashboardData.agents.total}
                 costToday={costDisplay}
-                uptimeFormatted={dashboardData.uptime.formatted}
+                uptimeFormatted={uptimeDisplay}
                 updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
-                healthStatus={
-                  !dashboardData.connection.connected
-                    ? 'offline'
-                    : dashboardData.uptime.seconds <= 0
-                      ? 'warning'
-                      : 'healthy'
-                }
+                healthStatus={healthStatus}
                 gatewayConnected={dashboardData.connection.connected}
                 sessionPercent={dashboardData.usage.contextPercent ?? undefined}
                 providers={dashboardData.cost.byProvider}
                 currentModel={dashboardData.model.current}
               />
-            </div>
-          ) : null}
 
-          {/* Inline widget controls — desktop only */}
-          {!isMobile && (
-            <div className="mb-3 flex items-center justify-end gap-2">
-              <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
-              <button
-                type="button"
-                onClick={handleResetLayout}
-                className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-accent-200 hover:text-accent-600 dark:border-gray-700 dark:bg-gray-800 dark:text-primary-400 dark:hover:border-accent-600 dark:hover:text-accent-400"
-                aria-label="Reset Layout"
-                title="Reset Layout"
-              >
-                <HugeiconsIcon icon={RefreshIcon} size={20} strokeWidth={1.5} />
-                <span>Reset</span>
-              </button>
+              {/* C6: Compact NowCard */}
+              <NowCard
+                gatewayConnected={dashboardData.connection.connected}
+                activeAgents={dashboardData.agents.active || dashboardData.agents.total}
+                activeTasks={dashboardData.cron.inProgress}
+                sessions={dashboardData.sessions.total}
+                updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
+              />
+
+              {/* Alert chips */}
+              {dashboardData.alerts.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {dashboardData.alerts.map((chip) => (
+                    <span
+                      key={chip.id}
+                      className={cn(
+                        'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium',
+                        chip.severity === 'red'
+                          ? 'border-red-200 bg-red-100/75 text-red-700'
+                          : 'border-amber-200 bg-amber-100/75 text-amber-700',
+                      )}
+                    >
+                      {chip.text}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Metric cards */}
+              <WidgetGrid items={metricItems} className="gap-3" />
+
+              {/* Deep sections (reorderable) */}
+              <div className="space-y-1.5">
+                {mobileDeepSections.map((section, visibleIndex) => {
+                  const canMoveUp = visibleIndex > 0
+                  const canMoveDown = visibleIndex < mobileDeepSections.length - 1
+
+                  return (
+                    <div key={section.id} className="relative w-full rounded-xl">
+                      {mobileEditMode ? (
+                        <div className="absolute right-1 top-1 z-10 flex gap-0.5 rounded-full border border-primary-200/80 bg-primary-50/90 p-0.5 shadow-sm">
+                          {canMoveUp ? (
+                            <button
+                              type="button"
+                              onClick={() => moveMobileSection(visibleIndex, visibleIndex - 1)}
+                              className="inline-flex size-5 items-center justify-center rounded-full text-primary-400 transition-colors hover:text-primary-600"
+                              aria-label={`Move ${section.label} up`}
+                            >
+                              <HugeiconsIcon icon={ArrowUp02Icon} size={12} strokeWidth={1.8} />
+                            </button>
+                          ) : null}
+                          {canMoveDown ? (
+                            <button
+                              type="button"
+                              onClick={() => moveMobileSection(visibleIndex, visibleIndex + 1)}
+                              className="inline-flex size-5 items-center justify-center rounded-full text-primary-400 transition-colors hover:text-primary-600"
+                              aria-label={`Move ${section.label} down`}
+                            >
+                              <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={1.8} />
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {section.content}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            /* ── Desktop enterprise layout (C2) ─────────────────────────────── */
+            <div className="flex flex-col gap-4">
+              {/* 1. SystemGlance */}
+              <SystemGlance
+                sessions={dashboardData.sessions.total}
+                activeAgents={dashboardData.agents.active || dashboardData.agents.total}
+                costToday={costDisplay}
+                uptimeFormatted={uptimeDisplay}
+                updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
+                healthStatus={healthStatus}
+                gatewayConnected={dashboardData.connection.connected}
+                sessionPercent={dashboardData.usage.contextPercent ?? undefined}
+                providers={dashboardData.cost.byProvider}
+                currentModel={dashboardData.model.current}
+              />
+
+              {/* 2. Alert chips */}
+              {visibleAlerts.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {visibleAlerts.map((chip) => (
+                    <span
+                      key={chip.id}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+                        chip.severity === 'red'
+                          ? 'border-red-200 bg-red-100/75 text-red-700'
+                          : 'border-amber-200 bg-amber-100/75 text-amber-700',
+                      )}
+                    >
+                      {chip.text}
+                      {chip.dismissable && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDismissedChips((prev) => {
+                              const next = new Set(prev)
+                              next.add(chip.id)
+                              try { window.localStorage.setItem('clawsuite-dismissed-chips', JSON.stringify([...next])) } catch {}
+                              return next
+                            })
+                          }}
+                          className={cn(
+                            'ml-0.5 rounded-full p-0.5 transition-colors hover:bg-black/10',
+                            chip.severity === 'red' ? 'text-red-500 hover:text-red-800' : 'text-amber-500 hover:text-amber-800',
+                          )}
+                          aria-label={`Dismiss ${chip.text}`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Metric summary row */}
+              <WidgetGrid items={metricItems} />
+
+              {/* D1: Widget edit controls — inline row above widgets */}
+              <div className="flex items-center justify-end gap-2">
+                <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
+                <button
+                  type="button"
+                  onClick={handleResetLayout}
+                  className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-accent-200 hover:text-accent-600 dark:border-gray-700 dark:bg-gray-800 dark:text-primary-400 dark:hover:border-accent-600 dark:hover:text-accent-400"
+                  aria-label="Reset Layout"
+                  title="Reset Layout"
+                >
+                  <HugeiconsIcon icon={RefreshIcon} size={20} strokeWidth={1.5} />
+                  <span>Reset</span>
+                </button>
+              </div>
+
+              {/* 3. Two-up: Usage Today + Squad Status */}
+              {(desktopLayout.showUsage || desktopLayout.showSquad) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {desktopLayout.showUsage && (
+                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} />
+                  )}
+                  {desktopLayout.showSquad && (
+                    <SquadStatusWidget />
+                  )}
+                </div>
+              )}
+
+              {/* 4. Two-up: Recent Sessions + Tasks */}
+              {(desktopLayout.showSessions || desktopLayout.showTasks) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {desktopLayout.showSessions && (
+                    <RecentSessionsWidget
+                      onOpenSession={(sessionKey) =>
+                        navigate({
+                          to: '/chat/$sessionKey',
+                          params: { sessionKey },
+                        })
+                      }
+                      onRemove={() => removeWidget('recent-sessions')}
+                    />
+                  )}
+                  {desktopLayout.showTasks && (
+                    <TasksWidget onRemove={() => removeWidget('tasks')} />
+                  )}
+                </div>
+              )}
+
+              {/* 5. Full-width: Activity Log */}
+              {desktopLayout.showActivity && (
+                <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+              )}
+
+              {/* 6. Skills + Notifications */}
+              {(desktopLayout.showSkills || desktopLayout.showNotifications) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {desktopLayout.showSkills && (
+                    <SkillsWidget onRemove={() => removeWidget('skills')} />
+                  )}
+                  {desktopLayout.showNotifications && (
+                    <NotificationsWidget onRemove={() => removeWidget('notifications')} />
+                  )}
+                </div>
+              )}
             </div>
           )}
-
-          <div>
-            {isMobile ? (
-              <div className="flex flex-col gap-3">
-                <div className="space-y-1.5">
-                  <NowCard
-                    gatewayConnected={dashboardData.connection.connected}
-                    activeAgents={dashboardData.agents.active || dashboardData.agents.total}
-                    activeTasks={dashboardData.cron.inProgress}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  {dashboardData.alerts.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {dashboardData.alerts.map((chip) => (
-                        <span
-                          key={chip.id}
-                          className={cn(
-                            'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium',
-                            chip.severity === 'red'
-                              ? 'border-red-200 bg-red-100/75 text-red-700'
-                              : 'border-amber-200 bg-amber-100/75 text-amber-700',
-                          )}
-                        >
-                          {chip.text}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                  <WidgetGrid items={metricItems} className="gap-3" />
-                </div>
-
-                <div className="space-y-1.5">
-                  {mobileDeepSections.map((section, visibleIndex) => {
-                    const canMoveUp = visibleIndex > 0
-                    const canMoveDown =
-                      visibleIndex < mobileDeepSections.length - 1
-
-                    return (
-                      <div key={section.id} className="relative w-full rounded-xl">
-                        {mobileEditMode ? (
-                          <div className="absolute right-1 top-1 z-10 flex gap-0.5 rounded-full border border-primary-200/80 bg-primary-50/90 p-0.5 shadow-sm">
-                            {canMoveUp ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  moveMobileSection(visibleIndex, visibleIndex - 1)
-                                }
-                                className="inline-flex size-5 items-center justify-center rounded-full text-primary-400 transition-colors hover:text-primary-600"
-                                aria-label={`Move ${section.label} up`}
-                                title={`Move ${section.label} up`}
-                              >
-                                <HugeiconsIcon
-                                  icon={ArrowUp02Icon}
-                                  size={12}
-                                  strokeWidth={1.8}
-                                />
-                              </button>
-                            ) : null}
-                            {canMoveDown ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  moveMobileSection(visibleIndex, visibleIndex + 1)
-                                }
-                                className="inline-flex size-5 items-center justify-center rounded-full text-primary-400 transition-colors hover:text-primary-600"
-                                aria-label={`Move ${section.label} down`}
-                                title={`Move ${section.label} down`}
-                              >
-                                <HugeiconsIcon
-                                  icon={ArrowDown01Icon}
-                                  size={12}
-                                  strokeWidth={1.8}
-                                />
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        {section.content}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : (
-              <WidgetGrid items={desktopWidgetItems} />
-            )}
-          </div>
         </section>
       </main>
 

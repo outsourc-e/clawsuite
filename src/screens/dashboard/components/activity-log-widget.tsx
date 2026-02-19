@@ -52,6 +52,19 @@ function parseJsonRecord(raw: string): Record<string, unknown> | null {
   }
 }
 
+/** Sanitize model label — use canonical formatter, fallback to "Custom" */
+function sanitizeModelLabel(raw: string): string {
+  if (!raw) return 'Custom'
+  const formatted = formatModelName(raw)
+  if (formatted === '—') return 'Custom'
+  return formatted
+}
+
+/** Sanitize event text that might contain "Unknown model" */
+function sanitizeEventText(text: string): string {
+  return text.replace(/unknown\s+model/gi, 'Custom')
+}
+
 function toFriendlySource(source?: string): string {
   const text = readString(source)
   if (!text) return 'Gateway'
@@ -130,13 +143,13 @@ function parseKnownJsonEvent(event: ActivityEvent): ActivityPreviewRow | null {
   }
 
   if (event.type === 'session' || parsedEventType.includes('session')) {
-    const modelLabel = parsedModel ? formatModelName(parsedModel) : ''
+    const modelLabel = sanitizeModelLabel(parsedModel)
     return {
       id: event.id,
       icon: '•',
       iconClassName: 'text-primary-500',
       sourceLabel: summarySource,
-      summary: modelLabel ? `Session started: ${modelLabel}` : 'Session started',
+      summary: modelLabel !== 'Custom' || parsedModel ? `Session started: ${modelLabel}` : 'Session started',
       timestamp: event.timestamp,
     }
   }
@@ -159,7 +172,7 @@ function toPreviewRow(event: ActivityEvent): ActivityPreviewRow | null {
       icon: '⚠',
       iconClassName: 'text-amber-600',
       sourceLabel,
-      summary: readString(event.title) || readString(event.detail) || 'Error event',
+      summary: sanitizeEventText(readString(event.title) || readString(event.detail) || 'Error event'),
       timestamp: event.timestamp,
     }
   }
@@ -181,12 +194,12 @@ function toPreviewRow(event: ActivityEvent): ActivityPreviewRow | null {
       icon: '•',
       iconClassName: 'text-primary-500',
       sourceLabel,
-      summary: readString(event.title) || 'Session started',
+      summary: sanitizeEventText(readString(event.title) || 'Session started'),
       timestamp: event.timestamp,
     }
   }
 
-  const fallbackSummary = readString(event.title) || readString(event.detail)
+  const fallbackSummary = sanitizeEventText(readString(event.title) || readString(event.detail) || '')
   if (!fallbackSummary) return null
 
   return {

@@ -93,7 +93,7 @@ export function WidgetShell({
         // Base glass card
         'group relative flex flex-col overflow-hidden rounded-2xl',
         'border border-white/30 dark:border-white/10',
-        'bg-white/60 dark:bg-neutral-900/50 md:dark:bg-neutral-900/60 backdrop-blur-md',
+        'bg-white/60 dark:bg-neutral-950/60 backdrop-blur-md',
         'shadow-sm transition-shadow',
         // Size
         SIZE_STYLES[size],

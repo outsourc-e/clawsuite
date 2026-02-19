@@ -314,9 +314,11 @@ export function UsageMeterWidget({
     refetchInterval: 30_000,
   })
 
-  const isLoading = usageQuery.isLoading || usageQuery.isFetching && !usageQuery.data
+  const isLoading = usageQuery.isLoading || (usageQuery.isFetching && !usageQuery.data)
   const queryResult = usageQuery.data
   const usageData = queryResult?.kind === 'ok' ? queryResult.data : null
+  // Show skeleton while the very first fetch is in flight (no data at all yet)
+  const showSkeleton = isLoading && !queryResult
 
   const topProviders = useMemo(() => {
     if (!usageData || usageData.providers.length === 0) return []
@@ -355,9 +357,10 @@ export function UsageMeterWidget({
       size="medium"
       title="Usage Today"
       icon={ChartLineData02Icon}
-      action={tabSwitcher}
+      action={!showSkeleton ? tabSwitcher : undefined}
       onRemove={onRemove}
       editMode={editMode}
+      loading={showSkeleton}
       className="h-full"
     >
       {queryResult?.kind === 'unavailable' ? (
@@ -368,15 +371,7 @@ export function UsageMeterWidget({
         <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-3 text-sm text-red-700">
           {queryResult.message}
         </div>
-      ) : isLoading && !usageData ? (
-        <div className="rounded-lg border border-primary-200 bg-primary-100/45 px-3 py-3 text-sm text-primary-600">
-          Loading usage data…
-        </div>
-      ) : !usageData ? (
-        <div className="rounded-lg border border-primary-200 bg-primary-100/45 px-3 py-3 text-sm text-primary-600">
-          Loading usage data…
-        </div>
-      ) : (
+      ) : !usageData ? null : (
         <>
           {/* Mobile layout */}
           <div className="space-y-3 md:hidden">
