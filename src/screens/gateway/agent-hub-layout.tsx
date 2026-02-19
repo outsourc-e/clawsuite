@@ -26,6 +26,22 @@ const TEMPLATE_MODEL_SUGGESTIONS: Record<TeamTemplateId, Array<ModelPresetId>> =
 
 const MODEL_IDS = new Set<string>(MODEL_PRESETS.map((preset) => preset.id))
 
+// Signals from an agent response that mean it finished its task batch
+const COMPLETION_SIGNALS = [
+  'done',
+  'completed',
+  'task complete',
+  'tasks complete',
+  'all done',
+  'finished',
+  'complete.',
+]
+
+function isCompletionSignal(text: string): boolean {
+  const lower = text.toLowerCase()
+  return COMPLETION_SIGNALS.some((signal) => lower.includes(signal))
+}
+
 function toTitleCase(value: string): string {
   return value
     .split(/[-_\s]+/)
@@ -266,6 +282,14 @@ function readSessionActivityMarker(session: SessionRecord): string {
   return `${updatedAtRaw}|${status}|${lastMessage}`
 }
 
+// Pending task that needs to be dispatched after resume
+type PendingDispatch = {
+  agentId: string
+  member: TeamMember | undefined
+  tasks: HubTask[]
+  missionGoalValue: string
+}
+
 function TeamActivityStrip({
   team,
   tasks,
@@ -358,11 +382,48 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (runtimeTeam.length > 0) return runtimeTeam
     return buildTeamFromTemplate('research')
   })
+
+  // ── Core refs ─────────────────────────────────────────────────────────────
   const taskBoardRef = useRef<TaskBoardRef | null>(null)
   const teamPanelFlashTimerRef = useRef<number | undefined>(undefined)
   const pendingTaskMovesRef = useRef<Array<{ taskIds: Array<string>; status: TaskStatus }>>([])
   const sessionActivityRef = useRef<Map<string, string>>(new Map())
   const dispatchingRef = useRef(false)
+
+  // ── Spec 4 refs ───────────────────────────────────────────────────────────
+
+  /** Idempotency: set of task IDs already sent to agents */
+  const dispatchedTaskIdsRef = useRef<Set<string>>(new Set())
+
+  /** Pause/Resume: tasks waiting to be dispatched when mission resumes */
+  const pendingDispatchTasksRef = useRef<PendingDispatch[]>([])
+
+  /** Sync copy of missionState for use inside async callbacks */
+  const missionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
+
+  /** Sync copy of agentSessionMap for use inside async callbacks */
+  const agentSessionMapRef = useRef<Record<string, string>>(agentSessionMap)
+
+  /** Sync copy of boardTasks for use inside stop handler */
+  const boardTasksRef = useRef<Array<HubTask>>([])
+
+  /** Sync copy of activeMissionGoal for use in resumeDispatch */
+  const activeMissionGoalRef = useRef('')
+
+  /** Completion detection: agentId → dispatched taskIds */
+  const agentTasksRef = useRef<Map<string, string[]>>(new Map())
+
+  /** Completion detection: sessionKey → time tasks were dispatched */
+  const sessionDispatchTimeRef = useRef<Map<string, number>>(new Map())
+
+  /** Completion detection: sessions that already received a 10-min timeout warning */
+  const warnedSessionsRef = useRef<Set<string>>(new Set())
+
+  // ── Keep refs in sync with state ──────────────────────────────────────────
+  useEffect(() => { missionStateRef.current = missionState }, [missionState])
+  useEffect(() => { agentSessionMapRef.current = agentSessionMap }, [agentSessionMap])
+  useEffect(() => { boardTasksRef.current = boardTasks }, [boardTasks])
+  useEffect(() => { activeMissionGoalRef.current = activeMissionGoal }, [activeMissionGoal])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -560,7 +621,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }, [spawnAgentSession])
 
   const ensureAgentSessions = useCallback(async (teamMembers: TeamMember[]): Promise<Record<string, string>> => {
-    const currentMap = { ...agentSessionMap }
+    const currentMap = { ...agentSessionMapRef.current }
     const spawnPromises: Array<Promise<void>> = []
 
     for (const member of teamMembers) {
@@ -592,9 +653,78 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     await Promise.allSettled(spawnPromises)
     setAgentSessionMap(currentMap)
+    agentSessionMapRef.current = currentMap
     return currentMap
-  }, [agentSessionMap, spawnAgentSession])
+  }, [spawnAgentSession])
 
+  /**
+   * dispatchToAgent — sends one agent's task batch to their dedicated session.
+   * Handles idempotency tracking, task status moves, and feed events.
+   */
+  const dispatchToAgent = useCallback(async (
+    agentId: string,
+    agentTasks: HubTask[],
+    sessionKey: string,
+    member: TeamMember | undefined,
+    missionGoalValue: string,
+  ): Promise<void> => {
+    const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
+    const message = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
+
+    try {
+      const response = await fetch('/api/sessions/send', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionKey, message }),
+      })
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
+        const errorMessage =
+          readString(payload.error) || readString(payload.message) || `HTTP ${response.status}`
+        throw new Error(errorMessage)
+      }
+
+      // Mark tasks dispatched (idempotency)
+      agentTasks.forEach((task) => dispatchedTaskIdsRef.current.add(task.id))
+
+      const taskIds = agentTasks.map((task) => task.id)
+
+      // Track for completion detection
+      agentTasksRef.current.set(agentId, [
+        ...(agentTasksRef.current.get(agentId) ?? []),
+        ...taskIds,
+      ])
+      sessionDispatchTimeRef.current.set(sessionKey, Date.now())
+
+      setDispatchedTaskIdsByAgent((previous) => ({
+        ...previous,
+        [agentId]: [...(previous[agentId] ?? []), ...taskIds],
+      }))
+      moveTasksToStatus(taskIds, 'in_progress')
+
+      agentTasks.forEach((task) => {
+        emitFeedEvent({
+          type: 'agent_active',
+          message: `${member?.name || agentId} started working on: ${task.title}`,
+          agentName: member?.name,
+          taskTitle: task.title,
+        })
+      })
+    } catch (error) {
+      emitFeedEvent({
+        type: 'system',
+        message: `Failed to dispatch to ${member?.name || agentId}: ${error instanceof Error ? error.message : String(error)}`,
+      })
+    }
+  }, [moveTasksToStatus])
+
+  /**
+   * executeMission — groups tasks by agent and dispatches them with:
+   * - Idempotency: skips tasks already in dispatchedTaskIdsRef
+   * - Staggered dispatch: 100ms delay between agents
+   * - Pause awareness: queues remaining agents into pendingDispatchTasksRef
+   */
   const executeMission = useCallback(async (
     tasks: Array<HubTask>,
     teamMembers: Array<TeamMember>,
@@ -603,17 +733,32 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     // STEP A: Ensure all agents have isolated gateway sessions
     const sessionMap = await ensureAgentSessions(teamMembers)
 
-    // STEP B: Group tasks by agent
+    // STEP B: Group undispatched tasks by agent (idempotency filter)
     const tasksByAgent = new Map<string, Array<HubTask>>()
     for (const task of tasks) {
       if (!task.agentId) continue
-      const existing = tasksByAgent.get(task.agentId) || []
+      // Skip tasks already dispatched (idempotency)
+      if (dispatchedTaskIdsRef.current.has(task.id)) continue
+      const existing = tasksByAgent.get(task.agentId) ?? []
       existing.push(task)
       tasksByAgent.set(task.agentId, existing)
     }
 
-    // STEP C: Dispatch to per-agent sessions
+    // STEP C: Dispatch to per-agent sessions with staggered delay
+    let firstAgent = true
     for (const [agentId, agentTasks] of tasksByAgent) {
+      const currentState = missionStateRef.current
+
+      // If stopped, abort all remaining dispatches
+      if (currentState === 'stopped') break
+
+      // If paused, queue remaining agents for later resume
+      if (currentState === 'paused') {
+        const member = teamMembers.find((entry) => entry.id === agentId)
+        pendingDispatchTasksRef.current.push({ agentId, member, tasks: agentTasks, missionGoalValue })
+        continue
+      }
+
       const sessionKey = sessionMap[agentId]
       if (!sessionKey) {
         emitFeedEvent({
@@ -623,50 +768,150 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         continue
       }
 
+      // Staggered dispatch: 100ms between agents to avoid overwhelming gateway
+      if (!firstAgent) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 100))
+      }
+      firstAgent = false
+
+      // Re-check state after the delay (user may have paused/stopped)
+      const stateAfterDelay = missionStateRef.current
+      if (stateAfterDelay === 'stopped') break
+      if (stateAfterDelay === 'paused') {
+        const member = teamMembers.find((entry) => entry.id === agentId)
+        pendingDispatchTasksRef.current.push({ agentId, member, tasks: agentTasks, missionGoalValue })
+        continue
+      }
+
       const member = teamMembers.find((entry) => entry.id === agentId)
-      const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
-      const message = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
+      await dispatchToAgent(agentId, agentTasks, sessionKey, member, missionGoalValue)
+    }
+  }, [ensureAgentSessions, dispatchToAgent])
 
-      try {
-        const response = await fetch('/api/sessions/send', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionKey, message }),
-        })
+  /**
+   * resumeDispatch — called when mission resumes from paused state.
+   * Drains pendingDispatchTasksRef and dispatches each agent's queued tasks.
+   */
+  const resumeDispatch = useCallback(async () => {
+    const pending = pendingDispatchTasksRef.current.splice(0)
+    if (pending.length === 0) return
 
-        if (!response.ok) {
-          const payload = (await response
-            .json()
-            .catch(() => ({}))) as Record<string, unknown>
-          const errorMessage =
-            readString(payload.error) || readString(payload.message) || `HTTP ${response.status}`
-          throw new Error(errorMessage)
-        }
+    const sessionMap = agentSessionMapRef.current
+    let firstAgent = true
 
-        const taskIds = agentTasks.map((task) => task.id)
-        setDispatchedTaskIdsByAgent((previous) => ({
-          ...previous,
-          [agentId]: taskIds,
-        }))
-        moveTasksToStatus(taskIds, 'in_progress')
+    for (const { agentId, member, tasks, missionGoalValue } of pending) {
+      const currentState = missionStateRef.current
+      if (currentState === 'stopped') break
+      if (currentState === 'paused') {
+        // Re-queue if paused again mid-resume
+        pendingDispatchTasksRef.current.push({ agentId, member, tasks, missionGoalValue })
+        continue
+      }
 
-        agentTasks.forEach((task) => {
-          emitFeedEvent({
-            type: 'agent_active',
-            message: `${member?.name || agentId} started working on: ${task.title}`,
-            agentName: member?.name,
-            taskTitle: task.title,
-          })
-        })
-      } catch (error) {
+      const sessionKey = sessionMap[agentId]
+      if (!sessionKey) {
         emitFeedEvent({
           type: 'system',
-          message: `Failed to dispatch to ${member?.name || agentId}: ${error instanceof Error ? error.message : String(error)}`,
+          message: `No session for agent ${agentId} — skipping resume dispatch`,
         })
+        continue
       }
-    }
-  }, [ensureAgentSessions, moveTasksToStatus])
 
+      // Staggered dispatch
+      if (!firstAgent) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 100))
+      }
+      firstAgent = false
+
+      const stateAfterDelay = missionStateRef.current
+      if (stateAfterDelay === 'stopped') break
+      if (stateAfterDelay === 'paused') {
+        pendingDispatchTasksRef.current.push({ agentId, member, tasks, missionGoalValue })
+        continue
+      }
+
+      // Filter out any tasks that were dispatched during this resume loop
+      const undispatchedTasks = tasks.filter((t) => !dispatchedTaskIdsRef.current.has(t.id))
+      if (undispatchedTasks.length === 0) continue
+
+      await dispatchToAgent(agentId, undispatchedTasks, sessionKey, member, missionGoalValue)
+    }
+  }, [dispatchToAgent])
+
+  /**
+   * stopMission — aborts all active sessions (best-effort), moves in_progress tasks
+   * back to inbox, deletes sessions, and resets all mission state.
+   */
+  const stopMission = useCallback(() => {
+    const sessionMap = agentSessionMapRef.current
+
+    // Abort active agent sessions (best-effort, fire-and-forget)
+    Object.values(sessionMap).forEach((sessionKey) => {
+      if (!sessionKey) return
+      fetch('/api/chat-abort', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionKey }),
+      }).catch(() => {})
+    })
+
+    // Delete sessions
+    Object.values(sessionMap).forEach((sessionKey) => {
+      if (!sessionKey) return
+      fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
+        method: 'DELETE',
+      }).catch(() => {})
+    })
+
+    // Move all in_progress tasks back to inbox (cancel in-flight work)
+    const inProgressTaskIds = boardTasksRef.current
+      .filter((task) => task.status === 'in_progress')
+      .map((task) => task.id)
+    if (inProgressTaskIds.length > 0) {
+      moveTasksToStatus(inProgressTaskIds, 'inbox')
+    }
+
+    // Reset all mission state
+    setAgentSessionMap({})
+    setSpawnState({})
+    setAgentSessionStatus({})
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('clawsuite:hub-agent-sessions')
+    }
+    setMissionState('stopped')
+    setMissionActive(false)
+    setShowNewMission(false)
+    setActiveMissionGoal('')
+    setMissionTasks([])
+    setDispatchedTaskIdsByAgent({})
+    setSelectedOutputAgentId(undefined)
+
+    // Reset all refs
+    dispatchingRef.current = false
+    missionStateRef.current = 'stopped'
+    agentSessionMapRef.current = {}
+    pendingTaskMovesRef.current = []
+    sessionActivityRef.current = new Map()
+    taskBoardRef.current = null
+    dispatchedTaskIdsRef.current.clear()
+    pendingDispatchTasksRef.current = []
+    agentTasksRef.current.clear()
+    sessionDispatchTimeRef.current.clear()
+    warnedSessionsRef.current.clear()
+  }, [moveTasksToStatus])
+
+  /**
+   * handleMissionResume — transitions from paused to running and drains
+   * any tasks that were queued during the pause.
+   */
+  const handleMissionResume = useCallback(() => {
+    missionStateRef.current = 'running'
+    setMissionState('running')
+    emitFeedEvent({ type: 'system', message: 'Mission resumed' })
+    void resumeDispatch()
+  }, [resumeDispatch])
+
+  // ── 5s Polling Loop ───────────────────────────────────────────────────────
   useEffect(() => {
     const isMissionRunning = missionActive && missionState === 'running'
 
@@ -674,6 +919,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (!isMissionRunning) {
       sessionActivityRef.current = new Map()
     }
+
+    // Stop all polling when paused (spec requirement)
+    if (missionState === 'paused') return
 
     const hasSessions = Object.keys(agentSessionMap).length > 0
 
@@ -771,7 +1019,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           }
         }
 
-        // ── Activity Feed Events (mission only) ───────────────────────────────
+        // ── Activity Feed Events + Completion Detection (mission only) ────────
         if (isMissionRunning) {
           const previousMarkers = sessionActivityRef.current
           const nextMarkers = new Map<string, string>()
@@ -785,18 +1033,56 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             const name = readSessionName(session) || sessionId
 
             nextMarkers.set(sessionId, marker)
-            if (!previous || previous === marker) continue
 
-            const lastMessage = readSessionLastMessage(session)
-            const summary = lastMessage
-              ? `Output: ${truncateMissionGoal(lastMessage, 80)}`
-              : 'Session activity detected'
+            if (previous && previous !== marker) {
+              const lastMessage = readSessionLastMessage(session)
+              const summary = lastMessage
+                ? `Output: ${truncateMissionGoal(lastMessage, 80)}`
+                : 'Session activity detected'
 
-            emitFeedEvent({
-              type: 'agent_active',
-              message: `${name} update: ${summary}`,
-              agentName: name,
-            })
+              emitFeedEvent({
+                type: 'agent_active',
+                message: `${name} update: ${summary}`,
+                agentName: name,
+              })
+
+              // Completion detection: move tasks to review on completion signal
+              if (lastMessage && isCompletionSignal(lastMessage)) {
+                const agentId = sessionKeyToAgentId.get(sessionId)
+                if (agentId) {
+                  const taskIds = agentTasksRef.current.get(agentId) ?? []
+                  if (taskIds.length > 0) {
+                    moveTasksToStatus(taskIds, 'review')
+                    // Remove from tracking so we don't re-trigger
+                    agentTasksRef.current.delete(agentId)
+                    sessionDispatchTimeRef.current.delete(sessionId)
+                    warnedSessionsRef.current.delete(sessionId)
+                    emitFeedEvent({
+                      type: 'task_completed',
+                      message: `${name} signaled task completion — moved to review`,
+                      agentName: name,
+                    })
+                  }
+                }
+              }
+            }
+
+            // 10-minute no-completion warning (emit once per session)
+            if (!warnedSessionsRef.current.has(sessionId)) {
+              const dispatchTime = sessionDispatchTimeRef.current.get(sessionId)
+              if (dispatchTime && now - dispatchTime > 10 * 60 * 1000) {
+                const agentId = sessionKeyToAgentId.get(sessionId)
+                const pendingTaskIds = agentId ? (agentTasksRef.current.get(agentId) ?? []) : []
+                if (pendingTaskIds.length > 0) {
+                  emitFeedEvent({
+                    type: 'system',
+                    message: `⚠️ ${name} has been running for over 10 minutes with no completion signal`,
+                    agentName: name,
+                  })
+                  warnedSessionsRef.current.add(sessionId)
+                }
+              }
+            }
           }
 
           if (!cancelled) {
@@ -817,7 +1103,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [agentSessionMap, missionActive, missionState])
+  }, [agentSessionMap, missionActive, missionState, moveTasksToStatus])
 
   function applyTemplate(templateId: TeamTemplateId) {
     setTeam(buildTeamFromTemplate(templateId))
@@ -866,16 +1152,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     dispatchingRef.current = true
+    missionStateRef.current = 'running'
     const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
     setMissionActive(true)
     setShowNewMission(false)
     setMissionState('running')
     setView('board')
     setActiveMissionGoal(trimmedGoal)
+    activeMissionGoalRef.current = trimmedGoal
     setMissionTasks(createdTasks)
     setDispatchedTaskIdsByAgent({})
     setSelectedOutputAgentId(firstAssignedAgentId)
     sessionActivityRef.current = new Map()
+    // Clear dispatch tracking for fresh mission
+    dispatchedTaskIdsRef.current.clear()
+    pendingDispatchTasksRef.current = []
+    agentTasksRef.current.clear()
+    sessionDispatchTimeRef.current.clear()
+    warnedSessionsRef.current.clear()
     emitFeedEvent({
       type: 'mission_started',
       message: `Mission started: ${trimmedGoal}`,
@@ -1104,7 +1398,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <div className="mt-2 grid grid-cols-3 gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setMissionState('running')}
+                    onClick={() => {
+                      if (missionState === 'paused') {
+                        handleMissionResume()
+                      } else {
+                        setMissionState('running')
+                      }
+                    }}
                     className={cn(
                       'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
                       missionState === 'running'
@@ -1112,11 +1412,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
                     )}
                   >
-                    Start
+                    {missionState === 'paused' ? 'Resume' : 'Start'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMissionState('paused')}
+                    onClick={() => {
+                      missionStateRef.current = 'paused'
+                      setMissionState('paused')
+                      emitFeedEvent({ type: 'agent_paused', message: 'Mission paused — dispatch halted' })
+                    }}
                     className={cn(
                       'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
                       missionState === 'paused'
@@ -1128,31 +1432,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      // Best-effort cleanup of per-agent sessions
-                      Object.values(agentSessionMap).forEach((sessionKey) => {
-                        fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
-                          method: 'DELETE',
-                        }).catch(() => {})
-                      })
-                      setAgentSessionMap({})
-                      setSpawnState({})
-                      setAgentSessionStatus({})
-                      if (typeof window !== 'undefined') {
-                        window.localStorage.removeItem('clawsuite:hub-agent-sessions')
-                      }
-                      setMissionState('stopped')
-                      setMissionActive(false)
-                      setShowNewMission(false)
-                      setActiveMissionGoal('')
-                      setMissionTasks([])
-                      setDispatchedTaskIdsByAgent({})
-                      setSelectedOutputAgentId(undefined)
-                      dispatchingRef.current = false
-                      pendingTaskMovesRef.current = []
-                      sessionActivityRef.current = new Map()
-                      taskBoardRef.current = null
-                    }}
+                    onClick={stopMission}
                     className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
                   >
                     Stop
