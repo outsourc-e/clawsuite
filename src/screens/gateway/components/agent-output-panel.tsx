@@ -3,9 +3,10 @@ import { cn } from '@/lib/utils'
 import type { HubTask } from './task-board'
 
 type OutputMessage = {
-  role: 'assistant' | 'tool'
+  role: 'assistant' | 'user' | 'tool'
   content: string
   timestamp: number
+  done?: boolean
 }
 
 export type AgentOutputPanelProps = {
@@ -83,8 +84,8 @@ export function AgentOutputPanel({
 
       setMessages((prev) => {
         const last = prev[prev.length - 1]
-        if (last && last.role === 'assistant') {
-          // Append to last assistant message
+        if (last && last.role === 'assistant' && !last.done) {
+          // Append to last assistant message (only if not a done marker)
           return [
             ...prev.slice(0, -1),
             { ...last, content: last.content + text },
@@ -109,22 +110,46 @@ export function AgentOutputPanel({
       ])
     })
 
-    // 'done' — session/run completed
-    source.addEventListener('done', (event) => {
-      if (!(event instanceof MessageEvent)) return
+    // 'done' — session/run completed: add inline ✓ Done marker
+    source.addEventListener('done', () => {
       setSessionEnded(true)
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: '✓ Done', timestamp: Date.now(), done: true },
+      ])
     })
 
-    // 'message' — generic fallback for unnamed SSE lines
+    // 'user_message' — user turn sent to the agent
+    source.addEventListener('user_message', (event) => {
+      if (!(event instanceof MessageEvent)) return
+      const payload = parseSsePayload(event.data as string)
+      if (!payload) return
+      const text = readString(payload.text) || readString(payload.content) || readString(payload.message)
+      if (!text) return
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', content: text, timestamp: Date.now() },
+      ])
+    })
+
+    // 'message' — generic fallback for unnamed SSE lines (also handles user turns)
     source.onmessage = (event) => {
       if (!(event instanceof MessageEvent)) return
       const payload = parseSsePayload(event.data as string)
       if (!payload) return
+      const role = readString(payload.role)
       const text = readString(payload.text) || readString(payload.content)
       if (!text) return
+      if (role === 'user') {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'user', content: text, timestamp: Date.now() },
+        ])
+        return
+      }
       setMessages((prev) => {
         const last = prev[prev.length - 1]
-        if (last && last.role === 'assistant') {
+        if (last && last.role === 'assistant' && !last.done) {
           return [
             ...prev.slice(0, -1),
             { ...last, content: last.content + text },
@@ -189,6 +214,21 @@ export function AgentOutputPanel({
                     <span className="text-neutral-600">▶ </span>
                     {msg.content}
                   </div>
+                ) : msg.role === 'user' ? (
+                  <div
+                    key={`${msg.timestamp}-${index}`}
+                    className="my-1 rounded border border-neutral-700 bg-neutral-800 px-2 py-1 text-neutral-300"
+                  >
+                    <span className="mr-1 text-[9px] uppercase tracking-wider text-neutral-500">you »</span>
+                    {msg.content}
+                  </div>
+                ) : msg.done ? (
+                  <div
+                    key={`${msg.timestamp}-${index}`}
+                    className="border-t border-neutral-800 pt-1 text-emerald-400"
+                  >
+                    {msg.content}
+                  </div>
                 ) : (
                   <div
                     key={`${msg.timestamp}-${index}`}
@@ -197,11 +237,6 @@ export function AgentOutputPanel({
                     {msg.content}
                   </div>
                 ),
-              )}
-              {sessionEnded && (
-                <p className={cn('mt-1 text-neutral-500', messages.length > 0 && 'border-t border-neutral-800 pt-1')}>
-                  Session ended
-                </p>
               )}
               {!sessionEnded && messages.length > 0 && (
                 <span className="animate-pulse text-green-400">▊</span>
