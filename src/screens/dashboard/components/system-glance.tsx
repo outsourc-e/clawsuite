@@ -1,5 +1,4 @@
-import { GlanceCard, HealthBadge, ProviderPill, StatBlock } from './glance-card'
-import { useState } from 'react'
+import { GlanceCard, HealthBadge, StatBlock } from './glance-card'
 import { cn } from '@/lib/utils'
 
 type SystemGlanceProps = {
@@ -10,18 +9,12 @@ type SystemGlanceProps = {
   updatedAgo: string
   healthStatus: 'healthy' | 'warning' | 'critical' | 'offline'
   gatewayConnected: boolean
-  /** Context usage % from API (e.g. 47.3) — shown as SESSION ring */
+  /** Context usage % from API (e.g. 47.3) — shown as MEMORY ring */
   sessionPercent?: number
   providers?: Array<{ name: string; cost: number; tokens: number }>
   currentModel?: string
   /** Compact single-row layout for mobile */
   compact?: boolean
-}
-
-function formatCompact(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return n.toString()
 }
 
 // ─── Compact mobile variant ───────────────────────────────────────────────────
@@ -98,35 +91,27 @@ export function SystemGlance(props: SystemGlanceProps) {
     healthStatus,
     gatewayConnected,
     sessionPercent,
-    providers = [],
     currentModel,
     compact = false,
   } = props
-
-  const [activeProvider, setActiveProvider] = useState<string | null>(null)
 
   if (compact) {
     return <SystemGlanceCompact {...props} />
   }
 
-  const filteredProviders = activeProvider
-    ? providers.filter((p) => p.name === activeProvider)
-    : providers
-
   return (
     <GlanceCard className="space-y-4">
-      {/* Header row */}
-      <div className="flex items-center justify-between">
+      {/* Row 1: Updated timestamp + model badge | Syncing + health badge */}
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-500 text-sm font-bold text-white shadow-sm">
-            CS
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">
-              ClawSuite
-            </h2>
-            <p className="text-[10px] text-neutral-400">AI Agent Monitor</p>
-          </div>
+          <span className="text-[10px] text-neutral-500 dark:text-neutral-400">
+            Updated {updatedAgo}
+          </span>
+          {currentModel && (
+            <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[9px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+              {currentModel}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {gatewayConnected && (
@@ -139,45 +124,13 @@ export function SystemGlance(props: SystemGlanceProps) {
         </div>
       </div>
 
-      {/* Provider pills */}
-      {providers.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {providers.map((p) => (
-            <ProviderPill
-              key={p.name}
-              name={p.name}
-              active={activeProvider === p.name}
-              onClick={() =>
-                setActiveProvider((prev) => (prev === p.name ? null : p.name))
-              }
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Updated timestamp + model */}
-      <div className="flex items-center gap-2">
-        <span className="flex size-5 items-center justify-center rounded-full bg-orange-500/15 text-[10px] font-bold text-orange-500">
-          S
-        </span>
-        <span className="text-[10px] text-neutral-500 dark:text-neutral-400">
-          Updated {updatedAgo}
-        </span>
-        {currentModel && (
-          <span className="ml-auto rounded bg-neutral-100 px-1.5 py-0.5 text-[9px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-            {currentModel}
-          </span>
-        )}
-      </div>
-
-      {/* Main stat grid — SESSION ring + COST text + AGENTS */}
+      {/* Row 2: Three stat blocks — Memory ring | Cost | Agents */}
       <div className="grid grid-cols-3 gap-3">
         <StatBlock
-          label="CONTEXT"
+          label="MEMORY"
           value={sessionPercent !== undefined ? `${Math.round(sessionPercent)}%` : sessions}
           percent={sessionPercent}
-          badge={healthStatus}
-          sublabel={`${sessions} sessions`}
+          sublabel="of context window"
         />
         <StatBlock
           label="COST"
@@ -191,7 +144,7 @@ export function SystemGlance(props: SystemGlanceProps) {
         />
       </div>
 
-      {/* GPU-style bar — uptime */}
+      {/* Row 3: Uptime bar */}
       <div className="rounded-xl border border-neutral-200/50 bg-neutral-50/50 p-3 dark:border-neutral-700/50 dark:bg-neutral-800/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -205,30 +158,6 @@ export function SystemGlance(props: SystemGlanceProps) {
           </span>
         </div>
       </div>
-
-      {/* Provider cost breakdown (when filtered or always when has data) */}
-      {filteredProviders.length > 0 && (
-        <div className="space-y-1.5">
-          {filteredProviders.map((p) => (
-            <div
-              key={p.name}
-              className="flex items-center justify-between rounded-lg bg-neutral-50/50 px-3 py-1.5 dark:bg-neutral-800/50"
-            >
-              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                {p.name}
-              </span>
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] tabular-nums text-neutral-400">
-                  {formatCompact(p.tokens)} tok
-                </span>
-                <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">
-                  ${p.cost.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </GlanceCard>
   )
 }

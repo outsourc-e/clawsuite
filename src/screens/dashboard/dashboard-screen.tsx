@@ -35,7 +35,6 @@ import { UsageMeterWidget } from './components/usage-meter-widget'
 import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
 import { WidgetGrid, type WidgetGridItem } from './components/widget-grid'
-import { ActivityTicker } from '@/components/activity-ticker'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
 import { useVisibleWidgets } from './hooks/use-visible-widgets'
@@ -486,7 +485,7 @@ export function DashboardScreen() {
                       </button>
                     </div>
                   ) : (
-                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} />
+                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} />
                   )}
                 </CollapsibleWidget>
               </div>
@@ -721,11 +720,6 @@ export function DashboardScreen() {
             </div>
           </header>
 
-          {/* Activity ticker — desktop only */}
-          <div className="hidden md:block">
-            <ActivityTicker />
-          </div>
-
           {/* ── Mobile layout ───────────────────────────────────────────────── */}
           {isMobile ? (
             <div className="flex flex-col gap-3">
@@ -873,7 +867,7 @@ export function DashboardScreen() {
               {(desktopLayout.showUsage || desktopLayout.showSquad) && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {desktopLayout.showUsage && (
-                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} />
+                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} />
                   )}
                   {desktopLayout.showSquad && (
                     <SquadStatusWidget />
