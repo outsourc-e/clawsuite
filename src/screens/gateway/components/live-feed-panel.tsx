@@ -11,7 +11,7 @@ const FILTERS = ['All', 'Tasks', 'Agents'] as const
 type FilterTab = (typeof FILTERS)[number]
 
 type SessionRecord = Record<string, unknown>
-type FeedRow = FeedEvent & { baseMessage: string, repeatCount: number }
+type FeedRow = FeedEvent & { baseMessage: string; repeatCount: number }
 
 const TASK_TYPES = new Set<FeedEventType>([
   'mission_started',
@@ -71,12 +71,29 @@ function sessionName(session: SessionRecord): string {
 function timeAgo(timestamp: number, now: number): string {
   const delta = Math.max(0, now - timestamp)
   const seconds = Math.floor(delta / 1000)
-  if (seconds < 60) return `${seconds}s`
+  if (seconds < 60) return `${seconds}s ago`
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m`
+  if (minutes < 60) return `${minutes}m ago`
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h`
-  return `${Math.floor(hours / 24)}d`
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+function rowColorClass(event: FeedRow): string {
+  const msg = event.baseMessage.toLowerCase()
+  if (
+    event.type === 'system' &&
+    (msg.includes('fail') || msg.includes('error') || msg.includes('failed'))
+  ) {
+    return 'bg-red-50/80 border-red-200/70 dark:bg-red-950/20 dark:border-red-900/40'
+  }
+  if (event.type === 'agent_spawned') {
+    return 'bg-emerald-50/80 border-emerald-200/70 dark:bg-emerald-950/20 dark:border-emerald-900/40'
+  }
+  if (event.type === 'system') {
+    return 'bg-neutral-50/80 border-neutral-200/70 dark:bg-neutral-900/50 dark:border-neutral-700'
+  }
+  return 'border-primary-200/70 bg-white/80 dark:border-neutral-800 dark:bg-neutral-900/70'
 }
 
 export function LiveFeedPanel() {
@@ -103,20 +120,21 @@ export function LiveFeedPanel() {
                 repeatCount: latest.repeatCount + 1,
               },
               ...previous.slice(1),
-            ].slice(0, 50)
+            ].slice(0, 100)
           }
 
           return [
             { ...event, baseMessage: event.message, repeatCount: 1 },
             ...previous,
-          ].slice(0, 50)
+          ].slice(0, 100)
         }),
       ),
     [],
   )
 
   useEffect(() => {
-    const tick = window.setInterval(() => setClock(Date.now()), 30_000)
+    // Refresh relative timestamps every 10s
+    const tick = window.setInterval(() => setClock(Date.now()), 10_000)
     return () => window.clearInterval(tick)
   }, [])
 
@@ -183,10 +201,21 @@ export function LiveFeedPanel() {
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3">
         <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">Live Feed</h2>
-        <span className="flex items-center gap-1 text-[11px] text-emerald-600">
-          <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-          Live
-        </span>
+        <div className="flex items-center gap-2">
+          {events.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setEvents([])}
+              className="rounded px-1.5 py-0.5 text-[11px] text-primary-400 transition-colors hover:bg-primary-100 hover:text-primary-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+            >
+              Clear
+            </button>
+          ) : null}
+          <span className="flex items-center gap-1 text-[11px] text-emerald-600">
+            <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
+            Live
+          </span>
+        </div>
       </div>
 
       <div className="flex gap-1 border-b border-primary-100 px-4 py-3">
@@ -209,28 +238,40 @@ export function LiveFeedPanel() {
 
       <div className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
         {visibleEvents.length === 0 ? (
-          <p className="py-8 text-center text-[11px] text-primary-400">Listening for events...</p>
+          <p className="py-8 text-center text-[11px] text-primary-400">
+            No events yet — start a mission
+          </p>
         ) : (
           visibleEvents.map((event) => {
-            const message = event.repeatCount > 1
-              ? `${event.baseMessage} (x${event.repeatCount})`
-              : event.baseMessage
+            const message =
+              event.repeatCount > 1
+                ? `${event.baseMessage} (x${event.repeatCount})`
+                : event.baseMessage
 
             return (
               <div
                 key={event.id}
-                className="flex items-start gap-2 rounded-lg border border-primary-200/70 bg-white/80 px-2.5 py-2 dark:border-neutral-800 dark:bg-neutral-900/70"
+                className={cn(
+                  'flex items-start gap-2 rounded-lg border px-2.5 py-2',
+                  rowColorClass(event),
+                )}
               >
                 <span className="mt-0.5 text-sm" aria-hidden>
                   {EVENT_ICONS[event.type] ?? '•'}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-medium text-primary-900 dark:text-neutral-100">{message}</p>
+                  <p className="text-[11px] font-medium text-primary-900 dark:text-neutral-100">
+                    {message}
+                  </p>
                   {event.agentName ? (
-                    <p className="truncate text-[10px] text-primary-500 dark:text-neutral-400">{event.agentName}</p>
+                    <p className="truncate text-[10px] text-primary-500 dark:text-neutral-400">
+                      {event.agentName}
+                    </p>
                   ) : null}
                 </div>
-                <span className="shrink-0 text-[10px] text-primary-400">{timeAgo(event.timestamp, clock)}</span>
+                <span className="shrink-0 text-[10px] text-primary-400">
+                  {timeAgo(event.timestamp, clock)}
+                </span>
               </div>
             )
           })

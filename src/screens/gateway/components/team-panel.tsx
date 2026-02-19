@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
+import type { HubTask } from './task-board'
 
 export const MODEL_PRESETS = [
   { id: 'auto', label: 'Auto', desc: 'Best model for the task' },
@@ -54,7 +55,9 @@ type TeamPanelProps = {
   spawnState?: Record<string, 'idle' | 'spawning' | 'ready' | 'error'>
   agentSessionStatus?: Record<string, AgentSessionStatusEntry>
   agentSessionMap?: Record<string, string>
+  tasks?: HubTask[]
   onRetrySpawn?: (member: TeamMember) => void
+  onKillSession?: (member: TeamMember) => void
   onApplyTemplate: (templateId: TeamTemplateId) => void
   onAddAgent: () => void
   onUpdateAgent: (
@@ -108,7 +111,9 @@ export function TeamPanel({
   spawnState,
   agentSessionStatus,
   agentSessionMap,
+  tasks,
   onRetrySpawn,
+  onKillSession,
   onApplyTemplate,
   onAddAgent,
   onUpdateAgent,
@@ -200,6 +205,11 @@ export function TeamPanel({
           const modelLabel = modelLabelById.get(agent.modelId) ?? 'Auto'
           const taskCount = agentTaskCounts?.[agent.id] ?? 0
           const cardTitle = agentSessionKey ? `Session: ${agentSessionKey}` : undefined
+
+          // Assigned tasks for this agent (non-done)
+          const assignedTasks = tasks?.filter(
+            (t) => t.agentId === agent.id && t.status !== 'done',
+          ) ?? []
 
           return (
             <div
@@ -327,6 +337,48 @@ export function TeamPanel({
                       className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                     />
                   </label>
+
+                  {/* Session key display */}
+                  {agentSessionKey ? (
+                    <div>
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                        Session Key
+                      </span>
+                      <p className="truncate rounded-md bg-primary-50 px-2 py-1.5 font-mono text-[10px] text-primary-700 dark:bg-neutral-800 dark:text-neutral-300">
+                        {agentSessionKey}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {/* Assigned tasks list */}
+                  {assignedTasks.length > 0 ? (
+                    <div>
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                        Active Tasks
+                      </span>
+                      <ul className="space-y-1">
+                        {assignedTasks.map((task) => (
+                          <li
+                            key={task.id}
+                            className="truncate rounded-md bg-primary-50 px-2 py-1 text-[10px] text-primary-700 dark:bg-neutral-800 dark:text-neutral-300"
+                          >
+                            • {task.title}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {/* Kill session button */}
+                  {agentSessionKey ? (
+                    <button
+                      type="button"
+                      onClick={() => onKillSession?.(agent)}
+                      className="w-full rounded-md bg-red-500 px-2 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-red-600"
+                    >
+                      Kill Session
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </div>

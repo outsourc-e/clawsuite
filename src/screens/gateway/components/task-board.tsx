@@ -99,6 +99,14 @@ function createTaskId(): string {
 function statusLabel(status: TaskStatus): string {
   return COLUMNS.find((column) => column.key === status)?.label ?? status
 }
+
+type TaskEditDraft = {
+  title: string
+  description: string
+  priority: TaskPriority
+  status: TaskStatus
+}
+
 export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTasksChange }: TaskBoardProps) {
   const [tasks, setTasks] = useState<Array<HubTask>>([])
   const [hydrated, setHydrated] = useState(false)
@@ -106,7 +114,12 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
   const [form, setForm] = useState({ title: '', description: '', priority: 'normal' as TaskPriority, agentId: selectedAgentId ?? '' })
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
+  const [taskEditDraft, setTaskEditDraft] = useState<TaskEditDraft | null>(null)
   const tasksRef = useRef<Array<HubTask>>([])
+  // Prevent click from firing right after a drag interaction
+  const dragHappenedRef = useRef(false)
+
   useEffect(() => {
     const storedTasks = loadTasks()
     tasksRef.current = storedTasks
@@ -192,6 +205,33 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
   useEffect(() => {
     onRef?.({ addTasks, moveTasks })
   }, [addTasks, moveTasks, onRef])
+
+  function openTaskDetail(task: HubTask) {
+    setExpandedTaskId(task.id)
+    setTaskEditDraft({
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      status: task.status,
+    })
+  }
+
+  function closeTaskDetail() {
+    setExpandedTaskId(null)
+    setTaskEditDraft(null)
+  }
+
+  function saveTaskDetail(taskId: string) {
+    if (!taskEditDraft) return
+    const now = Date.now()
+    setTasks((previous) =>
+      previous.map((t) =>
+        t.id === taskId ? { ...t, ...taskEditDraft, updatedAt: now } : t,
+      ),
+    )
+    closeTaskDetail()
+  }
+
   const selectedAgentName = selectedAgentId ? agentNameById.get(selectedAgentId) ?? selectedAgentId : undefined
   const tasksByColumn = useMemo(() => {
     const grouped: Record<TaskStatus, Array<HubTask>> = { inbox: [], assigned: [], in_progress: [], review: [], done: [] }
@@ -375,26 +415,40 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                     const priority = PRIORITIES.find((item) => item.key === task.priority)
                     const assignee = task.agentId ? agentNameById.get(task.agentId) ?? task.agentId : 'Unassigned'
                     const dimmed = Boolean(selectedAgentId && task.agentId !== selectedAgentId)
+                    const isExpanded = expandedTaskId === task.id
                     return (
                       <div
                         key={task.id}
                         draggable
                         onDragStart={(event) => {
+                          dragHappenedRef.current = true
                           setDraggedTaskId(task.id)
                           event.dataTransfer.effectAllowed = 'move'
                           event.dataTransfer.setData('text/plain', task.id)
                         }}
                         onDragEnd={() => {
+                          window.setTimeout(() => {
+                            dragHappenedRef.current = false
+                          }, 100)
                           setDraggedTaskId(null)
                           setDragOverStatus(null)
                         }}
+                        onClick={() => {
+                          if (dragHappenedRef.current) return
+                          if (isExpanded) {
+                            closeTaskDetail()
+                          } else {
+                            openTaskDetail(task)
+                          }
+                        }}
                         className={cn(
-                          'cursor-grab rounded-lg border border-primary-200 bg-white p-2.5 shadow-sm active:cursor-grabbing dark:border-neutral-700 dark:bg-neutral-900',
+                          'cursor-pointer rounded-lg border border-primary-200 bg-white p-2.5 shadow-sm transition-colors active:cursor-grabbing dark:border-neutral-700 dark:bg-neutral-900',
                           dimmed && 'opacity-50',
+                          isExpanded && 'border-accent-300 dark:border-accent-700',
                         )}
                       >
                         <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">{task.title}</p>
-                        {task.description ? (
+                        {task.description && !isExpanded ? (
                           <p className="mt-1 line-clamp-3 text-[11px] text-primary-500 dark:text-neutral-400">{task.description}</p>
                         ) : null}
                         <div className="mt-2 flex items-center justify-between gap-2">
@@ -403,6 +457,110 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                           </span>
                           <span className="truncate text-[10px] text-primary-500 dark:text-neutral-400">{assignee}</span>
                         </div>
+
+                        {/* Inline slide-down task detail panel */}
+                        {isExpanded && taskEditDraft ? (
+                          <div
+                            className="mt-3 space-y-2 border-t border-primary-200 pt-3 dark:border-neutral-700"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div>
+                              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                                Title
+                              </label>
+                              <input
+                                type="text"
+                                value={taskEditDraft.title}
+                                onChange={(e) =>
+                                  setTaskEditDraft((prev) =>
+                                    prev ? { ...prev, title: e.target.value } : prev,
+                                  )
+                                }
+                                className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                                Description
+                              </label>
+                              <textarea
+                                value={taskEditDraft.description}
+                                onChange={(e) =>
+                                  setTaskEditDraft((prev) =>
+                                    prev ? { ...prev, description: e.target.value } : prev,
+                                  )
+                                }
+                                rows={2}
+                                placeholder="Add a description…"
+                                className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                              />
+                            </div>
+                            <p className="text-[10px] text-primary-500">
+                              <span className="font-semibold uppercase tracking-wide">Agent:</span>{' '}
+                              {assignee}
+                            </p>
+                            <div>
+                              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                                Priority
+                              </label>
+                              <select
+                                value={taskEditDraft.priority}
+                                onChange={(e) =>
+                                  setTaskEditDraft((prev) =>
+                                    prev
+                                      ? { ...prev, priority: e.target.value as TaskPriority }
+                                      : prev,
+                                  )
+                                }
+                                className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                              >
+                                {PRIORITIES.map((p) => (
+                                  <option key={p.key} value={p.key}>
+                                    {p.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                                Status
+                              </label>
+                              <select
+                                value={taskEditDraft.status}
+                                onChange={(e) =>
+                                  setTaskEditDraft((prev) =>
+                                    prev
+                                      ? { ...prev, status: e.target.value as TaskStatus }
+                                      : prev,
+                                  )
+                                }
+                                className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                              >
+                                {COLUMNS.map((col) => (
+                                  <option key={col.key} value={col.key}>
+                                    {col.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex items-center gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => saveTaskDetail(task.id)}
+                                className="rounded-md bg-accent-500 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-accent-600"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={closeTaskDetail}
+                                className="rounded-md px-2 py-1 text-[11px] font-medium text-primary-500 transition-colors hover:bg-primary-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     )
                   })}
