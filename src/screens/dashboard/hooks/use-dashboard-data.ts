@@ -679,7 +679,7 @@ export function useDashboardData(): UseDashboardDataResult {
     if (todayCostTotal > 50) {
       alerts.push({
         id: 'high-spend',
-        text: `⚠ High spend today: ${formatMoney(todayCostTotal)}`,
+        text: '⚠ High spend today',
         severity: 'amber',
         dismissable: true,
       })

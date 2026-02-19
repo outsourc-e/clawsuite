@@ -326,7 +326,7 @@ export function UsageMeterWidget({
   editMode,
   overrideCost,
 }: UsageMeterWidgetProps) {
-  const [view, setView] = useState<'tokens' | 'cost'>('cost')
+  const [view, setView] = useState<'tokens' | 'cost'>('tokens')
   const [timedOut, setTimedOut] = useState(false)
   const usageQuery = useQuery({
     queryKey: ['dashboard', 'usage'],

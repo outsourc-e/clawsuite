@@ -2,13 +2,13 @@ import {
   ArrowDown01Icon,
   ArrowUp02Icon,
   Activity01Icon,
+  BubbleChatIcon,
   ChartLineData02Icon,
   Moon02Icon,
   PencilEdit02Icon,
   RefreshIcon,
   Settings01Icon,
   Sun02Icon,
-  Timer02Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -306,17 +306,17 @@ export function DashboardScreen() {
           ),
         },
         {
-          id: 'metric-uptime',
+          id: 'metric-messages',
           size: 'small',
           node: (
             <MetricsWidget
-              title="Uptime"
-              value={uptimeDisplay}
-              subtitle="Real session uptime"
-              icon={Timer02Icon}
-              accent="violet"
-              description="Time since the active gateway session started (firstActivity)."
-              rawValue={`${dashboardData.uptime.seconds}s`}
+              title="Messages"
+              value={dashboardData.usage.messages.total}
+              subtitle={`${dashboardData.usage.messages.user} user · ${dashboardData.usage.messages.assistant} assistant`}
+              icon={BubbleChatIcon}
+              accent="purple"
+              description="Total messages exchanged today across all sessions."
+              rawValue={`${dashboardData.usage.messages.total} messages`}
             />
           ),
         },
@@ -332,8 +332,9 @@ export function DashboardScreen() {
       dashboardData.cost.trend,
       dashboardData.sessions.total,
       dashboardData.status,
-      uptimeDisplay,
-      dashboardData.uptime.seconds,
+      dashboardData.usage.messages.total,
+      dashboardData.usage.messages.user,
+      dashboardData.usage.messages.assistant,
       refetch,
     ],
   )
