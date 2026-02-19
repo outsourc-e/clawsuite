@@ -52,7 +52,8 @@ const MODEL_PRESET_MAP: Record<string, string> = {
   codex: 'openai/gpt-5.3-codex',
   flash: 'google/gemini-2.5-flash',
   // PC1 local models (fixed Modelfiles — ChatML + num_ctx 16k+)
-  'pc1-planner': 'ollama-pc1/glm-4.7-flash-fixed',
+  // pc1-planner swapped to qwen3-14b-fixed: 4.3s vs 21s, no think leakage, 9GB vs 19GB
+  'pc1-planner': 'ollama-pc1/qwen3-14b-fixed',
   'pc1-coder':   'ollama-pc1/qwen3-coder-30b-fixed',
   'pc1-critic':  'ollama-pc1/deepseek-r1-32b-fixed',
   'pc1-fast':    'ollama-pc1/qwen3-14b-fixed',
@@ -2949,6 +2950,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
                 tasks={selectedOutputTasks}
                 onClose={() => setSelectedOutputAgentId(undefined)}
+                modelId={selectedOutputAgentId ? team.find((m) => m.id === selectedOutputAgentId)?.modelId : undefined}
               />
             </div>
           </div>

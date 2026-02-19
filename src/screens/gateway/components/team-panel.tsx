@@ -9,7 +9,7 @@ export const MODEL_PRESETS = [
   { id: 'codex',       label: 'Codex',       desc: 'Code specialist' },
   { id: 'flash',       label: 'Gemini Flash', desc: 'Quick & cheap' },
   // PC1 local models (RTX 4090 · free · fixed Modelfiles)
-  { id: 'pc1-planner', label: 'PC1 Planner', desc: 'glm-4.7-flash · local' },
+  { id: 'pc1-planner', label: 'PC1 Planner', desc: 'qwen3:14b · local' },
   { id: 'pc1-coder',   label: 'PC1 Coder',   desc: 'qwen3-coder:30b · local' },
   { id: 'pc1-critic',  label: 'PC1 Critic',  desc: 'deepseek-r1:32b · local' },
   { id: 'pc1-fast',    label: 'PC1 Fast',    desc: 'qwen3:14b · local' },

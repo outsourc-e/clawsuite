@@ -14,6 +14,8 @@ export type AgentOutputPanelProps = {
   sessionKey: string | null
   tasks: HubTask[]
   onClose: () => void
+  /** Model preset id — shown in header badge e.g. 'pc1-coder', 'sonnet' */
+  modelId?: string
   /** Compact mode: no outer border/padding and no internal header. Use inside LiveActivityPanel. */
   compact?: boolean
 }
@@ -54,16 +56,19 @@ export function AgentOutputPanel({
   sessionKey,
   tasks,
   onClose,
+  modelId,
   compact = false,
 }: AgentOutputPanelProps) {
   const [messages, setMessages] = useState<OutputMessage[]>([])
   const [sessionEnded, setSessionEnded] = useState(false)
+  const [tokenCount, setTokenCount] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Reset state when sessionKey changes
   useEffect(() => {
     setMessages([])
     setSessionEnded(false)
+    setTokenCount(0)
   }, [sessionKey])
 
   // Auto-scroll to bottom when messages update
@@ -87,6 +92,9 @@ export function AgentOutputPanel({
       if (!payload) return
       const text = readString(payload.text) || readString(payload.content) || readString(payload.chunk)
       if (!text) return
+
+      // Approximate token count: ~4 chars per token
+      setTokenCount((n) => n + Math.ceil(text.length / 4))
 
       setMessages((prev) => {
         const last = prev[prev.length - 1]
@@ -277,14 +285,26 @@ export function AgentOutputPanel({
   return (
     <div className="border-t border-primary-200 dark:border-neutral-700 p-3">
       {/* Header */}
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
-          {agentName} Output
-        </h3>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <h3 className="truncate text-xs font-semibold text-primary-900 dark:text-neutral-100">
+            {agentName}
+          </h3>
+          {modelId ? (
+            <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 font-mono text-[9px] font-semibold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+              {modelId}
+            </span>
+          ) : null}
+          {tokenCount > 0 ? (
+            <span className="shrink-0 font-mono text-[9px] text-neutral-400 tabular-nums">
+              ~{tokenCount.toLocaleString()} tok
+            </span>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={onClose}
-          className="text-xs text-primary-400 transition-colors hover:text-primary-600 dark:hover:text-neutral-200"
+          className="shrink-0 text-xs text-primary-400 transition-colors hover:text-primary-600 dark:hover:text-neutral-200"
         >
           ✕
         </button>

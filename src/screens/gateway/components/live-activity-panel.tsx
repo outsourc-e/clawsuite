@@ -451,6 +451,7 @@ export function LiveActivityPanel({
                 sessionKey={sessionKey}
                 tasks={outputTasks}
                 onClose={handleCloseOutput}
+                modelId={selectedAgent?.modelId}
                 compact
               />
             </div>
