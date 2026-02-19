@@ -97,7 +97,7 @@ function GatewayStatusPill({
   if (spawnErrorNames.length > 0) {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="flex items-center gap-1 rounded-full border border-red-800/50 bg-red-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-400">
+        <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-400">
           <span className="size-1.5 rounded-full bg-red-500" />
           Spawn Error
         </span>
@@ -105,7 +105,7 @@ function GatewayStatusPill({
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-full border border-red-800/50 bg-red-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-400 transition-colors hover:bg-red-900/40"
+            className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 transition-colors hover:bg-red-100 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-900/40"
           >
             Retry
           </button>
@@ -116,7 +116,7 @@ function GatewayStatusPill({
 
   if (status === 'disconnected') {
     return (
-      <span className="flex items-center gap-1 rounded-full border border-red-800/50 bg-red-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-400">
+      <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-400">
         <span className="size-1.5 rounded-full bg-red-500" />
         Offline
       </span>
@@ -125,7 +125,7 @@ function GatewayStatusPill({
 
   if (status === 'spawning') {
     return (
-      <span className="flex items-center gap-1 rounded-full border border-amber-800/50 bg-amber-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber-400">
+      <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-400">
         <span className="size-1.5 animate-pulse rounded-full bg-amber-400" />
         Spawning
       </span>
@@ -133,7 +133,7 @@ function GatewayStatusPill({
   }
 
   return (
-    <span className="flex items-center gap-1 rounded-full border border-emerald-800/50 bg-emerald-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-400">
+    <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-400">
       <span className="size-1.5 rounded-full bg-emerald-500" />
       Connected
     </span>
@@ -410,11 +410,11 @@ const AGENT_ACCENT_COLORS = [
 
 // ── Model badge styling ────────────────────────────────────────────────────────
 const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
-  auto:   'bg-neutral-800 text-neutral-400',
-  opus:   'bg-orange-950/70 text-orange-400',
-  sonnet: 'bg-blue-950/70 text-blue-400',
-  codex:  'bg-emerald-950/70 text-emerald-400',
-  flash:  'bg-violet-950/70 text-violet-400',
+  auto:   'bg-neutral-200 text-neutral-700 dark:bg-neutral-600 dark:text-neutral-200',
+  opus:   'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
+  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
+  codex:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
+  flash:  'bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-400',
 }
 
 const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
@@ -448,7 +448,7 @@ function OfficeView({
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
           <p className="mb-3 text-4xl">🏢</p>
-          <p className="text-sm font-medium text-neutral-300">No agents in your team</p>
+          <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">No agents in your team</p>
           <p className="mt-1 text-xs text-neutral-500">Switch to the Team tab to add agents.</p>
         </div>
       </div>
@@ -456,14 +456,14 @@ function OfficeView({
   }
 
   const processTypeBadgeClass =
-    processType === 'hierarchical' ? 'border-violet-800/50 bg-violet-950/40 text-violet-400' :
-    processType === 'sequential'   ? 'border-blue-800/50 bg-blue-950/40 text-blue-400' :
-                                     'border-emerald-800/50 bg-emerald-950/40 text-emerald-400'
+    processType === 'hierarchical' ? 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-400' :
+    processType === 'sequential'   ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-400' :
+                                     'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-400'
 
   return (
     <div className="h-full overflow-y-auto p-4">
       {/* ── Crew strip ─────────────────────────────────────────────────── */}
-      <div className="mb-4 flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-4 py-3">
+      <div className="mb-4 flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/60">
         {/* Overlapping agent avatars */}
         <div className="flex -space-x-2">
           {agentRows.slice(0, 5).map((agent, i) => {
@@ -473,7 +473,7 @@ function OfficeView({
                 key={agent.id}
                 title={agent.name}
                 className={cn(
-                  'flex size-8 items-center justify-center rounded-full border-2 border-neutral-900 text-xs font-bold text-white',
+                  'flex size-8 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white dark:border-neutral-900',
                   accent.avatar,
                 )}
               >
@@ -482,7 +482,7 @@ function OfficeView({
             )
           })}
           {agentRows.length > 5 ? (
-            <div className="flex size-8 items-center justify-center rounded-full border-2 border-neutral-900 bg-neutral-800 text-[10px] font-bold text-neutral-400">
+            <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-neutral-200 text-[10px] font-bold text-neutral-600 dark:border-neutral-900 dark:bg-neutral-800 dark:text-neutral-400">
               +{agentRows.length - 5}
             </div>
           ) : null}
@@ -490,12 +490,12 @@ function OfficeView({
 
         {/* Labels */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-sm font-semibold text-neutral-200">
+          <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
             {agentRows.length} agent{agentRows.length !== 1 ? 's' : ''}
           </span>
           {activeTemplateName ? (
             <>
-              <span className="text-neutral-700">·</span>
+              <span className="text-neutral-400 dark:text-neutral-700">·</span>
               <span className="truncate text-sm text-neutral-500">{activeTemplateName}</span>
             </>
           ) : null}
@@ -504,7 +504,7 @@ function OfficeView({
         {/* Process type badge */}
         <div className="flex items-center gap-2 shrink-0">
           {missionRunning && (
-            <span className="flex items-center gap-1 rounded-full border border-emerald-800/50 bg-emerald-950/40 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">
+            <span className="flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-400">
               <span className="relative flex size-1.5">
                 <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
@@ -524,13 +524,22 @@ function OfficeView({
       </div>
 
       {/* ── Agent desk grid ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+      <div
+        className={cn(
+          'grid gap-3',
+          agentRows.length <= 2 ? 'grid-cols-2' :
+          agentRows.length === 4 ? 'grid-cols-2' :
+          'grid-cols-2 md:grid-cols-3',
+        )}
+      >
         {agentRows.map((agent, i) => {
           const accent = AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length]
           const isActive = agent.status === 'active'
           const isSelected = agent.id === selectedOutputAgentId
           const isSpawning = agent.status === 'spawning'
 
+          // Fix 2: Standardised status dots
+          // 🟢 Green = active  🟡 Yellow = has session (idle/ready)  ⚫ Gray = no session  🔴 Red = error
           const statusDotEl = isActive ? (
             <span className="relative flex size-3 shrink-0">
               <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
@@ -545,10 +554,10 @@ function OfficeView({
             <span
               className={cn(
                 'size-3 shrink-0 rounded-full',
-                agent.status === 'idle'  ? 'bg-amber-500' :
-                agent.status === 'ready' ? 'bg-neutral-500' :
+                agent.status === 'idle'  ? 'bg-yellow-500' :
+                agent.status === 'ready' ? 'bg-yellow-500' :
                 agent.status === 'error' ? 'bg-red-500' :
-                'bg-neutral-700',
+                'bg-neutral-400',  // 'none' — no session
               )}
             />
           )
@@ -557,11 +566,11 @@ function OfficeView({
             <div
               key={agent.id}
               className={cn(
-                'relative overflow-hidden rounded-xl border bg-neutral-900 transition-all',
+                'relative overflow-hidden rounded-xl border bg-white transition-all dark:bg-neutral-900',
                 isSelected
-                  ? 'border-neutral-600 shadow-lg ring-1 ring-emerald-500/50 shadow-emerald-500/10'
-                  : 'border-neutral-800',
-                isActive && missionRunning && !isSelected && 'ring-1 ring-neutral-700',
+                  ? 'border-neutral-300 shadow-lg ring-1 ring-emerald-500/50 shadow-emerald-500/10 dark:border-neutral-600'
+                  : 'border-neutral-200 dark:border-neutral-800',
+                isActive && missionRunning && !isSelected && 'ring-1 ring-neutral-300 dark:ring-neutral-700',
               )}
             >
               {/* Top accent bar (3px) */}
@@ -584,14 +593,14 @@ function OfficeView({
                 </div>
 
                 {/* Agent name */}
-                <h3 className="mt-3 truncate text-sm font-bold tracking-tight text-white">
+                <h3 className="mt-3 truncate text-sm font-bold tracking-tight text-neutral-900 dark:text-white">
                   {agent.name}
                 </h3>
 
                 {/* Role / model row */}
                 <div className="mt-1 flex items-center gap-1.5">
                   {agent.roleDescription ? (
-                    <span className="truncate text-[10px] text-neutral-600">
+                    <span className="truncate text-[10px] text-neutral-500 dark:text-neutral-600">
                       {agent.roleDescription}
                     </span>
                   ) : null}
@@ -606,14 +615,14 @@ function OfficeView({
                 </div>
 
                 {/* Activity line (monospace) */}
-                <p className="mt-2 line-clamp-2 min-h-[2.4em] font-mono text-[10px] leading-relaxed text-neutral-600">
+                <p className="mt-2 line-clamp-2 min-h-[2.4em] font-mono text-[10px] leading-relaxed text-neutral-500 dark:text-neutral-600">
                   {agent.lastLine ?? (agent.status === 'none' ? '// no session' : '// waiting for mission…')}
                 </p>
 
                 {/* Footer: task count badge */}
                 {agent.taskCount > 0 ? (
                   <div className="mt-2">
-                    <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[9px] font-semibold text-neutral-400">
+                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
                       {agent.taskCount} task{agent.taskCount !== 1 ? 's' : ''}
                     </span>
                   </div>
@@ -626,8 +635,8 @@ function OfficeView({
                   className={cn(
                     'mt-3 w-full rounded-lg px-2 py-2 text-[11px] font-medium transition-colors',
                     isSelected
-                      ? 'bg-neutral-700 text-white'
-                      : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200',
+                      ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-700 dark:text-white'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-200',
                   )}
                 >
                   {isSelected ? '✓ Viewing Output' : 'View Output'}
@@ -636,6 +645,22 @@ function OfficeView({
             </div>
           )
         })}
+      </div>
+
+      {/* Fix 2: Status dot legend */}
+      <div className="mt-3 flex items-center justify-end gap-3 px-1">
+        <span className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600">
+          <span className="size-2 rounded-full bg-emerald-500" /> Active
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600">
+          <span className="size-2 rounded-full bg-yellow-500" /> Idle
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600">
+          <span className="size-2 rounded-full bg-neutral-400" /> No session
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600">
+          <span className="size-2 rounded-full bg-red-500" /> Error
+        </span>
       </div>
     </div>
   )
@@ -700,8 +725,8 @@ function HistoryView() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-2 size-5 animate-spin rounded-full border-2 border-neutral-600 border-t-neutral-300" />
-          <p className="font-mono text-[10px] text-neutral-600">// loading mission history…</p>
+          <div className="mx-auto mb-2 size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-600 dark:border-neutral-600 dark:border-t-neutral-300" />
+          <p className="font-mono text-[10px] text-neutral-500 dark:text-neutral-600">// loading mission history…</p>
         </div>
       </div>
     )
@@ -712,24 +737,24 @@ function HistoryView() {
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
           <p className="mb-3 text-4xl opacity-30">📋</p>
-          <p className="text-sm font-medium text-neutral-300">No mission history yet</p>
-          <p className="mt-1 font-mono text-[10px] text-neutral-600">// start a mission to see it recorded here</p>
+          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">No mission history yet</p>
+          <p className="mt-1 font-mono text-[10px] text-neutral-500 dark:text-neutral-600">// start a mission to see it recorded here</p>
         </div>
       </div>
     )
   }
 
   const PROCESS_TYPE_BADGE: Record<string, string> = {
-    sequential:   'bg-blue-950/60 text-blue-400 border border-blue-800/50',
-    hierarchical: 'bg-violet-950/60 text-violet-400 border border-violet-800/50',
-    parallel:     'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50',
+    sequential:   'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800/50',
+    hierarchical: 'bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/60 dark:text-violet-400 dark:border-violet-800/50',
+    parallel:     'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/50',
   }
 
   const CHECKPOINT_STATUS_BADGE: Record<string, { label: string; icon: string; className: string }> = {
-    running:   { label: 'Running',   icon: '▶', className: 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50' },
-    paused:    { label: 'Paused',    icon: '⏸', className: 'bg-amber-950/60 text-amber-400 border border-amber-800/50' },
-    completed: { label: 'Completed', icon: '●', className: 'bg-neutral-800 text-neutral-400 border border-neutral-700' },
-    aborted:   { label: 'Aborted',   icon: '✕', className: 'bg-red-950/60 text-red-400 border border-red-800/50' },
+    running:   { label: 'Running',   icon: '▶', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/50' },
+    paused:    { label: 'Paused',    icon: '⏸', className: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800/50' },
+    completed: { label: 'Completed', icon: '●', className: 'bg-neutral-100 text-neutral-600 border border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700' },
+    aborted:   { label: 'Aborted',   icon: '✕', className: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/60 dark:text-red-400 dark:border-red-800/50' },
   }
 
   return (
@@ -750,11 +775,11 @@ function HistoryView() {
             return (
               <div
                 key={cp.id}
-                className="rounded-xl border border-neutral-800 bg-neutral-900/80 p-4 transition-colors hover:border-neutral-700"
+                className="rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900/80 dark:hover:border-neutral-700"
               >
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] text-neutral-700" aria-hidden>{statusBadge!.icon}</span>
-                  <h3 className="truncate text-sm font-semibold text-neutral-100">
+                  <span className="text-[10px] text-neutral-500 dark:text-neutral-700" aria-hidden>{statusBadge!.icon}</span>
+                  <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                     {cp.label}
                   </h3>
                   <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold', statusBadge!.className)}>
@@ -774,14 +799,14 @@ function HistoryView() {
                         <span
                           key={member.id}
                           title={member.name}
-                          className={cn('flex size-6 items-center justify-center rounded-full border border-neutral-900 text-[9px] font-bold text-white', ac.avatar)}
+                          className={cn('flex size-6 items-center justify-center rounded-full border border-white text-[9px] font-bold text-white dark:border-neutral-900', ac.avatar)}
                         >
                           {member.name.charAt(0).toUpperCase()}
                         </span>
                       )
                     })}
                     {cp.team.length > 5 ? (
-                      <span className="flex size-6 items-center justify-center rounded-full border border-neutral-900 bg-neutral-800 text-[9px] font-bold text-neutral-500">
+                      <span className="flex size-6 items-center justify-center rounded-full border border-white bg-neutral-200 text-[9px] font-bold text-neutral-600 dark:border-neutral-900 dark:bg-neutral-800 dark:text-neutral-500">
                         +{cp.team.length - 5}
                       </span>
                     ) : null}
@@ -823,21 +848,21 @@ function HistoryView() {
 
             const statusBadge =
               status === 'active'
-                ? { label: 'Active', icon: '▶', className: 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50' }
+                ? { label: 'Active', icon: '▶', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/50' }
                 : status === 'idle'
-                  ? { label: 'Idle', icon: '⏸', className: 'bg-amber-950/60 text-amber-400 border border-amber-800/50' }
-                  : { label: 'Ended', icon: '●', className: 'bg-neutral-800 text-neutral-500 border border-neutral-700' }
+                  ? { label: 'Idle', icon: '⏸', className: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800/50' }
+                  : { label: 'Ended', icon: '●', className: 'bg-neutral-100 text-neutral-600 border border-neutral-200 dark:bg-neutral-800 dark:text-neutral-500 dark:border-neutral-700' }
 
             return (
               <div
                 key={sessionId || label}
-                className="rounded-xl border border-neutral-800 bg-neutral-900/80 p-4 transition-colors hover:border-neutral-700"
+                className="rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900/80 dark:hover:border-neutral-700"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] text-neutral-700" aria-hidden>{statusBadge.icon}</span>
-                      <h3 className="truncate text-sm font-semibold text-neutral-100">
+                      <span className="text-[10px] text-neutral-500 dark:text-neutral-700" aria-hidden>{statusBadge.icon}</span>
+                      <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                         {label.replace(/^Mission:\s*/, '')}
                       </h3>
                       <span
@@ -864,21 +889,21 @@ function HistoryView() {
                   <button
                     type="button"
                     onClick={() => setExpandedId(isExpanded ? null : sessionId)}
-                    className="shrink-0 rounded-lg border border-neutral-700 bg-neutral-800 px-2.5 py-1 text-[10px] font-medium text-neutral-400 transition-colors hover:border-neutral-600 hover:text-neutral-200"
+                    className="shrink-0 rounded-lg border border-neutral-200 bg-neutral-100 px-2.5 py-1 text-[10px] font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:text-neutral-200"
                   >
                     {isExpanded ? 'Hide' : 'View'}
                   </button>
                 </div>
 
                 {isExpanded ? (
-                  <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950/60 p-3">
-                    <p className="mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-neutral-700">
+                  <div className="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950/60">
+                    <p className="mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-700">
                       Session Details
                     </p>
                     <dl className="space-y-1.5">
                       <div className="flex gap-2">
-                        <dt className="shrink-0 font-mono text-[9px] text-neutral-700">ID</dt>
-                        <dd className="truncate font-mono text-[9px] text-neutral-400">{sessionId}</dd>
+                        <dt className="shrink-0 font-mono text-[9px] text-neutral-500 dark:text-neutral-700">ID</dt>
+                        <dd className="truncate font-mono text-[9px] text-neutral-600 dark:text-neutral-400">{sessionId}</dd>
                       </div>
                       {lastMessage ? (
                         <div className="flex flex-col gap-0.5">
@@ -1187,6 +1212,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           const data = JSON.parse(event.data as string) as Record<string, unknown>
           const text = String(data.text ?? data.content ?? data.chunk ?? '').trim()
           handleUpdate(text, 'assistant')
+          // TODO: SSE chunk events bypass the feed-event APPROVAL_REQUIRED parser.
+          // If agents send approval markers mid-stream, they won't be caught here.
+          // Fix: emit a feed event from handleUpdate when text contains APPROVAL_REQUIRED,
+          // so the onFeedEvent handler in the main effect can pick it up.
         } catch { /* ignore parse errors */ }
       })
 
@@ -1368,6 +1397,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         id: member.id,
         name: member.name,
         modelId: member.modelId,
+        roleDescription: member.roleDescription,
         status,
         lastLine,
         lastAt,
@@ -2348,9 +2378,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 bg-neutral-900 px-5 py-3 dark:bg-neutral-950">
+      <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-5 py-3 dark:border-neutral-800 dark:bg-neutral-900">
         <div>
-          <h1 className="text-base font-semibold tracking-tight text-white">
+          <h1 className="text-base font-semibold tracking-tight text-neutral-900 dark:text-white">
             Agent Hub
           </h1>
           <p className="font-mono text-[10px] text-neutral-500">// Mission Control</p>
@@ -2364,7 +2394,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       </div>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center border-b border-neutral-800 bg-neutral-900 dark:bg-neutral-950">
+      <div className="flex shrink-0 items-center border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'approvals'
             ? approvals.filter(a => a.status === 'pending').length
@@ -2378,8 +2408,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               className={cn(
                 'relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all',
                 isActive
-                  ? 'bg-neutral-800 text-white dark:bg-neutral-800 dark:text-white'
-                  : 'text-neutral-500 hover:bg-neutral-800/50 hover:text-neutral-200 dark:text-neutral-500 dark:hover:text-neutral-200',
+                  ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
+                  : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-200',
               )}
             >
               {/* Active tab: orange bottom highlight */}
@@ -2415,8 +2445,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
               liveFeedVisible
-                ? 'bg-neutral-700 text-neutral-100'
-                : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200',
+                ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100'
+                : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-200',
             )}
           >
             <span aria-hidden>📡</span>

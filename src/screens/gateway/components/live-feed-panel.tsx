@@ -39,11 +39,11 @@ const EVENT_BADGE: Record<FeedEventType, EventBadge> = {
   task_completed:  { label: 'DONE',    className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
   task_assigned:   { label: 'ASSIGN',  className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
   agent_active:    { label: 'AGENT',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
-  agent_idle:      { label: 'IDLE',    className: 'bg-neutral-800 text-neutral-500 border border-neutral-700' },
+  agent_idle:      { label: 'IDLE',    className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700' },
   agent_paused:    { label: 'PAUSE',   className: 'bg-amber-950/70 text-amber-400 border border-amber-800/50' },
   agent_spawned:   { label: 'SPAWN',   className: 'bg-blue-950/70 text-blue-400 border border-blue-800/50' },
   agent_killed:    { label: 'KILL',    className: 'bg-red-950/70 text-red-400 border border-red-800/50' },
-  gateway_health:  { label: 'SYS',     className: 'bg-neutral-900 text-neutral-600 border border-neutral-800' },
+  gateway_health:  { label: 'SYS',     className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' },
   system:          { label: 'SYS',     className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50' },
 }
 
@@ -163,10 +163,10 @@ export function LiveFeedPanel() {
   }, [activeFilter, events])
 
   return (
-    <div className="flex h-full flex-col bg-neutral-950 dark:bg-neutral-950">
+    <div className="flex h-full flex-col bg-white dark:bg-neutral-950">
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 px-4 py-2.5">
-        <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">
+      <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-4 py-2.5 dark:border-neutral-800">
+        <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400">
           Live Feed
         </h2>
         <div className="flex items-center gap-2">
@@ -191,7 +191,7 @@ export function LiveFeedPanel() {
       </div>
 
       {/* ── Filters ─────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 gap-1 border-b border-neutral-800 px-3 py-2">
+      <div className="flex shrink-0 gap-1 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
         {FILTERS.map((tab) => (
           <button
             key={tab}
@@ -200,8 +200,8 @@ export function LiveFeedPanel() {
             className={cn(
               'rounded px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors',
               activeFilter === tab
-                ? 'bg-neutral-800 text-neutral-100'
-                : 'text-neutral-600 hover:bg-neutral-900 hover:text-neutral-300',
+                ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
+                : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-600 dark:hover:bg-neutral-900 dark:hover:text-neutral-300',
             )}
           >
             {tab}
@@ -212,7 +212,7 @@ export function LiveFeedPanel() {
       {/* ── Events list ─────────────────────────────────────────────────── */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {/* Top fade overlay */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-neutral-950 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-white to-transparent dark:from-neutral-950" />
 
         <div className="h-full overflow-y-auto px-3 pb-3 pt-8">
           {visibleEvents.length === 0 ? (
@@ -231,7 +231,7 @@ export function LiveFeedPanel() {
                 return (
                   <div
                     key={event.id}
-                    className="flex items-start gap-2 rounded-md border border-neutral-800/60 bg-neutral-900/40 px-2 py-1.5"
+                    className="flex items-start gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 dark:border-neutral-800/60 dark:bg-neutral-900/40"
                   >
                     {/* Type badge */}
                     <span
@@ -245,7 +245,7 @@ export function LiveFeedPanel() {
 
                     {/* Message + agent name */}
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] leading-tight text-neutral-200">{message}</p>
+                      <p className="text-[11px] leading-tight text-neutral-800 dark:text-neutral-200">{message}</p>
                       {event.agentName ? (
                         <p className="mt-0.5 truncate font-mono text-[9px] text-neutral-700">
                           {event.agentName}

@@ -44,11 +44,11 @@ const ACCENT_COLORS = [
 ]
 
 const MODEL_BADGE: Record<ModelPresetId, string> = {
-  auto:   'bg-neutral-800 text-neutral-400',
-  opus:   'bg-orange-950/70 text-orange-400',
-  sonnet: 'bg-blue-950/70 text-blue-400',
-  codex:  'bg-emerald-950/70 text-emerald-400',
-  flash:  'bg-violet-950/70 text-violet-400',
+  auto:   'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+  opus:   'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
+  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
+  codex:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
+  flash:  'bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-400',
 }
 
 const MODEL_LABEL: Record<ModelPresetId, string> = {
@@ -115,8 +115,8 @@ function AgentRow({
       onClick={onSelect}
       className={cn(
         'group relative flex cursor-pointer items-stretch overflow-hidden rounded-lg border transition-all',
-        'border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800/60',
-        isSelected && 'border-neutral-600 bg-neutral-800/80 ring-1 ring-neutral-500/30',
+        'border-neutral-200 bg-neutral-50 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900/60 dark:hover:bg-neutral-800/60',
+        isSelected && 'border-neutral-300 bg-neutral-100 ring-1 ring-neutral-400/30 dark:border-neutral-600 dark:bg-neutral-800/80 dark:ring-neutral-500/30',
       )}
     >
       {/* Left accent bar */}
@@ -149,7 +149,7 @@ function AgentRow({
           </span>
 
           {/* Name */}
-          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-neutral-100">
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-neutral-900 dark:text-neutral-100">
             {agent.name}
           </span>
 
@@ -192,7 +192,7 @@ function AgentRow({
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }}
                     aria-hidden
                   />
-                  <div className="absolute bottom-full right-0 z-20 mb-1 min-w-[110px] rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl">
+                  <div className="absolute bottom-full right-0 z-20 mb-1 min-w-[110px] rounded-lg border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onKill() }}
@@ -235,9 +235,9 @@ function AgentCompactCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        'relative w-40 shrink-0 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900/60 px-2.5 py-2 text-left transition-colors',
-        'hover:bg-neutral-800/60',
-        isSelected && 'border-neutral-600 ring-1 ring-neutral-500/30',
+        'relative w-40 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-2 text-left transition-colors dark:border-neutral-800 dark:bg-neutral-900/60',
+        'hover:bg-neutral-100 dark:hover:bg-neutral-800/60',
+        isSelected && 'border-neutral-300 ring-1 ring-neutral-400/30 dark:border-neutral-600 dark:ring-neutral-500/30',
       )}
     >
       {/* Top accent bar */}
@@ -258,7 +258,7 @@ function AgentCompactCard({
             )}
           />
         )}
-        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-neutral-100">
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-neutral-900 dark:text-neutral-100">
           {agent.name}
         </span>
         <span
@@ -294,14 +294,14 @@ export function AgentsWorkingPanel({
   return (
     <div
       className={cn(
-        'rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/60',
+        'rounded-xl border border-neutral-200 bg-white backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/60',
         className,
       )}
     >
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-400" style={{ fontVariant: 'small-caps' }}>
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400" style={{ fontVariant: 'small-caps' }}>
             Agents Working
           </h3>
           {activeCount > 0 ? (
