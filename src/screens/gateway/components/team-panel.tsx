@@ -55,6 +55,7 @@ type TeamPanelProps = {
   spawnState?: Record<string, 'idle' | 'spawning' | 'ready' | 'error'>
   agentSessionStatus?: Record<string, AgentSessionStatusEntry>
   agentSessionMap?: Record<string, string>
+  agentModelNotApplied?: Record<string, boolean>
   tasks?: HubTask[]
   onRetrySpawn?: (member: TeamMember) => void
   onKillSession?: (member: TeamMember) => void
@@ -111,6 +112,7 @@ export function TeamPanel({
   spawnState,
   agentSessionStatus,
   agentSessionMap,
+  agentModelNotApplied,
   tasks,
   onRetrySpawn,
   onKillSession,
@@ -262,6 +264,11 @@ export function TeamPanel({
                         {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
                       </span>
                     </div>
+                    {agentModelNotApplied?.[agent.id] ? (
+                      <p className="mt-0.5 text-[9px] text-neutral-400 dark:text-neutral-500">
+                        Gateway used default model
+                      </p>
+                    ) : null}
                   </div>
 
                   {/* Expand arrow */}

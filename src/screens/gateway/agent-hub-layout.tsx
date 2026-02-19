@@ -3,7 +3,8 @@ import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type Team
 import { TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
 import { AgentOutputPanel } from './components/agent-output-panel'
-import { emitFeedEvent } from './components/feed-event-bus'
+import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
+import { AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +26,21 @@ const TEMPLATE_MODEL_SUGGESTIONS: Record<TeamTemplateId, Array<ModelPresetId>> =
 }
 
 const MODEL_IDS = new Set<string>(MODEL_PRESETS.map((preset) => preset.id))
+
+// Maps ModelPresetId → real model string for gateway. Empty string = omit (use gateway default).
+const MODEL_PRESET_MAP: Record<string, string> = {
+  auto: '',
+  opus: 'anthropic/claude-opus-4-6',
+  sonnet: 'anthropic/claude-sonnet-4-6',
+  codex: 'openai/gpt-5.3-codex',
+  flash: 'google/gemini-2.5-flash',
+}
+
+type AgentActivityEntry = {
+  lastLine?: string
+  lastAt?: number
+  lastEventType?: 'tool' | 'assistant' | 'system'
+}
 
 // Example mission chips: label → textarea fill text
 const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
@@ -349,61 +365,7 @@ const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
   content: 'Content Pipeline',
 }
 
-function TeamActivityStrip({
-  team,
-  tasks,
-  selectedAgentId,
-  onSelectAgent,
-}: {
-  team: TeamMember[]
-  tasks: HubTask[]
-  selectedAgentId?: string
-  onSelectAgent?: (agentId: string) => void
-}) {
-  return (
-    <div className="flex items-center gap-4 overflow-x-auto border-b border-primary-100 bg-primary-50/50 px-5 py-2 dark:border-neutral-800 dark:bg-neutral-900/30">
-      {team.map((member) => {
-        const assignedTask = tasks.find(
-          (task) => task.agentId === member.id && task.status !== 'done',
-        )
-        const isActive = Boolean(assignedTask)
-        const isSelected = selectedAgentId === member.id
-
-        return (
-          <button
-            key={member.id}
-            type="button"
-            onClick={() => onSelectAgent?.(member.id)}
-            className={cn(
-              'flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors',
-              isSelected
-                ? 'bg-accent-100/80 dark:bg-accent-900/20'
-                : 'hover:bg-primary-100/80 dark:hover:bg-neutral-800/60',
-            )}
-          >
-            <span className="relative inline-flex size-2.5 shrink-0">
-              {isActive ? (
-                <span className="absolute inset-0 rounded-full bg-emerald-400/70 animate-ping" />
-              ) : null}
-              <span
-                className={cn(
-                  'relative inline-flex size-2.5 rounded-full',
-                  isActive ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-neutral-600',
-                )}
-              />
-            </span>
-            <span className="shrink-0 text-xs font-medium text-primary-700 dark:text-neutral-200">
-              {member.name}
-            </span>
-            <span className="max-w-[180px] truncate text-[10px] text-primary-500 dark:text-neutral-400">
-              {assignedTask ? `Working on: ${assignedTask.title}` : 'Idle'}
-            </span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
+// TeamActivityStrip replaced by AgentsWorkingPanel (handles both desktop and mobile)
 
 
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
@@ -437,6 +399,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [spawnState, setSpawnState] = useState<Record<string, 'idle' | 'spawning' | 'ready' | 'error'>>({})
   const [agentSessionStatus, setAgentSessionStatus] = useState<Record<string, AgentSessionStatusEntry>>({})
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('connected')
+  const [agentModelNotApplied, setAgentModelNotApplied] = useState<Record<string, boolean>>({})
+  const [agentActivity, setAgentActivity] = useState<Record<string, AgentActivityEntry>>({})
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const stored = readStoredTeam()
     if (stored.length > 0) return stored
@@ -449,10 +413,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const pendingTaskMovesRef = useRef<Array<{ taskIds: Array<string>; status: TaskStatus }>>([])
   const sessionActivityRef = useRef<Map<string, string>>(new Map())
   const dispatchingRef = useRef(false)
+  // SSE streams for active agents (capped at MAX_AGENT_STREAMS)
+  const agentStreamsRef = useRef<Map<string, EventSource>>(new Map())
+  const agentStreamLastAtRef = useRef<Map<string, number>>(new Map())
+  // Stable ref for team so feed-event callback always sees latest team
+  const teamRef = useRef(team)
   // Stable refs for keyboard shortcut handler
   const missionGoalRef = useRef(missionGoal)
   const handleCreateMissionRef = useRef<() => void>(() => {})
 
+  teamRef.current = team
   missionGoalRef.current = missionGoal
 
   // Derived: which agents have spawn errors
@@ -544,6 +514,136 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       void checkGateway()
     }, 15_000)
     return () => window.clearInterval(interval)
+  }, [])
+
+  // ── Feed event → agentActivity ─────────────────────────────────────────────
+  // Update last-line activity from feed events (agent_active, agent_spawned, etc.)
+  useEffect(() => {
+    const unsubscribe = onFeedEvent((event) => {
+      if (!event.agentName) return
+      const currentTeam = teamRef.current
+      const member = currentTeam.find((m) => m.name === event.agentName)
+      if (!member) return
+      if (
+        event.type === 'agent_active' ||
+        event.type === 'agent_spawned' ||
+        event.type === 'task_assigned'
+      ) {
+        setAgentActivity((prev) => ({
+          ...prev,
+          [member.id]: {
+            ...prev[member.id],
+            lastLine: event.message,
+            lastAt: event.timestamp,
+            lastEventType: 'system',
+          },
+        }))
+      }
+    })
+    return unsubscribe
+  }, []) // uses teamRef — stable
+
+  // ── SSE streams for active agents ─────────────────────────────────────────
+  // Open SSE streams for up to 3 simultaneously-active agents; close stale ones.
+  const MAX_AGENT_STREAMS = 3
+  useEffect(() => {
+    const streams = agentStreamsRef.current
+    const lastAtMap = agentStreamLastAtRef.current
+    const currentTeam = teamRef.current
+
+    // Determine which agents are active and have sessions (capped at MAX_AGENT_STREAMS)
+    const activeAgentIds = currentTeam
+      .filter((m) => {
+        const status = agentSessionStatus[m.id]
+        return status && status.status === 'active' && agentSessionMap[m.id]
+      })
+      .slice(0, MAX_AGENT_STREAMS)
+      .map((m) => m.id)
+
+    const activeSessionKeys = new Set(
+      activeAgentIds.map((id) => agentSessionMap[id]).filter(Boolean),
+    )
+
+    // Close streams for agents no longer active
+    for (const [sessionKey, source] of streams) {
+      if (!activeSessionKeys.has(sessionKey)) {
+        source.close()
+        streams.delete(sessionKey)
+        lastAtMap.delete(sessionKey)
+      }
+    }
+
+    // Open new streams for newly-active agents
+    for (const agentId of activeAgentIds) {
+      const sessionKey = agentSessionMap[agentId]
+      if (!sessionKey || streams.has(sessionKey)) continue
+      if (streams.size >= MAX_AGENT_STREAMS) break
+
+      const source = new EventSource(
+        `/api/chat-events?sessionKey=${encodeURIComponent(sessionKey)}`,
+      )
+      streams.set(sessionKey, source)
+      lastAtMap.set(sessionKey, Date.now())
+
+      const handleUpdate = (text: string, type: AgentActivityEntry['lastEventType']) => {
+        if (!text) return
+        lastAtMap.set(sessionKey, Date.now())
+        setAgentActivity((prev) => ({
+          ...prev,
+          [agentId]: {
+            lastLine: text,
+            lastAt: Date.now(),
+            lastEventType: type,
+          },
+        }))
+      }
+
+      source.addEventListener('chunk', (event) => {
+        if (!(event instanceof MessageEvent)) return
+        try {
+          const data = JSON.parse(event.data as string) as Record<string, unknown>
+          const text = String(data.text ?? data.content ?? data.chunk ?? '').trim()
+          handleUpdate(text, 'assistant')
+        } catch { /* ignore parse errors */ }
+      })
+
+      source.addEventListener('tool', (event) => {
+        if (!(event instanceof MessageEvent)) return
+        try {
+          const data = JSON.parse(event.data as string) as Record<string, unknown>
+          const name = String(data.name ?? 'tool')
+          handleUpdate(`${name}()`, 'tool')
+        } catch { /* ignore parse errors */ }
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentSessionStatus, agentSessionMap]) // intentionally omit teamRef (stable ref)
+
+  // Stale SSE stream pruner (30s inactivity → close) + unmount cleanup
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const streams = agentStreamsRef.current
+      const lastAtMap = agentStreamLastAtRef.current
+      const now = Date.now()
+      for (const [sessionKey, source] of streams) {
+        const lastAt = lastAtMap.get(sessionKey) ?? 0
+        if (now - lastAt > 30_000) {
+          source.close()
+          streams.delete(sessionKey)
+          lastAtMap.delete(sessionKey)
+        }
+      }
+    }, 10_000)
+
+    return () => {
+      window.clearInterval(interval)
+      // Close all streams on unmount
+      for (const source of agentStreamsRef.current.values()) {
+        source.close()
+      }
+      agentStreamsRef.current.clear()
+      agentStreamLastAtRef.current.clear()
+    }
   }, [])
 
   // Keyboard shortcuts (desktop only): Cmd/Ctrl+Enter → Start Mission; Escape → close panel / deselect
@@ -648,6 +748,64 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     ? teamById.get(selectedOutputAgentId)?.name ?? selectedOutputAgentId
     : ''
 
+  // Build AgentWorkingRow array for AgentsWorkingPanel
+  const agentWorkingRows = useMemo((): AgentWorkingRow[] => {
+    return teamWithRuntimeStatus.map((member) => {
+      const sessionStatus = agentSessionStatus[member.id]
+      const spawnStatus = spawnState[member.id]
+      const sessionKey = agentSessionMap[member.id]
+      const hasSession = Boolean(sessionKey)
+      const activity = agentActivity[member.id]
+
+      // Resolve working status
+      let status: AgentWorkingStatus
+      if (spawnStatus === 'spawning') {
+        status = 'spawning'
+      } else if (!hasSession) {
+        status = spawnStatus === 'error' ? 'error' : 'none'
+      } else if (!sessionStatus) {
+        status = 'ready'
+      } else if (sessionStatus.status === 'error') {
+        status = 'error'
+      } else if (sessionStatus.status === 'active') {
+        status = 'active'
+      } else {
+        status = 'idle'
+      }
+
+      const inProgressTask = boardTasks.find(
+        (t) => t.agentId === member.id && t.status === 'in_progress',
+      )
+
+      // Prefer SSE stream activity over session poll lastMessage
+      const lastLine = activity?.lastLine ?? sessionStatus?.lastMessage
+      const lastAt = activity?.lastAt ?? (sessionStatus?.lastSeen ?? undefined)
+
+      return {
+        id: member.id,
+        name: member.name,
+        modelId: member.modelId,
+        status,
+        lastLine,
+        lastAt,
+        taskCount: agentTaskCounts[member.id] ?? 0,
+        currentTask: inProgressTask?.title,
+        sessionKey,
+      }
+    })
+  }, [
+    teamWithRuntimeStatus,
+    agentSessionStatus,
+    spawnState,
+    agentSessionMap,
+    agentActivity,
+    boardTasks,
+    agentTaskCounts,
+  ])
+
+  const showAgentsWorking =
+    missionActive || Object.keys(agentSessionMap).length > 0
+
   const moveTasksToStatus = useCallback((taskIds: Array<string>, status: TaskStatus) => {
     if (taskIds.length === 0) return
     const uniqueTaskIds = Array.from(new Set(taskIds))
@@ -689,10 +847,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const friendlyId = `hub-${baseName}-${suffix}`
     const label = `Mission: ${member.name}`
 
+    const modelString = MODEL_PRESET_MAP[member.modelId] ?? ''
+    const requestBody: Record<string, string> = { friendlyId, label }
+    if (modelString) requestBody.model = modelString
+
     const response = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ friendlyId, label }),
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {
@@ -705,6 +867,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const data = (await response.json()) as Record<string, unknown>
     const sessionKey = readString(data.sessionKey)
     if (!sessionKey) throw new Error('No sessionKey in spawn response')
+
+    // Track whether the gateway actually applied the requested model
+    const modelApplied = data.modelApplied !== false
+    if (modelString && !modelApplied) {
+      setAgentModelNotApplied((prev) => ({ ...prev, [member.id]: true }))
+    } else {
+      setAgentModelNotApplied((prev) => {
+        if (!prev[member.id]) return prev
+        const next = { ...prev }
+        delete next[member.id]
+        return next
+      })
+    }
+
     return sessionKey
   }, [])
 
@@ -752,6 +928,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     })
     setSpawnState((prev) => ({ ...prev, [member.id]: 'idle' }))
     setAgentSessionStatus((prev) => {
+      const next = { ...prev }
+      delete next[member.id]
+      return next
+    })
+    setAgentModelNotApplied((prev) => {
+      if (!prev[member.id]) return prev
+      const next = { ...prev }
+      delete next[member.id]
+      return next
+    })
+    setAgentActivity((prev) => {
+      if (!prev[member.id]) return prev
       const next = { ...prev }
       delete next[member.id]
       return next
@@ -1173,6 +1361,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             spawnState={spawnState}
             agentSessionStatus={agentSessionStatus}
             agentSessionMap={agentSessionMap}
+            agentModelNotApplied={agentModelNotApplied}
             tasks={boardTasks}
             onRetrySpawn={handleRetrySpawn}
             onKillSession={handleKillSession}
@@ -1322,12 +1511,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   {missionBadge.label}
                 </span>
               </div>
-              {missionActive ? (
-                <TeamActivityStrip
-                  team={teamWithRuntimeStatus}
-                  tasks={boardTasks}
+              {showAgentsWorking ? (
+                <AgentsWorkingPanel
+                  agents={agentWorkingRows}
+                  className="mx-3 mt-2 mb-1"
                   selectedAgentId={selectedOutputAgentId}
                   onSelectAgent={handleAgentSelection}
+                  onKillAgent={(agentId) => {
+                    const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
+                    if (member) void handleKillSession(member)
+                  }}
+                  onRespawnAgent={(agentId) => {
+                    const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
+                    if (member) void handleRetrySpawn(member)
+                  }}
                 />
               ) : null}
               <div className="min-h-0 flex-1">

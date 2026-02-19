@@ -103,13 +103,36 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
           const friendlyId = requestedFriendlyId || randomUUID()
 
-          const params: Record<string, unknown> = { key: friendlyId }
-          if (label) params.label = label
+          const requestedModel =
+            typeof body.model === 'string' ? body.model.trim() : ''
+          const model = requestedModel || undefined
 
-          const payload = await gatewayRpc<SessionsPatchResponse>(
-            'sessions.patch',
-            params,
-          )
+          const baseParams: Record<string, unknown> = { key: friendlyId }
+          if (label) baseParams.label = label
+
+          let payload: SessionsPatchResponse
+          let modelApplied = Boolean(model)
+
+          if (model) {
+            // Try with model first; if gateway rejects it, retry without (backwards compat)
+            try {
+              payload = await gatewayRpc<SessionsPatchResponse>('sessions.patch', {
+                ...baseParams,
+                model,
+              })
+            } catch {
+              modelApplied = false
+              payload = await gatewayRpc<SessionsPatchResponse>(
+                'sessions.patch',
+                baseParams,
+              )
+            }
+          } else {
+            payload = await gatewayRpc<SessionsPatchResponse>(
+              'sessions.patch',
+              baseParams,
+            )
+          }
 
           const sessionKeyRaw = payload.key
           const sessionKey =
@@ -132,6 +155,7 @@ export const Route = createFileRoute('/api/sessions')({
             sessionKey,
             friendlyId,
             entry: payload.entry,
+            modelApplied,
           })
         } catch (err) {
           return json(
