@@ -4,7 +4,8 @@ import { TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './c
 import { LiveFeedPanel } from './components/live-feed-panel'
 import { AgentOutputPanel } from './components/agent-output-panel'
 import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
-import { AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
+import { type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
+import { LiveActivityPanel } from './components/live-activity-panel'
 import { ApprovalsPanel } from './components/approvals-panel'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -2160,9 +2161,62 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   const isMissionRunning = missionActive && missionState === 'running'
 
+  // ── tasksByAgentId: map agentId → tasks dispatched to that agent ──────────
+  const tasksByAgentId = useMemo((): Record<string, Array<import('./components/task-board').HubTask>> => {
+    const result: Record<string, Array<import('./components/task-board').HubTask>> = {}
+    const taskSource = boardTasks.length > 0 ? boardTasks : missionTasks
+    for (const [agentId, taskIds] of Object.entries(dispatchedTaskIdsByAgent)) {
+      const idSet = new Set(taskIds)
+      result[agentId] = taskSource.filter((t) => idSet.has(t.id))
+    }
+    return result
+  }, [boardTasks, missionTasks, dispatchedTaskIdsByAgent])
+
+  // ── Stop mission helper ───────────────────────────────────────────────────
+  function handleStopMission() {
+    const currentCp = loadMissionCheckpoint()
+    if (currentCp) {
+      archiveMissionToHistory({ ...currentCp, status: 'aborted' })
+      clearMissionCheckpoint()
+    }
+    Object.values(agentSessionMap).forEach((sessionKey) => {
+      fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
+        method: 'DELETE',
+      }).catch(() => {})
+    })
+    setAgentSessionMap({})
+    setSpawnState({})
+    setAgentSessionStatus({})
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('clawsuite:hub-agent-sessions')
+    }
+    setMissionState('stopped')
+    setMissionActive(false)
+    setShowNewMission(false)
+    setActiveMissionGoal('')
+    setMissionTasks([])
+    setDispatchedTaskIdsByAgent({})
+    setSelectedOutputAgentId(undefined)
+    dispatchingRef.current = false
+    pendingTaskMovesRef.current = []
+    sessionActivityRef.current = new Map()
+    taskBoardRef.current = null
+    missionIdRef.current = ''
+  }
+
   // ── Mission tab content ────────────────────────────────────────────────────
   function renderMissionContent() {
     const showRestoreBanner = restoreCheckpoint && !restoreDismissed && !missionActive
+
+    // Compute progress metrics for the command header
+    const totalTasks = boardTasks.length
+    const doneTasks = boardTasks.filter((t) => t.status === 'done').length
+    const reviewTasks = boardTasks.filter((t) => t.status === 'review').length
+    const inProgressTasks = boardTasks.filter((t) => t.status === 'in_progress').length
+    const percentComplete = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
+    const donePercent = totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0
+    const reviewPercent = totalTasks > 0 ? (reviewTasks / totalTasks) * 100 : 0
+    const inProgressPercent = totalTasks > 0 ? (inProgressTasks / totalTasks) * 100 : 0
 
     return (
       <div className="flex min-h-0 flex-1 flex-col">
@@ -2183,7 +2237,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <button
               type="button"
               onClick={() => {
-                // Restore: pre-fill goal from label and re-populate team/tasks
                 setMissionGoal(restoreCheckpoint.label)
                 setProcessType(restoreCheckpoint.processType)
                 setRestoreDismissed(true)
@@ -2206,229 +2259,303 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </button>
           </div>
         ) : null}
-        {/* Agents Working Panel */}
-        {team.length > 0 ? (
-          <AgentsWorkingPanel
-            agents={agentWorkingRows}
-            className="mx-3 mt-2 mb-1"
-            selectedAgentId={selectedOutputAgentId}
-            onSelectAgent={handleAgentSelection}
-            onKillAgent={(agentId: string) => {
-              const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
-              if (member) void handleKillSession(member)
-            }}
-            onRespawnAgent={(agentId: string) => {
-              const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
-              if (member) void handleRetrySpawn(member)
-            }}
-          />
+
+        {/* ── A) Command Header — visible when mission is active ── */}
+        {missionActive ? (
+          <div className="sticky top-0 z-30 shrink-0 border-b border-neutral-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-neutral-950/70">
+            {/* Primary row: goal title + status + progress bar + controls */}
+            <div className="flex items-center gap-3 px-4 py-2.5">
+              {/* Left: title + status pill + % */}
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                  {truncateMissionGoal(activeMissionGoal || missionGoal.trim(), 70)}
+                </p>
+                <span
+                  className={cn(
+                    'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                    missionBadge.className,
+                  )}
+                >
+                  {missionBadge.label}
+                </span>
+                {totalTasks > 0 ? (
+                  <span className="shrink-0 font-mono text-[10px] text-neutral-500 dark:text-neutral-400">
+                    {percentComplete}%
+                  </span>
+                ) : null}
+              </div>
+
+              {/* Center: progress bar */}
+              {totalTasks > 0 ? (
+                <div className="hidden h-1.5 w-36 shrink-0 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800 md:flex">
+                  <div className="h-full bg-emerald-500 transition-all" style={{ width: `${donePercent}%` }} />
+                  <div className="h-full bg-amber-400 transition-all" style={{ width: `${reviewPercent}%` }} />
+                  <div className="h-full bg-blue-400 transition-all" style={{ width: `${inProgressPercent}%` }} />
+                </div>
+              ) : null}
+
+              {/* Right: mission controls */}
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setMissionState('running')}
+                  className={cn(
+                    'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                    missionState === 'running'
+                      ? 'bg-emerald-500 text-white shadow-sm'
+                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40',
+                  )}
+                >
+                  ▶ Start
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMissionState('paused')}
+                  className={cn(
+                    'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                    missionState === 'paused'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40',
+                  )}
+                >
+                  ⏸ Pause
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStopMission}
+                  className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-200 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/40"
+                >
+                  ■ Stop
+                </button>
+              </div>
+            </div>
+
+            {/* Secondary row: budget + auto-assign + view toggle */}
+            <div className="flex items-center gap-4 border-t border-neutral-100 px-4 py-1.5 dark:border-white/5">
+              <label className="flex items-center gap-1.5">
+                <span className="text-[10px] text-neutral-500 dark:text-neutral-500">Budget</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={budgetLimit}
+                  onChange={(e) => setBudgetLimit(e.target.value)}
+                  className="w-24 rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[10px] text-neutral-700 outline-none focus:ring-1 focus:ring-accent-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+                />
+                <span className="text-[10px] text-neutral-400 dark:text-neutral-600">tokens</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setAutoAssign((p) => !p)}
+                className="flex items-center gap-1.5 text-[10px] transition-colors hover:text-neutral-700 dark:hover:text-neutral-300"
+              >
+                <span className="text-neutral-500 dark:text-neutral-500">Auto-assign</span>
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                    autoAssign
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                      : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
+                  )}
+                >
+                  {autoAssign ? 'On' : 'Off'}
+                </span>
+              </button>
+
+              {/* View toggle */}
+              <div className="ml-auto flex items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-neutral-700 dark:bg-neutral-900">
+                {(['board', 'timeline'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setView(v)}
+                    className={cn(
+                      'rounded-md px-2 py-0.5 text-[10px] font-medium capitalize transition-colors',
+                      view === v
+                        ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-100'
+                        : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300',
+                    )}
+                  >
+                    {v === 'board' ? 'Board' : 'Timeline'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : null}
 
-        {/* Mission board area + optional inline agent output */}
-        <div className="flex min-h-0 flex-1">
-          {/* Board / Create Mission */}
-          <div className="min-w-0 flex-1 overflow-hidden">
-            {!missionActive ? (
-              showNewMission ? (
-                <div className="flex min-h-0 flex-1 items-center justify-center px-8 py-6 h-full">
-                  <div className="w-full max-w-2xl rounded-2xl border border-primary-200 bg-white/80 px-8 py-6 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/70">
-                    <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-xs text-primary-400">
-                      <span className="rounded-full bg-primary-100 px-2 py-0.5">
-                        1. Choose a team template
-                      </span>
-                      <span className="text-primary-300">→</span>
-                      <span className="rounded-full bg-primary-100 px-2 py-0.5">
-                        2. Describe your mission
-                      </span>
-                      <span className="text-primary-300">→</span>
-                      <span className="rounded-full bg-primary-100 px-2 py-0.5">3. Launch</span>
-                    </div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-500">
-                      No Active Mission
-                    </p>
-                    <h2 className="mt-2 text-2xl font-semibold text-primary-900 dark:text-neutral-100">
-                      + Create Mission
-                    </h2>
-                    <p className="mt-2 text-sm text-primary-500">
-                      Describe your goal and we&apos;ll suggest an agent team.
-                    </p>
+        {/* ── B) Main workspace ────────────────────────────────────────────── */}
+        {!missionActive ? (
+          showNewMission ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center px-8 py-6">
+              <div className="w-full max-w-2xl rounded-2xl border border-primary-200 bg-white/80 px-8 py-6 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/70">
+                <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-xs text-primary-400">
+                  <span className="rounded-full bg-primary-100 px-2 py-0.5">1. Choose a team template</span>
+                  <span className="text-primary-300">→</span>
+                  <span className="rounded-full bg-primary-100 px-2 py-0.5">2. Describe your mission</span>
+                  <span className="text-primary-300">→</span>
+                  <span className="rounded-full bg-primary-100 px-2 py-0.5">3. Launch</span>
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-500">
+                  No Active Mission
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-primary-900 dark:text-neutral-100">
+                  + Create Mission
+                </h2>
+                <p className="mt-2 text-sm text-primary-500">
+                  Describe your goal and we&apos;ll suggest an agent team.
+                </p>
 
-                    <div className="mt-5 space-y-3">
-                      <textarea
-                        value={missionGoal}
-                        onChange={(event) => setMissionGoal(event.target.value)}
-                        rows={4}
-                        placeholder="Example: Ship a release plan and implementation tasks for authentication hardening"
-                        className="w-full resize-none rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-                      />
+                <div className="mt-5 space-y-3">
+                  <textarea
+                    value={missionGoal}
+                    onChange={(event) => setMissionGoal(event.target.value)}
+                    rows={4}
+                    placeholder="Example: Ship a release plan and implementation tasks for authentication hardening"
+                    className="w-full resize-none rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                  />
 
-                      {/* Example chips */}
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        {EXAMPLE_MISSIONS.map((example) => (
-                          <button
-                            key={example.label}
-                            type="button"
-                            onClick={() => setMissionGoal(example.text)}
-                            className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:border-accent-400 hover:bg-accent-50 hover:text-accent-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:bg-accent-950/20 dark:hover:text-accent-300"
-                          >
-                            {example.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Live template preview */}
-                      {suggestedTemplateName ? (
-                        <p className="text-[11px] text-primary-400 dark:text-neutral-500">
-                          Will use:{' '}
-                          <span className="font-semibold text-accent-600 dark:text-accent-400">
-                            {suggestedTemplateName}
-                          </span>
-                        </p>
-                      ) : null}
-
-                      {/* Process Type selector */}
-                      <div className="space-y-1.5">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary-500">
-                          Process Type
-                        </p>
-                        <div className="flex items-center justify-center gap-1.5">
-                          {(
-                            [
-                              { id: 'sequential', label: 'Sequential', tip: 'A → B → C, tasks flow one at a time' },
-                              { id: 'hierarchical', label: 'Hierarchical', tip: 'Lead agent coordinates workers' },
-                              { id: 'parallel', label: 'Parallel', tip: 'All agents work simultaneously' },
-                            ] as const
-                          ).map((option) => (
-                            <button
-                              key={option.id}
-                              type="button"
-                              title={option.tip}
-                              onClick={() => setProcessType(option.id)}
-                              className={cn(
-                                'rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors',
-                                processType === option.id
-                                  ? 'border-accent-400 bg-accent-50 text-accent-700 dark:border-accent-600 dark:bg-accent-950/30 dark:text-accent-300'
-                                  : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-600',
-                              )}
-                            >
-                              {processType === option.id ? '● ' : '○ '}{option.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleAutoConfigure}
-                          disabled={!missionGoal.trim()}
-                          className="rounded-lg border border-accent-400 px-4 py-2 text-xs font-medium text-accent-600 transition-colors hover:bg-accent-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          ✨ Auto-configure
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleCreateMission}
-                          disabled={!missionGoal.trim()}
-                          title="Start Mission (Cmd+Enter)"
-                          className="rounded-lg bg-accent-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Start Mission
-                        </button>
-                      </div>
-                    </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {EXAMPLE_MISSIONS.map((example) => (
+                      <button
+                        key={example.label}
+                        type="button"
+                        onClick={() => setMissionGoal(example.text)}
+                        className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:border-accent-400 hover:bg-accent-50 hover:text-accent-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:bg-accent-950/20 dark:hover:text-accent-300"
+                      >
+                        {example.label}
+                      </button>
+                    ))}
                   </div>
-                </div>
-              ) : (
-                <div className="flex min-h-0 h-full flex-1 items-center justify-center px-6">
-                  <div className="rounded-xl border border-primary-200 bg-white/80 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/70">
-                    <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                      Mission stopped
-                    </h2>
-                    <p className="mt-1 text-xs text-primary-500">
-                      Launch a new mission to resume orchestration.
+
+                  {suggestedTemplateName ? (
+                    <p className="text-[11px] text-primary-400 dark:text-neutral-500">
+                      Will use:{' '}
+                      <span className="font-semibold text-accent-600 dark:text-accent-400">
+                        {suggestedTemplateName}
+                      </span>
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowNewMission(true)}
-                      className="mt-3 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600"
-                    >
-                      Create another mission
-                    </button>
-                  </div>
-                </div>
-              )
-            ) : view === 'timeline' ? (
-              <div className="flex min-h-0 h-full flex-1 items-center justify-center px-6">
-                <div className="rounded-xl border border-dashed border-primary-300 bg-white/60 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
-                  <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                    Timeline view coming soon
-                  </h3>
-                  <p className="mt-1 text-xs text-primary-500">
-                    Switch back to Board for active mission orchestration.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex min-h-0 flex-1 flex-col h-full">
-                <div className="flex items-center justify-between border-b border-emerald-200 bg-emerald-50/40 px-4 py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/15">
-                  <p className="truncate text-xs font-medium text-emerald-800 dark:text-emerald-200">
-                    Mission: {truncateMissionGoal(activeMissionGoal || missionGoal.trim())}
-                  </p>
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
-                    {/* Board/Timeline toggle — use string cast to avoid TS narrowing in else branch */}
-                    <div className="flex items-center rounded-lg border border-primary-200 bg-white p-0.5 dark:border-neutral-700 dark:bg-neutral-900">
-                      {(['board', 'timeline'] as const).map((v) => (
+                  ) : null}
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary-500">
+                      Process Type
+                    </p>
+                    <div className="flex items-center justify-center gap-1.5">
+                      {(
+                        [
+                          { id: 'sequential', label: 'Sequential', tip: 'A → B → C, tasks flow one at a time' },
+                          { id: 'hierarchical', label: 'Hierarchical', tip: 'Lead agent coordinates workers' },
+                          { id: 'parallel', label: 'Parallel', tip: 'All agents work simultaneously' },
+                        ] as const
+                      ).map((option) => (
                         <button
-                          key={v}
+                          key={option.id}
                           type="button"
+                          title={option.tip}
+                          onClick={() => setProcessType(option.id)}
                           className={cn(
-                            'rounded-md px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
-                            (view as string) === v
-                              ? 'bg-primary-100 text-primary-800 dark:bg-neutral-800 dark:text-neutral-100'
-                              : 'text-primary-500 hover:text-primary-700',
+                            'rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors',
+                            processType === option.id
+                              ? 'border-accent-400 bg-accent-50 text-accent-700 dark:border-accent-600 dark:bg-accent-950/30 dark:text-accent-300'
+                              : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-600',
                           )}
-                          onClick={() => setView(v)}
                         >
-                          {v.charAt(0).toUpperCase() + v.slice(1)}
+                          {processType === option.id ? '● ' : '○ '}{option.label}
                         </button>
                       ))}
                     </div>
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                        missionBadge.className,
-                      )}
+                  </div>
+
+                  <div className="flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAutoConfigure}
+                      disabled={!missionGoal.trim()}
+                      className="rounded-lg border border-accent-400 px-4 py-2 text-xs font-medium text-accent-600 transition-colors hover:bg-accent-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {missionBadge.label}
-                    </span>
+                      ✨ Auto-configure
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateMission}
+                      disabled={!missionGoal.trim()}
+                      title="Start Mission (Cmd+Enter)"
+                      className="rounded-lg bg-accent-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Start Mission
+                    </button>
                   </div>
                 </div>
-                <div className="min-h-0 flex-1">
-                  <TaskBoard
-                    agents={boardAgents}
-                    initialTasks={missionTasks}
-                    selectedAgentId={selectedAgentId}
-                    onRef={handleTaskBoardRef}
-                    onTasksChange={setBoardTasks}
-                  />
-                </div>
               </div>
-            )}
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+              <div className="rounded-xl border border-primary-200 bg-white/80 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/70">
+                <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">Mission stopped</h2>
+                <p className="mt-1 text-xs text-primary-500">
+                  Launch a new mission to resume orchestration.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowNewMission(true)}
+                  className="mt-3 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600"
+                >
+                  Create another mission
+                </button>
+              </div>
+            </div>
+          )
+        ) : view === 'timeline' ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+            <div className="rounded-xl border border-dashed border-primary-300 bg-white/60 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
+              <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                Timeline view coming soon
+              </h3>
+              <p className="mt-1 text-xs text-primary-500">
+                Switch back to Board for active mission orchestration.
+              </p>
+            </div>
           </div>
-
-          {/* Inline agent output panel (desktop, right of task board) */}
-          {!isMobileHub && missionActive && selectedOutputAgentId ? (
-            <div className="w-72 shrink-0 border-l border-primary-200 dark:border-neutral-700">
-              <AgentOutputPanel
-                agentName={selectedOutputAgentName}
-                sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
-                tasks={selectedOutputTasks}
-                onClose={() => setSelectedOutputAgentId(undefined)}
+        ) : (
+          /* ── 2-column workspace: TaskBoard + LiveActivityPanel ── */
+          <div className="flex min-h-0 flex-1">
+            {/* Left: Task Board */}
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <TaskBoard
+                agents={boardAgents}
+                initialTasks={missionTasks}
+                selectedAgentId={selectedAgentId}
+                onRef={handleTaskBoardRef}
+                onTasksChange={setBoardTasks}
+                activeMissionId={missionIdRef.current || undefined}
               />
             </div>
-          ) : null}
-        </div>
+
+            {/* Right: Live Activity Panel (desktop only) */}
+            {!isMobileHub ? (
+              <div className="w-[380px] shrink-0">
+                <LiveActivityPanel
+                  agents={agentWorkingRows}
+                  selectedAgentId={selectedOutputAgentId}
+                  sessionKeyByAgentId={agentSessionMap}
+                  tasksByAgentId={tasksByAgentId}
+                  onViewAgent={handleAgentSelection}
+                  onKillAgent={(agentId: string) => {
+                    const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
+                    if (member) void handleKillSession(member)
+                  }}
+                  onRespawnAgent={(agentId: string) => {
+                    const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
+                    if (member) void handleRetrySpawn(member)
+                  }}
+                  onCloseOutput={() => setSelectedOutputAgentId(undefined)}
+                  missionRunning={isMissionRunning}
+                />
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     )
   }
@@ -2590,119 +2717,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           ) : null}
         </div>
 
-        {/* ── Collapsible Live Feed + Mission Controls sidebar ── */}
+        {/* ── Collapsible Live Feed sidebar ── */}
         {liveFeedVisible ? (
           <div className="flex w-72 shrink-0 flex-col border-l border-primary-200 bg-primary-50/30 dark:border-neutral-700 dark:bg-neutral-900/20">
             <div className="min-h-0 flex-1 overflow-hidden">
               <LiveFeedPanel />
-            </div>
-
-            {/* Mission controls (bottom of sidebar) */}
-            <div className="border-t border-primary-200 px-4 py-3">
-              {missionActive ? (
-                <>
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-500">
-                    Mission Controls
-                  </h3>
-                  <div className="mt-2 grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setMissionState('running')}
-                      className={cn(
-                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
-                        missionState === 'running'
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
-                      )}
-                    >
-                      Start
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMissionState('paused')}
-                      className={cn(
-                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
-                        missionState === 'paused'
-                          ? 'bg-amber-500 text-white'
-                          : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
-                      )}
-                    >
-                      Pause
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Archive mission checkpoint before stopping
-                        const currentCp = loadMissionCheckpoint()
-                        if (currentCp) {
-                          archiveMissionToHistory({ ...currentCp, status: 'aborted' })
-                          clearMissionCheckpoint()
-                        }
-                        // Best-effort cleanup of per-agent sessions
-                        Object.values(agentSessionMap).forEach((sessionKey) => {
-                          fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
-                            method: 'DELETE',
-                          }).catch(() => {})
-                        })
-                        setAgentSessionMap({})
-                        setSpawnState({})
-                        setAgentSessionStatus({})
-                        if (typeof window !== 'undefined') {
-                          window.localStorage.removeItem('clawsuite:hub-agent-sessions')
-                        }
-                        setMissionState('stopped')
-                        setMissionActive(false)
-                        setShowNewMission(false)
-                        setActiveMissionGoal('')
-                        setMissionTasks([])
-                        setDispatchedTaskIdsByAgent({})
-                        setSelectedOutputAgentId(undefined)
-                        dispatchingRef.current = false
-                        pendingTaskMovesRef.current = []
-                        sessionActivityRef.current = new Map()
-                        taskBoardRef.current = null
-                        missionIdRef.current = ''
-                      }}
-                      className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
-                    >
-                      Stop
-                    </button>
-                  </div>
-
-                  <label className="mt-3 block">
-                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                      Budget Limit (max tokens)
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={budgetLimit}
-                      onChange={(event) => setBudgetLimit(event.target.value)}
-                      className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setAutoAssign((current) => !current)}
-                    className="mt-2 flex w-full items-center justify-between rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
-                  >
-                    <span>Auto-assign tasks</span>
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                        autoAssign
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                          : 'bg-primary-100 text-primary-600 dark:bg-neutral-700 dark:text-neutral-300',
-                      )}
-                    >
-                      {autoAssign ? 'On' : 'Off'}
-                    </span>
-                  </button>
-                </>
-              ) : (
-                <p className="text-xs text-primary-400">Start a mission to see controls here</p>
-              )}
             </div>
           </div>
         ) : null}
