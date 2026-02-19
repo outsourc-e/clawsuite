@@ -5,8 +5,23 @@ import { LiveFeedPanel } from './components/live-feed-panel'
 import { AgentOutputPanel } from './components/agent-output-panel'
 import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
+import { ApprovalsPanel } from './components/approvals-panel'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import {
+  saveMissionCheckpoint,
+  loadMissionCheckpoint,
+  clearMissionCheckpoint,
+  archiveMissionToHistory,
+  loadMissionHistory,
+  type MissionCheckpoint,
+} from './lib/mission-checkpoint'
+import {
+  loadApprovals,
+  saveApprovals,
+  addApproval,
+  type ApprovalRequest,
+} from './lib/approvals-store'
 
 type AgentHubLayoutProps = {
   agents: Array<{
@@ -60,13 +75,14 @@ const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
 
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 
-type ActiveTab = 'office' | 'mission' | 'history' | 'team'
+type ActiveTab = 'office' | 'mission' | 'history' | 'team' | 'approvals'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'office', icon: '🏢', label: 'Office' },
   { id: 'mission', icon: '🚀', label: 'Mission' },
   { id: 'history', icon: '📋', label: 'History' },
   { id: 'team', icon: '👥', label: 'Team' },
+  { id: 'approvals', icon: '✅', label: 'Approvals' },
 ]
 
 function GatewayConnectionBanner({
@@ -533,6 +549,7 @@ function HistoryView() {
   const [sessions, setSessions] = useState<SessionRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [localHistory] = useState<MissionCheckpoint[]>(() => loadMissionHistory())
 
   useEffect(() => {
     let cancelled = false
@@ -567,7 +584,10 @@ function HistoryView() {
     }
   }, [])
 
-  if (loading) {
+  const hasLocalHistory = localHistory.length > 0
+  const hasApiSessions = sessions.length > 0
+
+  if (loading && !hasLocalHistory) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
@@ -578,7 +598,7 @@ function HistoryView() {
     )
   }
 
-  if (sessions.length === 0) {
+  if (!hasLocalHistory && !hasApiSessions) {
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
@@ -590,94 +610,174 @@ function HistoryView() {
     )
   }
 
+  const PROCESS_TYPE_BADGE: Record<string, string> = {
+    sequential: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    hierarchical: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    parallel: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  }
+
+  const CHECKPOINT_STATUS_BADGE: Record<string, { label: string; className: string }> = {
+    running: { label: 'Running', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
+    paused: { label: 'Paused', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+    completed: { label: 'Completed', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+    aborted: { label: 'Aborted', className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+  }
+
   return (
     <div className="h-full space-y-3 overflow-y-auto p-4">
       <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-primary-400">Mission History</h2>
-      {sessions.map((session) => {
-        const sessionId = readSessionId(session)
-        const label = readString(session.label)
-        const status = readString(session.status)
-        const lastMessage = readSessionLastMessage(session)
-        const updatedAtRaw = session.updatedAt
-        const updatedAt =
-          typeof updatedAtRaw === 'number'
-            ? updatedAtRaw
-            : typeof updatedAtRaw === 'string'
-              ? Date.parse(updatedAtRaw)
-              : 0
-        const isExpanded = expandedId === sessionId
-        const tokenCount = typeof session.tokenCount === 'number' ? session.tokenCount : undefined
 
-        const statusBadge =
-          status === 'active'
-            ? { label: 'Active', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' }
-            : status === 'idle'
-              ? { label: 'Idle', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
-              : { label: 'Ended', className: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400' }
+      {/* Local checkpoint history */}
+      {hasLocalHistory ? (
+        <div className="space-y-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-primary-400">📦 Local Checkpoints</p>
+          {localHistory.map((cp) => {
+            const completedTasks = cp.tasks.filter(t => t.status === 'done' || t.status === 'completed').length
+            const totalTasks = cp.tasks.length
+            const statusBadge = CHECKPOINT_STATUS_BADGE[cp.status] ?? CHECKPOINT_STATUS_BADGE['completed']!
+            const processClass = PROCESS_TYPE_BADGE[cp.processType] ?? ''
+            const timeRef = cp.completedAt ?? cp.updatedAt
 
-        return (
-          <div
-            key={sessionId || label}
-            className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
+            return (
+              <div
+                key={cp.id}
+                className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+              >
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                   <h3 className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                    {label}
+                    {cp.label}
                   </h3>
-                  <span
-                    className={cn(
-                      'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                      statusBadge.className,
-                    )}
-                  >
-                    {statusBadge.label}
+                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold', statusBadge!.className)}>
+                    {statusBadge!.label}
+                  </span>
+                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize', processClass)}>
+                    {cp.processType}
                   </span>
                 </div>
-                {lastMessage ? (
-                  <p className="mt-1 line-clamp-2 text-[11px] text-primary-500 dark:text-neutral-400">
-                    {lastMessage}
-                  </p>
+
+                {/* Team avatars */}
+                {cp.team.length > 0 ? (
+                  <div className="mb-2 flex flex-wrap items-center gap-1">
+                    {cp.team.slice(0, 5).map((member) => (
+                      <span
+                        key={member.id}
+                        title={member.name}
+                        className="flex size-6 items-center justify-center rounded-full bg-primary-100 text-[10px] font-semibold text-primary-700 dark:bg-neutral-800 dark:text-neutral-300"
+                      >
+                        {member.name.slice(0, 2).toUpperCase()}
+                      </span>
+                    ))}
+                    {cp.team.length > 5 ? (
+                      <span className="text-[10px] text-primary-400">+{cp.team.length - 5}</span>
+                    ) : null}
+                  </div>
                 ) : null}
-                <div className="mt-1.5 flex items-center gap-3 text-[10px] text-primary-400">
-                  {updatedAt > 0 ? <span>{timeAgoFromMs(updatedAt)}</span> : null}
-                  {tokenCount !== undefined ? (
-                    <span>{tokenCount.toLocaleString()} tokens</span>
+
+                <div className="flex items-center gap-3 text-[10px] text-primary-400">
+                  {totalTasks > 0 ? (
+                    <span>{completedTasks}/{totalTasks} tasks</span>
                   ) : null}
+                  {timeRef > 0 ? <span>{timeAgoFromMs(timeRef)}</span> : null}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setExpandedId(isExpanded ? null : sessionId)}
-                className="shrink-0 rounded-lg border border-primary-200 px-2.5 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-              >
-                {isExpanded ? 'Hide' : 'View'}
-              </button>
-            </div>
+            )
+          })}
+        </div>
+      ) : null}
 
-            {isExpanded ? (
-              <div className="mt-3 rounded-lg border border-primary-100 bg-primary-50/50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-400">
-                  Session Details
-                </p>
-                <dl className="space-y-1 text-[11px]">
-                  <div className="flex gap-2">
-                    <dt className="shrink-0 text-primary-400">ID</dt>
-                    <dd className="truncate font-mono text-primary-700 dark:text-neutral-300">{sessionId}</dd>
-                  </div>
-                  {lastMessage ? (
-                    <div className="flex gap-2">
-                      <dt className="shrink-0 text-primary-400">Last output</dt>
-                      <dd className="line-clamp-4 text-primary-700 dark:text-neutral-300">{lastMessage}</dd>
+      {/* API sessions history */}
+      {hasApiSessions ? (
+        <div className="space-y-3">
+          {hasLocalHistory ? (
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-primary-400">🌐 Gateway Sessions</p>
+          ) : null}
+          {sessions.map((session) => {
+            const sessionId = readSessionId(session)
+            const label = readString(session.label)
+            const status = readString(session.status)
+            const lastMessage = readSessionLastMessage(session)
+            const updatedAtRaw = session.updatedAt
+            const updatedAt =
+              typeof updatedAtRaw === 'number'
+                ? updatedAtRaw
+                : typeof updatedAtRaw === 'string'
+                  ? Date.parse(updatedAtRaw)
+                  : 0
+            const isExpanded = expandedId === sessionId
+            const tokenCount = typeof session.tokenCount === 'number' ? session.tokenCount : undefined
+
+            const statusBadge =
+              status === 'active'
+                ? { label: 'Active', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' }
+                : status === 'idle'
+                  ? { label: 'Idle', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
+                  : { label: 'Ended', className: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400' }
+
+            return (
+              <div
+                key={sessionId || label}
+                className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                        {label}
+                      </h3>
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          statusBadge.className,
+                        )}
+                      >
+                        {statusBadge.label}
+                      </span>
                     </div>
-                  ) : null}
-                </dl>
+                    {lastMessage ? (
+                      <p className="mt-1 line-clamp-2 text-[11px] text-primary-500 dark:text-neutral-400">
+                        {lastMessage}
+                      </p>
+                    ) : null}
+                    <div className="mt-1.5 flex items-center gap-3 text-[10px] text-primary-400">
+                      {updatedAt > 0 ? <span>{timeAgoFromMs(updatedAt)}</span> : null}
+                      {tokenCount !== undefined ? (
+                        <span>{tokenCount.toLocaleString()} tokens</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(isExpanded ? null : sessionId)}
+                    className="shrink-0 rounded-lg border border-primary-200 px-2.5 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  >
+                    {isExpanded ? 'Hide' : 'View'}
+                  </button>
+                </div>
+
+                {isExpanded ? (
+                  <div className="mt-3 rounded-lg border border-primary-100 bg-primary-50/50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-400">
+                      Session Details
+                    </p>
+                    <dl className="space-y-1 text-[11px]">
+                      <div className="flex gap-2">
+                        <dt className="shrink-0 text-primary-400">ID</dt>
+                        <dd className="truncate font-mono text-primary-700 dark:text-neutral-300">{sessionId}</dd>
+                      </div>
+                      {lastMessage ? (
+                        <div className="flex gap-2">
+                          <dt className="shrink-0 text-primary-400">Last output</dt>
+                          <dd className="line-clamp-4 text-primary-700 dark:text-neutral-300">{lastMessage}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        )
-      })}
+            )
+          })}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -688,6 +788,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
+
+  // ── Approvals state ────────────────────────────────────────────────────────
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>(() => loadApprovals())
+
+  // ── Restore-banner state (from localStorage checkpoint) ───────────────────
+  const [restoreCheckpoint, setRestoreCheckpoint] = useState<MissionCheckpoint | null>(() => {
+    const cp = loadMissionCheckpoint()
+    return cp?.status === 'running' ? cp : null
+  })
+  const [restoreDismissed, setRestoreDismissed] = useState(false)
 
   // ── Existing state ──────────────────────────────────────────────────────────
   const [isMobileHub, setIsMobileHub] = useState(() =>
@@ -735,6 +845,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const pendingTaskMovesRef = useRef<Array<{ taskIds: Array<string>; status: TaskStatus }>>([])
   const sessionActivityRef = useRef<Map<string, string>>(new Map())
   const dispatchingRef = useRef(false)
+  // Mission ID for checkpointing
+  const missionIdRef = useRef<string>('')
+  const missionStartedAtRef = useRef<number>(0)
   // SSE streams for active agents (capped at MAX_AGENT_STREAMS)
   const agentStreamsRef = useRef<Map<string, EventSource>>(new Map())
   const agentStreamLastAtRef = useRef<Map<string, number>>(new Map())
@@ -859,8 +972,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
   }, [liveFeedVisible])
 
-  // ── Feed event → agentActivity ─────────────────────────────────────────────
+  // ── Feed event → agentActivity + approval parsing ─────────────────────────
   // Update last-line activity from feed events (agent_active, agent_spawned, etc.)
+  // Also parse APPROVAL_REQUIRED: markers from assistant messages.
   useEffect(() => {
     const unsubscribe = onFeedEvent((event) => {
       if (!event.agentName) return
@@ -881,6 +995,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             lastEventType: 'system',
           },
         }))
+      }
+
+      // Parse APPROVAL_REQUIRED from assistant messages
+      const content = event.message ?? ''
+      if (content.includes('APPROVAL_REQUIRED:')) {
+        const agentId = member.id
+        const agentName = member.name
+        const action = content.split('APPROVAL_REQUIRED:')[1]?.split('\n')[0]?.trim() ?? content
+        addApproval({ agentId, agentName, action, context: content })
+        setApprovals(loadApprovals())
       }
     })
     return unsubscribe
@@ -1151,12 +1275,28 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const uniqueTaskIds = Array.from(new Set(taskIds))
     const ids = new Set(uniqueTaskIds)
 
-    setMissionTasks((previous) =>
-      previous.map((task) => {
+    setMissionTasks((previous) => {
+      const updated = previous.map((task) => {
         if (!ids.has(task.id) || task.status === status) return task
         return { ...task, status, updatedAt: Date.now() }
-      }),
-    )
+      })
+
+      // Save checkpoint with updated task statuses
+      const currentCp = loadMissionCheckpoint()
+      if (currentCp) {
+        saveMissionCheckpoint({
+          ...currentCp,
+          tasks: updated.map(t => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            assignedTo: t.agentId,
+          })),
+        })
+      }
+
+      return updated
+    })
 
     const boardApi = taskBoardRef.current
     if (boardApi) {
@@ -1308,6 +1448,49 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       agentName: member.name,
     })
   }, [agentSessionMap])
+
+  // ── Approval handlers ──────────────────────────────────────────────────────
+  const handleApprove = useCallback((id: string) => {
+    const approval = approvals.find(a => a.id === id)
+    if (!approval) return
+    const sessionKey = agentSessionMap[approval.agentId]
+    if (sessionKey) {
+      fetch('/api/sessions/send', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey,
+          message: `[APPROVED] You may proceed with: ${approval.action}`,
+        }),
+      }).catch(() => { /* best-effort */ })
+    }
+    const updated = approvals.map(a =>
+      a.id === id ? { ...a, status: 'approved' as const, resolvedAt: Date.now() } : a
+    )
+    setApprovals(updated)
+    saveApprovals(updated)
+  }, [approvals, agentSessionMap])
+
+  const handleDeny = useCallback((id: string) => {
+    const approval = approvals.find(a => a.id === id)
+    if (!approval) return
+    const sessionKey = agentSessionMap[approval.agentId]
+    if (sessionKey) {
+      fetch('/api/sessions/send', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey,
+          message: `[DENIED] You may NOT proceed with: ${approval.action}. Please stop and await further instructions.`,
+        }),
+      }).catch(() => { /* best-effort */ })
+    }
+    const updated = approvals.map(a =>
+      a.id === id ? { ...a, status: 'denied' as const, resolvedAt: Date.now() } : a
+    )
+    setApprovals(updated)
+    saveApprovals(updated)
+  }, [approvals, agentSessionMap])
 
   const ensureAgentSessions = useCallback(async (teamMembers: TeamMember[]): Promise<Record<string, string>> => {
     const currentMap = { ...agentSessionMap }
@@ -1702,6 +1885,38 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     dispatchingRef.current = true
     const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
+
+    // Save initial checkpoint
+    const missionId = `mission-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    missionIdRef.current = missionId
+    missionStartedAtRef.current = Date.now()
+    saveMissionCheckpoint({
+      id: missionId,
+      label: truncateMissionGoal(trimmedGoal, 60),
+      processType,
+      team: teamWithRuntimeStatus.map(m => ({
+        id: m.id,
+        name: m.name,
+        modelId: m.modelId,
+        roleDescription: m.roleDescription,
+        goal: m.goal,
+        backstory: m.backstory,
+      })),
+      tasks: createdTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        assignedTo: t.agentId,
+      })),
+      agentSessionMap: { ...agentSessionMap },
+      status: 'running',
+      startedAt: missionStartedAtRef.current,
+      updatedAt: missionStartedAtRef.current,
+    })
+    // Dismiss any existing restore banner
+    setRestoreCheckpoint(null)
+    setRestoreDismissed(true)
+
     setMissionActive(true)
     setShowNewMission(false)
     setMissionState('running')
@@ -1740,8 +1955,50 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   // ── Mission tab content ────────────────────────────────────────────────────
   function renderMissionContent() {
+    const showRestoreBanner = restoreCheckpoint && !restoreDismissed && !missionActive
+
     return (
       <div className="flex min-h-0 flex-1 flex-col">
+        {/* Restore banner */}
+        {showRestoreBanner ? (
+          <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs dark:border-amber-800/40 dark:bg-amber-950/20">
+            <span aria-hidden>⚡</span>
+            <span className="flex-1 truncate text-amber-800 dark:text-amber-200">
+              Resume previous mission?{' '}
+              <span className="font-semibold">
+                &ldquo;{truncateMissionGoal(restoreCheckpoint.label, 40)}&rdquo;
+              </span>
+              {' · '}started {timeAgoFromMs(restoreCheckpoint.startedAt)}
+              {restoreCheckpoint.tasks.length > 0 ? (
+                <> · {restoreCheckpoint.tasks.filter(t => t.status === 'done' || t.status === 'completed').length}/{restoreCheckpoint.tasks.length} tasks done</>
+              ) : null}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                // Restore: pre-fill goal from label and re-populate team/tasks
+                setMissionGoal(restoreCheckpoint.label)
+                setProcessType(restoreCheckpoint.processType)
+                setRestoreDismissed(true)
+                setRestoreCheckpoint(null)
+              }}
+              className="shrink-0 rounded-md bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-amber-600"
+            >
+              Restore
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearMissionCheckpoint()
+                setRestoreCheckpoint(null)
+                setRestoreDismissed(true)
+              }}
+              className="shrink-0 rounded-md border border-amber-300 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/30"
+            >
+              Discard
+            </button>
+          </div>
+        ) : null}
         {/* Agents Working Panel */}
         {team.length > 0 ? (
           <AgentsWorkingPanel
@@ -1991,29 +2248,40 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
       <div className="flex items-center border-b border-primary-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
-        {TAB_DEFS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors',
-              activeTab === tab.id
-                ? 'border-b-2 border-accent-500 text-accent-600 dark:border-accent-400 dark:text-accent-400'
-                : 'border-b-2 border-transparent text-primary-500 hover:text-primary-700 dark:text-neutral-400 dark:hover:text-neutral-200',
-            )}
-          >
-            <span aria-hidden>{tab.icon}</span>
-            <span>{tab.label}</span>
-            {/* Mission tab: animated running indicator */}
-            {tab.id === 'mission' && isMissionRunning ? (
-              <span className="relative ml-0.5 flex size-1.5">
-                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-              </span>
-            ) : null}
-          </button>
-        ))}
+        {TAB_DEFS.map((tab) => {
+          const pendingApprovals = tab.id === 'approvals'
+            ? approvals.filter(a => a.status === 'pending').length
+            : 0
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors',
+                activeTab === tab.id
+                  ? 'border-b-2 border-accent-500 text-accent-600 dark:border-accent-400 dark:text-accent-400'
+                  : 'border-b-2 border-transparent text-primary-500 hover:text-primary-700 dark:text-neutral-400 dark:hover:text-neutral-200',
+              )}
+            >
+              <span aria-hidden>{tab.icon}</span>
+              <span>{tab.label}</span>
+              {/* Mission tab: animated running indicator */}
+              {tab.id === 'mission' && isMissionRunning ? (
+                <span className="relative ml-0.5 flex size-1.5">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
+                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                </span>
+              ) : null}
+              {/* Approvals tab: pending count badge */}
+              {tab.id === 'approvals' && pendingApprovals > 0 ? (
+                <span className="ml-0.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white leading-none">
+                  {pendingApprovals > 99 ? '99+' : pendingApprovals}
+                </span>
+              ) : null}
+            </button>
+          )
+        })}
 
         {/* Spacer + Live Feed toggle */}
         <div className="ml-auto flex items-center pr-3">
@@ -2063,6 +2331,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* History tab */}
           {activeTab === 'history' ? <HistoryView /> : null}
+
+          {/* Approvals tab */}
+          {activeTab === 'approvals' ? (
+            <ApprovalsPanel
+              approvals={approvals}
+              onApprove={handleApprove}
+              onDeny={handleDeny}
+            />
+          ) : null}
 
           {/* Team tab */}
           {activeTab === 'team' ? (
@@ -2140,6 +2417,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <button
                       type="button"
                       onClick={() => {
+                        // Archive mission checkpoint before stopping
+                        const currentCp = loadMissionCheckpoint()
+                        if (currentCp) {
+                          archiveMissionToHistory({ ...currentCp, status: 'aborted' })
+                          clearMissionCheckpoint()
+                        }
                         // Best-effort cleanup of per-agent sessions
                         Object.values(agentSessionMap).forEach((sessionKey) => {
                           fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
@@ -2163,6 +2446,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         pendingTaskMovesRef.current = []
                         sessionActivityRef.current = new Map()
                         taskBoardRef.current = null
+                        missionIdRef.current = ''
                       }}
                       className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
                     >
@@ -2251,28 +2535,38 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex">
-          {TAB_DEFS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                'relative flex flex-1 flex-col items-center justify-center py-2.5 text-[10px] font-medium transition-colors',
-                activeTab === tab.id
-                  ? 'text-accent-600 dark:text-accent-400'
-                  : 'text-primary-500 hover:text-primary-700 dark:text-neutral-400 dark:hover:text-neutral-200',
-              )}
-            >
-              <span className="text-base leading-none" aria-hidden>{tab.icon}</span>
-              <span className="mt-0.5">{tab.label}</span>
-              {tab.id === 'mission' && isMissionRunning ? (
-                <span className="absolute right-3 top-1.5 flex size-1.5">
-                  <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                </span>
-              ) : null}
-            </button>
-          ))}
+          {TAB_DEFS.map((tab) => {
+            const pendingApprovals = tab.id === 'approvals'
+              ? approvals.filter(a => a.status === 'pending').length
+              : 0
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'relative flex flex-1 flex-col items-center justify-center py-2.5 text-[10px] font-medium transition-colors',
+                  activeTab === tab.id
+                    ? 'text-accent-600 dark:text-accent-400'
+                    : 'text-primary-500 hover:text-primary-700 dark:text-neutral-400 dark:hover:text-neutral-200',
+                )}
+              >
+                <span className="text-base leading-none" aria-hidden>{tab.icon}</span>
+                <span className="mt-0.5">{tab.label}</span>
+                {tab.id === 'mission' && isMissionRunning ? (
+                  <span className="absolute right-3 top-1.5 flex size-1.5">
+                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
+                    <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                ) : null}
+                {tab.id === 'approvals' && pendingApprovals > 0 ? (
+                  <span className="absolute right-2 top-1 rounded-full bg-red-500 px-1 text-[8px] font-bold text-white leading-tight">
+                    {pendingApprovals > 9 ? '9+' : pendingApprovals}
+                  </span>
+                ) : null}
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>
