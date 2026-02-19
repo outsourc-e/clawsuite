@@ -9,12 +9,13 @@ export const MODEL_PRESETS = [
   { id: 'codex',       label: 'Codex',       desc: 'Code specialist' },
   { id: 'flash',       label: 'Gemini Flash', desc: 'Quick & cheap' },
   // PC1 local models (RTX 4090 · free · fixed Modelfiles)
-  { id: 'pc1-planner', label: 'PC1 Planner', desc: 'qwen3:14b · local' },
-  { id: 'pc1-coder',   label: 'PC1 Coder',   desc: 'qwen3-coder:30b · local' },
-  { id: 'pc1-critic',  label: 'PC1 Critic',  desc: 'deepseek-r1:32b · local' },
-  { id: 'pc1-fast',    label: 'PC1 Fast',    desc: 'qwen3:14b · local' },
-  { id: 'pc1-heavy',   label: 'PC1 Heavy',   desc: 'qwen3:30b · local' },
-  { id: 'pc1-fmt',     label: 'PC1 Fmt',     desc: 'gpt-oss:20b · local' },
+  { id: 'pc1-planner',  label: 'PC1 Planner',  desc: 'qwen3:14b · local' },
+  { id: 'pc1-coder',    label: 'PC1 Coder',    desc: 'qwen3-coder:30b · local' },
+  { id: 'pc1-devstral', label: 'PC1 Devstral', desc: 'devstral:22b · local' },
+  { id: 'pc1-critic',   label: 'PC1 Critic',   desc: 'deepseek-r1:32b · local' },
+  { id: 'pc1-fast',     label: 'PC1 Fast',     desc: 'qwen3:14b · local' },
+  { id: 'pc1-heavy',    label: 'PC1 Heavy',    desc: 'qwen3:30b · local' },
+  { id: 'pc1-fmt',      label: 'PC1 Fmt',      desc: 'gpt-oss:20b · local' },
 ] as const
 
 export const TEAM_TEMPLATES = [
@@ -94,7 +95,8 @@ const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
   'pc1-critic':  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
   'pc1-fast':    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
   'pc1-heavy':   'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
-  'pc1-fmt':     'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  'pc1-fmt':      'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  'pc1-devstral': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
 }
 
 type SessionDotState = 'active' | 'idle' | 'stale' | 'dead' | 'spawning' | 'none'

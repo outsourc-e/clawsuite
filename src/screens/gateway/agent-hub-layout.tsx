@@ -53,8 +53,9 @@ const MODEL_PRESET_MAP: Record<string, string> = {
   flash: 'google/gemini-2.5-flash',
   // PC1 local models (fixed Modelfiles — ChatML + num_ctx 16k+)
   // pc1-planner swapped to qwen3-14b-fixed: 4.3s vs 21s, no think leakage, 9GB vs 19GB
-  'pc1-planner': 'ollama-pc1/qwen3-14b-fixed',
-  'pc1-coder':   'ollama-pc1/qwen3-coder-30b-fixed',
+  'pc1-planner':  'ollama-pc1/qwen3-14b-fixed',
+  'pc1-coder':    'ollama-pc1/qwen3-coder-30b-fixed',
+  'pc1-devstral': 'ollama-pc1/devstral-fixed',   // Mistral code model — 23.6B, 13GB, no think leak
   'pc1-critic':  'ollama-pc1/deepseek-r1-32b-fixed',
   'pc1-fast':    'ollama-pc1/qwen3-14b-fixed',
   'pc1-heavy':   'ollama-pc1/qwen3-30b-fixed',
@@ -438,7 +439,8 @@ const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
   'pc1-critic':  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
   'pc1-fast':    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
   'pc1-heavy':   'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
-  'pc1-fmt':     'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  'pc1-fmt':      'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  'pc1-devstral': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
 }
 
 const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
@@ -452,7 +454,8 @@ const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
   'pc1-critic':  'PC1·Critic',
   'pc1-fast':    'PC1·Fast',
   'pc1-heavy':   'PC1·Heavy',
-  'pc1-fmt':     'PC1·Fmt',
+  'pc1-fmt':      'PC1·Fmt',
+  'pc1-devstral': 'PC1·Dev',
 }
 
 // ── OfficeView ─────────────────────────────────────────────────────────────────
@@ -1821,6 +1824,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         'You are a deep analyst. Think carefully, then output a structured, thorough analysis. Be specific and cite evidence from the provided context.',
       'pc1-fmt':
         'You are a formatter. Output ONLY valid, clean JSON or structured data matching the schema provided. No explanation, no prose.',
+      'pc1-devstral':
+        'You are Devstral, an expert software engineer. Write clean, production-ready code. Output ONLY the implementation — no explanation, no prose outside code blocks. No new dependencies unless explicitly asked.',
     }
 
     function buildAgentContext(member: TeamMember): string {
