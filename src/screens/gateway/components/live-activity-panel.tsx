@@ -20,19 +20,31 @@ export type LiveActivityPanelProps = {
 type PanelTab = 'activity' | 'output'
 
 const MODEL_BADGE: Record<ModelPresetId, string> = {
-  auto:   'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
-  opus:   'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
-  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
-  codex:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
-  flash:  'bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-400',
+  auto:          'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+  opus:          'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
+  sonnet:        'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
+  codex:         'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
+  flash:         'bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-400',
+  'pc1-planner': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+  'pc1-coder':   'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  'pc1-critic':  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+  'pc1-fast':    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  'pc1-heavy':   'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  'pc1-fmt':     'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
 }
 
 const MODEL_LABEL: Record<ModelPresetId, string> = {
-  auto:   'Auto',
-  opus:   'Opus',
-  sonnet: 'Sonnet',
-  codex:  'Codex',
-  flash:  'Flash',
+  auto:          'Auto',
+  opus:          'Opus',
+  sonnet:        'Sonnet',
+  codex:         'Codex',
+  flash:         'Flash',
+  'pc1-planner': 'PC1·Plan',
+  'pc1-coder':   'PC1·Code',
+  'pc1-critic':  'PC1·Critic',
+  'pc1-fast':    'PC1·Fast',
+  'pc1-heavy':   'PC1·Heavy',
+  'pc1-fmt':     'PC1·Fmt',
 }
 
 function statusDotEl(status: AgentWorkingStatus) {

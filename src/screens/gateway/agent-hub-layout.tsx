@@ -50,6 +50,13 @@ const MODEL_PRESET_MAP: Record<string, string> = {
   sonnet: 'anthropic/claude-sonnet-4-6',
   codex: 'openai/gpt-5.3-codex',
   flash: 'google/gemini-2.5-flash',
+  // PC1 local models (fixed Modelfiles — ChatML + num_ctx 16k+)
+  'pc1-planner': 'ollama-pc1/glm-4.7-flash-fixed',
+  'pc1-coder':   'ollama-pc1/qwen3-coder-30b-fixed',
+  'pc1-critic':  'ollama-pc1/deepseek-r1-32b-fixed',
+  'pc1-fast':    'ollama-pc1/qwen3-14b-fixed',
+  'pc1-heavy':   'ollama-pc1/qwen3-30b-fixed',
+  'pc1-fmt':     'ollama-pc1/gpt-oss-20b-fixed',
 }
 
 type AgentActivityEntry = {
@@ -418,19 +425,31 @@ const AGENT_ACCENT_COLORS = [
 
 // ── Model badge styling ────────────────────────────────────────────────────────
 const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
-  auto:   'bg-neutral-200 text-neutral-700 dark:bg-neutral-600 dark:text-neutral-200',
-  opus:   'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
-  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
-  codex:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
-  flash:  'bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-400',
+  auto:          'bg-neutral-200 text-neutral-700 dark:bg-neutral-600 dark:text-neutral-200',
+  opus:          'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
+  sonnet:        'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
+  codex:         'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
+  flash:         'bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-400',
+  'pc1-planner': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+  'pc1-coder':   'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  'pc1-critic':  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+  'pc1-fast':    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  'pc1-heavy':   'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  'pc1-fmt':     'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
 }
 
 const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
-  auto:   'Auto',
-  opus:   'Opus',
-  sonnet: 'Sonnet',
-  codex:  'Codex',
-  flash:  'Flash',
+  auto:          'Auto',
+  opus:          'Opus',
+  sonnet:        'Sonnet',
+  codex:         'Codex',
+  flash:         'Flash',
+  'pc1-planner': 'PC1·Plan',
+  'pc1-coder':   'PC1·Code',
+  'pc1-critic':  'PC1·Critic',
+  'pc1-fast':    'PC1·Fast',
+  'pc1-heavy':   'PC1·Heavy',
+  'pc1-fmt':     'PC1·Fmt',
 }
 
 // ── OfficeView ─────────────────────────────────────────────────────────────────
@@ -1036,10 +1055,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const handleCreateMissionRef = useRef<() => void>(() => {})
   // Stable ref for live feed visibility (used in feed-count effect)
   const liveFeedVisibleRef = useRef(liveFeedVisible)
+  // Spec 4: idempotency ref — tracks task IDs that have already been dispatched
+  const dispatchedTaskIdsRef = useRef<Set<string>>(new Set())
+  // Spec 4: stable ref for missionState so executeMission always sees current value
+  const missionStateRef = useRef(missionState)
+  // Spec 4: stable ref for missionTasks for completion detection in polling loop
+  const missionTasksRef = useRef(missionTasks)
+  // Spec 4: track which session keys have had their tasks moved to review (avoid repeat)
+  const completionDetectedRef = useRef<Set<string>>(new Set())
 
   teamRef.current = team
   missionGoalRef.current = missionGoal
   liveFeedVisibleRef.current = liveFeedVisible
+  missionStateRef.current = missionState
+  missionTasksRef.current = missionTasks
 
   // Derived: which agents have spawn errors
   const spawnErrorNames = useMemo(
@@ -1781,6 +1810,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       const member = teamMembers.find((entry) => entry.id === agentId)
 
+      // Spec 4: idempotency — filter tasks already dispatched
+      const newTasks = agentTasks.filter((task) => !dispatchedTaskIdsRef.current.has(task.id))
+      if (newTasks.length === 0) return
+
       try {
         const response = await fetch('/api/sessions/send', {
           method: 'POST',
@@ -1796,6 +1829,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             readString(payload.error) || readString(payload.message) || `HTTP ${response.status}`
           throw new Error(errorMessage)
         }
+
+        // Spec 4: mark tasks as dispatched in idempotency ref
+        newTasks.forEach((task) => dispatchedTaskIdsRef.current.add(task.id))
 
         const taskIds = agentTasks.map((task) => task.id)
         setDispatchedTaskIdsByAgent((previous) => ({
@@ -1864,7 +1900,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (mode === 'sequential') {
       const agentEntries = Array.from(tasksByAgent.entries())
       for (let i = 0; i < agentEntries.length; i++) {
-        const [agentId, agentTasks] = agentEntries[i]
+        // Spec 4: pause gate
+        if (missionStateRef.current === 'paused') continue
+        const [agentId, agentTasks] = agentEntries[i]!
         const member = teamMembers.find((entry) => entry.id === agentId)
         const agentContext = member ? buildAgentContext(member) : ''
         const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
@@ -1881,13 +1919,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     // ── PARALLEL mode (default) ────────────────────────────────────────────
-    for (const [agentId, agentTasks] of tasksByAgent) {
+    const parallelEntries = Array.from(tasksByAgent.entries())
+    for (let pi = 0; pi < parallelEntries.length; pi++) {
+      // Spec 4: pause gate — skip dispatch if mission is paused
+      if (missionStateRef.current === 'paused') continue
+      const [agentId, agentTasks] = parallelEntries[pi]!
       const member = teamMembers.find((entry) => entry.id === agentId)
       const agentContext = member ? buildAgentContext(member) : ''
       const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
       const body = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
       const message = [agentContext, body].filter(Boolean).join('\n\n')
       await dispatchToAgent(agentId, agentTasks, message)
+      // Spec 4: 100ms stagger between per-agent batches
+      if (pi < parallelEntries.length - 1) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 100))
+      }
     }
   }, [ensureAgentSessions, moveTasksToStatus])
 
@@ -2025,6 +2071,39 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           if (!cancelled) {
             sessionActivityRef.current = nextMarkers
+          }
+
+          // ── Completion detection ────────────────────────────────────────────
+          // When a session's last message signals task completion, move its
+          // in-progress tasks to 'review' and fire a feed event (once per session).
+          const COMPLETION_PHRASES = /done|completed|task complete/i
+          for (const session of sessions) {
+            const sessionId = readSessionId(session)
+            if (!sessionId) continue
+            if (completionDetectedRef.current.has(sessionId)) continue
+
+            const lastMessage = readSessionLastMessage(session)
+            if (!lastMessage || !COMPLETION_PHRASES.test(lastMessage)) continue
+
+            const agentId = sessionKeyToAgentId.get(sessionId)
+            if (!agentId) continue
+
+            completionDetectedRef.current.add(sessionId)
+
+            // Move this agent's in-progress tasks to review
+            const tasksToMove = missionTasksRef.current
+              .filter((t) => t.agentId === agentId && t.status === 'in_progress')
+              .map((t) => t.id)
+            if (tasksToMove.length > 0) {
+              moveTasksToStatus(tasksToMove, 'review')
+            }
+
+            const agentName = readSessionName(session) || agentId
+            emitFeedEvent({
+              type: 'task_completed',
+              message: `${agentName} completed — tasks moved to review`,
+              agentName,
+            })
           }
         }
       } catch {
@@ -2179,6 +2258,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       archiveMissionToHistory({ ...currentCp, status: 'aborted' })
       clearMissionCheckpoint()
     }
+    // Best-effort abort: signal each agent session to stop current inference
+    Object.values(agentSessionMap).forEach((sessionKey) => {
+      fetch('/api/chat-abort', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionKey }),
+      }).catch(() => {})
+    })
+    // Then tear down the sessions
     Object.values(agentSessionMap).forEach((sessionKey) => {
       fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
         method: 'DELETE',
