@@ -65,6 +65,21 @@ const config = defineConfig(({ mode }) => {
       host: allowedHosts.length > 0 ? '0.0.0.0' : '127.0.0.1',
       allowedHosts: allowedHosts.length > 0 ? [...allowedHosts, '127.0.0.1', 'localhost'] : ['127.0.0.1', 'localhost'],
       proxy: {
+        // WebSocket proxy: clients connect to /ws-gateway on the ClawSuite
+        // server (any IP/port), which internally forwards to the local gateway.
+        // This means phone/LAN/Docker users never need to reach port 18789 directly.
+        '/ws-gateway': {
+          target: proxyTarget,
+          changeOrigin: false,
+          ws: true,
+          rewrite: (path) => path.replace(/^\/ws-gateway/, ''),
+        },
+        // REST API proxy: all /api/gateway/* calls proxied through ClawSuite server
+        '/api/gateway-proxy': {
+          target: proxyTarget,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/gateway-proxy/, ''),
+        },
         '/gateway-ui': {
           target: proxyTarget,
           changeOrigin: true,
