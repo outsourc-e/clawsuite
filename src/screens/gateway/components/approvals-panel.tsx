@@ -43,15 +43,24 @@ export function ApprovalsPanel({ approvals, onApprove, onDeny }: ApprovalsPanelP
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-primary-200 px-4 py-3 dark:border-neutral-700">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-primary-400">
-          ✅ Approvals
-        </h2>
-        {pendingCount > 0 ? (
-          <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-            {pendingCount}
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+            Approvals
           </span>
-        ) : null}
+          {pendingCount > 0 ? (
+            <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              {pendingCount} pending
+            </span>
+          ) : (
+            <span className="rounded-full border border-neutral-200 bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
+              All clear
+            </span>
+          )}
+        </div>
+        {pendingCount > 0 && (
+          <span className="text-[10px] text-amber-500 dark:text-amber-400">⚠ Review required</span>
+        )}
       </div>
 
       {/* Content */}
@@ -59,17 +68,19 @@ export function ApprovalsPanel({ approvals, onApprove, onDeny }: ApprovalsPanelP
         {approvals.length === 0 ? (
           <div className="flex h-full items-center justify-center p-8">
             <div className="text-center">
-              <p className="mb-2 text-2xl">✅</p>
-              <p className="text-sm font-medium text-primary-700 dark:text-neutral-300">
+              <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-neutral-800">
+                <span className="text-2xl">✅</span>
+              </div>
+              <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                 No pending approvals
               </p>
-              <p className="mt-1 text-xs text-primary-400">
+              <p className="mt-1 text-xs text-neutral-400">
                 Agents are running autonomously
               </p>
             </div>
           </div>
         ) : (
-          <div className="space-y-3 p-4">
+          <div className="space-y-2 p-4">
             {approvals.map((approval) => (
               <ApprovalCard
                 key={approval.id}
@@ -99,67 +110,69 @@ function ApprovalCard({
   return (
     <div
       className={cn(
-        'rounded-xl border bg-white p-4 shadow-sm dark:bg-neutral-900',
+        'overflow-hidden rounded-xl border transition-all duration-200',
         isPending
-          ? 'border-amber-200 dark:border-amber-800/60'
-          : 'border-primary-200 dark:border-neutral-700 opacity-70',
+          ? 'border border-l-4 border-amber-200 border-l-amber-500 bg-amber-50/30 shadow-sm dark:border-amber-800/40 dark:border-l-amber-500 dark:bg-amber-950/10'
+          : 'border-neutral-200 bg-neutral-50 opacity-60 dark:border-neutral-800 dark:bg-neutral-900',
       )}
     >
-      {/* Agent badge + time */}
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span
-          className={cn(
-            'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-            agentBadgeClass(approval.agentName),
-          )}
-        >
-          {approval.agentName}
-        </span>
-        <span className="shrink-0 text-[10px] text-primary-400">
-          {timeAgo(approval.requestedAt)}
-        </span>
-      </div>
-
-      {/* Action */}
-      <p className="mb-1.5 text-xs font-semibold text-primary-900 dark:text-neutral-100">
-        {approval.action}
-      </p>
-
-      {/* Context snippet */}
-      <p className="mb-3 line-clamp-2 text-[11px] text-primary-500 dark:text-neutral-400">
-        {approval.context}
-      </p>
-
-      {/* Actions or resolved label */}
-      {isPending ? (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => onApprove(approval.id)}
-            className="flex-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-600"
+      <div className="p-4">
+        {/* Agent badge + time */}
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <span
+            className={cn(
+              'rounded-md px-2 py-0.5 text-[10px] font-semibold',
+              agentBadgeClass(approval.agentName),
+            )}
           >
-            Approve
-          </button>
-          <button
-            type="button"
-            onClick={() => onDeny(approval.id)}
-            className="flex-1 rounded-lg bg-red-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-red-600"
-          >
-            Deny
-          </button>
+            {approval.agentName}
+          </span>
+          <span className="shrink-0 font-mono text-[10px] text-neutral-400">
+            {timeAgo(approval.requestedAt)}
+          </span>
         </div>
-      ) : (
-        <p
-          className={cn(
-            'text-[11px] font-semibold',
-            approval.status === 'approved'
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : 'text-red-500 dark:text-red-400',
-          )}
-        >
-          {approval.status === 'approved' ? 'Approved ✓' : 'Denied ✗'}
+
+        {/* Action — monospace */}
+        <p className="mb-1.5 font-mono text-xs font-semibold text-neutral-900 dark:text-neutral-100">
+          {approval.action}
         </p>
-      )}
+
+        {/* Context snippet */}
+        <p className="mb-3 line-clamp-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+          {approval.context}
+        </p>
+
+        {/* Actions or resolved label */}
+        {isPending ? (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onApprove(approval.id)}
+              className="flex-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition-all duration-200 hover:bg-emerald-700"
+            >
+              ✓ Approve
+            </button>
+            <button
+              type="button"
+              onClick={() => onDeny(approval.id)}
+              className="flex-1 rounded-lg border border-red-400 px-3 py-1.5 text-[11px] font-semibold text-red-600 transition-all duration-200 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/20"
+            >
+              ✕ Deny
+            </button>
+          </div>
+        ) : (
+          <p
+            className={cn(
+              'text-[11px] font-semibold',
+              approval.status === 'approved'
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-red-500 dark:text-red-400',
+            )}
+          >
+            {approval.status === 'approved' ? '✓ Approved' : '✕ Denied'}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

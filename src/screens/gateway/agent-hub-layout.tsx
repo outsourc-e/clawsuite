@@ -85,7 +85,7 @@ const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'approvals', icon: '✅', label: 'Approvals' },
 ]
 
-function GatewayConnectionBanner({
+function GatewayStatusPill({
   status,
   spawnErrorNames,
   onRetry,
@@ -96,16 +96,16 @@ function GatewayConnectionBanner({
 }) {
   if (spawnErrorNames.length > 0) {
     return (
-      <div className="flex h-auto min-h-8 w-full items-center gap-2 bg-red-100 px-4 py-1.5 text-xs text-red-800 dark:bg-red-950/40 dark:text-red-300">
-        <span aria-hidden>🔴</span>
-        <span className="flex-1 truncate">
-          Spawn failed for: {spawnErrorNames.join(', ')}
+      <div className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1 rounded-full border border-red-800/50 bg-red-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-400">
+          <span className="size-1.5 rounded-full bg-red-500" />
+          Spawn Error
         </span>
         {onRetry ? (
           <button
             type="button"
             onClick={onRetry}
-            className="shrink-0 rounded-md border border-red-300 px-2 py-0.5 text-[11px] font-semibold transition-colors hover:bg-red-200 dark:border-red-700 dark:hover:bg-red-900/40"
+            className="rounded-full border border-red-800/50 bg-red-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-400 transition-colors hover:bg-red-900/40"
           >
             Retry
           </button>
@@ -116,27 +116,27 @@ function GatewayConnectionBanner({
 
   if (status === 'disconnected') {
     return (
-      <div className="flex h-8 w-full items-center gap-2 bg-red-100 px-4 text-xs text-red-800 dark:bg-red-950/40 dark:text-red-300">
-        <span aria-hidden>🔴</span>
-        <span>Gateway disconnected — check your connection</span>
-      </div>
+      <span className="flex items-center gap-1 rounded-full border border-red-800/50 bg-red-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-400">
+        <span className="size-1.5 rounded-full bg-red-500" />
+        Offline
+      </span>
     )
   }
 
   if (status === 'spawning') {
     return (
-      <div className="flex h-8 w-full items-center gap-2 bg-amber-100 px-4 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-        <span aria-hidden>🟡</span>
-        <span>Spawning agents…</span>
-      </div>
+      <span className="flex items-center gap-1 rounded-full border border-amber-800/50 bg-amber-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber-400">
+        <span className="size-1.5 animate-pulse rounded-full bg-amber-400" />
+        Spawning
+      </span>
     )
   }
 
   return (
-    <div className="flex h-8 w-full items-center gap-2 bg-emerald-50 px-4 text-xs text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300">
-      <span aria-hidden>🟢</span>
-      <span>Gateway connected</span>
-    </div>
+    <span className="flex items-center gap-1 rounded-full border border-emerald-800/50 bg-emerald-950/40 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-400">
+      <span className="size-1.5 rounded-full bg-emerald-500" />
+      Connected
+    </span>
   )
 }
 
@@ -398,21 +398,31 @@ const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
   content: 'Content Pipeline',
 }
 
-// ── Model badge styling (matches team-panel internal) ──────────────────────────
+// ── Agent accent colors (indexed per agent slot) ───────────────────────────────
+const AGENT_ACCENT_COLORS = [
+  { bar: 'bg-orange-500', avatar: 'bg-orange-500', text: 'text-orange-400', ring: 'ring-orange-500/30' },
+  { bar: 'bg-blue-500',   avatar: 'bg-blue-500',   text: 'text-blue-400',   ring: 'ring-blue-500/30' },
+  { bar: 'bg-violet-500', avatar: 'bg-violet-500', text: 'text-violet-400', ring: 'ring-violet-500/30' },
+  { bar: 'bg-emerald-500',avatar: 'bg-emerald-500',text: 'text-emerald-400',ring: 'ring-emerald-500/30' },
+  { bar: 'bg-rose-500',   avatar: 'bg-rose-500',   text: 'text-rose-400',   ring: 'ring-rose-500/30' },
+  { bar: 'bg-amber-500',  avatar: 'bg-amber-500',  text: 'text-amber-400',  ring: 'ring-amber-500/30' },
+]
+
+// ── Model badge styling ────────────────────────────────────────────────────────
 const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
-  auto: 'bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200',
-  opus: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  codex: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  flash: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+  auto:   'bg-neutral-800 text-neutral-400',
+  opus:   'bg-orange-950/70 text-orange-400',
+  sonnet: 'bg-blue-950/70 text-blue-400',
+  codex:  'bg-emerald-950/70 text-emerald-400',
+  flash:  'bg-violet-950/70 text-violet-400',
 }
 
 const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
-  auto: 'Auto',
-  opus: 'Opus',
+  auto:   'Auto',
+  opus:   'Opus',
   sonnet: 'Sonnet',
-  codex: 'Codex',
-  flash: 'Flash',
+  codex:  'Codex',
+  flash:  'Flash',
 }
 
 // ── OfficeView ─────────────────────────────────────────────────────────────────
@@ -421,109 +431,208 @@ type OfficeViewProps = {
   missionRunning: boolean
   onViewOutput: (agentId: string) => void
   selectedOutputAgentId?: string
+  activeTemplateName?: string
+  processType: 'sequential' | 'hierarchical' | 'parallel'
 }
 
-function OfficeView({ agentRows, missionRunning, onViewOutput, selectedOutputAgentId }: OfficeViewProps) {
+function OfficeView({
+  agentRows,
+  missionRunning,
+  onViewOutput,
+  selectedOutputAgentId,
+  activeTemplateName,
+  processType,
+}: OfficeViewProps) {
   if (agentRows.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
           <p className="mb-3 text-4xl">🏢</p>
-          <p className="text-sm font-medium text-primary-700 dark:text-neutral-300">No agents in your team</p>
-          <p className="mt-1 text-xs text-primary-400">Switch to the Team tab to add agents.</p>
+          <p className="text-sm font-medium text-neutral-300">No agents in your team</p>
+          <p className="mt-1 text-xs text-neutral-500">Switch to the Team tab to add agents.</p>
         </div>
       </div>
     )
   }
 
+  const processTypeBadgeClass =
+    processType === 'hierarchical' ? 'border-violet-800/50 bg-violet-950/40 text-violet-400' :
+    processType === 'sequential'   ? 'border-blue-800/50 bg-blue-950/40 text-blue-400' :
+                                     'border-emerald-800/50 bg-emerald-950/40 text-emerald-400'
+
   return (
     <div className="h-full overflow-y-auto p-4">
-      {/* Header row */}
-      <div className="mb-4 flex items-center gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-primary-400">Visual Office</h2>
-        {missionRunning && (
-          <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-            <span className="relative flex size-1.5">
-              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
-              <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-            </span>
-            Mission Active
+      {/* ── Crew strip ─────────────────────────────────────────────────── */}
+      <div className="mb-4 flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-4 py-3">
+        {/* Overlapping agent avatars */}
+        <div className="flex -space-x-2">
+          {agentRows.slice(0, 5).map((agent, i) => {
+            const accent = AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length]
+            return (
+              <div
+                key={agent.id}
+                title={agent.name}
+                className={cn(
+                  'flex size-8 items-center justify-center rounded-full border-2 border-neutral-900 text-xs font-bold text-white',
+                  accent.avatar,
+                )}
+              >
+                {agent.name.charAt(0).toUpperCase()}
+              </div>
+            )
+          })}
+          {agentRows.length > 5 ? (
+            <div className="flex size-8 items-center justify-center rounded-full border-2 border-neutral-900 bg-neutral-800 text-[10px] font-bold text-neutral-400">
+              +{agentRows.length - 5}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Labels */}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="text-sm font-semibold text-neutral-200">
+            {agentRows.length} agent{agentRows.length !== 1 ? 's' : ''}
           </span>
-        )}
+          {activeTemplateName ? (
+            <>
+              <span className="text-neutral-700">·</span>
+              <span className="truncate text-sm text-neutral-500">{activeTemplateName}</span>
+            </>
+          ) : null}
+        </div>
+
+        {/* Process type badge */}
+        <div className="flex items-center gap-2 shrink-0">
+          {missionRunning && (
+            <span className="flex items-center gap-1 rounded-full border border-emerald-800/50 bg-emerald-950/40 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">
+              <span className="relative flex size-1.5">
+                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+              </span>
+              MISSION ACTIVE
+            </span>
+          )}
+          <span
+            className={cn(
+              'rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
+              processTypeBadgeClass,
+            )}
+          >
+            {processType}
+          </span>
+        </div>
       </div>
 
-      {/* Agent desk grid */}
+      {/* ── Agent desk grid ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        {agentRows.map((agent) => {
+        {agentRows.map((agent, i) => {
+          const accent = AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length]
           const isActive = agent.status === 'active'
           const isSelected = agent.id === selectedOutputAgentId
-          const statusDotClass = isActive
-            ? '' // handled with ping
-            : agent.status === 'idle' || agent.status === 'ready'
-              ? 'bg-amber-400'
-              : 'bg-neutral-400 dark:bg-neutral-600'
+          const isSpawning = agent.status === 'spawning'
+
+          const statusDotEl = isActive ? (
+            <span className="relative flex size-3 shrink-0">
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+              <span className="relative inline-flex size-3 rounded-full bg-emerald-500" />
+            </span>
+          ) : isSpawning ? (
+            <span className="relative flex size-3 shrink-0">
+              <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/60" />
+              <span className="relative inline-flex size-3 rounded-full bg-amber-400" />
+            </span>
+          ) : (
+            <span
+              className={cn(
+                'size-3 shrink-0 rounded-full',
+                agent.status === 'idle'  ? 'bg-amber-500' :
+                agent.status === 'ready' ? 'bg-neutral-500' :
+                agent.status === 'error' ? 'bg-red-500' :
+                'bg-neutral-700',
+              )}
+            />
+          )
 
           return (
             <div
               key={agent.id}
               className={cn(
-                'rounded-xl border bg-white p-4 shadow-sm transition-all dark:bg-neutral-900',
+                'relative overflow-hidden rounded-xl border bg-neutral-900 transition-all',
                 isSelected
-                  ? 'border-accent-400 ring-1 ring-accent-300 dark:border-accent-600 dark:ring-accent-700'
-                  : 'border-primary-200 dark:border-neutral-700',
-                isActive && missionRunning && 'ring-1 ring-emerald-200 dark:ring-emerald-800/50',
+                  ? 'border-neutral-600 shadow-lg ring-1 ring-emerald-500/50 shadow-emerald-500/10'
+                  : 'border-neutral-800',
+                isActive && missionRunning && !isSelected && 'ring-1 ring-neutral-700',
               )}
             >
-              {/* Top row: status dot + model badge + task count */}
-              <div className="mb-3 flex items-start justify-between">
-                <div className="flex items-center gap-1.5">
-                  {isActive ? (
-                    <span className="relative flex size-3 shrink-0">
-                      <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
-                      <span className="relative inline-flex size-3 rounded-full bg-emerald-500" />
+              {/* Top accent bar (3px) */}
+              <div className={cn('h-[3px] w-full', accent.bar)} />
+
+              <div className="p-4">
+                {/* Header: avatar (left) + status dot (right) */}
+                <div className="flex items-start justify-between">
+                  {/* Avatar */}
+                  <div
+                    className={cn(
+                      'flex size-12 items-center justify-center rounded-full text-lg font-bold text-white',
+                      accent.avatar,
+                    )}
+                  >
+                    {agent.name.charAt(0).toUpperCase()}
+                  </div>
+                  {/* Status dot */}
+                  {statusDotEl}
+                </div>
+
+                {/* Agent name */}
+                <h3 className="mt-3 truncate text-sm font-bold tracking-tight text-white">
+                  {agent.name}
+                </h3>
+
+                {/* Role / model row */}
+                <div className="mt-1 flex items-center gap-1.5">
+                  {agent.roleDescription ? (
+                    <span className="truncate text-[10px] text-neutral-600">
+                      {agent.roleDescription}
                     </span>
-                  ) : (
-                    <span className={cn('size-3 shrink-0 rounded-full', statusDotClass)} />
-                  )}
+                  ) : null}
                   <span
                     className={cn(
-                      'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                      'shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-medium',
                       OFFICE_MODEL_BADGE[agent.modelId],
                     )}
                   >
                     {OFFICE_MODEL_LABEL[agent.modelId]}
                   </span>
                 </div>
-                {agent.taskCount > 0 && (
-                  <span className="rounded-full bg-accent-100 px-1.5 py-0.5 text-[9px] font-bold text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
-                    {agent.taskCount}t
-                  </span>
-                )}
+
+                {/* Activity line (monospace) */}
+                <p className="mt-2 line-clamp-2 min-h-[2.4em] font-mono text-[10px] leading-relaxed text-neutral-600">
+                  {agent.lastLine ?? (agent.status === 'none' ? '// no session' : '// waiting for mission…')}
+                </p>
+
+                {/* Footer: task count badge */}
+                {agent.taskCount > 0 ? (
+                  <div className="mt-2">
+                    <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[9px] font-semibold text-neutral-400">
+                      {agent.taskCount} task{agent.taskCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                ) : null}
+
+                {/* View Output button — full-width */}
+                <button
+                  type="button"
+                  onClick={() => onViewOutput(agent.id)}
+                  className={cn(
+                    'mt-3 w-full rounded-lg px-2 py-2 text-[11px] font-medium transition-colors',
+                    isSelected
+                      ? 'bg-neutral-700 text-white'
+                      : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200',
+                  )}
+                >
+                  {isSelected ? '✓ Viewing Output' : 'View Output'}
+                </button>
               </div>
-
-              {/* Agent name */}
-              <h3 className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                {agent.name}
-              </h3>
-
-              {/* Activity line */}
-              <p className="mt-1 line-clamp-2 min-h-[2.5em] text-[11px] text-primary-500 dark:text-neutral-400">
-                {agent.lastLine ?? (agent.status === 'none' ? 'No session' : 'Waiting for mission…')}
-              </p>
-
-              {/* View Output button */}
-              <button
-                type="button"
-                onClick={() => onViewOutput(agent.id)}
-                className={cn(
-                  'mt-3 w-full rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors',
-                  isSelected
-                    ? 'border-accent-400 bg-accent-50 text-accent-700 dark:border-accent-600 dark:bg-accent-950/30 dark:text-accent-300'
-                    : 'border-primary-200 bg-primary-50 text-primary-600 hover:border-primary-300 hover:bg-primary-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
-                )}
-              >
-                {isSelected ? '✓ Viewing Output' : 'View Output'}
-              </button>
             </div>
           )
         })}
@@ -591,8 +700,8 @@ function HistoryView() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-2 size-5 animate-spin rounded-full border-2 border-accent-400 border-t-transparent" />
-          <p className="text-xs text-primary-400">Loading mission history…</p>
+          <div className="mx-auto mb-2 size-5 animate-spin rounded-full border-2 border-neutral-600 border-t-neutral-300" />
+          <p className="font-mono text-[10px] text-neutral-600">// loading mission history…</p>
         </div>
       </div>
     )
@@ -602,35 +711,35 @@ function HistoryView() {
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
-          <p className="mb-3 text-4xl">📋</p>
-          <p className="text-sm font-medium text-primary-700 dark:text-neutral-300">No mission history yet</p>
-          <p className="mt-1 text-xs text-primary-400">Start a mission to see it recorded here.</p>
+          <p className="mb-3 text-4xl opacity-30">📋</p>
+          <p className="text-sm font-medium text-neutral-300">No mission history yet</p>
+          <p className="mt-1 font-mono text-[10px] text-neutral-600">// start a mission to see it recorded here</p>
         </div>
       </div>
     )
   }
 
   const PROCESS_TYPE_BADGE: Record<string, string> = {
-    sequential: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    hierarchical: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-    parallel: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    sequential:   'bg-blue-950/60 text-blue-400 border border-blue-800/50',
+    hierarchical: 'bg-violet-950/60 text-violet-400 border border-violet-800/50',
+    parallel:     'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50',
   }
 
-  const CHECKPOINT_STATUS_BADGE: Record<string, { label: string; className: string }> = {
-    running: { label: 'Running', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
-    paused: { label: 'Paused', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-    completed: { label: 'Completed', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-    aborted: { label: 'Aborted', className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+  const CHECKPOINT_STATUS_BADGE: Record<string, { label: string; icon: string; className: string }> = {
+    running:   { label: 'Running',   icon: '▶', className: 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50' },
+    paused:    { label: 'Paused',    icon: '⏸', className: 'bg-amber-950/60 text-amber-400 border border-amber-800/50' },
+    completed: { label: 'Completed', icon: '●', className: 'bg-neutral-800 text-neutral-400 border border-neutral-700' },
+    aborted:   { label: 'Aborted',   icon: '✕', className: 'bg-red-950/60 text-red-400 border border-red-800/50' },
   }
 
   return (
-    <div className="h-full space-y-3 overflow-y-auto p-4">
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-primary-400">Mission History</h2>
+    <div className="h-full overflow-y-auto p-4">
+      <h2 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-neutral-600">Mission History</h2>
 
       {/* Local checkpoint history */}
       {hasLocalHistory ? (
         <div className="space-y-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-primary-400">📦 Local Checkpoints</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700">📦 Local Checkpoints</p>
           {localHistory.map((cp) => {
             const completedTasks = cp.tasks.filter(t => t.status === 'done' || t.status === 'completed').length
             const totalTasks = cp.tasks.length
@@ -641,39 +750,45 @@ function HistoryView() {
             return (
               <div
                 key={cp.id}
-                className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+                className="rounded-xl border border-neutral-800 bg-neutral-900/80 p-4 transition-colors hover:border-neutral-700"
               >
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <h3 className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                  <span className="text-[10px] text-neutral-700" aria-hidden>{statusBadge!.icon}</span>
+                  <h3 className="truncate text-sm font-semibold text-neutral-100">
                     {cp.label}
                   </h3>
-                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold', statusBadge!.className)}>
+                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold', statusBadge!.className)}>
                     {statusBadge!.label}
                   </span>
-                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize', processClass)}>
+                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold capitalize', processClass)}>
                     {cp.processType}
                   </span>
                 </div>
 
                 {/* Team avatars */}
                 {cp.team.length > 0 ? (
-                  <div className="mb-2 flex flex-wrap items-center gap-1">
-                    {cp.team.slice(0, 5).map((member) => (
-                      <span
-                        key={member.id}
-                        title={member.name}
-                        className="flex size-6 items-center justify-center rounded-full bg-primary-100 text-[10px] font-semibold text-primary-700 dark:bg-neutral-800 dark:text-neutral-300"
-                      >
-                        {member.name.slice(0, 2).toUpperCase()}
-                      </span>
-                    ))}
+                  <div className="mb-2 flex -space-x-1.5">
+                    {cp.team.slice(0, 5).map((member, idx) => {
+                      const ac = AGENT_ACCENT_COLORS[idx % AGENT_ACCENT_COLORS.length]
+                      return (
+                        <span
+                          key={member.id}
+                          title={member.name}
+                          className={cn('flex size-6 items-center justify-center rounded-full border border-neutral-900 text-[9px] font-bold text-white', ac.avatar)}
+                        >
+                          {member.name.charAt(0).toUpperCase()}
+                        </span>
+                      )
+                    })}
                     {cp.team.length > 5 ? (
-                      <span className="text-[10px] text-primary-400">+{cp.team.length - 5}</span>
+                      <span className="flex size-6 items-center justify-center rounded-full border border-neutral-900 bg-neutral-800 text-[9px] font-bold text-neutral-500">
+                        +{cp.team.length - 5}
+                      </span>
                     ) : null}
                   </div>
                 ) : null}
 
-                <div className="flex items-center gap-3 text-[10px] text-primary-400">
+                <div className="flex items-center gap-3 font-mono text-[9px] text-neutral-700">
                   {totalTasks > 0 ? (
                     <span>{completedTasks}/{totalTasks} tasks</span>
                   ) : null}
@@ -689,7 +804,7 @@ function HistoryView() {
       {hasApiSessions ? (
         <div className="space-y-3">
           {hasLocalHistory ? (
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-primary-400">🌐 Gateway Sessions</p>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700">🌐 Gateway Sessions</p>
           ) : null}
           {sessions.map((session) => {
             const sessionId = readSessionId(session)
@@ -708,25 +823,26 @@ function HistoryView() {
 
             const statusBadge =
               status === 'active'
-                ? { label: 'Active', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' }
+                ? { label: 'Active', icon: '▶', className: 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50' }
                 : status === 'idle'
-                  ? { label: 'Idle', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
-                  : { label: 'Ended', className: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400' }
+                  ? { label: 'Idle', icon: '⏸', className: 'bg-amber-950/60 text-amber-400 border border-amber-800/50' }
+                  : { label: 'Ended', icon: '●', className: 'bg-neutral-800 text-neutral-500 border border-neutral-700' }
 
             return (
               <div
                 key={sessionId || label}
-                className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+                className="rounded-xl border border-neutral-800 bg-neutral-900/80 p-4 transition-colors hover:border-neutral-700"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                        {label}
+                      <span className="text-[10px] text-neutral-700" aria-hidden>{statusBadge.icon}</span>
+                      <h3 className="truncate text-sm font-semibold text-neutral-100">
+                        {label.replace(/^Mission:\s*/, '')}
                       </h3>
                       <span
                         className={cn(
-                          'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold',
                           statusBadge.className,
                         )}
                       >
@@ -734,11 +850,11 @@ function HistoryView() {
                       </span>
                     </div>
                     {lastMessage ? (
-                      <p className="mt-1 line-clamp-2 text-[11px] text-primary-500 dark:text-neutral-400">
+                      <p className="mt-1.5 line-clamp-2 font-mono text-[10px] text-neutral-600">
                         {lastMessage}
                       </p>
                     ) : null}
-                    <div className="mt-1.5 flex items-center gap-3 text-[10px] text-primary-400">
+                    <div className="mt-2 flex items-center gap-3 font-mono text-[9px] text-neutral-700">
                       {updatedAt > 0 ? <span>{timeAgoFromMs(updatedAt)}</span> : null}
                       {tokenCount !== undefined ? (
                         <span>{tokenCount.toLocaleString()} tokens</span>
@@ -748,26 +864,26 @@ function HistoryView() {
                   <button
                     type="button"
                     onClick={() => setExpandedId(isExpanded ? null : sessionId)}
-                    className="shrink-0 rounded-lg border border-primary-200 px-2.5 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                    className="shrink-0 rounded-lg border border-neutral-700 bg-neutral-800 px-2.5 py-1 text-[10px] font-medium text-neutral-400 transition-colors hover:border-neutral-600 hover:text-neutral-200"
                   >
                     {isExpanded ? 'Hide' : 'View'}
                   </button>
                 </div>
 
                 {isExpanded ? (
-                  <div className="mt-3 rounded-lg border border-primary-100 bg-primary-50/50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-400">
+                  <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950/60 p-3">
+                    <p className="mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-neutral-700">
                       Session Details
                     </p>
-                    <dl className="space-y-1 text-[11px]">
+                    <dl className="space-y-1.5">
                       <div className="flex gap-2">
-                        <dt className="shrink-0 text-primary-400">ID</dt>
-                        <dd className="truncate font-mono text-primary-700 dark:text-neutral-300">{sessionId}</dd>
+                        <dt className="shrink-0 font-mono text-[9px] text-neutral-700">ID</dt>
+                        <dd className="truncate font-mono text-[9px] text-neutral-400">{sessionId}</dd>
                       </div>
                       {lastMessage ? (
-                        <div className="flex gap-2">
-                          <dt className="shrink-0 text-primary-400">Last output</dt>
-                          <dd className="line-clamp-4 text-primary-700 dark:text-neutral-300">{lastMessage}</dd>
+                        <div className="flex flex-col gap-0.5">
+                          <dt className="font-mono text-[9px] text-neutral-700">Last output</dt>
+                          <dd className="line-clamp-4 font-mono text-[9px] text-neutral-500">{lastMessage}</dd>
                         </div>
                       ) : null}
                     </dl>
@@ -2227,44 +2343,50 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-white dark:bg-gradient-to-br dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950">
+      {/* ── Brand top accent border ──────────────────────────────────────── */}
+      <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
+
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-primary-200 px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 bg-neutral-900 px-5 py-3 dark:bg-neutral-950">
         <div>
-          <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
+          <h1 className="text-base font-semibold tracking-tight text-white">
             Agent Hub
           </h1>
-          <p className="text-xs text-primary-500">Mission Control</p>
+          <p className="font-mono text-[10px] text-neutral-500">// Mission Control</p>
         </div>
-        <p className="text-xs text-primary-400">Agent Hub · Mission Control</p>
+        {/* Status pill lives in the header */}
+        <GatewayStatusPill
+          status={effectiveGatewayStatus}
+          spawnErrorNames={spawnErrorNames}
+          onRetry={spawnErrorNames.length > 0 ? handleRetryAllSpawnErrors : undefined}
+        />
       </div>
 
-      {/* ── Gateway Connection Banner ──────────────────────────────────────── */}
-      <GatewayConnectionBanner
-        status={effectiveGatewayStatus}
-        spawnErrorNames={spawnErrorNames}
-        onRetry={spawnErrorNames.length > 0 ? handleRetryAllSpawnErrors : undefined}
-      />
-
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="flex items-center border-b border-primary-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
+      <div className="flex shrink-0 items-center border-b border-neutral-800 bg-neutral-900 dark:bg-neutral-950">
         {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'approvals'
             ? approvals.filter(a => a.status === 'pending').length
             : 0
+          const isActive = activeTab === tab.id
           return (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors',
-                activeTab === tab.id
-                  ? 'border-b-2 border-accent-500 text-accent-600 dark:border-accent-400 dark:text-accent-400'
-                  : 'border-b-2 border-transparent text-primary-500 hover:text-primary-700 dark:text-neutral-400 dark:hover:text-neutral-200',
+                'relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all',
+                isActive
+                  ? 'bg-neutral-800 text-white dark:bg-neutral-800 dark:text-white'
+                  : 'text-neutral-500 hover:bg-neutral-800/50 hover:text-neutral-200 dark:text-neutral-500 dark:hover:text-neutral-200',
               )}
             >
-              <span aria-hidden>{tab.icon}</span>
+              {/* Active tab: orange bottom highlight */}
+              {isActive ? (
+                <span className="absolute inset-x-0 bottom-0 h-[2px] bg-orange-500" />
+              ) : null}
+              <span aria-hidden className="text-base leading-none">{tab.icon}</span>
               <span>{tab.label}</span>
               {/* Mission tab: animated running indicator */}
               {tab.id === 'mission' && isMissionRunning ? (
@@ -2275,7 +2397,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               ) : null}
               {/* Approvals tab: pending count badge */}
               {tab.id === 'approvals' && pendingApprovals > 0 ? (
-                <span className="ml-0.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white leading-none">
+                <span className="ml-0.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
                   {pendingApprovals > 99 ? '99+' : pendingApprovals}
                 </span>
               ) : null}
@@ -2284,23 +2406,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         })}
 
         {/* Spacer + Live Feed toggle */}
-        <div className="ml-auto flex items-center pr-3">
+        <div className="ml-auto flex items-center gap-3 pr-3">
           <button
             type="button"
             onClick={() => {
               setLiveFeedVisible((v) => !v)
             }}
             className={cn(
-              'flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
               liveFeedVisible
-                ? 'bg-primary-100 text-primary-700 dark:bg-neutral-800 dark:text-neutral-200'
-                : 'text-primary-400 hover:text-primary-600 dark:text-neutral-500 dark:hover:text-neutral-300',
+                ? 'bg-neutral-700 text-neutral-100'
+                : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200',
             )}
           >
             <span aria-hidden>📡</span>
             <span className="hidden sm:inline">Live Feed</span>
             {unreadFeedCount > 0 && !liveFeedVisible ? (
-              <span className="ml-0.5 rounded-full bg-accent-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+              <span className="ml-0.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
                 {unreadFeedCount > 99 ? '99+' : unreadFeedCount}
               </span>
             ) : null}
@@ -2318,6 +2440,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
               selectedOutputAgentId={selectedOutputAgentId}
+              activeTemplateName={activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined}
+              processType={processType}
               onViewOutput={(agentId) => {
                 handleAgentSelection(agentId)
                 // Switch to mission tab to see output

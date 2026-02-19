@@ -21,6 +21,7 @@ export type AgentWorkingRow = {
   taskCount: number
   currentTask?: string
   sessionKey?: string
+  roleDescription?: string
 }
 
 type AgentsWorkingPanelProps = {
@@ -32,104 +33,79 @@ type AgentsWorkingPanelProps = {
   selectedAgentId?: string
 }
 
+// Accent colors per agent index (cycled) — must match AGENT_ACCENT_COLORS in agent-hub-layout
+const ACCENT_COLORS = [
+  { bar: 'bg-orange-500', text: 'text-orange-400' },
+  { bar: 'bg-blue-500',   text: 'text-blue-400' },
+  { bar: 'bg-violet-500', text: 'text-violet-400' },
+  { bar: 'bg-emerald-500',text: 'text-emerald-400' },
+  { bar: 'bg-rose-500',   text: 'text-rose-400' },
+  { bar: 'bg-amber-500',  text: 'text-amber-400' },
+]
+
 const MODEL_BADGE: Record<ModelPresetId, string> = {
-  auto: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
-  opus: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  codex: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  flash: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  auto:   'bg-neutral-800 text-neutral-400',
+  opus:   'bg-orange-950/70 text-orange-400',
+  sonnet: 'bg-blue-950/70 text-blue-400',
+  codex:  'bg-emerald-950/70 text-emerald-400',
+  flash:  'bg-violet-950/70 text-violet-400',
 }
 
 const MODEL_LABEL: Record<ModelPresetId, string> = {
-  auto: 'Auto',
-  opus: 'Opus 4.6',
-  sonnet: 'Sonnet 4.6',
-  codex: 'Codex',
-  flash: 'Flash',
+  auto:   'Auto',
+  opus:   'Opus',
+  sonnet: 'Sonnet',
+  codex:  'Codex',
+  flash:  'Flash',
 }
 
-function timeAgo(timestamp: number): string {
-  const delta = Math.max(0, Date.now() - timestamp)
-  const seconds = Math.floor(delta / 1000)
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  return `${hours}h ago`
+const STATUS_TEXT: Record<AgentWorkingStatus, string> = {
+  active:   '● working',
+  spawning: '◌ spawning...',
+  ready:    '○ ready',
+  idle:     '○ idle',
+  paused:   '⏸ paused',
+  error:    '✕ error',
+  none:     '— no session',
 }
 
-function StatusDot({
-  status,
-  className,
-}: {
-  status: AgentWorkingStatus
-  className?: string
-}) {
-  if (status === 'active') {
-    return (
-      <span className={cn('relative inline-flex size-2.5 shrink-0', className)}>
-        <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
-        <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
-      </span>
-    )
-  }
-  if (status === 'spawning') {
-    return (
-      <span className={cn('relative inline-flex size-2.5 shrink-0', className)}>
-        <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/70" />
-        <span className="relative inline-flex size-2.5 rounded-full bg-amber-400" />
-      </span>
-    )
-  }
-
-  const DOT_COLOR: Record<AgentWorkingStatus, string> = {
-    active: 'bg-emerald-500',
-    spawning: 'bg-amber-400',
-    ready: 'bg-neutral-400 dark:bg-neutral-500',
-    idle: 'bg-amber-500',
-    paused: 'bg-orange-500',
-    error: 'bg-neutral-300 dark:bg-neutral-600',
-    none: 'bg-neutral-300 dark:bg-neutral-600',
-  }
-
+function SpinnerIcon({ className }: { className?: string }) {
   return (
-    <span className={cn('relative inline-flex size-2.5 shrink-0', className)}>
-      <span
-        className={cn('relative inline-flex size-2.5 rounded-full', DOT_COLOR[status])}
-      />
-    </span>
+    <svg
+      className={cn('animate-spin', className)}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
+    </svg>
   )
 }
 
-function AgentCard({
+function AgentRow({
   agent,
+  accentIndex,
   isSelected,
   onSelect,
   onKill,
   onRespawn,
 }: {
   agent: AgentWorkingRow
+  accentIndex: number
   isSelected: boolean
   onSelect: () => void
   onKill?: () => void
   onRespawn?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const accent = ACCENT_COLORS[accentIndex % ACCENT_COLORS.length]
+  const isActive = agent.status === 'active'
+  const isSpawning = agent.status === 'spawning'
 
-  const placeholderText =
-    agent.status === 'active'
-      ? 'Working...'
-      : agent.status === 'spawning'
-        ? 'Spawning...'
-        : agent.status === 'idle'
-          ? 'Idle'
-          : agent.status === 'ready'
-            ? 'Ready'
-            : agent.status === 'paused'
-              ? 'Paused'
-              : agent.status === 'error'
-                ? 'Error — click ↻ to respawn'
-                : 'No session'
+  const statusLine = agent.lastLine
+    ? agent.lastLine
+    : STATUS_TEXT[agent.status]
 
   return (
     <div
@@ -138,108 +114,89 @@ function AgentCard({
       onKeyDown={(e) => e.key === 'Enter' && onSelect()}
       onClick={onSelect}
       className={cn(
-        'rounded-xl border border-white/10 bg-white/70 dark:bg-neutral-900/50 px-3 py-2 transition-colors cursor-pointer',
-        'hover:bg-white/90 dark:hover:bg-neutral-900/70',
-        isSelected &&
-          'ring-2 ring-accent-400 dark:ring-accent-600 bg-accent-50/40 dark:bg-accent-950/10',
+        'group relative flex cursor-pointer items-stretch overflow-hidden rounded-lg border transition-all',
+        'border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800/60',
+        isSelected && 'border-neutral-600 bg-neutral-800/80 ring-1 ring-neutral-500/30',
       )}
     >
-      {/* Top row: status dot + name + model badge + respawn */}
-      <div className="flex min-w-0 items-center gap-2">
-        <StatusDot status={agent.status} className="mt-px shrink-0" />
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-primary-900 dark:text-neutral-100">
-          {agent.name}
-        </span>
-        <span
-          className={cn(
-            'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium',
-            MODEL_BADGE[agent.modelId],
-          )}
-        >
-          {MODEL_LABEL[agent.modelId]}
-        </span>
-        {agent.status === 'error' && onRespawn ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onRespawn()
-            }}
-            className="shrink-0 text-sm text-neutral-400 transition-colors hover:text-neutral-600 dark:hover:text-neutral-200"
-            title="Respawn agent"
-          >
-            ↻
-          </button>
-        ) : null}
-      </div>
+      {/* Left accent bar */}
+      <div className={cn('w-0.5 shrink-0', accent.bar)} />
 
-      {/* Middle: last line (2-line max with fade) */}
-      <div className="relative mt-1.5 overflow-hidden" style={{ maxHeight: '2.6em' }}>
-        <p
-          className={cn(
-            'line-clamp-2 text-[11px] leading-[1.3] text-primary-600 dark:text-neutral-400',
-            !agent.lastLine && 'italic text-primary-400 dark:text-neutral-500',
-          )}
-        >
-          {agent.lastLine ?? placeholderText}
-        </p>
-        {agent.lastLine ? (
-          <div className="pointer-events-none absolute bottom-0 right-0 h-4 w-12 bg-gradient-to-l from-white/70 to-transparent dark:from-neutral-900/50" />
-        ) : null}
-      </div>
+      {/* Content */}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-2 pl-3 pr-2">
+        {/* Row 1: status indicator + name + model badge + actions */}
+        <div className="flex items-center gap-2">
+          {/* Status indicator */}
+          <span className="shrink-0">
+            {isActive ? (
+              <span className="relative flex size-2">
+                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+              </span>
+            ) : isSpawning ? (
+              <SpinnerIcon className="size-3 text-amber-400" />
+            ) : (
+              <span
+                className={cn(
+                  'inline-flex size-2 rounded-full',
+                  agent.status === 'idle'  ? 'bg-amber-500' :
+                  agent.status === 'ready' ? 'bg-neutral-500' :
+                  agent.status === 'error' ? 'bg-red-500' :
+                  'bg-neutral-700',
+                )}
+              />
+            )}
+          </span>
 
-      {/* Bottom: timestamp + action buttons */}
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
-          {agent.lastAt
-            ? timeAgo(agent.lastAt)
-            : agent.taskCount > 0
-              ? `${agent.taskCount} task${agent.taskCount !== 1 ? 's' : ''}`
-              : '—'}
-        </span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onSelect()
-            }}
-            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-primary-500 transition-colors hover:bg-primary-100 hover:text-primary-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          {/* Name */}
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-neutral-100">
+            {agent.name}
+          </span>
+
+          {/* Model badge */}
+          <span
+            className={cn(
+              'shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-medium',
+              MODEL_BADGE[agent.modelId],
+            )}
           >
-            View
-          </button>
+            {MODEL_LABEL[agent.modelId]}
+          </span>
+
+          {/* Respawn on error */}
+          {agent.status === 'error' && onRespawn ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRespawn() }}
+              className="shrink-0 text-xs text-neutral-500 transition-colors hover:text-neutral-200"
+              title="Respawn agent"
+            >
+              ↻
+            </button>
+          ) : null}
+
+          {/* Context menu */}
           {onKill ? (
             <div className="relative">
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setMenuOpen((prev) => !prev)
-                }}
-                className="rounded px-1.5 py-0.5 text-[10px] font-medium text-primary-400 transition-colors hover:bg-primary-100 hover:text-primary-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen((p) => !p) }}
+                className="shrink-0 text-sm text-neutral-700 transition-colors group-hover:text-neutral-400 hover:text-neutral-200"
               >
                 ⋯
               </button>
               {menuOpen ? (
                 <>
-                  {/* Backdrop to close */}
                   <div
                     className="fixed inset-0 z-10"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setMenuOpen(false)
-                    }}
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }}
                     aria-hidden
                   />
-                  <div className="absolute bottom-full right-0 z-20 mb-1 min-w-[110px] rounded-lg border border-primary-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                  <div className="absolute bottom-full right-0 z-20 mb-1 min-w-[110px] rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setMenuOpen(false)
-                        onKill()
-                      }}
-                      className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                      onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onKill() }}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-red-400 transition-colors hover:bg-red-950/20"
                     >
                       Kill session
                     </button>
@@ -249,6 +206,11 @@ function AgentCard({
             </div>
           ) : null}
         </div>
+
+        {/* Row 2: status / last activity in monospace */}
+        <p className="truncate font-mono text-[9px] text-neutral-600">
+          {statusLine}
+        </p>
       </div>
     </div>
   )
@@ -256,39 +218,60 @@ function AgentCard({
 
 function AgentCompactCard({
   agent,
+  accentIndex,
   isSelected,
   onSelect,
 }: {
   agent: AgentWorkingRow
+  accentIndex: number
   isSelected: boolean
   onSelect: () => void
 }) {
+  const accent = ACCENT_COLORS[accentIndex % ACCENT_COLORS.length]
+  const isActive = agent.status === 'active'
+
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        'w-40 shrink-0 rounded-xl border border-white/10 bg-white/70 px-2.5 py-2 text-left transition-colors dark:bg-neutral-900/50',
-        'hover:bg-white/90 dark:hover:bg-neutral-900/70',
-        isSelected && 'ring-2 ring-accent-400 dark:ring-accent-600',
+        'relative w-40 shrink-0 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900/60 px-2.5 py-2 text-left transition-colors',
+        'hover:bg-neutral-800/60',
+        isSelected && 'border-neutral-600 ring-1 ring-neutral-500/30',
       )}
     >
-      <div className="flex items-center gap-1.5">
-        <StatusDot status={agent.status} />
-        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-primary-900 dark:text-neutral-100">
+      {/* Top accent bar */}
+      <div className={cn('absolute inset-x-0 top-0 h-0.5', accent.bar)} />
+      <div className="flex items-center gap-1.5 pt-0.5">
+        {isActive ? (
+          <span className="relative flex size-1.5 shrink-0">
+            <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+            <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+          </span>
+        ) : (
+          <span
+            className={cn(
+              'inline-flex size-1.5 shrink-0 rounded-full',
+              agent.status === 'idle' ? 'bg-amber-500' :
+              agent.status === 'error' ? 'bg-red-500' :
+              'bg-neutral-600',
+            )}
+          />
+        )}
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-neutral-100">
           {agent.name}
         </span>
         <span
           className={cn(
-            'shrink-0 rounded-full px-1 py-px text-[9px] font-medium',
+            'shrink-0 rounded px-1 py-px font-mono text-[8px]',
             MODEL_BADGE[agent.modelId],
           )}
         >
           {MODEL_LABEL[agent.modelId]}
         </span>
       </div>
-      <p className="mt-1 truncate text-[10px] italic text-primary-400 dark:text-neutral-500">
-        {agent.lastLine ?? (agent.status === 'active' ? 'Working...' : 'Idle')}
+      <p className="mt-1 truncate font-mono text-[9px] text-neutral-600">
+        {agent.lastLine ?? (isActive ? '● working' : STATUS_TEXT[agent.status])}
       </p>
     </button>
   )
@@ -311,35 +294,33 @@ export function AgentsWorkingPanel({
   return (
     <div
       className={cn(
-        'rounded-2xl border border-white/10 bg-white/60 backdrop-blur-md dark:border-white/10 dark:bg-neutral-950/40',
+        'rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/60',
         className,
       )}
     >
-      {/* Header */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-neutral-200">
-            Agents working
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-400" style={{ fontVariant: 'small-caps' }}>
+            Agents Working
           </h3>
           {activeCount > 0 ? (
             <div className="flex items-center gap-1">
               <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                Live
+              <span className="font-mono text-[9px] font-medium text-emerald-500">
+                {activeCount} live
               </span>
             </div>
           ) : null}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-primary-400 dark:text-neutral-500">
-            {activeCount > 0
-              ? `${activeCount} active`
-              : `${agents.length} agent${agents.length !== 1 ? 's' : ''}`}
+          <span className="font-mono text-[9px] text-neutral-700">
+            {agents.length} agent{agents.length !== 1 ? 's' : ''}
           </span>
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
-            className="rounded p-0.5 text-primary-400 transition-colors hover:text-primary-600 dark:hover:text-neutral-200"
+            className="rounded p-0.5 text-neutral-600 transition-colors hover:text-neutral-300"
             aria-label={collapsed ? 'Expand agents panel' : 'Collapse agents panel'}
           >
             <svg
@@ -356,20 +337,21 @@ export function AgentsWorkingPanel({
         </div>
       </div>
 
-      {/* Content */}
+      {/* ── Content ─────────────────────────────────────────────────────── */}
       {!collapsed ? (
         agents.length === 0 ? (
-          <p className="px-3 pb-3 text-center text-[11px] text-primary-400 dark:text-neutral-500">
-            No agents configured — choose a template to get started
+          <p className="px-3 pb-3 text-center font-mono text-[10px] text-neutral-700">
+            // no agents configured
           </p>
         ) : (
           <>
             {/* Desktop: vertical card list */}
-            <div className="hidden space-y-1.5 px-2 pb-2 md:block">
-              {agents.map((agent) => (
-                <AgentCard
+            <div className="hidden space-y-1 px-2 pb-2 md:block">
+              {agents.map((agent, i) => (
+                <AgentRow
                   key={agent.id}
                   agent={agent}
+                  accentIndex={i}
                   isSelected={selectedAgentId === agent.id}
                   onSelect={() => onSelectAgent?.(agent.id)}
                   onKill={onKillAgent ? () => onKillAgent(agent.id) : undefined}
@@ -380,10 +362,11 @@ export function AgentsWorkingPanel({
 
             {/* Mobile: horizontal scrollable compact cards */}
             <div className="flex gap-2 overflow-x-auto px-2 pb-2 md:hidden">
-              {agents.map((agent) => (
+              {agents.map((agent, i) => (
                 <AgentCompactCard
                   key={agent.id}
                   agent={agent}
+                  accentIndex={i}
                   isSelected={selectedAgentId === agent.id}
                   onSelect={() => onSelectAgent?.(agent.id)}
                 />

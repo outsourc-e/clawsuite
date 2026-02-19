@@ -30,19 +30,21 @@ const AGENT_TYPES = new Set<FeedEventType>([
   'gateway_health',
 ])
 
-const EVENT_ICONS: Record<FeedEventType, string> = {
-  mission_started: '🚀',
-  task_created: '🆕',
-  task_moved: '🔀',
-  task_completed: '✅',
-  task_assigned: '👤',
-  agent_active: '🟢',
-  agent_idle: '🟡',
-  agent_paused: '⏸️',
-  agent_spawned: '➕',
-  agent_killed: '🛑',
-  gateway_health: '💓',
-  system: 'ℹ️',
+type EventBadge = { label: string; className: string }
+
+const EVENT_BADGE: Record<FeedEventType, EventBadge> = {
+  mission_started: { label: 'MISSION', className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50' },
+  task_created:    { label: 'TASK',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
+  task_moved:      { label: 'MOVE',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
+  task_completed:  { label: 'DONE',    className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
+  task_assigned:   { label: 'ASSIGN',  className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
+  agent_active:    { label: 'AGENT',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
+  agent_idle:      { label: 'IDLE',    className: 'bg-neutral-800 text-neutral-500 border border-neutral-700' },
+  agent_paused:    { label: 'PAUSE',   className: 'bg-amber-950/70 text-amber-400 border border-amber-800/50' },
+  agent_spawned:   { label: 'SPAWN',   className: 'bg-blue-950/70 text-blue-400 border border-blue-800/50' },
+  agent_killed:    { label: 'KILL',    className: 'bg-red-950/70 text-red-400 border border-red-800/50' },
+  gateway_health:  { label: 'SYS',     className: 'bg-neutral-900 text-neutral-600 border border-neutral-800' },
+  system:          { label: 'SYS',     className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50' },
 }
 
 function readString(value: unknown): string {
@@ -68,38 +70,16 @@ function sessionName(session: SessionRecord): string {
   )
 }
 
-function timeAgo(timestamp: number, now: number): string {
-  const delta = Math.max(0, now - timestamp)
-  const seconds = Math.floor(delta / 1000)
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
-
-function rowColorClass(event: FeedRow): string {
-  const msg = event.baseMessage.toLowerCase()
-  if (
-    event.type === 'system' &&
-    (msg.includes('fail') || msg.includes('error') || msg.includes('failed'))
-  ) {
-    return 'bg-red-50/80 border-red-200/70 dark:bg-red-950/20 dark:border-red-900/40'
-  }
-  if (event.type === 'agent_spawned') {
-    return 'bg-emerald-50/80 border-emerald-200/70 dark:bg-emerald-950/20 dark:border-emerald-900/40'
-  }
-  if (event.type === 'system') {
-    return 'bg-neutral-50/80 border-neutral-200/70 dark:bg-neutral-900/50 dark:border-neutral-700'
-  }
-  return 'border-primary-200/70 bg-white/80 dark:border-neutral-800 dark:bg-neutral-900/70'
+function formatTimestamp(ts: number): string {
+  const d = new Date(ts)
+  return [d.getHours(), d.getMinutes(), d.getSeconds()]
+    .map((n) => String(n).padStart(2, '0'))
+    .join(':')
 }
 
 export function LiveFeedPanel() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('All')
   const [events, setEvents] = useState<Array<FeedRow>>([])
-  const [clock, setClock] = useState(Date.now())
   const previousSessionsRef = useRef<Map<string, string> | null>(null)
 
   useEffect(
@@ -122,7 +102,6 @@ export function LiveFeedPanel() {
               ...previous.slice(1),
             ].slice(0, 100)
           }
-
           return [
             { ...event, baseMessage: event.message, repeatCount: 1 },
             ...previous,
@@ -133,27 +112,18 @@ export function LiveFeedPanel() {
   )
 
   useEffect(() => {
-    // Refresh relative timestamps every 10s
-    const tick = window.setInterval(() => setClock(Date.now()), 10_000)
-    return () => window.clearInterval(tick)
-  }, [])
-
-  useEffect(() => {
     async function pollSessions() {
       try {
         const response = await fetch('/api/sessions')
         if (!response.ok) return
-
         const payload = (await response.json()) as { sessions?: Array<SessionRecord> }
         const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
         const next = new Map<string, string>()
-
         sessions.forEach((session) => {
           const id = sessionIdentity(session)
           if (!id) return
           next.set(id, sessionName(session) || id)
         })
-
         const previous = previousSessionsRef.current
         if (previous) {
           next.forEach((name, id) => {
@@ -167,25 +137,20 @@ export function LiveFeedPanel() {
             }
           })
         }
-
         previousSessionsRef.current = next
       } catch {
         // Ignore polling errors; feed continues from local events.
       }
     }
-
     void pollSessions()
-    const interval = window.setInterval(() => {
-      void pollSessions()
-    }, 10_000)
-
+    const interval = window.setInterval(() => void pollSessions(), 10_000)
     return () => window.clearInterval(interval)
   }, [])
 
   useEffect(() => {
-    const emitHealth = () => emitFeedEvent({ type: 'gateway_health', message: 'Gateway health check' })
-    emitHealth()
-    const interval = window.setInterval(emitHealth, 30_000)
+    const emit = () => emitFeedEvent({ type: 'gateway_health', message: 'Gateway health check' })
+    emit()
+    const interval = window.setInterval(emit, 30_000)
     return () => window.clearInterval(interval)
   }, [])
 
@@ -198,37 +163,45 @@ export function LiveFeedPanel() {
   }, [activeFilter, events])
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3">
-        <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">Live Feed</h2>
+    <div className="flex h-full flex-col bg-neutral-950 dark:bg-neutral-950">
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">
+          Live Feed
+        </h2>
         <div className="flex items-center gap-2">
           {events.length > 0 ? (
             <button
               type="button"
               onClick={() => setEvents([])}
-              className="rounded px-1.5 py-0.5 text-[11px] text-primary-400 transition-colors hover:bg-primary-100 hover:text-primary-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              className="rounded px-1.5 py-0.5 text-[10px] text-neutral-600 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
             >
               Clear
             </button>
           ) : null}
-          <span className="flex items-center gap-1 text-[11px] text-emerald-600">
-            <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-            Live
+          {/* Animated LIVE badge */}
+          <span className="flex items-center gap-1.5 rounded-full border border-emerald-800/50 bg-emerald-950/40 px-2 py-0.5 text-[9px] font-bold tracking-wider text-emerald-400">
+            <span className="relative flex size-1.5">
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+            </span>
+            LIVE
           </span>
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-primary-100 px-4 py-3">
+      {/* ── Filters ─────────────────────────────────────────────────────── */}
+      <div className="flex shrink-0 gap-1 border-b border-neutral-800 px-3 py-2">
         {FILTERS.map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveFilter(tab)}
             className={cn(
-              'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors',
+              'rounded px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors',
               activeFilter === tab
-                ? 'bg-primary-100 text-primary-700 dark:bg-neutral-800 dark:text-neutral-200'
-                : 'text-primary-500 hover:bg-primary-50 dark:hover:bg-neutral-800/50',
+                ? 'bg-neutral-800 text-neutral-100'
+                : 'text-neutral-600 hover:bg-neutral-900 hover:text-neutral-300',
             )}
           >
             {tab}
@@ -236,46 +209,60 @@ export function LiveFeedPanel() {
         ))}
       </div>
 
-      <div className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
-        {visibleEvents.length === 0 ? (
-          <p className="py-8 text-center text-[11px] text-primary-400">
-            No events yet — start a mission
-          </p>
-        ) : (
-          visibleEvents.map((event) => {
-            const message =
-              event.repeatCount > 1
-                ? `${event.baseMessage} (x${event.repeatCount})`
-                : event.baseMessage
+      {/* ── Events list ─────────────────────────────────────────────────── */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {/* Top fade overlay */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-neutral-950 to-transparent" />
 
-            return (
-              <div
-                key={event.id}
-                className={cn(
-                  'flex items-start gap-2 rounded-lg border px-2.5 py-2',
-                  rowColorClass(event),
-                )}
-              >
-                <span className="mt-0.5 text-sm" aria-hidden>
-                  {EVENT_ICONS[event.type] ?? '•'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-medium text-primary-900 dark:text-neutral-100">
-                    {message}
-                  </p>
-                  {event.agentName ? (
-                    <p className="truncate text-[10px] text-primary-500 dark:text-neutral-400">
-                      {event.agentName}
-                    </p>
-                  ) : null}
-                </div>
-                <span className="shrink-0 text-[10px] text-primary-400">
-                  {timeAgo(event.timestamp, clock)}
-                </span>
-              </div>
-            )
-          })
-        )}
+        <div className="h-full overflow-y-auto px-3 pb-3 pt-8">
+          {visibleEvents.length === 0 ? (
+            <p className="py-8 text-center font-mono text-[10px] text-neutral-700">
+              {`// no events yet — start a mission`}
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {visibleEvents.map((event) => {
+                const message =
+                  event.repeatCount > 1
+                    ? `${event.baseMessage} ×${event.repeatCount}`
+                    : event.baseMessage
+                const badge = EVENT_BADGE[event.type] ?? EVENT_BADGE.system
+
+                return (
+                  <div
+                    key={event.id}
+                    className="flex items-start gap-2 rounded-md border border-neutral-800/60 bg-neutral-900/40 px-2 py-1.5"
+                  >
+                    {/* Type badge */}
+                    <span
+                      className={cn(
+                        'mt-0.5 shrink-0 rounded px-1 py-px font-mono text-[8px] font-bold tracking-wider',
+                        badge.className,
+                      )}
+                    >
+                      {badge.label}
+                    </span>
+
+                    {/* Message + agent name */}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] leading-tight text-neutral-200">{message}</p>
+                      {event.agentName ? (
+                        <p className="mt-0.5 truncate font-mono text-[9px] text-neutral-700">
+                          {event.agentName}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {/* Timestamp */}
+                    <span className="shrink-0 font-mono text-[9px] tabular-nums text-neutral-700">
+                      {formatTimestamp(event.timestamp)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
