@@ -537,11 +537,9 @@ export function useDashboardData(): UseDashboardDataResult {
       }
     }
 
-    // Fallback 1: use top-level dailyCost from session-status (enriched by the API route)
-    if (todayCostTotal === 0) {
-      const ssDaily = readNumber(ssPayload?.dailyCost ?? ssPayload?.costUsd ?? 0)
-      if (ssDaily > 0) todayCostTotal = ssDaily
-    }
+    // Primary: top-level dailyCost from session-status (most accurate, always present)
+    const ssDaily = readNumber(ssPayload?.dailyCost ?? ssPayload?.costUsd ?? 0)
+    if (ssDaily > 0) todayCostTotal = ssDaily
 
     // Also pull input/output/cacheRead from usage API for finer breakdown
     const usageData = usageSummaryQuery.data?.kind === 'ok' ? usageSummaryQuery.data.data : null
