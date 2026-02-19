@@ -25,6 +25,8 @@ type TaskBoardProps = {
   selectedAgentId?: string
   onRef?: (ref: TaskBoardRef) => void
   onTasksChange?: (tasks: Array<HubTask>) => void
+  /** When set, board defaults to showing only tasks with this missionId */
+  activeMissionId?: string
 }
 const STORAGE_KEY = 'clawsuite:hub-tasks'
 const COLUMNS: Array<{ key: TaskStatus; label: string }> = [
@@ -111,7 +113,7 @@ type TaskEditDraft = {
   status: TaskStatus
 }
 
-export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTasksChange }: TaskBoardProps) {
+export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTasksChange, activeMissionId }: TaskBoardProps) {
   const [tasks, setTasks] = useState<Array<HubTask>>([])
   const [hydrated, setHydrated] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -120,6 +122,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
   const [form, setForm] = useState({ title: '', description: '', priority: 'normal' as TaskPriority, agentId: selectedAgentId ?? '' })
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [taskEditDraft, setTaskEditDraft] = useState<TaskEditDraft | null>(null)
+  const [showAllTasks, setShowAllTasks] = useState(false)
   const tasksRef = useRef<Array<HubTask>>([])
   // Prevent click from firing right after a drag interaction
   const dragHappenedRef = useRef(false)
@@ -141,6 +144,12 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
     onTasksChange?.(tasks)
   }, [onTasksChange, tasks])
   const agentNameById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents])
+
+  // Filter tasks by activeMissionId (unless showAllTasks is on)
+  const visibleTasks = useMemo(() => {
+    if (!activeMissionId || showAllTasks) return tasks
+    return tasks.filter((t) => t.missionId === activeMissionId)
+  }, [tasks, activeMissionId, showAllTasks])
   const addTasks = useCallback((incomingTasks: Array<HubTask>) => {
     if (incomingTasks.length === 0) return
     const normalizedIncomingTasks = incomingTasks.map(normalizeTask)
@@ -239,10 +248,10 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
   const selectedAgentName = selectedAgentId ? agentNameById.get(selectedAgentId) ?? selectedAgentId : undefined
   const tasksByColumn = useMemo(() => {
     const grouped: Record<TaskStatus, Array<HubTask>> = { inbox: [], assigned: [], in_progress: [], review: [], done: [] }
-    tasks.forEach((task) => grouped[task.status].push(task))
+    visibleTasks.forEach((task) => grouped[task.status].push(task))
     ;(Object.keys(grouped) as Array<TaskStatus>).forEach((status) => grouped[status].sort((a, b) => b.updatedAt - a.updatedAt))
     return grouped
-  }, [tasks])
+  }, [visibleTasks])
   function closeCreateForm() {
     setIsCreating(false)
     setForm((previous) => ({ ...previous, title: '', description: '' }))
@@ -289,11 +298,28 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-primary-200 px-4 py-3">
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">Tasks</h2>
-          <p className="truncate text-[11px] text-primary-500">
-            {selectedAgentName ? `Focused agent: ${selectedAgentName}` : 'Showing all agents'}
-          </p>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">Tasks</h2>
+            <p className="truncate text-[11px] text-primary-500">
+              {selectedAgentName ? `Focused agent: ${selectedAgentName}` : 'Showing all agents'}
+            </p>
+          </div>
+          {activeMissionId ? (
+            <button
+              type="button"
+              onClick={() => setShowAllTasks((p) => !p)}
+              className={cn(
+                'shrink-0 rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors',
+                showAllTasks
+                  ? 'border-neutral-300 bg-neutral-100 text-neutral-700 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+                  : 'border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-500 dark:hover:border-neutral-600',
+              )}
+              title={showAllTasks ? 'Show only current mission tasks' : 'Show tasks from all missions'}
+            >
+              {showAllTasks ? 'Mission only' : 'Show all'}
+            </button>
+          ) : null}
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-x-auto px-4 py-3">

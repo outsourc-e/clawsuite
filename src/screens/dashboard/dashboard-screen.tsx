@@ -26,7 +26,6 @@ import { SquadStatusWidget } from './components/squad-status-widget'
 import { ActivityLogWidget } from './components/activity-log-widget'
 import { CollapsibleWidget } from './components/collapsible-widget'
 import { MetricsWidget } from './components/metrics-widget'
-import { NowCard } from './components/now-card'
 import { NotificationsWidget } from './components/notifications-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
 import { SkillsWidget } from './components/skills-widget'
@@ -212,12 +211,10 @@ export function DashboardScreen() {
 
   // ── Derived display values ─────────────────────────────────────────────────
 
-  // P0-A: always show a dollar value — never "—" for cost
-  const costDisplay = formatMoney(dashboardData.todayCostUsd ?? 0)
-
-  // Metric card cost: use cost.today (session-status dailyBreakdown — same primary source as SystemGlance).
-  // todayCostUsd can be null while queries load; cost.today is always 0+ once available.
-  const metricCostDisplay = formatMoney(dashboardData.cost.today ?? 0)
+  // Canonical cost display — single source of truth for both SystemGlance and MetricCards.
+  // todayCostUsd is the priority-resolved value; cost.today mirrors it once the hook settles.
+  // Never shows "—"; always shows at least $0.00.
+  const costTodayDisplay = formatMoney(dashboardData.todayCostUsd ?? dashboardData.cost.today)
 
   // B1: Uptime fallback — if formatted is "—", show "Active · last check Xm ago"
   const uptimeDisplay = useMemo(() => {
@@ -291,7 +288,7 @@ export function DashboardScreen() {
           node: (
             <MetricsWidget
               title="Cost Today"
-              value={metricCostDisplay}
+              value={costTodayDisplay}
               subtitle="Today's spend"
               icon={ChartLineData02Icon}
               accent="emerald"
@@ -299,7 +296,7 @@ export function DashboardScreen() {
               trendLabel={dashboardData.cost.trend !== null ? 'vs prev day' : undefined}
               trendInverted
               description="Today's estimated spend from gateway cost telemetry."
-              rawValue={metricCostDisplay}
+              rawValue={costTodayDisplay}
               chartData={costChartData}
               chartAccentClass="bg-emerald-500"
             />
@@ -323,8 +320,7 @@ export function DashboardScreen() {
       ]
     },
     [
-      costDisplay,
-      metricCostDisplay,
+      costTodayDisplay,
       costChartData,
       sessionsChartData,
       dashboardData.agents.active,
@@ -729,16 +725,21 @@ export function DashboardScreen() {
           {/* ── Mobile layout ───────────────────────────────────────────────── */}
           {isMobile ? (
             <div className="flex flex-col gap-3">
-              {/* Mobile hero: compact NowCard */}
-              <NowCard
-                gatewayConnected={dashboardData.connection.connected}
-                activeAgents={dashboardData.agents.active || dashboardData.agents.total}
-                activeTasks={dashboardData.cron.inProgress}
+              {/* Mobile hero: SystemGlance compact — single source of truth for Sessions/Agents/Cost/Uptime */}
+              <SystemGlance
                 sessions={dashboardData.sessions.total}
+                activeAgents={dashboardData.agents.active || dashboardData.agents.total}
+                costToday={costTodayDisplay}
+                uptimeFormatted={uptimeDisplay}
                 updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
+                healthStatus={healthStatus}
+                gatewayConnected={dashboardData.connection.connected}
+                sessionPercent={dashboardData.usage.contextPercent ?? undefined}
+                currentModel={dashboardData.model.current}
+                compact
               />
 
-              {/* Alert chips */}
+              {/* Alert signal chips — only one top-of-page clutter element */}
               {dashboardData.alerts.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {dashboardData.alerts.map((chip) => (
@@ -757,8 +758,7 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
-              {/* Metric cards */}
-              <WidgetGrid items={metricItems} className="gap-3" />
+              {/* MetricCards intentionally omitted on mobile — SystemGlance above is the canonical hero */}
 
               {/* Deep sections (reorderable) */}
               <div className="space-y-1.5">
@@ -805,7 +805,7 @@ export function DashboardScreen() {
               <SystemGlance
                 sessions={dashboardData.sessions.total}
                 activeAgents={dashboardData.agents.active || dashboardData.agents.total}
-                costToday={costDisplay}
+                costToday={costTodayDisplay}
                 uptimeFormatted={uptimeDisplay}
                 updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
                 healthStatus={healthStatus}

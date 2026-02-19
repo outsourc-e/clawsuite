@@ -204,7 +204,7 @@ function extractMissionItems(goal: string): string[] {
   return uniqueSegments
 }
 
-function parseMissionGoal(goal: string, teamMembers: TeamMember[]): HubTask[] {
+function parseMissionGoal(goal: string, teamMembers: TeamMember[], missionId?: string): HubTask[] {
   const trimmedGoal = goal.trim()
   if (!trimmedGoal) return []
   const now = Date.now()
@@ -231,6 +231,7 @@ function parseMissionGoal(goal: string, teamMembers: TeamMember[]): HubTask[] {
       priority: index === 0 ? 'high' : 'normal',
       status: member ? 'assigned' : 'inbox',
       agentId: member?.id,
+      missionId,
       createdAt,
       updatedAt: createdAt,
     }
@@ -2083,18 +2084,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (dispatchingRef.current) return
     const trimmedGoal = missionGoal.trim()
     if (!trimmedGoal) return
-    const createdTasks = parseMissionGoal(trimmedGoal, teamWithRuntimeStatus)
+    const newMissionId = `mission-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    const createdTasks = parseMissionGoal(trimmedGoal, teamWithRuntimeStatus, newMissionId)
     if (createdTasks.length === 0) {
       toast('Could not parse actionable tasks from mission goal', { type: 'error' })
       return
     }
 
     dispatchingRef.current = true
-    const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
 
     // Save initial checkpoint
-    const missionId = `mission-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-    missionIdRef.current = missionId
+    const missionId = newMissionId
     missionStartedAtRef.current = Date.now()
     saveMissionCheckpoint({
       id: missionId,
@@ -2130,6 +2130,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setActiveMissionGoal(trimmedGoal)
     setMissionTasks(createdTasks)
     setDispatchedTaskIdsByAgent({})
+    const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
     setSelectedOutputAgentId(firstAssignedAgentId)
     sessionActivityRef.current = new Map()
     // ── Auto-switch to Mission tab and show live feed ──────────────────────
@@ -2212,11 +2213,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             className="mx-3 mt-2 mb-1"
             selectedAgentId={selectedOutputAgentId}
             onSelectAgent={handleAgentSelection}
-            onKillAgent={(agentId) => {
+            onKillAgent={(agentId: string) => {
               const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
               if (member) void handleKillSession(member)
             }}
-            onRespawnAgent={(agentId) => {
+            onRespawnAgent={(agentId: string) => {
               const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
               if (member) void handleRetrySpawn(member)
             }}

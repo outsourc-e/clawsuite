@@ -7,7 +7,11 @@ import {
   type FeedEventType,
 } from './feed-event-bus'
 
-const FILTERS = ['All', 'Tasks', 'Agents'] as const
+// 'Activity' = tasks + agents (no health checks), default
+// 'Tasks'    = task events only
+// 'Agents'   = agent events only
+// 'System'   = gateway_health + system events
+const FILTERS = ['Activity', 'Tasks', 'Agents', 'System'] as const
 type FilterTab = (typeof FILTERS)[number]
 
 type SessionRecord = Record<string, unknown>
@@ -27,7 +31,17 @@ const AGENT_TYPES = new Set<FeedEventType>([
   'agent_paused',
   'agent_spawned',
   'agent_killed',
+])
+
+const SYSTEM_TYPES = new Set<FeedEventType>([
   'gateway_health',
+  'system',
+])
+
+// Activity = all except system/health
+const ACTIVITY_TYPES = new Set<FeedEventType>([
+  ...TASK_TYPES,
+  ...AGENT_TYPES,
 ])
 
 type EventBadge = { label: string; className: string }
@@ -78,7 +92,8 @@ function formatTimestamp(ts: number): string {
 }
 
 export function LiveFeedPanel() {
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('All')
+  // Default to 'Activity' to hide noisy health checks
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('Activity')
   const [events, setEvents] = useState<Array<FeedRow>>([])
   const previousSessionsRef = useRef<Map<string, string> | null>(null)
 
@@ -158,7 +173,9 @@ export function LiveFeedPanel() {
     return events.filter((event) => {
       if (activeFilter === 'Tasks') return TASK_TYPES.has(event.type)
       if (activeFilter === 'Agents') return AGENT_TYPES.has(event.type)
-      return true
+      if (activeFilter === 'System') return SYSTEM_TYPES.has(event.type)
+      // 'Activity': tasks + agents, no health/system noise
+      return ACTIVITY_TYPES.has(event.type)
     })
   }, [activeFilter, events])
 
@@ -191,14 +208,14 @@ export function LiveFeedPanel() {
       </div>
 
       {/* ── Filters ─────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 gap-1 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
+      <div className="flex shrink-0 gap-0.5 border-b border-neutral-200 px-2 py-1.5 dark:border-neutral-800">
         {FILTERS.map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveFilter(tab)}
             className={cn(
-              'rounded px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors',
+              'rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors',
               activeFilter === tab
                 ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
                 : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-600 dark:hover:bg-neutral-900 dark:hover:text-neutral-300',
@@ -217,7 +234,9 @@ export function LiveFeedPanel() {
         <div className="h-full overflow-y-auto px-3 pb-3 pt-8">
           {visibleEvents.length === 0 ? (
             <p className="py-8 text-center font-mono text-[10px] text-neutral-700">
-              {`// no events yet — start a mission`}
+              {activeFilter === 'Activity'
+                ? `// no activity events yet — start a mission`
+                : `// no ${activeFilter.toLowerCase()} events`}
             </p>
           ) : (
             <div className="space-y-1">

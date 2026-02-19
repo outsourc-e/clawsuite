@@ -751,7 +751,9 @@ export function useDashboardData(): UseDashboardDataResult {
         roster,
       },
       cost: {
-        today: todayCostTotal,
+        // Use todayCostUsd (canonical priority-resolved value) so cost.today
+        // always reflects the same number shown in SystemGlance and MetricCards.
+        today: todayCostUsd ?? todayCostTotal,
         total: billingTotal,
         trend,
         byProvider,

@@ -338,13 +338,17 @@ export function UsageMeterWidget({
     refetchInterval: 30_000,
   })
 
-  const isLoading = usageQuery.isLoading || (usageQuery.isFetching && !usageQuery.data)
+  // Use isLoading only for the very first fetch (no cached data yet).
+  // isFetching is true during any background refetch — don't block UI for those.
+  const isLoading = usageQuery.isLoading
   const queryResult = usageQuery.data
   const usageData = queryResult?.kind === 'ok' ? queryResult.data : null
   // Show skeleton while the very first fetch is in flight (no data at all yet)
   const showSkeleton = isLoading && !queryResult
+  // "Settled" = query finished and not in a loading state
+  const isSettled = !usageQuery.isLoading && !usageQuery.isFetching
 
-  // 15s hard timeout — stops infinite skeleton
+  // 15s hard timeout — stops infinite skeleton if query hangs
   useEffect(() => {
     if (!isLoading) {
       setTimedOut(false)
@@ -363,10 +367,13 @@ export function UsageMeterWidget({
     }))
   }, [usageData])
 
-  // Use overrideCost (from dashboard's session-status) when provided — avoids $0.00 vs $179 contradiction
+  // Use overrideCost (from dashboard's session-status) when provided — avoids $0.00 vs actual contradiction
   const displayCost = overrideCost !== undefined ? overrideCost : (usageData?.totalCost ?? 0)
   // Use overrideTokens (from dashboard's session-status dailyBreakdown) when provided
   const displayTokens = overrideTokens !== undefined ? overrideTokens : (usageData?.totalUsage ?? 0)
+
+  // Whether there is anything meaningful to show (non-zero cost, tokens, or provider rows)
+  const hasAnyData = displayCost > 0 || displayTokens > 0 || topProviders.length > 0
 
   const tabSwitcher = (
     <div className="hidden items-center gap-0.5 rounded-full border border-primary-200 bg-primary-100/70 p-0.5 text-[10px] md:inline-flex">
@@ -392,13 +399,15 @@ export function UsageMeterWidget({
   )
 
   const showTimeoutOrError = (showSkeleton && timedOut) || queryResult?.kind === 'error' || queryResult?.kind === 'unavailable'
+  // Show empty state when: settled (not loading/fetching) and no meaningful data
+  const showEmptyState = !showSkeleton && !showTimeoutOrError && (!usageData || !hasAnyData)
 
   return (
     <WidgetShell
       size="medium"
       title="Usage Today"
       icon={ChartLineData02Icon}
-      action={!showSkeleton ? tabSwitcher : undefined}
+      action={!showSkeleton && !showEmptyState ? tabSwitcher : undefined}
       onRemove={onRemove}
       editMode={editMode}
       loading={showSkeleton && !timedOut}
@@ -421,6 +430,22 @@ export function UsageMeterWidget({
           >
             Retry
           </button>
+        </div>
+      ) : showEmptyState ? (
+        <div className="flex h-full flex-col items-center justify-center gap-1.5 py-4 text-center">
+          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">No usage yet today</p>
+          <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
+            Usage will appear once your first session is active.
+          </p>
+          {isSettled && (
+            <button
+              type="button"
+              onClick={() => void usageQuery.refetch()}
+              className="mt-1 rounded-md border border-neutral-200 bg-neutral-100/80 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            >
+              Refresh
+            </button>
+          )}
         </div>
       ) : !usageData ? null : (
         <>
