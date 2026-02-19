@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId } from './components/team-panel'
 import { TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
+import { AgentOutputPanel } from './components/agent-output-panel'
 import { emitFeedEvent } from './components/feed-event-bus'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -321,47 +322,6 @@ function TeamActivityStrip({
   )
 }
 
-function AgentOutputPanel({ agentName, tasks, onClose }: {
-  agentName: string
-  tasks: HubTask[]
-  onClose: () => void
-}) {
-  return (
-    <div className="border-t border-primary-200 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-primary-900 dark:text-neutral-100">{agentName} Output</h3>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-xs text-primary-400 transition-colors hover:text-primary-600 dark:hover:text-neutral-200"
-        >
-          ✕
-        </button>
-      </div>
-      <div className="space-y-2">
-        {tasks.length === 0 ? (
-          <p className="text-[11px] text-primary-500 dark:text-neutral-400">No dispatched tasks yet.</p>
-        ) : (
-          tasks.map((task) => (
-            <div key={task.id} className="rounded-lg bg-primary-50 px-3 py-2 dark:bg-neutral-800/80">
-              <div className="flex items-center gap-2">
-                <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                <span className="text-xs font-medium text-primary-700 dark:text-neutral-100">{task.title}</span>
-              </div>
-              <p className="mt-1 text-[10px] text-primary-400">
-                {task.status === 'in_progress' ? 'Working...' : task.status === 'done' ? 'Completed' : 'Queued'}
-              </p>
-            </div>
-          ))
-        )}
-      </div>
-      <div className="mt-3 min-h-[80px] rounded-lg bg-neutral-900 p-3 font-mono text-[11px] text-green-400">
-        <p>$ Dispatching to {agentName}...</p>
-        <p className="animate-pulse">▊</p>
-      </div>
-    </div>
-  )
-}
 
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [missionActive, setMissionActive] = useState(false)
@@ -1009,6 +969,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           {missionActive && selectedOutputAgentId ? (
             <AgentOutputPanel
               agentName={selectedOutputAgentName}
+              sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
               tasks={selectedOutputTasks}
               onClose={() => setSelectedOutputAgentId(undefined)}
             />
