@@ -62,6 +62,17 @@ function toSessionDisplayName(session: Record<string, unknown>): string {
   return friendlyId === 'main' ? 'Main Session' : (friendlyId || 'Session')
 }
 
+/** Returns true if the session is a spawned subagent (should be excluded from user-facing counts). */
+function isSubagentSession(session: Record<string, unknown>): boolean {
+  const key = readString(session.key ?? session.sessionKey ?? '')
+  const label = readString(session.label ?? '')
+  return (
+    key.startsWith('agent:main:subagent:') ||
+    key.includes('subagent') ||
+    label.toLowerCase().includes('subagent')
+  )
+}
+
 // ─── API fetch functions ─────────────────────────────────────────────────────
 
 type SessionStatusSession = {
@@ -323,7 +334,9 @@ export function useDashboardData(): UseDashboardDataResult {
     // ── Session-status payload ──────────────────────────────────────────────
     const ssPayload = sessionStatusQuery.data?.payload
     const ssSessions: Array<SessionStatusSession> = Array.isArray(ssPayload?.sessions)
-      ? (ssPayload.sessions as Array<SessionStatusSession>)
+      ? (ssPayload.sessions as Array<SessionStatusSession>).filter(
+          (s) => !isSubagentSession(s as Record<string, unknown>),
+        )
       : []
     const updatedAt = normalizeTimestamp(ssPayload?.updatedAt ?? 0)
 
@@ -359,7 +372,12 @@ export function useDashboardData(): UseDashboardDataResult {
     })
 
     // Fallback: if no sessions in session-status, use sessions from sessions API
-    const chatSessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
+    // Filter out subagent sessions from both sources
+    const chatSessions = Array.isArray(sessionsQuery.data)
+      ? sessionsQuery.data.filter(
+          (s) => !isSubagentSession(s as unknown as Record<string, unknown>),
+        )
+      : []
     const sessionTotal = activeSessions24h.length || chatSessions.length
 
     // Build session list for widget from sessions query (has friendlyId etc)
@@ -500,6 +518,12 @@ export function useDashboardData(): UseDashboardDataResult {
           })
         }
       }
+    }
+
+    // Fallback 1: use top-level dailyCost from session-status (enriched by the API route)
+    if (todayCostTotal === 0) {
+      const ssDaily = readNumber(ssPayload?.dailyCost ?? ssPayload?.costUsd ?? 0)
+      if (ssDaily > 0) todayCostTotal = ssDaily
     }
 
     // Also pull input/output/cacheRead from usage API for finer breakdown

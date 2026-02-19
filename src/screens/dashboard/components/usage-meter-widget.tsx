@@ -156,12 +156,22 @@ function parseUsagePayload(payload: unknown): UsageMeterData {
   }
 }
 
+/** Fetch a URL with a hard timeout; returns null on timeout or network error. */
+function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(url, { signal: controller.signal })
+    .catch(() => null)
+    .finally(() => clearTimeout(timer))
+}
+
 export async function fetchUsage(): Promise<UsageQueryResult> {
   try {
-    // Fetch both lifetime usage and today's session-status in parallel
+    // Fire both in parallel, each with a hard timeout to prevent hanging.
+    // session-status is lower priority — give usage a longer window.
     const [usageRes, ssRes] = await Promise.all([
-      fetch('/api/usage').catch(() => null),
-      fetch('/api/session-status').catch(() => null),
+      fetchWithTimeout('/api/usage', 10_000),
+      fetchWithTimeout('/api/session-status', 8_000),
     ])
 
     const usagePayload = usageRes
@@ -196,10 +206,17 @@ export async function fetchUsage(): Promise<UsageQueryResult> {
         ? (payload.sessions as Array<Record<string, unknown>>)
         : []
       const oneDayAgo = Date.now() - 86_400_000
-      const activeSessions = sessions.filter(
-        (s) =>
-          typeof s.updatedAt === 'number' && (s.updatedAt as number) > oneDayAgo,
-      )
+      const activeSessions = sessions.filter((s) => {
+        if (typeof s.updatedAt === 'number' && (s.updatedAt as number) <= oneDayAgo) return false
+        const key = readString(s.key ?? '')
+        const label = readString(s.label ?? '')
+        // Exclude subagent sessions from the count
+        return (
+          !key.startsWith('agent:main:subagent:') &&
+          !key.includes('subagent') &&
+          !label.toLowerCase().includes('subagent')
+        )
+      })
 
       // Override with today's data — this is what matters
       if (dailyCost > 0) data.totalCost = dailyCost

@@ -92,8 +92,18 @@ export function SquadStatusWidget({ editMode }: SquadStatusWidgetProps) {
     refetchInterval: 15_000,
   })
   const agents = useMemo(() => {
-    const source = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
+    const allSessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
     const now = Date.now()
+    // Filter out spawned subagent sessions — they clutter the squad view
+    const source = allSessions.filter((session) => {
+      const key = readString(session.key ?? '')
+      const label = readString(session.label ?? '')
+      return (
+        !key.startsWith('agent:main:subagent:') &&
+        !key.includes('subagent') &&
+        !label.toLowerCase().includes('subagent')
+      )
+    })
     return source
       .map((session, index): SquadAgentRow => {
         const updatedAt = readTimestamp(session.updatedAt)
