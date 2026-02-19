@@ -370,7 +370,9 @@ const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
 
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [mobileView, setMobileView] = useState<'board' | 'team' | 'feed'>('board')
-  const [isMobileHub, setIsMobileHub] = useState(false)
+  const [isMobileHub, setIsMobileHub] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768
+  )
   const [missionActive, setMissionActive] = useState(false)
   const [missionGoal, setMissionGoal] = useState('')
   const [activeMissionGoal, setActiveMissionGoal] = useState('')
@@ -802,9 +804,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     boardTasks,
     agentTaskCounts,
   ])
-
-  const showAgentsWorking =
-    missionActive || Object.keys(agentSessionMap).length > 0
 
   const moveTasksToStatus = useCallback((taskIds: Array<string>, status: TaskStatus) => {
     if (taskIds.length === 0) return
@@ -1386,9 +1385,27 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             mobileView === 'board' ? 'flex w-full flex-col border-l' : 'hidden md:flex',
           )}
         >
+          {/* Agents Working Panel: always visible when team has members */}
+          {team.length > 0 ? (
+            <AgentsWorkingPanel
+              agents={agentWorkingRows}
+              className="mx-3 mt-2 mb-1"
+              selectedAgentId={selectedOutputAgentId}
+              onSelectAgent={handleAgentSelection}
+              onKillAgent={(agentId) => {
+                const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
+                if (member) void handleKillSession(member)
+              }}
+              onRespawnAgent={(agentId) => {
+                const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
+                if (member) void handleRetrySpawn(member)
+              }}
+            />
+          ) : null}
+
           {!missionActive ? (
             showNewMission ? (
-              <div className="flex h-full items-center justify-center px-8 py-6">
+              <div className="flex flex-1 min-h-0 items-center justify-center px-8 py-6">
                 <div className="w-full max-w-2xl rounded-2xl border border-primary-200 bg-white/80 px-8 py-6 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/70">
                   <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-xs text-primary-400">
                     <span className="rounded-full bg-primary-100 px-2 py-0.5">
@@ -1467,7 +1484,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </div>
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center px-6">
+              <div className="flex flex-1 min-h-0 items-center justify-center px-6">
                 <div className="rounded-xl border border-primary-200 bg-white/80 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/70">
                   <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
                     Mission stopped
@@ -1486,7 +1503,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               </div>
             )
           ) : view === 'timeline' ? (
-            <div className="flex h-full items-center justify-center px-6">
+            <div className="flex flex-1 min-h-0 items-center justify-center px-6">
               <div className="rounded-xl border border-dashed border-primary-300 bg-white/60 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
                 <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
                   Timeline view coming soon
@@ -1497,7 +1514,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               </div>
             </div>
           ) : (
-            <div className="flex h-full flex-col">
+            <div className="flex flex-1 min-h-0 flex-col">
               <div className="flex items-center justify-between border-b border-emerald-200 bg-emerald-50/40 px-4 py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/15">
                 <p className="truncate text-xs font-medium text-emerald-800 dark:text-emerald-200">
                   Mission: {truncateMissionGoal(activeMissionGoal || missionGoal.trim())}
@@ -1511,22 +1528,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   {missionBadge.label}
                 </span>
               </div>
-              {showAgentsWorking ? (
-                <AgentsWorkingPanel
-                  agents={agentWorkingRows}
-                  className="mx-3 mt-2 mb-1"
-                  selectedAgentId={selectedOutputAgentId}
-                  onSelectAgent={handleAgentSelection}
-                  onKillAgent={(agentId) => {
-                    const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
-                    if (member) void handleKillSession(member)
-                  }}
-                  onRespawnAgent={(agentId) => {
-                    const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
-                    if (member) void handleRetrySpawn(member)
-                  }}
-                />
-              ) : null}
               <div className="min-h-0 flex-1">
                 <TaskBoard
                   agents={boardAgents}

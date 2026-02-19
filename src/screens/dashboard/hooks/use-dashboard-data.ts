@@ -293,6 +293,7 @@ export function useDashboardData(): UseDashboardDataResult {
     queryFn: fetchSessionStatus,
     retry: false,
     refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   })
 
   const costTimeseriesQuery = useQuery({
