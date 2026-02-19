@@ -1066,6 +1066,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const missionTasksRef = useRef(missionTasks)
   // Spec 4: track which session keys have had their tasks moved to review (avoid repeat)
   const completionDetectedRef = useRef<Set<string>>(new Set())
+  // Spec 5: track dispatch start time per agentId for 10-min timeout warning
+  const dispatchStartTimeRef = useRef<Record<string, number>>({})
+  // Spec 5: track which agents have already received a timeout warning (avoid repeat)
+  const warnedTimeoutRef = useRef<Set<string>>(new Set())
 
   teamRef.current = team
   missionGoalRef.current = missionGoal
@@ -1358,6 +1362,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           setSelectedAgentId(undefined)
           return undefined
         })
+      }
+
+      // Space: Pause/resume mission (not when typing)
+      if (event.key === ' ') {
+        const target = event.target as HTMLElement
+        if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName)) return
+        const state = missionStateRef.current
+        if (state === 'running') {
+          event.preventDefault()
+          setMissionState('paused')
+        } else if (state === 'paused') {
+          event.preventDefault()
+          setMissionState('running')
+        }
       }
     }
 
@@ -1857,6 +1875,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
         // Spec 4: mark tasks as dispatched in idempotency ref
         newTasks.forEach((task) => dispatchedTaskIdsRef.current.add(task.id))
+        // Spec 5: record dispatch start time for timeout detection
+        dispatchStartTimeRef.current[agentId] = Date.now()
 
         const taskIds = agentTasks.map((task) => task.id)
         setDispatchedTaskIdsByAgent((previous) => ({
@@ -2130,6 +2150,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               type: 'task_completed',
               message: `${agentName} completed — tasks moved to review`,
               agentName,
+            })
+          }
+
+          // ── 10-min timeout warning ─────────────────────────────────────────
+          for (const agentId of Object.keys(dispatchedTaskIdsByAgent)) {
+            const sessionKey = agentSessionMap[agentId]
+            if (!sessionKey) continue
+            if (completionDetectedRef.current.has(sessionKey)) continue
+            if (warnedTimeoutRef.current.has(agentId)) continue
+            const startTime = dispatchStartTimeRef.current[agentId]
+            if (!startTime || Date.now() - startTime <= 600_000) continue
+            warnedTimeoutRef.current.add(agentId)
+            const member = teamRef.current.find((m) => m.id === agentId)
+            const name = member?.name ?? agentId
+            emitFeedEvent({
+              type: 'system',
+              message: `⚠️ ${name} has been running 10+ min with no completion signal`,
+              agentName: name,
             })
           }
         }
@@ -2534,6 +2572,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     placeholder="Example: Ship a release plan and implementation tasks for authentication hardening"
                     className="w-full resize-none rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                   />
+                  <div className="mt-1 flex w-full justify-between px-1">
+                    <span className="text-[10px] text-primary-400">{missionGoal.length} chars</span>
+                    {suggestedTemplateName ? (
+                      <span className="text-[10px] font-medium text-accent-500 dark:text-accent-400">
+                        Team: {suggestedTemplateName}
+                      </span>
+                    ) : null}
+                  </div>
 
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     {EXAMPLE_MISSIONS.map((example) => (
@@ -2774,6 +2820,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           ⚠️ Gateway disconnected — retrying…
         </div>
       ) : null}
+
+      {/* ── Spawn-failed banners ──────────────────────────────────────────── */}
+      {teamRef.current
+        .filter((agent) => spawnState[agent.id] === 'error')
+        .map((agent) => (
+          <div
+            key={agent.id}
+            className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 py-1.5 text-xs text-amber-700 dark:text-amber-400"
+          >
+            ⚠️ {agent.name} failed to spawn —{' '}
+            <button
+              type="button"
+              onClick={() => { void handleRetrySpawn(agent) }}
+              className="font-semibold underline hover:no-underline"
+            >
+              retry
+            </button>
+          </div>
+        ))}
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
