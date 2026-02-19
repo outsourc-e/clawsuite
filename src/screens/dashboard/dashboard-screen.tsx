@@ -213,9 +213,8 @@ export function DashboardScreen() {
 
   // ── Derived display values ─────────────────────────────────────────────────
 
-  const costDisplay = dashboardData.cost.today > 0
-    ? formatMoney(dashboardData.cost.today)
-    : dashboardData.status === 'loading' ? '—' : '$0.00'
+  // P0-A: always show a dollar value — never "—" for cost
+  const costDisplay = formatMoney(dashboardData.todayCostUsd ?? 0)
 
   // B1: Uptime fallback — if formatted is "—", show "Active · last check Xm ago"
   const uptimeDisplay = useMemo(() => {
@@ -227,7 +226,7 @@ export function DashboardScreen() {
   }, [dashboardData.uptime.formatted, dashboardData.connection.connected, dashboardData.updatedAt])
 
   const usageSummaryText = buildUsageSummaryText(dashboardData)
-  const usageSummaryIsError = dashboardData.usageStatus === 'error' || dashboardData.usageStatus === 'unavailable'
+  const usageSummaryIsError = dashboardData.usageStatus === 'error' || dashboardData.usageStatus === 'timeout'
 
   const visibleAlerts = dashboardData.alerts.filter((c) => !dismissedChips.has(c.id))
 
@@ -293,8 +292,6 @@ export function DashboardScreen() {
               subtitle="Today's spend"
               icon={ChartLineData02Icon}
               accent="emerald"
-              isError={dashboardData.status === 'error'}
-              onRetry={refetch}
               trendPct={dashboardData.cost.trend ?? undefined}
               trendLabel={dashboardData.cost.trend !== null ? 'vs prev day' : undefined}
               trendInverted
@@ -732,22 +729,7 @@ export function DashboardScreen() {
           {/* ── Mobile layout ───────────────────────────────────────────────── */}
           {isMobile ? (
             <div className="flex flex-col gap-3">
-              {/* C1: SystemGlance compact on mobile */}
-              <SystemGlance
-                compact
-                sessions={dashboardData.sessions.total}
-                activeAgents={dashboardData.agents.active || dashboardData.agents.total}
-                costToday={costDisplay}
-                uptimeFormatted={uptimeDisplay}
-                updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
-                healthStatus={healthStatus}
-                gatewayConnected={dashboardData.connection.connected}
-                sessionPercent={dashboardData.usage.contextPercent ?? undefined}
-                providers={dashboardData.cost.byProvider}
-                currentModel={dashboardData.model.current}
-              />
-
-              {/* C6: Compact NowCard */}
+              {/* Mobile hero: compact NowCard */}
               <NowCard
                 gatewayConnected={dashboardData.connection.connected}
                 activeAgents={dashboardData.agents.active || dashboardData.agents.total}
@@ -871,9 +853,6 @@ export function DashboardScreen() {
                   ))}
                 </div>
               ) : null}
-
-              {/* Metric summary row */}
-              <WidgetGrid items={metricItems} />
 
               {/* D1: Widget edit controls — inline row above widgets */}
               <div className="flex items-center justify-end gap-2">

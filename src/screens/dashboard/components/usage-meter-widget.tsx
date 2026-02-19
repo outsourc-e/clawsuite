@@ -1,6 +1,6 @@
 import { ChartLineData02Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { WidgetShell } from './widget-shell'
 import { cn } from '@/lib/utils'
 
@@ -324,6 +324,7 @@ export function UsageMeterWidget({
   editMode,
 }: UsageMeterWidgetProps) {
   const [view, setView] = useState<'tokens' | 'cost'>('cost')
+  const [timedOut, setTimedOut] = useState(false)
   const usageQuery = useQuery({
     queryKey: ['dashboard', 'usage'],
     queryFn: fetchUsage,
@@ -336,6 +337,16 @@ export function UsageMeterWidget({
   const usageData = queryResult?.kind === 'ok' ? queryResult.data : null
   // Show skeleton while the very first fetch is in flight (no data at all yet)
   const showSkeleton = isLoading && !queryResult
+
+  // 15s hard timeout — stops infinite skeleton
+  useEffect(() => {
+    if (!isLoading) {
+      setTimedOut(false)
+      return
+    }
+    const timer = window.setTimeout(() => setTimedOut(true), 15_000)
+    return () => window.clearTimeout(timer)
+  }, [isLoading])
 
   const topProviders = useMemo(() => {
     if (!usageData || usageData.providers.length === 0) return []
@@ -369,6 +380,8 @@ export function UsageMeterWidget({
     </div>
   )
 
+  const showTimeoutOrError = (showSkeleton && timedOut) || queryResult?.kind === 'error' || queryResult?.kind === 'unavailable'
+
   return (
     <WidgetShell
       size="medium"
@@ -377,16 +390,26 @@ export function UsageMeterWidget({
       action={!showSkeleton ? tabSwitcher : undefined}
       onRemove={onRemove}
       editMode={editMode}
-      loading={showSkeleton}
+      loading={showSkeleton && !timedOut}
       className="h-full"
     >
-      {queryResult?.kind === 'unavailable' ? (
-        <div className="rounded-lg border border-primary-200 bg-primary-100/45 px-3 py-3 text-sm text-primary-600">
-          {queryResult.message}
-        </div>
-      ) : queryResult?.kind === 'error' ? (
-        <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-3 text-sm text-red-700">
-          {queryResult.message}
+      {showTimeoutOrError ? (
+        <div className="flex flex-col items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-3 dark:border-amber-900/40 dark:bg-amber-950/15">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Usage unavailable</p>
+          <p className="text-[11px] text-amber-700 dark:text-amber-400">
+            {queryResult?.kind === 'unavailable'
+              ? queryResult.message
+              : timedOut
+                ? 'Request timed out. Check gateway connection.'
+                : (queryResult as { kind: 'error'; message: string } | undefined)?.message ?? 'Could not load usage data.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => { setTimedOut(false); void usageQuery.refetch() }}
+            className="rounded-md border border-amber-300 bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/50"
+          >
+            Retry
+          </button>
         </div>
       ) : !usageData ? null : (
         <>

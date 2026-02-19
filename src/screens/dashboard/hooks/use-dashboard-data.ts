@@ -6,7 +6,7 @@
  * dashboard screen and its widgets.
  */
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchInstalledSkills } from '../components/skills-widget'
 import { fetchUsage } from '../components/usage-meter-widget'
 import { formatModelName, formatMoney, formatRelativeTime, formatTokens, formatUptime } from '../lib/formatters'
@@ -190,7 +190,9 @@ export type DashboardData = {
   /** Overall load state */
   status: 'loading' | 'ready' | 'error'
   /** Usage-specific load state (separate from overall status) */
-  usageStatus: 'loading' | 'ok' | 'error' | 'unavailable'
+  usageStatus: 'idle' | 'loading' | 'ready' | 'timeout' | 'error'
+  /** Today's total spend in USD — null while loading, 0 after all sources exhausted */
+  todayCostUsd: number | null
   connection: { connected: boolean; syncing: boolean }
   /** Last update timestamp from session-status payload (ms) */
   updatedAt: number
@@ -319,6 +321,19 @@ export function useDashboardData(): UseDashboardDataResult {
     retry: false,
     refetchInterval: 30_000,
   })
+
+  // ── Usage timeout (15s) — stops infinite skeleton ────────────────────────
+
+  const [usageTimedOut, setUsageTimedOut] = useState(false)
+
+  useEffect(() => {
+    if (!usageSummaryQuery.isLoading) {
+      setUsageTimedOut(false)
+      return
+    }
+    const timer = window.setTimeout(() => setUsageTimedOut(true), 15_000)
+    return () => window.clearTimeout(timer)
+  }, [usageSummaryQuery.isLoading])
 
   // ── Derived computations ─────────────────────────────────────────────────
 
@@ -567,6 +582,26 @@ export function useDashboardData(): UseDashboardDataResult {
       trend = ((latestPoint.amount - previousPoint.amount) / previousPoint.amount) * 100
     }
 
+    // ── Canonical todayCostUsd ────────────────────────────────────────────────
+    // Priority: (1) session-status dailyBreakdown/dailyCost, (2) /api/cost today,
+    //           (3) /api/usage totalCost, (4) 0 once all queries have resolved
+    const costTodayFromTimeseries = points.find((p) => p.date === todayKey)?.amount ?? null
+    let todayCostUsd: number | null = null
+    if (todayCostTotal > 0) {
+      todayCostUsd = todayCostTotal
+    } else if (costTodayFromTimeseries !== null && costTodayFromTimeseries > 0) {
+      todayCostUsd = costTodayFromTimeseries
+    } else if (usageData && usageData.totalCost > 0) {
+      todayCostUsd = usageData.totalCost
+    } else if (
+      !sessionStatusQuery.isLoading &&
+      !costTimeseriesQuery.isLoading &&
+      !usageSummaryQuery.isLoading
+    ) {
+      // All queries resolved with no cost data — show $0.00 rather than "—"
+      todayCostUsd = 0
+    }
+
     // ── Message counts ───────────────────────────────────────────────────────
     let msgTotal = 0
     let msgUser = 0
@@ -683,22 +718,23 @@ export function useDashboardData(): UseDashboardDataResult {
         : 'ready'
 
     // Usage-specific status
-    let usageStatus: DashboardData['usageStatus'] = 'loading'
     const usageResult = usageSummaryQuery.data
-    if (usageSummaryQuery.isError || usageResult?.kind === 'error') {
+    let usageStatus: DashboardData['usageStatus']
+    if (usageSummaryQuery.isError || usageResult?.kind === 'error' || usageResult?.kind === 'unavailable') {
       usageStatus = 'error'
-    } else if (usageResult?.kind === 'unavailable') {
-      usageStatus = 'unavailable'
     } else if (usageResult?.kind === 'ok') {
-      usageStatus = 'ok'
-    } else if (!usageSummaryQuery.isLoading) {
-      // Not loading but no data yet — treat as error
-      usageStatus = 'error'
+      usageStatus = 'ready'
+    } else if (usageSummaryQuery.isLoading) {
+      usageStatus = usageTimedOut ? 'timeout' : 'loading'
+    } else {
+      // Not loading, no data
+      usageStatus = usageTimedOut ? 'timeout' : 'error'
     }
 
     return {
       status,
       usageStatus,
+      todayCostUsd,
       connection: { connected, syncing },
       updatedAt,
       sessions: {
@@ -770,9 +806,12 @@ export function useDashboardData(): UseDashboardDataResult {
     sessionStatusQuery.isLoading,
     sessionStatusQuery.isError,
     costTimeseriesQuery.data,
+    costTimeseriesQuery.isLoading,
     cronJobsQuery.data,
     skillsSummaryQuery.data,
     usageSummaryQuery.data,
+    usageSummaryQuery.isLoading,
+    usageTimedOut,
   ])
 
   const refetch = useCallback(
@@ -810,11 +849,12 @@ export function useUpdatedAgo(updatedAt: number): string {
 // ─── Derived usage text for CollapsibleWidget summary ───────────────────────
 
 export function buildUsageSummaryText(data: DashboardData): string {
-  if (data.usageStatus === 'error') return 'Usage unavailable'
-  if (data.usageStatus === 'unavailable') return 'Usage unavailable on this Gateway version'
-  if (data.usageStatus === 'loading') return 'Usage: loading…'
-  if (data.cost.today > 0 || data.usage.tokens > 0) {
-    return `Usage: ${formatMoney(data.cost.today)} today • ${formatTokens(data.usage.tokens)} tokens`
+  if (data.usageStatus === 'error' || data.usageStatus === 'timeout') return 'Usage unavailable'
+  if (data.usageStatus === 'idle' || data.usageStatus === 'loading') return 'Usage: loading…'
+  // 'ready'
+  const costVal = data.todayCostUsd ?? data.cost.today
+  if (costVal > 0 || data.usage.tokens > 0) {
+    return `Usage: ${formatMoney(costVal)} today • ${formatTokens(data.usage.tokens)} tokens`
   }
-  return 'Usage: loading…'
+  return 'Usage: $0.00 today'
 }

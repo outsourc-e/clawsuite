@@ -169,12 +169,16 @@ function parseMissionGoal(goal: string, teamMembers: TeamMember[]): HubTask[] {
   const now = Date.now()
   const segments = extractMissionItems(trimmedGoal)
   const normalizedGoal = cleanMissionSegment(trimmedGoal)
-  const missionItems =
-    segments.length > 0
-      ? segments
-      : normalizedGoal
-        ? [normalizedGoal]
-        : []
+
+  // If we extracted >= 2 subtasks, return ONLY those subtasks (not the full goal as a task).
+  // If 0–1 subtasks, collapse to [goal] as a single task.
+  let missionItems: string[]
+  if (segments.length >= 2) {
+    const withoutFullGoal = segments.filter((s) => s !== normalizedGoal)
+    missionItems = withoutFullGoal.length >= 1 ? withoutFullGoal : segments
+  } else {
+    missionItems = normalizedGoal ? [normalizedGoal] : []
+  }
 
   return missionItems.map((segment, index) => {
     const member = teamMembers.length > 0 ? teamMembers[index % teamMembers.length] : undefined
@@ -403,6 +407,8 @@ function TeamActivityStrip({
 
 
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
+  const [mobileView, setMobileView] = useState<'board' | 'team' | 'feed'>('board')
+  const [isMobileHub, setIsMobileHub] = useState(false)
   const [missionActive, setMissionActive] = useState(false)
   const [missionGoal, setMissionGoal] = useState('')
   const [activeMissionGoal, setActiveMissionGoal] = useState('')
@@ -513,6 +519,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     },
     [],
   )
+
+  // Mobile viewport detection
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setIsMobileHub(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
 
   // Gateway status polling every 15s
   useEffect(() => {
@@ -1140,10 +1155,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       />
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
-      <div className="flex min-h-0 flex-1">
+      {/* pb-14 on mobile reserves space above fixed bottom nav */}
+      <div className="flex min-h-0 flex-1 pb-14 md:pb-0">
+        {/* ── Team Panel ── desktop: fixed 280px; mobile: full-width when active */}
         <div
           className={cn(
-            'w-[280px] shrink-0 transition-colors',
+            'shrink-0 transition-colors',
+            'md:w-[280px] md:block',
+            mobileView === 'team' ? 'block w-full' : 'hidden md:block',
             teamPanelFlash && 'bg-emerald-50/70 dark:bg-emerald-900/10',
           )}
         >
@@ -1170,7 +1189,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           />
         </div>
 
-        <div className="min-w-0 flex-1 overflow-hidden border-l border-primary-200">
+        {/* ── Task Board ── desktop: flex-1; mobile: full-width when active */}
+        <div
+          className={cn(
+            'overflow-hidden border-primary-200',
+            'md:min-w-0 md:flex-1 md:flex md:flex-col md:border-l',
+            mobileView === 'board' ? 'flex w-full flex-col border-l' : 'hidden md:flex',
+          )}
+        >
           {!missionActive ? (
             showNewMission ? (
               <div className="flex h-full items-center justify-center px-8 py-6">
@@ -1317,11 +1343,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           )}
         </div>
 
-        <div className="flex w-[280px] shrink-0 flex-col border-l border-primary-200 bg-primary-50/30 dark:bg-neutral-900/20">
+        {/* ── Right Panel (Live Feed + Controls) ── desktop: fixed 280px; mobile: full-width when active */}
+        <div
+          className={cn(
+            'flex flex-col border-primary-200 bg-primary-50/30 dark:bg-neutral-900/20',
+            'md:w-[280px] md:shrink-0 md:flex md:border-l',
+            mobileView === 'feed' ? 'flex w-full border-l' : 'hidden md:flex',
+          )}
+        >
           <div className="min-h-0 flex-1 overflow-hidden">
             <LiveFeedPanel />
           </div>
-          {missionActive && selectedOutputAgentId ? (
+          {/* Agent output: desktop inline, mobile bottom sheet (rendered separately) */}
+          {!isMobileHub && missionActive && selectedOutputAgentId ? (
             <AgentOutputPanel
               agentName={selectedOutputAgentName}
               sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
@@ -1429,6 +1463,73 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <p className="text-xs text-primary-400">Start a mission to see controls here</p>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ── Mobile: Agent Output Bottom Sheet ──────────────────────────────── */}
+      {/* Only rendered on mobile when not in 'feed' view (feed panel has it inline) */}
+      {isMobileHub && missionActive && selectedOutputAgentId && mobileView !== 'feed' ? (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setSelectedOutputAgentId(undefined)}
+            aria-hidden
+          />
+          {/* Sheet */}
+          <div className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-t-2xl bg-white dark:bg-neutral-900 shadow-xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-primary-200 p-3 dark:border-neutral-700">
+              <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                {selectedOutputAgentName} Output
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedOutputAgentId(undefined)}
+                className="flex size-7 items-center justify-center rounded-full text-primary-400 transition-colors hover:bg-primary-100 hover:text-primary-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                aria-label="Close agent output"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <AgentOutputPanel
+                agentName={selectedOutputAgentName}
+                sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
+                tasks={selectedOutputTasks}
+                onClose={() => setSelectedOutputAgentId(undefined)}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Mobile: Bottom Segmented Nav ───────────────────────────────────── */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary-200 bg-white/95 backdrop-blur-sm dark:border-neutral-700 dark:bg-neutral-900/95 md:hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex">
+          {(
+            [
+              { view: 'board', label: 'Board' },
+              { view: 'team', label: 'Team' },
+              { view: 'feed', label: 'Feed' },
+            ] as const
+          ).map(({ view: v, label }) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setMobileView(v)}
+              className={cn(
+                'flex flex-1 items-center justify-center py-3 text-xs font-medium transition-colors',
+                mobileView === v
+                  ? 'text-accent-600 dark:text-accent-400'
+                  : 'text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200',
+              )}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </div>
