@@ -60,6 +60,15 @@ const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
 
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 
+type ActiveTab = 'office' | 'mission' | 'history' | 'team'
+
+const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
+  { id: 'office', icon: '🏢', label: 'Office' },
+  { id: 'mission', icon: '🚀', label: 'Mission' },
+  { id: 'history', icon: '📋', label: 'History' },
+  { id: 'team', icon: '👥', label: 'Team' },
+]
+
 function GatewayConnectionBanner({
   status,
   spawnErrorNames,
@@ -365,11 +374,313 @@ const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
   content: 'Content Pipeline',
 }
 
-// TeamActivityStrip replaced by AgentsWorkingPanel (handles both desktop and mobile)
+// ── Model badge styling (matches team-panel internal) ──────────────────────────
+const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
+  auto: 'bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200',
+  opus: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  codex: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  flash: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+}
 
+const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
+  auto: 'Auto',
+  opus: 'Opus',
+  sonnet: 'Sonnet',
+  codex: 'Codex',
+  flash: 'Flash',
+}
+
+// ── OfficeView ─────────────────────────────────────────────────────────────────
+type OfficeViewProps = {
+  agentRows: AgentWorkingRow[]
+  missionRunning: boolean
+  onViewOutput: (agentId: string) => void
+  selectedOutputAgentId?: string
+}
+
+function OfficeView({ agentRows, missionRunning, onViewOutput, selectedOutputAgentId }: OfficeViewProps) {
+  if (agentRows.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <div className="text-center">
+          <p className="mb-3 text-4xl">🏢</p>
+          <p className="text-sm font-medium text-primary-700 dark:text-neutral-300">No agents in your team</p>
+          <p className="mt-1 text-xs text-primary-400">Switch to the Team tab to add agents.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full overflow-y-auto p-4">
+      {/* Header row */}
+      <div className="mb-4 flex items-center gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-primary-400">Visual Office</h2>
+        {missionRunning && (
+          <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+            <span className="relative flex size-1.5">
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+            </span>
+            Mission Active
+          </span>
+        )}
+      </div>
+
+      {/* Agent desk grid */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        {agentRows.map((agent) => {
+          const isActive = agent.status === 'active'
+          const isSelected = agent.id === selectedOutputAgentId
+          const statusDotClass = isActive
+            ? '' // handled with ping
+            : agent.status === 'idle' || agent.status === 'ready'
+              ? 'bg-amber-400'
+              : 'bg-neutral-400 dark:bg-neutral-600'
+
+          return (
+            <div
+              key={agent.id}
+              className={cn(
+                'rounded-xl border bg-white p-4 shadow-sm transition-all dark:bg-neutral-900',
+                isSelected
+                  ? 'border-accent-400 ring-1 ring-accent-300 dark:border-accent-600 dark:ring-accent-700'
+                  : 'border-primary-200 dark:border-neutral-700',
+                isActive && missionRunning && 'ring-1 ring-emerald-200 dark:ring-emerald-800/50',
+              )}
+            >
+              {/* Top row: status dot + model badge + task count */}
+              <div className="mb-3 flex items-start justify-between">
+                <div className="flex items-center gap-1.5">
+                  {isActive ? (
+                    <span className="relative flex size-3 shrink-0">
+                      <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+                      <span className="relative inline-flex size-3 rounded-full bg-emerald-500" />
+                    </span>
+                  ) : (
+                    <span className={cn('size-3 shrink-0 rounded-full', statusDotClass)} />
+                  )}
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                      OFFICE_MODEL_BADGE[agent.modelId],
+                    )}
+                  >
+                    {OFFICE_MODEL_LABEL[agent.modelId]}
+                  </span>
+                </div>
+                {agent.taskCount > 0 && (
+                  <span className="rounded-full bg-accent-100 px-1.5 py-0.5 text-[9px] font-bold text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
+                    {agent.taskCount}t
+                  </span>
+                )}
+              </div>
+
+              {/* Agent name */}
+              <h3 className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                {agent.name}
+              </h3>
+
+              {/* Activity line */}
+              <p className="mt-1 line-clamp-2 min-h-[2.5em] text-[11px] text-primary-500 dark:text-neutral-400">
+                {agent.lastLine ?? (agent.status === 'none' ? 'No session' : 'Waiting for mission…')}
+              </p>
+
+              {/* View Output button */}
+              <button
+                type="button"
+                onClick={() => onViewOutput(agent.id)}
+                className={cn(
+                  'mt-3 w-full rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors',
+                  isSelected
+                    ? 'border-accent-400 bg-accent-50 text-accent-700 dark:border-accent-600 dark:bg-accent-950/30 dark:text-accent-300'
+                    : 'border-primary-200 bg-primary-50 text-primary-600 hover:border-primary-300 hover:bg-primary-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
+                )}
+              >
+                {isSelected ? '✓ Viewing Output' : 'View Output'}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── HistoryView ────────────────────────────────────────────────────────────────
+function timeAgoFromMs(ms: number): string {
+  const delta = Math.max(0, Date.now() - ms)
+  const seconds = Math.floor(delta / 1000)
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function HistoryView() {
+  const [sessions, setSessions] = useState<SessionRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchHistory() {
+      setLoading(true)
+      try {
+        const res = await fetch('/api/sessions')
+        if (!res.ok || cancelled) return
+        const data = (await res.json()) as { sessions?: SessionRecord[] }
+        const missionSessions = (data.sessions ?? [])
+          .filter((s) => {
+            const label = readString(s.label)
+            return label.startsWith('Mission:')
+          })
+          .sort((a, b) => {
+            const aTime = typeof a.updatedAt === 'number' ? a.updatedAt : 0
+            const bTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0
+            return bTime - aTime
+          })
+        if (!cancelled) setSessions(missionSessions)
+      } catch {
+        // ignore fetch errors
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void fetchHistory()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-2 size-5 animate-spin rounded-full border-2 border-accent-400 border-t-transparent" />
+          <p className="text-xs text-primary-400">Loading mission history…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (sessions.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <div className="text-center">
+          <p className="mb-3 text-4xl">📋</p>
+          <p className="text-sm font-medium text-primary-700 dark:text-neutral-300">No mission history yet</p>
+          <p className="mt-1 text-xs text-primary-400">Start a mission to see it recorded here.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full space-y-3 overflow-y-auto p-4">
+      <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-primary-400">Mission History</h2>
+      {sessions.map((session) => {
+        const sessionId = readSessionId(session)
+        const label = readString(session.label)
+        const status = readString(session.status)
+        const lastMessage = readSessionLastMessage(session)
+        const updatedAtRaw = session.updatedAt
+        const updatedAt =
+          typeof updatedAtRaw === 'number'
+            ? updatedAtRaw
+            : typeof updatedAtRaw === 'string'
+              ? Date.parse(updatedAtRaw)
+              : 0
+        const isExpanded = expandedId === sessionId
+        const tokenCount = typeof session.tokenCount === 'number' ? session.tokenCount : undefined
+
+        const statusBadge =
+          status === 'active'
+            ? { label: 'Active', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' }
+            : status === 'idle'
+              ? { label: 'Idle', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
+              : { label: 'Ended', className: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400' }
+
+        return (
+          <div
+            key={sessionId || label}
+            className="rounded-xl border border-primary-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                    {label}
+                  </h3>
+                  <span
+                    className={cn(
+                      'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                      statusBadge.className,
+                    )}
+                  >
+                    {statusBadge.label}
+                  </span>
+                </div>
+                {lastMessage ? (
+                  <p className="mt-1 line-clamp-2 text-[11px] text-primary-500 dark:text-neutral-400">
+                    {lastMessage}
+                  </p>
+                ) : null}
+                <div className="mt-1.5 flex items-center gap-3 text-[10px] text-primary-400">
+                  {updatedAt > 0 ? <span>{timeAgoFromMs(updatedAt)}</span> : null}
+                  {tokenCount !== undefined ? (
+                    <span>{tokenCount.toLocaleString()} tokens</span>
+                  ) : null}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedId(isExpanded ? null : sessionId)}
+                className="shrink-0 rounded-lg border border-primary-200 px-2.5 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              >
+                {isExpanded ? 'Hide' : 'View'}
+              </button>
+            </div>
+
+            {isExpanded ? (
+              <div className="mt-3 rounded-lg border border-primary-100 bg-primary-50/50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-400">
+                  Session Details
+                </p>
+                <dl className="space-y-1 text-[11px]">
+                  <div className="flex gap-2">
+                    <dt className="shrink-0 text-primary-400">ID</dt>
+                    <dd className="truncate font-mono text-primary-700 dark:text-neutral-300">{sessionId}</dd>
+                  </div>
+                  {lastMessage ? (
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-primary-400">Last output</dt>
+                      <dd className="line-clamp-4 text-primary-700 dark:text-neutral-300">{lastMessage}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </div>
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
-  const [mobileView, setMobileView] = useState<'board' | 'team' | 'feed'>('board')
+  // ── Tab + sidebar state ────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<ActiveTab>('office')
+  const [liveFeedVisible, setLiveFeedVisible] = useState(false)
+  const [unreadFeedCount, setUnreadFeedCount] = useState(0)
+
+  // ── Existing state ──────────────────────────────────────────────────────────
   const [isMobileHub, setIsMobileHub] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768
   )
@@ -423,9 +734,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // Stable refs for keyboard shortcut handler
   const missionGoalRef = useRef(missionGoal)
   const handleCreateMissionRef = useRef<() => void>(() => {})
+  // Stable ref for live feed visibility (used in feed-count effect)
+  const liveFeedVisibleRef = useRef(liveFeedVisible)
 
   teamRef.current = team
   missionGoalRef.current = missionGoal
+  liveFeedVisibleRef.current = liveFeedVisible
 
   // Derived: which agents have spawn errors
   const spawnErrorNames = useMemo(
@@ -517,6 +831,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }, 15_000)
     return () => window.clearInterval(interval)
   }, [])
+
+  // ── Unread feed count ───────────────────────────────────────────────────────
+  // Increment when feed is hidden and a new event arrives; reset when feed opens
+  useEffect(() => {
+    const unsubscribe = onFeedEvent(() => {
+      if (!liveFeedVisibleRef.current) {
+        setUnreadFeedCount((prev) => prev + 1)
+      }
+    })
+    return unsubscribe
+  }, []) // uses liveFeedVisibleRef — stable
+
+  // Reset unread count when feed becomes visible
+  useEffect(() => {
+    if (liveFeedVisible) {
+      setUnreadFeedCount(0)
+    }
+  }, [liveFeedVisible])
 
   // ── Feed event → agentActivity ─────────────────────────────────────────────
   // Update last-line activity from feed events (agent_active, agent_spawned, etc.)
@@ -1285,6 +1617,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setDispatchedTaskIdsByAgent({})
     setSelectedOutputAgentId(firstAssignedAgentId)
     sessionActivityRef.current = new Map()
+    // ── Auto-switch to Mission tab and show live feed ──────────────────────
+    setActiveTab('mission')
+    setLiveFeedVisible(true)
     emitFeedEvent({
       type: 'mission_started',
       message: `Mission started: ${trimmedGoal}`,
@@ -1307,6 +1642,208 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     errorMembers.forEach((m) => void handleRetrySpawn(m))
   }
 
+  const isMissionRunning = missionActive && missionState === 'running'
+
+  // ── Mission tab content ────────────────────────────────────────────────────
+  function renderMissionContent() {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {/* Agents Working Panel */}
+        {team.length > 0 ? (
+          <AgentsWorkingPanel
+            agents={agentWorkingRows}
+            className="mx-3 mt-2 mb-1"
+            selectedAgentId={selectedOutputAgentId}
+            onSelectAgent={handleAgentSelection}
+            onKillAgent={(agentId) => {
+              const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
+              if (member) void handleKillSession(member)
+            }}
+            onRespawnAgent={(agentId) => {
+              const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
+              if (member) void handleRetrySpawn(member)
+            }}
+          />
+        ) : null}
+
+        {/* Mission board area + optional inline agent output */}
+        <div className="flex min-h-0 flex-1">
+          {/* Board / Create Mission */}
+          <div className="min-w-0 flex-1 overflow-hidden">
+            {!missionActive ? (
+              showNewMission ? (
+                <div className="flex min-h-0 flex-1 items-center justify-center px-8 py-6 h-full">
+                  <div className="w-full max-w-2xl rounded-2xl border border-primary-200 bg-white/80 px-8 py-6 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/70">
+                    <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-xs text-primary-400">
+                      <span className="rounded-full bg-primary-100 px-2 py-0.5">
+                        1. Choose a team template
+                      </span>
+                      <span className="text-primary-300">→</span>
+                      <span className="rounded-full bg-primary-100 px-2 py-0.5">
+                        2. Describe your mission
+                      </span>
+                      <span className="text-primary-300">→</span>
+                      <span className="rounded-full bg-primary-100 px-2 py-0.5">3. Launch</span>
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-500">
+                      No Active Mission
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold text-primary-900 dark:text-neutral-100">
+                      + Create Mission
+                    </h2>
+                    <p className="mt-2 text-sm text-primary-500">
+                      Describe your goal and we&apos;ll suggest an agent team.
+                    </p>
+
+                    <div className="mt-5 space-y-3">
+                      <textarea
+                        value={missionGoal}
+                        onChange={(event) => setMissionGoal(event.target.value)}
+                        rows={4}
+                        placeholder="Example: Ship a release plan and implementation tasks for authentication hardening"
+                        className="w-full resize-none rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                      />
+
+                      {/* Example chips */}
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        {EXAMPLE_MISSIONS.map((example) => (
+                          <button
+                            key={example.label}
+                            type="button"
+                            onClick={() => setMissionGoal(example.text)}
+                            className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:border-accent-400 hover:bg-accent-50 hover:text-accent-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:bg-accent-950/20 dark:hover:text-accent-300"
+                          >
+                            {example.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Live template preview */}
+                      {suggestedTemplateName ? (
+                        <p className="text-[11px] text-primary-400 dark:text-neutral-500">
+                          Will use:{' '}
+                          <span className="font-semibold text-accent-600 dark:text-accent-400">
+                            {suggestedTemplateName}
+                          </span>
+                        </p>
+                      ) : null}
+
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleAutoConfigure}
+                          disabled={!missionGoal.trim()}
+                          className="rounded-lg border border-accent-400 px-4 py-2 text-xs font-medium text-accent-600 transition-colors hover:bg-accent-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          ✨ Auto-configure
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCreateMission}
+                          disabled={!missionGoal.trim()}
+                          title="Start Mission (Cmd+Enter)"
+                          className="rounded-lg bg-accent-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Start Mission
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex min-h-0 h-full flex-1 items-center justify-center px-6">
+                  <div className="rounded-xl border border-primary-200 bg-white/80 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/70">
+                    <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                      Mission stopped
+                    </h2>
+                    <p className="mt-1 text-xs text-primary-500">
+                      Launch a new mission to resume orchestration.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewMission(true)}
+                      className="mt-3 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600"
+                    >
+                      Create another mission
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : view === 'timeline' ? (
+              <div className="flex min-h-0 h-full flex-1 items-center justify-center px-6">
+                <div className="rounded-xl border border-dashed border-primary-300 bg-white/60 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
+                  <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                    Timeline view coming soon
+                  </h3>
+                  <p className="mt-1 text-xs text-primary-500">
+                    Switch back to Board for active mission orchestration.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col h-full">
+                <div className="flex items-center justify-between border-b border-emerald-200 bg-emerald-50/40 px-4 py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/15">
+                  <p className="truncate text-xs font-medium text-emerald-800 dark:text-emerald-200">
+                    Mission: {truncateMissionGoal(activeMissionGoal || missionGoal.trim())}
+                  </p>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {/* Board/Timeline toggle — use string cast to avoid TS narrowing in else branch */}
+                    <div className="flex items-center rounded-lg border border-primary-200 bg-white p-0.5 dark:border-neutral-700 dark:bg-neutral-900">
+                      {(['board', 'timeline'] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          className={cn(
+                            'rounded-md px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
+                            (view as string) === v
+                              ? 'bg-primary-100 text-primary-800 dark:bg-neutral-800 dark:text-neutral-100'
+                              : 'text-primary-500 hover:text-primary-700',
+                          )}
+                          onClick={() => setView(v)}
+                        >
+                          {v.charAt(0).toUpperCase() + v.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        missionBadge.className,
+                      )}
+                    >
+                      {missionBadge.label}
+                    </span>
+                  </div>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <TaskBoard
+                    agents={boardAgents}
+                    initialTasks={missionTasks}
+                    selectedAgentId={selectedAgentId}
+                    onRef={handleTaskBoardRef}
+                    onTasksChange={setBoardTasks}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Inline agent output panel (desktop, right of task board) */}
+          {!isMobileHub && missionActive && selectedOutputAgentId ? (
+            <div className="w-72 shrink-0 border-l border-primary-200 dark:border-neutral-700">
+              <AgentOutputPanel
+                agentName={selectedOutputAgentName}
+                sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
+                tasks={selectedOutputTasks}
+                onClose={() => setSelectedOutputAgentId(undefined)}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* ── Header ────────────────────────────────────────────────────────── */}
@@ -1317,39 +1854,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </h1>
           <p className="text-xs text-primary-500">Mission Control</p>
         </div>
-
-        <div className="flex min-h-[30px] items-center">
-          {missionActive ? (
-            <div className="flex items-center rounded-lg border border-primary-200 bg-white p-0.5 dark:border-neutral-700 dark:bg-neutral-900">
-              <button
-                type="button"
-                className={cn(
-                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                  view === 'board'
-                    ? 'bg-primary-100 text-primary-800 dark:bg-neutral-800 dark:text-neutral-100'
-                    : 'text-primary-500 hover:text-primary-700',
-                )}
-                onClick={() => setView('board')}
-              >
-                Board
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                  view === 'timeline'
-                    ? 'bg-primary-100 text-primary-800 dark:bg-neutral-800 dark:text-neutral-100'
-                    : 'text-primary-500 hover:text-primary-700',
-                )}
-                onClick={() => setView('timeline')}
-              >
-                Timeline
-              </button>
-            </div>
-          ) : (
-            <p className="text-xs text-primary-400">Agent Hub · Mission Control</p>
-          )}
-        </div>
+        <p className="text-xs text-primary-400">Agent Hub · Mission Control</p>
       </div>
 
       {/* ── Gateway Connection Banner ──────────────────────────────────────── */}
@@ -1359,332 +1864,228 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         onRetry={spawnErrorNames.length > 0 ? handleRetryAllSpawnErrors : undefined}
       />
 
-      {/* ── Main content ──────────────────────────────────────────────────── */}
-      {/* pb-14 on mobile reserves space above fixed bottom nav */}
-      <div className="flex min-h-0 flex-1 pb-14 md:pb-0">
-        {/* ── Team Panel ── desktop: fixed 280px; mobile: full-width when active */}
-        <div
-          className={cn(
-            'shrink-0 transition-colors',
-            'md:w-[280px] md:block',
-            mobileView === 'team' ? 'block w-full' : 'hidden md:block',
-            teamPanelFlash && 'bg-emerald-50/70 dark:bg-emerald-900/10',
-          )}
-        >
-          <TeamPanel
-            team={teamWithRuntimeStatus}
-            activeTemplateId={activeTemplateId}
-            agentTaskCounts={agentTaskCounts}
-            spawnState={spawnState}
-            agentSessionStatus={agentSessionStatus}
-            agentSessionMap={agentSessionMap}
-            agentModelNotApplied={agentModelNotApplied}
-            tasks={boardTasks}
-            onRetrySpawn={handleRetrySpawn}
-            onKillSession={handleKillSession}
-            onApplyTemplate={applyTemplate}
-            onAddAgent={handleAddAgent}
-            onUpdateAgent={(agentId, updates) => {
-              setTeam((previous) =>
-                previous.map((member) =>
-                  member.id === agentId ? { ...member, ...updates } : member,
-                ),
-              )
-            }}
-            onSelectAgent={handleAgentSelection}
-          />
-        </div>
-
-        {/* ── Task Board ── desktop: flex-1; mobile: full-width when active */}
-        <div
-          className={cn(
-            'overflow-hidden border-primary-200',
-            'md:min-w-0 md:flex-1 md:flex md:flex-col md:border-l',
-            mobileView === 'board' ? 'flex w-full flex-col border-l' : 'hidden md:flex',
-          )}
-        >
-          {/* Agents Working Panel: always visible when team has members */}
-          {team.length > 0 ? (
-            <AgentsWorkingPanel
-              agents={agentWorkingRows}
-              className="mx-3 mt-2 mb-1"
-              selectedAgentId={selectedOutputAgentId}
-              onSelectAgent={handleAgentSelection}
-              onKillAgent={(agentId) => {
-                const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
-                if (member) void handleKillSession(member)
-              }}
-              onRespawnAgent={(agentId) => {
-                const member = teamWithRuntimeStatus.find((m) => m.id === agentId)
-                if (member) void handleRetrySpawn(member)
-              }}
-            />
-          ) : null}
-
-          {!missionActive ? (
-            showNewMission ? (
-              <div className="flex flex-1 min-h-0 items-center justify-center px-8 py-6">
-                <div className="w-full max-w-2xl rounded-2xl border border-primary-200 bg-white/80 px-8 py-6 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/70">
-                  <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-xs text-primary-400">
-                    <span className="rounded-full bg-primary-100 px-2 py-0.5">
-                      1. Choose a team template
-                    </span>
-                    <span className="text-primary-300">→</span>
-                    <span className="rounded-full bg-primary-100 px-2 py-0.5">
-                      2. Describe your mission
-                    </span>
-                    <span className="text-primary-300">→</span>
-                    <span className="rounded-full bg-primary-100 px-2 py-0.5">3. Launch</span>
-                  </div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-500">
-                    No Active Mission
-                  </p>
-                  <h2 className="mt-2 text-2xl font-semibold text-primary-900 dark:text-neutral-100">
-                    + Create Mission
-                  </h2>
-                  <p className="mt-2 text-sm text-primary-500">
-                    Describe your goal and we&apos;ll suggest an agent team.
-                  </p>
-
-                  <div className="mt-5 space-y-3">
-                    <textarea
-                      value={missionGoal}
-                      onChange={(event) => setMissionGoal(event.target.value)}
-                      rows={4}
-                      placeholder="Example: Ship a release plan and implementation tasks for authentication hardening"
-                      className="w-full resize-none rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-                    />
-
-                    {/* Example chips */}
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      {EXAMPLE_MISSIONS.map((example) => (
-                        <button
-                          key={example.label}
-                          type="button"
-                          onClick={() => setMissionGoal(example.text)}
-                          className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:border-accent-400 hover:bg-accent-50 hover:text-accent-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:bg-accent-950/20 dark:hover:text-accent-300"
-                        >
-                          {example.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Live template preview */}
-                    {suggestedTemplateName ? (
-                      <p className="text-[11px] text-primary-400 dark:text-neutral-500">
-                        Will use:{' '}
-                        <span className="font-semibold text-accent-600 dark:text-accent-400">
-                          {suggestedTemplateName}
-                        </span>
-                      </p>
-                    ) : null}
-
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleAutoConfigure}
-                        disabled={!missionGoal.trim()}
-                        className="rounded-lg border border-accent-400 px-4 py-2 text-xs font-medium text-accent-600 transition-colors hover:bg-accent-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        ✨ Auto-configure
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCreateMission}
-                        disabled={!missionGoal.trim()}
-                        title="Start Mission (Cmd+Enter)"
-                        className="rounded-lg bg-accent-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Start Mission
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-1 min-h-0 items-center justify-center px-6">
-                <div className="rounded-xl border border-primary-200 bg-white/80 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/70">
-                  <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                    Mission stopped
-                  </h2>
-                  <p className="mt-1 text-xs text-primary-500">
-                    Launch a new mission to resume orchestration.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewMission(true)}
-                    className="mt-3 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600"
-                  >
-                    Create another mission
-                  </button>
-                </div>
-              </div>
-            )
-          ) : view === 'timeline' ? (
-            <div className="flex flex-1 min-h-0 items-center justify-center px-6">
-              <div className="rounded-xl border border-dashed border-primary-300 bg-white/60 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
-                <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                  Timeline view coming soon
-                </h3>
-                <p className="mt-1 text-xs text-primary-500">
-                  Switch back to Board for active mission orchestration.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-1 min-h-0 flex-col">
-              <div className="flex items-center justify-between border-b border-emerald-200 bg-emerald-50/40 px-4 py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/15">
-                <p className="truncate text-xs font-medium text-emerald-800 dark:text-emerald-200">
-                  Mission: {truncateMissionGoal(activeMissionGoal || missionGoal.trim())}
-                </p>
-                <span
-                  className={cn(
-                    'ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                    missionBadge.className,
-                  )}
-                >
-                  {missionBadge.label}
-                </span>
-              </div>
-              <div className="min-h-0 flex-1">
-                <TaskBoard
-                  agents={boardAgents}
-                  initialTasks={missionTasks}
-                  selectedAgentId={selectedAgentId}
-                  onRef={handleTaskBoardRef}
-                  onTasksChange={setBoardTasks}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Right Panel (Live Feed + Controls) ── desktop: fixed 280px; mobile: full-width when active */}
-        <div
-          className={cn(
-            'flex flex-col border-primary-200 bg-primary-50/30 dark:bg-neutral-900/20',
-            'md:w-[280px] md:shrink-0 md:flex md:border-l',
-            mobileView === 'feed' ? 'flex w-full border-l' : 'hidden md:flex',
-          )}
-        >
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <LiveFeedPanel />
-          </div>
-          {/* Agent output: desktop inline, mobile bottom sheet (rendered separately) */}
-          {!isMobileHub && missionActive && selectedOutputAgentId ? (
-            <AgentOutputPanel
-              agentName={selectedOutputAgentName}
-              sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
-              tasks={selectedOutputTasks}
-              onClose={() => setSelectedOutputAgentId(undefined)}
-            />
-          ) : null}
-
-          <div className="border-t border-primary-200 px-4 py-3">
-            {missionActive ? (
-              <>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-500">
-                  Mission Controls
-                </h3>
-                <div className="mt-2 grid grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setMissionState('running')}
-                    className={cn(
-                      'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
-                      missionState === 'running'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
-                    )}
-                  >
-                    Start
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMissionState('paused')}
-                    className={cn(
-                      'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
-                      missionState === 'paused'
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
-                    )}
-                  >
-                    Pause
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Best-effort cleanup of per-agent sessions
-                      Object.values(agentSessionMap).forEach((sessionKey) => {
-                        fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
-                          method: 'DELETE',
-                        }).catch(() => {})
-                      })
-                      setAgentSessionMap({})
-                      setSpawnState({})
-                      setAgentSessionStatus({})
-                      if (typeof window !== 'undefined') {
-                        window.localStorage.removeItem('clawsuite:hub-agent-sessions')
-                      }
-                      setMissionState('stopped')
-                      setMissionActive(false)
-                      setShowNewMission(false)
-                      setActiveMissionGoal('')
-                      setMissionTasks([])
-                      setDispatchedTaskIdsByAgent({})
-                      setSelectedOutputAgentId(undefined)
-                      dispatchingRef.current = false
-                      pendingTaskMovesRef.current = []
-                      sessionActivityRef.current = new Map()
-                      taskBoardRef.current = null
-                    }}
-                    className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
-                  >
-                    Stop
-                  </button>
-                </div>
-
-                <label className="mt-3 block">
-                  <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                    Budget Limit (max tokens)
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={budgetLimit}
-                    onChange={(event) => setBudgetLimit(event.target.value)}
-                    className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-                  />
-                </label>
-
-                <button
-                  type="button"
-                  onClick={() => setAutoAssign((current) => !current)}
-                  className="mt-2 flex w-full items-center justify-between rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
-                >
-                  <span>Auto-assign tasks</span>
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                      autoAssign
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                        : 'bg-primary-100 text-primary-600 dark:bg-neutral-700 dark:text-neutral-300',
-                    )}
-                  >
-                    {autoAssign ? 'On' : 'Off'}
-                  </span>
-                </button>
-              </>
-            ) : (
-              <p className="text-xs text-primary-400">Start a mission to see controls here</p>
+      {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
+      <div className="flex items-center border-b border-primary-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
+        {TAB_DEFS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              'relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors',
+              activeTab === tab.id
+                ? 'border-b-2 border-accent-500 text-accent-600 dark:border-accent-400 dark:text-accent-400'
+                : 'border-b-2 border-transparent text-primary-500 hover:text-primary-700 dark:text-neutral-400 dark:hover:text-neutral-200',
             )}
-          </div>
+          >
+            <span aria-hidden>{tab.icon}</span>
+            <span>{tab.label}</span>
+            {/* Mission tab: animated running indicator */}
+            {tab.id === 'mission' && isMissionRunning ? (
+              <span className="relative ml-0.5 flex size-1.5">
+                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+              </span>
+            ) : null}
+          </button>
+        ))}
+
+        {/* Spacer + Live Feed toggle */}
+        <div className="ml-auto flex items-center pr-3">
+          <button
+            type="button"
+            onClick={() => {
+              setLiveFeedVisible((v) => !v)
+            }}
+            className={cn(
+              'flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
+              liveFeedVisible
+                ? 'bg-primary-100 text-primary-700 dark:bg-neutral-800 dark:text-neutral-200'
+                : 'text-primary-400 hover:text-primary-600 dark:text-neutral-500 dark:hover:text-neutral-300',
+            )}
+          >
+            <span aria-hidden>📡</span>
+            <span className="hidden sm:inline">Live Feed</span>
+            {unreadFeedCount > 0 && !liveFeedVisible ? (
+              <span className="ml-0.5 rounded-full bg-accent-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                {unreadFeedCount > 99 ? '99+' : unreadFeedCount}
+              </span>
+            ) : null}
+          </button>
         </div>
       </div>
 
+      {/* ── Main content ──────────────────────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* ── Tab content area ── */}
+        <div className="min-w-0 flex-1 overflow-hidden">
+          {/* Office tab */}
+          {activeTab === 'office' ? (
+            <OfficeView
+              agentRows={agentWorkingRows}
+              missionRunning={isMissionRunning}
+              selectedOutputAgentId={selectedOutputAgentId}
+              onViewOutput={(agentId) => {
+                handleAgentSelection(agentId)
+                // Switch to mission tab to see output
+                setActiveTab('mission')
+              }}
+            />
+          ) : null}
+
+          {/* Mission tab */}
+          {activeTab === 'mission' ? renderMissionContent() : null}
+
+          {/* History tab */}
+          {activeTab === 'history' ? <HistoryView /> : null}
+
+          {/* Team tab */}
+          {activeTab === 'team' ? (
+            <div
+              className={cn(
+                'h-full overflow-y-auto',
+                teamPanelFlash && 'bg-emerald-50/70 dark:bg-emerald-900/10',
+              )}
+            >
+              <TeamPanel
+                team={teamWithRuntimeStatus}
+                activeTemplateId={activeTemplateId}
+                agentTaskCounts={agentTaskCounts}
+                spawnState={spawnState}
+                agentSessionStatus={agentSessionStatus}
+                agentSessionMap={agentSessionMap}
+                agentModelNotApplied={agentModelNotApplied}
+                tasks={boardTasks}
+                onRetrySpawn={handleRetrySpawn}
+                onKillSession={handleKillSession}
+                onApplyTemplate={applyTemplate}
+                onAddAgent={handleAddAgent}
+                onUpdateAgent={(agentId, updates) => {
+                  setTeam((previous) =>
+                    previous.map((member) =>
+                      member.id === agentId ? { ...member, ...updates } : member,
+                    ),
+                  )
+                }}
+                onSelectAgent={handleAgentSelection}
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {/* ── Collapsible Live Feed + Mission Controls sidebar ── */}
+        {liveFeedVisible ? (
+          <div className="flex w-72 shrink-0 flex-col border-l border-primary-200 bg-primary-50/30 dark:border-neutral-700 dark:bg-neutral-900/20">
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <LiveFeedPanel />
+            </div>
+
+            {/* Mission controls (bottom of sidebar) */}
+            <div className="border-t border-primary-200 px-4 py-3">
+              {missionActive ? (
+                <>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                    Mission Controls
+                  </h3>
+                  <div className="mt-2 grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setMissionState('running')}
+                      className={cn(
+                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
+                        missionState === 'running'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
+                      )}
+                    >
+                      Start
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMissionState('paused')}
+                      className={cn(
+                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
+                        missionState === 'paused'
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
+                      )}
+                    >
+                      Pause
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Best-effort cleanup of per-agent sessions
+                        Object.values(agentSessionMap).forEach((sessionKey) => {
+                          fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
+                            method: 'DELETE',
+                          }).catch(() => {})
+                        })
+                        setAgentSessionMap({})
+                        setSpawnState({})
+                        setAgentSessionStatus({})
+                        if (typeof window !== 'undefined') {
+                          window.localStorage.removeItem('clawsuite:hub-agent-sessions')
+                        }
+                        setMissionState('stopped')
+                        setMissionActive(false)
+                        setShowNewMission(false)
+                        setActiveMissionGoal('')
+                        setMissionTasks([])
+                        setDispatchedTaskIdsByAgent({})
+                        setSelectedOutputAgentId(undefined)
+                        dispatchingRef.current = false
+                        pendingTaskMovesRef.current = []
+                        sessionActivityRef.current = new Map()
+                        taskBoardRef.current = null
+                      }}
+                      className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
+                    >
+                      Stop
+                    </button>
+                  </div>
+
+                  <label className="mt-3 block">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                      Budget Limit (max tokens)
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={budgetLimit}
+                      onChange={(event) => setBudgetLimit(event.target.value)}
+                      className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setAutoAssign((current) => !current)}
+                    className="mt-2 flex w-full items-center justify-between rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    <span>Auto-assign tasks</span>
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                        autoAssign
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                          : 'bg-primary-100 text-primary-600 dark:bg-neutral-700 dark:text-neutral-300',
+                      )}
+                    >
+                      {autoAssign ? 'On' : 'Off'}
+                    </span>
+                  </button>
+                </>
+              ) : (
+                <p className="text-xs text-primary-400">Start a mission to see controls here</p>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
       {/* ── Mobile: Agent Output Bottom Sheet ──────────────────────────────── */}
-      {/* Only rendered on mobile when not in 'feed' view (feed panel has it inline) */}
-      {isMobileHub && missionActive && selectedOutputAgentId && mobileView !== 'feed' ? (
+      {isMobileHub && missionActive && selectedOutputAgentId ? (
         <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden">
           {/* Backdrop */}
           <div
@@ -1693,7 +2094,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             aria-hidden
           />
           {/* Sheet */}
-          <div className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-t-2xl bg-white dark:bg-neutral-900 shadow-xl">
+          <div className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl dark:bg-neutral-900">
             <div className="flex shrink-0 items-center justify-between border-b border-primary-200 p-3 dark:border-neutral-700">
               <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
                 {selectedOutputAgentName} Output
@@ -1719,31 +2120,32 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
       ) : null}
 
-      {/* ── Mobile: Bottom Segmented Nav ───────────────────────────────────── */}
+      {/* ── Mobile: Bottom Tab Nav ─────────────────────────────────────────── */}
       <div
         className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary-200 bg-white/95 backdrop-blur-sm dark:border-neutral-700 dark:bg-neutral-900/95 md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex">
-          {(
-            [
-              { view: 'board', label: 'Board' },
-              { view: 'team', label: 'Team' },
-              { view: 'feed', label: 'Feed' },
-            ] as const
-          ).map(({ view: v, label }) => (
+          {TAB_DEFS.map((tab) => (
             <button
-              key={v}
+              key={tab.id}
               type="button"
-              onClick={() => setMobileView(v)}
+              onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex flex-1 items-center justify-center py-3 text-xs font-medium transition-colors',
-                mobileView === v
+                'relative flex flex-1 flex-col items-center justify-center py-2.5 text-[10px] font-medium transition-colors',
+                activeTab === tab.id
                   ? 'text-accent-600 dark:text-accent-400'
-                  : 'text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200',
+                  : 'text-primary-500 hover:text-primary-700 dark:text-neutral-400 dark:hover:text-neutral-200',
               )}
             >
-              {label}
+              <span className="text-base leading-none" aria-hidden>{tab.icon}</span>
+              <span className="mt-0.5">{tab.label}</span>
+              {tab.id === 'mission' && isMissionRunning ? (
+                <span className="absolute right-3 top-1.5 flex size-1.5">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
+                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
