@@ -303,6 +303,25 @@ export function TeamPanel({
 
               {expanded ? (
                 <div className="mt-2 space-y-2 border-t border-primary-200 pt-2 dark:border-neutral-700">
+                  {/* Quick-look: Model + Session */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-primary-50/60 px-2 py-1.5 text-[10px] dark:bg-neutral-800/60">
+                    <span className="flex items-center gap-1">
+                      <span className="text-primary-400 dark:text-neutral-500">Model:</span>
+                      <span className={cn('rounded px-1.5 py-0.5 font-medium', MODEL_BADGE_COLOR[agent.modelId])}>
+                        {modelLabel}
+                      </span>
+                    </span>
+                    {agentSessionKey ? (
+                      <span className="flex min-w-0 items-center gap-1">
+                        <span className="shrink-0 text-primary-400 dark:text-neutral-500">Session:</span>
+                        <code className="max-w-[14ch] truncate rounded bg-white px-1 font-mono text-primary-700 dark:bg-neutral-900 dark:text-neutral-400">
+                          {agentSessionKey}
+                        </code>
+                      </span>
+                    ) : (
+                      <span className="text-primary-300 dark:text-neutral-600">No session</span>
+                    )}
+                  </div>
                   {agentSessionEntry?.lastMessage ? (
                     <p className="truncate text-[10px] italic text-primary-400 dark:text-neutral-500">
                       {agentSessionEntry.lastMessage}

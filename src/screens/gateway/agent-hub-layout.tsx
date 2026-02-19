@@ -344,6 +344,12 @@ function resolveActiveTemplate(team: TeamMember[]): TeamTemplateId | undefined {
   })?.id
 }
 
+// Stored format for agent session info in localStorage (v2)
+type AgentSessionInfo = {
+  sessionKey: string
+  model?: string
+}
+
 type SessionRecord = Record<string, unknown>
 
 function readString(value: unknown): string {
@@ -964,7 +970,36 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (typeof window === 'undefined') return {}
     try {
       const stored = window.localStorage.getItem('clawsuite:hub-agent-sessions')
-      return stored ? (JSON.parse(stored) as Record<string, string>) : {}
+      if (!stored) return {}
+      const parsed = JSON.parse(stored) as Record<string, unknown>
+      const result: Record<string, string> = {}
+      for (const [id, value] of Object.entries(parsed)) {
+        if (typeof value === 'string') {
+          // Old format: plain string sessionKey
+          result[id] = value
+        } else if (value && typeof value === 'object' && typeof (value as AgentSessionInfo).sessionKey === 'string') {
+          // New format: { sessionKey, model? }
+          result[id] = (value as AgentSessionInfo).sessionKey
+        }
+      }
+      return result
+    } catch {
+      return {}
+    }
+  })
+  const [agentSessionModelMap, setAgentSessionModelMap] = useState<Record<string, string>>(() => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const stored = window.localStorage.getItem('clawsuite:hub-agent-sessions')
+      if (!stored) return {}
+      const parsed = JSON.parse(stored) as Record<string, unknown>
+      const result: Record<string, string> = {}
+      for (const [id, value] of Object.entries(parsed)) {
+        if (value && typeof value === 'object' && typeof (value as AgentSessionInfo).model === 'string') {
+          result[id] = (value as AgentSessionInfo).model as string
+        }
+      }
+      return result
     } catch {
       return {}
     }
@@ -1035,8 +1070,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    window.localStorage.setItem('clawsuite:hub-agent-sessions', JSON.stringify(agentSessionMap))
-  }, [agentSessionMap])
+    const combined: Record<string, AgentSessionInfo> = {}
+    for (const [id, sessionKey] of Object.entries(agentSessionMap)) {
+      const model = agentSessionModelMap[id]
+      combined[id] = model ? { sessionKey, model } : { sessionKey }
+    }
+    window.localStorage.setItem('clawsuite:hub-agent-sessions', JSON.stringify(combined))
+  }, [agentSessionMap, agentSessionModelMap])
 
   useEffect(() => {
     if (team.length > 0) return
@@ -1533,14 +1573,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     try {
       const sessionKey = await spawnAgentSession(member)
       setAgentSessionMap((prev) => ({ ...prev, [member.id]: sessionKey }))
+      // Track model used at spawn time
+      const modelString = MODEL_PRESET_MAP[member.modelId] ?? ''
+      if (modelString) {
+        setAgentSessionModelMap((prev) => ({ ...prev, [member.id]: modelString }))
+      }
       setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
       setAgentSessionStatus((prev) => ({
         ...prev,
         [member.id]: { status: 'idle', lastSeen: Date.now() },
       }))
+      const modelPreset = MODEL_PRESETS.find((p) => p.id === member.modelId)
+      const modelSuffix = member.modelId !== 'auto' && modelPreset ? ` (${modelPreset.label})` : ''
       emitFeedEvent({
         type: 'agent_spawned',
-        message: `${member.name} session re-created`,
+        message: `${member.name} session re-created${modelSuffix}`,
         agentName: member.name,
       })
     } catch (err) {
@@ -1577,6 +1624,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       return next
     })
     setAgentModelNotApplied((prev) => {
+      if (!prev[member.id]) return prev
+      const next = { ...prev }
+      delete next[member.id]
+      return next
+    })
+    setAgentSessionModelMap((prev) => {
       if (!prev[member.id]) return prev
       const next = { ...prev }
       delete next[member.id]
@@ -1652,9 +1705,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           .then((sessionKey) => {
             currentMap[member.id] = sessionKey
             setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
+            // Track model used at spawn time
+            const modelString = MODEL_PRESET_MAP[member.modelId] ?? ''
+            if (modelString) {
+              setAgentSessionModelMap((prev) => ({ ...prev, [member.id]: modelString }))
+            }
+            const modelPreset = MODEL_PRESETS.find((p) => p.id === member.modelId)
+            const modelSuffix = member.modelId !== 'auto' && modelPreset ? ` (${modelPreset.label})` : ''
             emitFeedEvent({
               type: 'agent_spawned',
-              message: `${member.name} session created`,
+              message: `spawned ${member.name}${modelSuffix}`,
               agentName: member.name,
             })
           })

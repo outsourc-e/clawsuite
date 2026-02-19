@@ -13,6 +13,8 @@ export type AgentOutputPanelProps = {
   sessionKey: string | null
   tasks: HubTask[]
   onClose: () => void
+  /** Compact mode: no outer border/padding and no internal header. Use inside LiveActivityPanel. */
+  compact?: boolean
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -45,6 +47,7 @@ export function AgentOutputPanel({
   sessionKey,
   tasks,
   onClose,
+  compact = false,
 }: AgentOutputPanelProps) {
   const [messages, setMessages] = useState<OutputMessage[]>([])
   const [sessionEnded, setSessionEnded] = useState(false)
@@ -136,25 +139,11 @@ export function AgentOutputPanel({
     }
   }, [sessionKey])
 
-  return (
-    <div className="border-t border-primary-200 dark:border-neutral-700 p-3">
-      {/* Header */}
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
-          {agentName} Output
-        </h3>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-xs text-primary-400 transition-colors hover:text-primary-600 dark:hover:text-neutral-200"
-        >
-          ✕
-        </button>
-      </div>
-
+  const inner = (
+    <>
       {/* Task list */}
       {tasks.length > 0 && (
-        <div className="mb-2 space-y-1.5">
+        <div className={cn('space-y-1.5', compact ? 'mb-2' : 'mb-2')}>
           {tasks.map((task) => (
             <div
               key={task.id}
@@ -182,7 +171,10 @@ export function AgentOutputPanel({
       {sessionKey ? (
         <div
           ref={scrollRef}
-          className="mt-1 min-h-[80px] max-h-[220px] overflow-y-auto rounded-lg bg-neutral-900 p-3 font-mono text-[11px] leading-relaxed"
+          className={cn(
+            'overflow-y-auto rounded-lg bg-neutral-900 p-3 font-mono text-[11px] leading-relaxed',
+            compact ? 'h-full min-h-[120px]' : 'mt-1 min-h-[80px] max-h-[220px]',
+          )}
         >
           {messages.length === 0 && !sessionEnded ? (
             <p className="animate-pulse text-neutral-400">Waiting for response…</p>
@@ -219,7 +211,7 @@ export function AgentOutputPanel({
         </div>
       ) : (
         // Fallback placeholder when no sessionKey
-        <div className="mt-3 min-h-[80px] rounded-lg bg-neutral-900 p-3 font-mono text-[11px] text-green-400">
+        <div className={cn('rounded-lg bg-neutral-900 p-3 font-mono text-[11px] text-green-400', compact ? 'flex-1' : 'mt-3 min-h-[80px]')}>
           {tasks.length === 0 ? (
             <p className="text-neutral-500">No dispatched tasks yet.</p>
           ) : (
@@ -230,6 +222,33 @@ export function AgentOutputPanel({
           )}
         </div>
       )}
+    </>
+  )
+
+  if (compact) {
+    return (
+      <div className="flex h-full flex-col p-3">
+        {inner}
+      </div>
+    )
+  }
+
+  return (
+    <div className="border-t border-primary-200 dark:border-neutral-700 p-3">
+      {/* Header */}
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+          {agentName} Output
+        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs text-primary-400 transition-colors hover:text-primary-600 dark:hover:text-neutral-200"
+        >
+          ✕
+        </button>
+      </div>
+      {inner}
     </div>
   )
 }

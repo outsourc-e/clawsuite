@@ -10,6 +10,8 @@ export type HubTask = {
   priority: TaskPriority
   status: TaskStatus
   agentId?: string
+  /** ID of the mission that created this task. Used to filter stale tasks. */
+  missionId?: string
   createdAt: number
   updatedAt: number
 }
@@ -63,6 +65,7 @@ function toTask(value: unknown): HubTask | null {
   const createdAt = typeof row.createdAt === 'number' ? row.createdAt : Date.now()
   const updatedAt = typeof row.updatedAt === 'number' ? row.updatedAt : createdAt
   const agentId = typeof row.agentId === 'string' ? row.agentId : undefined
+  const missionId = typeof row.missionId === 'string' ? row.missionId : undefined
   if (!id || !title || !isTaskPriority(row.priority) || !isTaskStatus(row.status)) return null
   return normalizeTask({
     id,
@@ -71,6 +74,7 @@ function toTask(value: unknown): HubTask | null {
     priority: row.priority,
     status: row.status,
     agentId,
+    missionId,
     createdAt,
     updatedAt,
   })
