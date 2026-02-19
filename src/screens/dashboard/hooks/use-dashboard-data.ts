@@ -62,14 +62,16 @@ function toSessionDisplayName(session: Record<string, unknown>): string {
   return friendlyId === 'main' ? 'Main Session' : (friendlyId || 'Session')
 }
 
-/** Returns true if the session is a spawned subagent (should be excluded from user-facing counts). */
+/** Returns true if the session is a spawned subagent or Agent Hub mission session (exclude from hero counts). */
 function isSubagentSession(session: Record<string, unknown>): boolean {
   const key = readString(session.key ?? session.sessionKey ?? '')
   const label = readString(session.label ?? '')
   return (
     key.startsWith('agent:main:subagent:') ||
     key.includes('subagent') ||
-    label.toLowerCase().includes('subagent')
+    label.toLowerCase().includes('subagent') ||
+    label.startsWith('Mission:') ||
+    key.includes('hub-')
   )
 }
 
