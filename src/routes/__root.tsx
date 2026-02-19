@@ -20,11 +20,25 @@ const themeScript = `
 (() => {
   window.process = window.process || { env: {}, platform: 'browser' };
   
-  // Auto-configure gateway URL for network access (mobile)
+  // Gateway connection via ClawSuite server proxy.
+  // Clients connect to /ws-gateway on the ClawSuite server (same host:port as the page).
+  // The server proxies internally to ws://127.0.0.1:18789 — so phone/LAN/Docker
+  // users never need direct access to port 18789.
+  // Manual override: set gatewayUrl in settings to skip proxy (e.g. wss:// remote).
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      window.__GATEWAY_URL__ = 'ws://' + hostname + ':18789';
+    try {
+      const stored = localStorage.getItem('openclaw-settings')
+      const parsed = stored ? JSON.parse(stored) : null
+      const manualUrl = parsed?.state?.settings?.gatewayUrl
+      if (manualUrl && typeof manualUrl === 'string' && manualUrl.startsWith('ws')) {
+        window.__GATEWAY_URL__ = manualUrl
+      } else {
+        // Use proxy path — works from any device that can reach ClawSuite
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        window.__GATEWAY_URL__ = proto + '//' + window.location.host + '/ws-gateway'
+      }
+    } catch {
+      window.__GATEWAY_URL__ = 'ws://127.0.0.1:18789'
     }
   }
   
