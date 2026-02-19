@@ -67,6 +67,16 @@ function toSessionUpdatedAt(session: SessionMeta): number {
   return 0
 }
 
+function isSubagentSession(session: { key?: string; label?: string }): boolean {
+  const key = session.key ?? ''
+  const label = session.label ?? ''
+  return (
+    key.startsWith('agent:main:subagent:') ||
+    key.includes('subagent') ||
+    label.toLowerCase().includes('subagent')
+  )
+}
+
 export function RecentSessionsWidget({
   onOpenSession,
   draggable = false,
@@ -82,7 +92,9 @@ export function RecentSessionsWidget({
     function buildRecentSessions() {
       const rows = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
 
-      const sorted = [...rows].sort(function sortByMostRecent(a, b) {
+      const filtered = rows.filter((s) => !isSubagentSession(s))
+
+      const sorted = [...filtered].sort(function sortByMostRecent(a, b) {
         return toSessionUpdatedAt(b) - toSessionUpdatedAt(a)
       })
 

@@ -318,6 +318,8 @@ type UsageMeterWidgetProps = {
   editMode?: boolean
   /** When provided, overrides the self-fetched cost total as the "today's spend" hero value. */
   overrideCost?: number
+  /** When provided, overrides the self-fetched token total as the "tokens today" hero value. */
+  overrideTokens?: number
 }
 
 export function UsageMeterWidget({
@@ -325,6 +327,7 @@ export function UsageMeterWidget({
   onRemove,
   editMode,
   overrideCost,
+  overrideTokens,
 }: UsageMeterWidgetProps) {
   const [view, setView] = useState<'tokens' | 'cost'>('tokens')
   const [timedOut, setTimedOut] = useState(false)
@@ -362,6 +365,8 @@ export function UsageMeterWidget({
 
   // Use overrideCost (from dashboard's session-status) when provided — avoids $0.00 vs $179 contradiction
   const displayCost = overrideCost !== undefined ? overrideCost : (usageData?.totalCost ?? 0)
+  // Use overrideTokens (from dashboard's session-status dailyBreakdown) when provided
+  const displayTokens = overrideTokens !== undefined ? overrideTokens : (usageData?.totalUsage ?? 0)
 
   const tabSwitcher = (
     <div className="hidden items-center gap-0.5 rounded-full border border-primary-200 bg-primary-100/70 p-0.5 text-[10px] md:inline-flex">
@@ -423,7 +428,7 @@ export function UsageMeterWidget({
           <div className="space-y-3 md:hidden">
             <div className="flex items-baseline gap-2">
               <p className="text-3xl font-bold leading-none tabular-nums text-neutral-900 dark:text-neutral-50">
-                {view === 'cost' ? formatUsd(displayCost) : formatTokens(usageData.totalUsage)}
+                {view === 'cost' ? formatUsd(displayCost) : formatTokens(displayTokens)}
               </p>
               <span className="text-xs text-neutral-400">{view === 'cost' ? 'today' : 'tokens'}</span>
             </div>
@@ -480,7 +485,7 @@ export function UsageMeterWidget({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-mono text-2xl font-bold leading-none text-ink tabular-nums">
-                  {view === 'cost' ? formatUsd(displayCost) : formatTokens(usageData.totalUsage)}
+                  {view === 'cost' ? formatUsd(displayCost) : formatTokens(displayTokens)}
                 </p>
                 <p className="mt-1 text-[11px] text-primary-500">
                   {view === 'cost' ? 'today\'s spend' : 'tokens today'}
@@ -488,7 +493,7 @@ export function UsageMeterWidget({
               </div>
               <div className="text-right">
                 <p className="font-mono text-sm font-semibold tabular-nums text-neutral-700 dark:text-neutral-300">
-                  {view === 'cost' ? formatTokens(usageData.totalUsage) : formatUsd(displayCost)}
+                  {view === 'cost' ? formatTokens(displayTokens) : formatUsd(displayCost)}
                 </p>
                 <p className="mt-0.5 text-[11px] text-primary-400">
                   {view === 'cost' ? 'tokens' : 'spend'}

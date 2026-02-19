@@ -491,7 +491,7 @@ export function DashboardScreen() {
                       </button>
                     </div>
                   ) : (
-                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} />
+                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
                   )}
                 </CollapsibleWidget>
               </div>
@@ -877,7 +877,7 @@ export function DashboardScreen() {
               {(desktopLayout.showUsage || desktopLayout.showSquad) && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {desktopLayout.showUsage && (
-                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} />
+                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
                   )}
                   {desktopLayout.showSquad && (
                     <SquadStatusWidget />

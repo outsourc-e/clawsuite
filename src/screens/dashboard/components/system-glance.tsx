@@ -83,7 +83,6 @@ function StatItem({ label, value }: { label: string; value: string }) {
 
 export function SystemGlance(props: SystemGlanceProps) {
   const {
-    sessions,
     costToday,
     uptimeFormatted,
     updatedAgo,
@@ -128,7 +127,7 @@ export function SystemGlance(props: SystemGlanceProps) {
       <div className="grid grid-cols-3 gap-3">
         <StatBlock
           label="MEMORY"
-          value={sessionPercent !== undefined ? `${Math.round(sessionPercent)}%` : sessions}
+          value=""
           percent={sessionPercent}
           sublabel="of context window"
         />
