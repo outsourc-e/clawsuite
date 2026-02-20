@@ -16,6 +16,7 @@ type FilterTab = (typeof FILTERS)[number]
 
 type SessionRecord = Record<string, unknown>
 type FeedRow = FeedEvent & { baseMessage: string; repeatCount: number }
+const MAX_EVENTS = 100
 
 const TASK_TYPES = new Set<FeedEventType>([
   'mission_started',
@@ -45,6 +46,7 @@ const ACTIVITY_TYPES = new Set<FeedEventType>([
 ])
 
 type EventBadge = { label: string; className: string }
+type EventSeverity = 'error' | 'spawn' | 'system' | 'default'
 
 const EVENT_BADGE: Record<FeedEventType, EventBadge> = {
   mission_started: { label: 'MISSION', className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50' },
@@ -55,10 +57,10 @@ const EVENT_BADGE: Record<FeedEventType, EventBadge> = {
   agent_active:    { label: 'AGENT',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
   agent_idle:      { label: 'IDLE',    className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700' },
   agent_paused:    { label: 'PAUSE',   className: 'bg-amber-950/70 text-amber-400 border border-amber-800/50' },
-  agent_spawned:   { label: 'SPAWN',   className: 'bg-blue-950/70 text-blue-400 border border-blue-800/50' },
+  agent_spawned:   { label: 'SPAWN',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
   agent_killed:    { label: 'KILL',    className: 'bg-red-950/70 text-red-400 border border-red-800/50' },
   gateway_health:  { label: 'SYS',     className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' },
-  system:          { label: 'SYS',     className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50' },
+  system:          { label: 'SYS',     className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' },
 }
 
 function readString(value: unknown): string {
@@ -84,18 +86,76 @@ function sessionName(session: SessionRecord): string {
   )
 }
 
-function relativeTime(ts: number): string {
-  const s = Math.floor((Date.now() - ts) / 1000)
-  if (s < 10) return 'just now'
+function relativeTime(ts: number, now: number): string {
+  const s = Math.max(0, Math.floor((now - ts) / 1000))
+  if (s < 5) return 'just now'
   if (s < 60) return `${s}s ago`
   if (s < 3600) return `${Math.floor(s / 60)}m ago`
-  return `${Math.floor(s / 3600)}h ago`
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
+  if (s < 604800) return `${Math.floor(s / 86400)}d ago`
+  return `${Math.floor(s / 604800)}w ago`
+}
+
+function eventSeverity(event: FeedRow): EventSeverity {
+  const lowerMessage = event.baseMessage.toLowerCase()
+  const isErrorMessage =
+    lowerMessage.includes('failed') ||
+    lowerMessage.includes('error') ||
+    lowerMessage.includes('unauthorized') ||
+    lowerMessage.includes('forbidden') ||
+    lowerMessage.includes('disconnected')
+
+  if (event.type === 'agent_killed') return 'error'
+  if (event.type === 'agent_spawned') return 'spawn'
+  if (event.type === 'system' && isErrorMessage) return 'error'
+  if (SYSTEM_TYPES.has(event.type)) return 'system'
+  if (event.type === 'task_completed') return 'spawn'
+  return 'default'
+}
+
+function severityClass(severity: EventSeverity): string {
+  if (severity === 'error') {
+    return 'border-red-200 bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/30'
+  }
+  if (severity === 'spawn') {
+    return 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/40 dark:bg-emerald-950/30'
+  }
+  if (severity === 'system') {
+    return 'border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/50'
+  }
+  return 'border-neutral-200 bg-neutral-50 dark:border-neutral-800/60 dark:bg-neutral-900/40'
+}
+
+function severityBadge(event: FeedRow, severity: EventSeverity): EventBadge {
+  if (severity === 'error') {
+    return { label: 'ERROR', className: 'bg-red-950/70 text-red-300 border border-red-800/60' }
+  }
+  return EVENT_BADGE[event.type] ?? EVENT_BADGE.system
+}
+
+function severityTextClass(severity: EventSeverity): string {
+  if (severity === 'error') return 'text-red-800 dark:text-red-200'
+  if (severity === 'system') return 'text-neutral-700 dark:text-neutral-300'
+  return 'text-neutral-800 dark:text-neutral-200'
+}
+
+function severityTimestampClass(severity: EventSeverity): string {
+  if (severity === 'error') return 'text-red-700 dark:text-red-300'
+  if (severity === 'spawn') return 'text-emerald-700 dark:text-emerald-300'
+  if (severity === 'system') return 'text-neutral-500 dark:text-neutral-500'
+  return 'text-neutral-700 dark:text-neutral-400'
+}
+
+function placeholderLabel(activeFilter: FilterTab): string {
+  if (activeFilter === 'Activity') return 'No events yet'
+  return `No events yet in ${activeFilter}`
 }
 
 export function LiveFeedPanel() {
   // Default to 'Activity' to hide noisy health checks
   const [activeFilter, setActiveFilter] = useState<FilterTab>('Activity')
   const [events, setEvents] = useState<Array<FeedRow>>([])
+  const [now, setNow] = useState(() => Date.now())
   const previousSessionsRef = useRef<Map<string, string> | null>(null)
 
   useEffect(
@@ -116,16 +176,21 @@ export function LiveFeedPanel() {
                 repeatCount: latest.repeatCount + 1,
               },
               ...previous.slice(1),
-            ].slice(0, 100)
+            ].slice(0, MAX_EVENTS)
           }
           return [
             { ...event, baseMessage: event.message, repeatCount: 1 },
             ...previous,
-          ].slice(0, 100)
+          ].slice(0, MAX_EVENTS)
         }),
       ),
     [],
   )
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     async function pollSessions() {
@@ -234,10 +299,8 @@ export function LiveFeedPanel() {
 
         <div className="h-full overflow-y-auto px-3 pb-3 pt-8">
           {visibleEvents.length === 0 ? (
-            <p className="py-8 text-center font-mono text-[10px] text-neutral-700">
-              {activeFilter === 'Activity'
-                ? `// no activity events yet — start a mission`
-                : `// no ${activeFilter.toLowerCase()} events`}
+            <p className="py-8 text-center font-mono text-[10px] text-neutral-600 dark:text-neutral-500">
+              {placeholderLabel(activeFilter)}
             </p>
           ) : (
             <div className="space-y-1">
@@ -246,12 +309,16 @@ export function LiveFeedPanel() {
                   event.repeatCount > 1
                     ? `${event.baseMessage} ×${event.repeatCount}`
                     : event.baseMessage
-                const badge = EVENT_BADGE[event.type] ?? EVENT_BADGE.system
+                const severity = eventSeverity(event)
+                const badge = severityBadge(event, severity)
 
                 return (
                   <div
                     key={event.id}
-                    className="flex items-start gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 dark:border-neutral-800/60 dark:bg-neutral-900/40"
+                    className={cn(
+                      'flex items-start gap-2 rounded-md border px-2 py-1.5',
+                      severityClass(severity),
+                    )}
                   >
                     {/* Type badge */}
                     <span
@@ -265,17 +332,22 @@ export function LiveFeedPanel() {
 
                     {/* Message + agent name */}
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] leading-tight text-neutral-800 dark:text-neutral-200">{message}</p>
+                      <p className={cn('text-[11px] leading-tight', severityTextClass(severity))}>{message}</p>
                       {event.agentName ? (
-                        <p className="mt-0.5 truncate font-mono text-[9px] text-neutral-700">
+                        <p className="mt-0.5 truncate font-mono text-[9px] text-neutral-600 dark:text-neutral-500">
                           {event.agentName}
                         </p>
                       ) : null}
                     </div>
 
                     {/* Timestamp */}
-                    <span className="shrink-0 font-mono text-[9px] tabular-nums text-neutral-700">
-                      {relativeTime(event.timestamp)}
+                    <span
+                      className={cn(
+                        'shrink-0 font-mono text-[9px] tabular-nums',
+                        severityTimestampClass(severity),
+                      )}
+                    >
+                      {relativeTime(event.timestamp, now)}
                     </span>
                   </div>
                 )

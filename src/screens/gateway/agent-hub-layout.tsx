@@ -84,7 +84,7 @@ const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
   },
 ]
 
-type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
+type GatewayStatus = 'connected' | 'disconnected' | 'spawning' | 'failed'
 
 type ActiveTab = 'office' | 'mission' | 'history' | 'team' | 'approvals'
 
@@ -96,58 +96,52 @@ const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'approvals', icon: '✅', label: 'Approvals' },
 ]
 
-function GatewayStatusPill({
+function GatewayStatusBar({
   status,
-  spawnErrorNames,
+  message,
+  authStatus,
   onRetry,
 }: {
   status: GatewayStatus
-  spawnErrorNames: string[]
+  message: string
+  authStatus?: 401 | 403 | null
   onRetry?: () => void
 }) {
-  if (spawnErrorNames.length > 0) {
-    return (
-      <div className="flex items-center gap-1.5">
-        <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-400">
-          <span className="size-1.5 rounded-full bg-red-500" />
-          Spawn Error
-        </span>
-        {onRetry ? (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 transition-colors hover:bg-red-100 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-900/40"
-          >
-            Retry
-          </button>
-        ) : null}
-      </div>
-    )
-  }
+  const palette =
+    status === 'connected'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300'
+      : status === 'spawning'
+        ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300'
+        : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/40 dark:bg-red-950/30 dark:text-red-300'
 
-  if (status === 'disconnected') {
-    return (
-      <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-400">
-        <span className="size-1.5 rounded-full bg-red-500" />
-        Offline
-      </span>
-    )
-  }
-
-  if (status === 'spawning') {
-    return (
-      <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-400">
-        <span className="size-1.5 animate-pulse rounded-full bg-amber-400" />
-        Spawning
-      </span>
-    )
-  }
+  const dotClass =
+    status === 'connected'
+      ? 'bg-emerald-500'
+      : status === 'spawning'
+        ? 'animate-pulse bg-amber-400'
+        : 'bg-red-500'
 
   return (
-    <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-400">
-      <span className="size-1.5 rounded-full bg-emerald-500" />
-      Connected
-    </span>
+    <div className={cn('flex items-center justify-between border-b px-5 py-2 text-xs', palette)}>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className={cn('size-2.5 shrink-0 rounded-full', dotClass)} />
+        <span className="truncate font-medium">{message}</span>
+        {authStatus ? (
+          <span className="shrink-0 rounded-full border border-current/30 px-1.5 py-0.5 font-mono text-[10px]">
+            {authStatus === 401 ? '401 Unauthorized' : '403 Forbidden'}
+          </span>
+        ) : null}
+      </div>
+      {onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="ml-3 shrink-0 rounded-md border border-current/30 px-2 py-0.5 text-[11px] font-semibold transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+        >
+          Retry
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -215,22 +209,23 @@ function extractMissionItems(goal: string): string[] {
   return uniqueSegments
 }
 
-function parseMissionGoal(goal: string, teamMembers: TeamMember[], missionId?: string): HubTask[] {
+function deriveMissionItemTitles(goal: string): string[] {
   const trimmedGoal = goal.trim()
   if (!trimmedGoal) return []
-  const now = Date.now()
   const segments = extractMissionItems(trimmedGoal)
   const normalizedGoal = cleanMissionSegment(trimmedGoal)
 
-  // If we extracted >= 2 subtasks, return ONLY those subtasks (not the full goal as a task).
-  // If 0–1 subtasks, collapse to [goal] as a single task.
-  let missionItems: string[]
   if (segments.length >= 2) {
-    const withoutFullGoal = segments.filter((s) => s !== normalizedGoal)
-    missionItems = withoutFullGoal.length >= 1 ? withoutFullGoal : segments
-  } else {
-    missionItems = normalizedGoal ? [normalizedGoal] : []
+    const withoutFullGoal = segments.filter((segment) => segment !== normalizedGoal)
+    return withoutFullGoal.length >= 1 ? withoutFullGoal : segments
   }
+
+  return normalizedGoal ? [normalizedGoal] : []
+}
+
+function parseMissionGoal(goal: string, teamMembers: TeamMember[], missionId?: string): HubTask[] {
+  const now = Date.now()
+  const missionItems = deriveMissionItemTitles(goal)
 
   return missionItems.map((segment, index) => {
     const member = teamMembers.length > 0 ? teamMembers[index % teamMembers.length] : undefined
@@ -408,6 +403,65 @@ function readSessionActivityMarker(session: SessionRecord): string {
   const lastMessage = readSessionLastMessage(session)
   const status = readString(session.status)
   return `${updatedAtRaw}|${status}|${lastMessage}`
+}
+
+const COMPLETION_SIGNAL_REGEX =
+  /(?:^|\n)\s*(?:done|completed?|task(?:s)? complete(?:d)?|finished|resolved)\b/i
+const NUMBERED_COMPLETION_LINE_REGEX =
+  /(?:^|\n)\s*\d+\s*[.)-]\s*(?:done|completed?|finished|task\s*complete(?:d)?)\b/i
+const ALL_TASKS_COMPLETED_REGEX =
+  /\b(?:all|every|entire)\s+(?:assigned\s+)?tasks?\s+(?:are\s+)?(?:done|completed?|finished)\b/i
+const MISSION_COMPLETED_REGEX = /\bmission\s+(?:is\s+)?(?:done|complete(?:d)?|finished)\b/i
+
+function normalizeCompletionText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function parseCompletedTaskIdsFromMessage(
+  message: string,
+  candidateTasks: Array<HubTask>,
+): Array<string> {
+  if (!message || candidateTasks.length === 0) return []
+
+  const hasCompletionSignal =
+    COMPLETION_SIGNAL_REGEX.test(message) || NUMBERED_COMPLETION_LINE_REGEX.test(message)
+  if (!hasCompletionSignal) return []
+
+  if (ALL_TASKS_COMPLETED_REGEX.test(message) || MISSION_COMPLETED_REGEX.test(message)) {
+    return candidateTasks.map((task) => task.id)
+  }
+
+  const normalizedMessage = normalizeCompletionText(message)
+  const lowerMessage = message.toLowerCase()
+  const matchedTaskIds: string[] = []
+
+  candidateTasks.forEach((task, index) => {
+    const taskNumber = index + 1
+    const normalizedTitle = normalizeCompletionText(task.title)
+    const mentionedById = lowerMessage.includes(task.id.toLowerCase())
+    const mentionedByTitle =
+      normalizedTitle.length > 0 && normalizedMessage.includes(normalizedTitle)
+    const numberedDonePattern = new RegExp(
+      `(?:^|\\n)\\s*${taskNumber}\\s*[.)-]\\s*(?:done|completed?|finished|task\\s*complete(?:d)?)\\b`,
+      'i',
+    )
+    const mentionsTaskNumber = new RegExp(`\\b(?:task\\s*)?#?${taskNumber}\\b`, 'i').test(message)
+    const mentionedByNumber = numberedDonePattern.test(message) || mentionsTaskNumber
+
+    if (mentionedById || (mentionedByTitle && hasCompletionSignal) || mentionedByNumber) {
+      matchedTaskIds.push(task.id)
+    }
+  })
+
+  if (matchedTaskIds.length === 0 && candidateTasks.length === 1 && hasCompletionSignal) {
+    return [candidateTasks[0]!.id]
+  }
+
+  return Array.from(new Set(matchedTaskIds))
 }
 
 const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
@@ -962,7 +1016,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
-  const [gatewayOk, setGatewayOk] = useState(true)
+  const [gatewayConnection, setGatewayConnection] = useState<'connected' | 'disconnected'>('connected')
+  const [gatewayAuthStatus, setGatewayAuthStatus] = useState<401 | 403 | null>(null)
+  const [gatewayErrorDetail, setGatewayErrorDetail] = useState<string | null>(null)
 
   // ── Approvals state ────────────────────────────────────────────────────────
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(() => loadApprovals())
@@ -1034,7 +1090,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   })
   const [spawnState, setSpawnState] = useState<Record<string, 'idle' | 'spawning' | 'ready' | 'error'>>({})
   const [agentSessionStatus, setAgentSessionStatus] = useState<Record<string, AgentSessionStatusEntry>>({})
-  const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('connected')
   const [agentModelNotApplied, setAgentModelNotApplied] = useState<Record<string, boolean>>({})
   const [agentActivity, setAgentActivity] = useState<Record<string, AgentActivityEntry>>({})
   const [team, setTeam] = useState<TeamMember[]>(() => {
@@ -1057,8 +1112,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const agentStreamLastAtRef = useRef<Map<string, number>>(new Map())
   // Stable ref for team so feed-event callback always sees latest team
   const teamRef = useRef(team)
+  const isMobileHubRef = useRef(isMobileHub)
   // Stable refs for keyboard shortcut handler
   const missionGoalRef = useRef(missionGoal)
+  const missionActiveRef = useRef(missionActive)
+  const missionProcessTypeRef = useRef(processType)
   const handleCreateMissionRef = useRef<() => void>(() => {})
   // Stable ref for live feed visibility (used in feed-count effect)
   const liveFeedVisibleRef = useRef(liveFeedVisible)
@@ -1068,15 +1126,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const missionStateRef = useRef(missionState)
   // Spec 4: stable ref for missionTasks for completion detection in polling loop
   const missionTasksRef = useRef(missionTasks)
-  // Spec 4: track which session keys have had their tasks moved to review (avoid repeat)
+  // Spec 4: track processed completion markers to avoid duplicate task moves
   const completionDetectedRef = useRef<Set<string>>(new Set())
+  // Spec 4: mission execution token for Start/Stop race hardening
+  const missionExecutionIdRef = useRef(0)
   // Spec 5: track dispatch start time per agentId for 10-min timeout warning
   const dispatchStartTimeRef = useRef<Record<string, number>>({})
   // Spec 5: track which agents have already received a timeout warning (avoid repeat)
   const warnedTimeoutRef = useRef<Set<string>>(new Set())
 
   teamRef.current = team
+  isMobileHubRef.current = isMobileHub
   missionGoalRef.current = missionGoal
+  missionActiveRef.current = missionActive
+  missionProcessTypeRef.current = processType
   liveFeedVisibleRef.current = liveFeedVisible
   missionStateRef.current = missionState
   missionTasksRef.current = missionTasks
@@ -1095,15 +1158,67 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     () => Object.values(spawnState).some((s) => s === 'spawning'),
     [spawnState],
   )
-  const effectiveGatewayStatus: GatewayStatus = isAnySpawning ? 'spawning' : gatewayStatus
-
-  // Live template suggestion based on current mission goal input
-  const suggestedTemplateName = useMemo(() => {
+  const suggestedTemplate = useMemo(() => {
     const trimmed = missionGoal.trim()
     if (!trimmed) return null
     const templateId = suggestTemplate(trimmed)
-    return TEMPLATE_DISPLAY_NAMES[templateId]
+    return TEAM_TEMPLATES.find((template) => template.id === templateId) ?? null
   }, [missionGoal])
+  const missionPreviewTitles = useMemo(
+    () => deriveMissionItemTitles(missionGoal).slice(0, 4),
+    [missionGoal],
+  )
+  const gatewayStatusBar = useMemo(() => {
+    if (spawnErrorNames.length > 0) {
+      const first = spawnErrorNames[0]!
+      const suffix = spawnErrorNames.length > 1 ? ` +${spawnErrorNames.length - 1} more` : ''
+      return {
+        status: 'failed' as GatewayStatus,
+        message: `Spawn failed for ${first}${suffix}`,
+        authStatus: null as 401 | 403 | null,
+        showRetry: true,
+      }
+    }
+
+    if (isAnySpawning) {
+      return {
+        status: 'spawning' as GatewayStatus,
+        message: 'Spawning agents...',
+        authStatus: null as 401 | 403 | null,
+        showRetry: false,
+      }
+    }
+
+    if (gatewayAuthStatus) {
+      return {
+        status: 'failed' as GatewayStatus,
+        message:
+          gatewayAuthStatus === 401
+            ? 'Gateway auth failed (401)'
+            : 'Gateway access forbidden (403)',
+        authStatus: gatewayAuthStatus,
+        showRetry: false,
+      }
+    }
+
+    if (gatewayConnection === 'disconnected') {
+      return {
+        status: 'disconnected' as GatewayStatus,
+        message: gatewayErrorDetail
+          ? `Gateway disconnected (${gatewayErrorDetail})`
+          : 'Gateway disconnected',
+        authStatus: null as 401 | 403 | null,
+        showRetry: false,
+      }
+    }
+
+    return {
+      status: 'connected' as GatewayStatus,
+      message: 'Gateway connected',
+      authStatus: null as 401 | 403 | null,
+      showRetry: false,
+    }
+  }, [gatewayAuthStatus, gatewayConnection, gatewayErrorDetail, isAnySpawning, spawnErrorNames])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1160,21 +1275,48 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return () => media.removeEventListener('change', update)
   }, [])
 
-  // Gateway status polling every 15s
+  // Gateway status polling every 15s (uses /api/sessions so auth errors are visible)
   useEffect(() => {
+    let cancelled = false
+
     async function checkGateway() {
       try {
-        const res = await fetch('/api/gateway/status')
-        setGatewayStatus(res.ok ? 'connected' : 'disconnected')
+        const response = await fetch('/api/sessions')
+        if (cancelled) return
+
+        if (response.status === 401 || response.status === 403) {
+          setGatewayConnection('connected')
+          setGatewayAuthStatus(response.status)
+          setGatewayErrorDetail(null)
+          return
+        }
+
+        if (!response.ok) {
+          setGatewayConnection('disconnected')
+          setGatewayAuthStatus(null)
+          setGatewayErrorDetail(`HTTP ${response.status}`)
+          return
+        }
+
+        setGatewayConnection('connected')
+        setGatewayAuthStatus(null)
+        setGatewayErrorDetail(null)
       } catch {
-        setGatewayStatus('disconnected')
+        if (cancelled) return
+        setGatewayConnection('disconnected')
+        setGatewayAuthStatus(null)
+        setGatewayErrorDetail('network error')
       }
     }
+
     void checkGateway()
     const interval = window.setInterval(() => {
       void checkGateway()
     }, 15_000)
-    return () => window.clearInterval(interval)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
   }, [])
 
   // ── Unread feed count ───────────────────────────────────────────────────────
@@ -1343,13 +1485,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // Keyboard shortcuts (desktop only): Cmd/Ctrl+Enter → Start Mission; Escape → close panel / deselect
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (isMobileHubRef.current) return
+
+      const target = event.target instanceof HTMLElement ? event.target : null
+      const targetTag = target?.tagName ?? ''
       const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
       const modKey = isMac ? event.metaKey : event.ctrlKey
 
       // Cmd/Ctrl+Enter: Start Mission when textarea is focused and has content
       if (modKey && event.key === 'Enter') {
-        const target = event.target as HTMLElement
-        if (target.tagName === 'TEXTAREA' && missionGoalRef.current.trim()) {
+        if (targetTag === 'TEXTAREA' && missionGoalRef.current.trim()) {
           event.preventDefault()
           handleCreateMissionRef.current()
         }
@@ -1358,9 +1503,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       // Escape: Close output panel → deselect agent
       if (event.key === 'Escape') {
-        const target = event.target as HTMLElement
         // Don't interfere when user is typing in an input/textarea
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+        if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT') return
         setSelectedOutputAgentId((prev) => {
           if (prev) return undefined
           setSelectedAgentId(undefined)
@@ -1370,14 +1514,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       // Space: Pause/resume mission (not when typing)
       if (event.key === ' ') {
-        const target = event.target as HTMLElement
-        if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName)) return
+        if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(targetTag)) return
         const state = missionStateRef.current
         if (state === 'running') {
           event.preventDefault()
+          missionStateRef.current = 'paused'
           setMissionState('paused')
         } else if (state === 'paused') {
           event.preventDefault()
+          missionStateRef.current = 'running'
           setMissionState('running')
         }
       }
@@ -1748,11 +1893,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     saveApprovals(updated)
   }, [approvals, agentSessionMap])
 
-  const ensureAgentSessions = useCallback(async (teamMembers: TeamMember[]): Promise<Record<string, string>> => {
+  const ensureAgentSessions = useCallback(async (
+    teamMembers: TeamMember[],
+    executionId: number,
+  ): Promise<Record<string, string>> => {
     const currentMap = { ...agentSessionMap }
+    const existingSessionKeys = new Set(
+      Object.values(agentSessionMap).filter((sessionKey): sessionKey is string => Boolean(sessionKey)),
+    )
     const spawnPromises: Array<Promise<void>> = []
 
     for (const member of teamMembers) {
+      if (missionExecutionIdRef.current !== executionId) break
       if (currentMap[member.id]) continue
 
       setSpawnState((prev) => ({ ...prev, [member.id]: 'spawning' }))
@@ -1787,6 +1939,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     await Promise.allSettled(spawnPromises)
+    if (missionExecutionIdRef.current !== executionId) {
+      const staleSessionKeys = Object.values(currentMap).filter(
+        (sessionKey): sessionKey is string =>
+          Boolean(sessionKey) && !existingSessionKeys.has(sessionKey),
+      )
+      if (staleSessionKeys.length > 0) {
+        void Promise.allSettled(
+          staleSessionKeys.map((sessionKey) =>
+            fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
+              method: 'DELETE',
+            }),
+          ),
+        )
+      }
+      return currentMap
+    }
     setAgentSessionMap(currentMap)
     return currentMap
   }, [agentSessionMap, spawnAgentSession])
@@ -1796,9 +1964,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     teamMembers: Array<TeamMember>,
     missionGoalValue: string,
     mode: 'sequential' | 'hierarchical' | 'parallel' = 'parallel',
+    executionId: number,
   ) => {
+    const isExecutionCurrent = () =>
+      missionExecutionIdRef.current === executionId
+      && missionActiveRef.current
+    const canDispatch = () =>
+      isExecutionCurrent()
+      && missionStateRef.current === 'running'
+    const waitBetweenAgents = () => new Promise<void>((resolve) => window.setTimeout(resolve, 100))
+
+    if (!canDispatch()) return
+
     // STEP A: Ensure all agents have isolated gateway sessions
-    const sessionMap = await ensureAgentSessions(teamMembers)
+    const sessionMap = await ensureAgentSessions(teamMembers, executionId)
+    if (!canDispatch()) return
 
     // STEP B: Group tasks by agent
     const tasksByAgent = new Map<string, Array<HubTask>>()
@@ -1848,6 +2028,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       agentTasks: Array<HubTask>,
       messageText: string,
     ): Promise<void> {
+      if (!canDispatch()) return
+
       const sessionKey = sessionMap[agentId]
       if (!sessionKey) {
         emitFeedEvent({
@@ -1864,11 +2046,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       if (newTasks.length === 0) return
 
       try {
+        if (!canDispatch()) return
+
         const response = await fetch('/api/sessions/send', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ sessionKey, message: messageText }),
         })
+
+        if (!isExecutionCurrent()) return
 
         if (!response.ok) {
           const payload = (await response
@@ -1884,14 +2070,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         // Spec 5: record dispatch start time for timeout detection
         dispatchStartTimeRef.current[agentId] = Date.now()
 
-        const taskIds = agentTasks.map((task) => task.id)
+        const taskIds = newTasks.map((task) => task.id)
         setDispatchedTaskIdsByAgent((previous) => ({
           ...previous,
-          [agentId]: taskIds,
+          [agentId]: Array.from(new Set([...(previous[agentId] ?? []), ...taskIds])),
         }))
         moveTasksToStatus(taskIds, 'in_progress')
 
-        agentTasks.forEach((task) => {
+        newTasks.forEach((task) => {
           emitFeedEvent({
             type: 'agent_active',
             message: `${member?.name || agentId} started working on: ${task.title}`,
@@ -1909,6 +2095,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     // ── HIERARCHICAL mode ─────────────────────────────────────────────────
     if (mode === 'hierarchical') {
+      if (!canDispatch()) return
       const [leadMember, ...workerMembers] = teamMembers
       if (!leadMember) return
 
@@ -1931,9 +2118,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           updatedAt: Date.now(),
         }]
         await dispatchToAgent(leadMember.id, effectiveLeadTasks, leadMessage)
+        if (!canDispatch()) return
+        if (workerMembers.length > 0) await waitBetweenAgents()
 
         // Dispatch to workers with delegation prefix
-        for (const worker of workerMembers) {
+        for (let wi = 0; wi < workerMembers.length; wi++) {
+          if (!canDispatch()) return
+          const worker = workerMembers[wi]!
           const workerTasks = tasksByAgent.get(worker.id)
           if (!workerTasks || workerTasks.length === 0) continue
           const workerContext = buildAgentContext(worker)
@@ -1942,6 +2133,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           const workerBody = `${delegationPrefix}\n\nMission Task Assignment for ${worker.name}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
           const workerMessage = [workerContext, workerBody].filter(Boolean).join('\n\n')
           await dispatchToAgent(worker.id, workerTasks, workerMessage)
+          if (wi < workerMembers.length - 1) {
+            await waitBetweenAgents()
+          }
         }
       }
       return
@@ -1951,8 +2145,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (mode === 'sequential') {
       const agentEntries = Array.from(tasksByAgent.entries())
       for (let i = 0; i < agentEntries.length; i++) {
-        // Spec 4: pause gate
-        if (missionStateRef.current === 'paused') continue
+        if (!canDispatch()) return
         const [agentId, agentTasks] = agentEntries[i]!
         const member = teamMembers.find((entry) => entry.id === agentId)
         const agentContext = member ? buildAgentContext(member) : ''
@@ -1960,10 +2153,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         const body = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
         const message = [agentContext, body].filter(Boolean).join('\n\n')
         await dispatchToAgent(agentId, agentTasks, message)
+        if (!canDispatch()) return
 
-        // Stagger: wait 30 seconds between agents (except after the last one)
+        // Spec 4: 100ms stagger between per-agent batches
         if (i < agentEntries.length - 1) {
-          await new Promise<void>((resolve) => window.setTimeout(resolve, 30_000))
+          await waitBetweenAgents()
         }
       }
       return
@@ -1972,8 +2166,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     // ── PARALLEL mode (default) ────────────────────────────────────────────
     const parallelEntries = Array.from(tasksByAgent.entries())
     for (let pi = 0; pi < parallelEntries.length; pi++) {
-      // Spec 4: pause gate — skip dispatch if mission is paused
-      if (missionStateRef.current === 'paused') continue
+      if (!canDispatch()) return
       const [agentId, agentTasks] = parallelEntries[pi]!
       const member = teamMembers.find((entry) => entry.id === agentId)
       const agentContext = member ? buildAgentContext(member) : ''
@@ -1981,12 +2174,40 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       const body = `Mission Task Assignment for ${member?.name || agentId}:\n\n${taskList}\n\nMission Goal: ${missionGoalValue}\n\nPlease work through these tasks sequentially. Report progress on each.`
       const message = [agentContext, body].filter(Boolean).join('\n\n')
       await dispatchToAgent(agentId, agentTasks, message)
+      if (!canDispatch()) return
       // Spec 4: 100ms stagger between per-agent batches
       if (pi < parallelEntries.length - 1) {
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 100))
+        await waitBetweenAgents()
       }
     }
   }, [ensureAgentSessions, moveTasksToStatus])
+
+  useEffect(() => {
+    if (!missionActive || missionState !== 'running') return
+    if (dispatchingRef.current) return
+
+    const pendingTasks = missionTasksRef.current.filter(
+      (task) => Boolean(task.agentId) && !dispatchedTaskIdsRef.current.has(task.id),
+    )
+    if (pendingTasks.length === 0) return
+
+    const missionGoalValue = (activeMissionGoal || missionGoalRef.current).trim()
+    if (!missionGoalValue) return
+
+    const executionId = missionExecutionIdRef.current
+    dispatchingRef.current = true
+    void executeMission(
+      pendingTasks,
+      teamWithRuntimeStatus,
+      missionGoalValue,
+      missionProcessTypeRef.current,
+      executionId,
+    ).finally(() => {
+      if (missionExecutionIdRef.current === executionId) {
+        dispatchingRef.current = false
+      }
+    })
+  }, [activeMissionGoal, executeMission, missionActive, missionState, teamWithRuntimeStatus])
 
   useEffect(() => {
     const isMissionRunning = missionActive && missionState === 'running'
@@ -2012,9 +2233,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     async function pollSessions() {
       try {
         const response = await fetch('/api/sessions')
-        if (!response.ok || cancelled) return
+        if (cancelled) return
 
-        if (!cancelled) setGatewayOk(true)
+        if (response.status === 401 || response.status === 403) {
+          setGatewayConnection('connected')
+          setGatewayAuthStatus(response.status)
+          setGatewayErrorDetail(null)
+          return
+        }
+
+        if (!response.ok) {
+          setGatewayConnection('disconnected')
+          setGatewayAuthStatus(null)
+          setGatewayErrorDetail(`HTTP ${response.status}`)
+          return
+        }
+
+        setGatewayConnection('connected')
+        setGatewayAuthStatus(null)
+        setGatewayErrorDetail(null)
 
         const payload = (await response
           .json()
@@ -2098,6 +2335,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         if (isMissionRunning) {
           const previousMarkers = sessionActivityRef.current
           const nextMarkers = new Map<string, string>()
+          const changedSessions: Array<{ session: SessionRecord; sessionId: string; marker: string }> = []
 
           for (const session of sessions) {
             const sessionId = readSessionId(session)
@@ -2109,6 +2347,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
             nextMarkers.set(sessionId, marker)
             if (!previous || previous === marker) continue
+
+            changedSessions.push({ session, sessionId, marker })
 
             const lastMessage = readSessionLastMessage(session)
             const summary = lastMessage
@@ -2126,47 +2366,63 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             sessionActivityRef.current = nextMarkers
           }
 
-          // ── Completion detection ────────────────────────────────────────────
-          // When a session's last message signals task completion, move its
-          // in-progress tasks to 'review' and fire a feed event (once per session).
-          const COMPLETION_PHRASES = /done|completed|task complete/i
-          for (const session of sessions) {
-            const sessionId = readSessionId(session)
-            if (!sessionId) continue
-            if (completionDetectedRef.current.has(sessionId)) continue
-
-            const lastMessage = readSessionLastMessage(session)
-            if (!lastMessage || !COMPLETION_PHRASES.test(lastMessage)) continue
+          // ── Completion detection from real agent output ─────────────────────
+          for (const { session, sessionId, marker } of changedSessions) {
+            const completionMarkerId = `${sessionId}|${marker}`
+            if (completionDetectedRef.current.has(completionMarkerId)) continue
 
             const agentId = sessionKeyToAgentId.get(sessionId)
             if (!agentId) continue
 
-            completionDetectedRef.current.add(sessionId)
+            const inProgressTasks = missionTasksRef.current.filter(
+              (task) => task.agentId === agentId && task.status === 'in_progress',
+            )
+            if (inProgressTasks.length === 0) continue
 
-            // Move this agent's in-progress tasks to review
-            const tasksToMove = missionTasksRef.current
-              .filter((t) => t.agentId === agentId && t.status === 'in_progress')
-              .map((t) => t.id)
-            if (tasksToMove.length > 0) {
-              moveTasksToStatus(tasksToMove, 'review')
+            const lastMessage = readSessionLastMessage(session)
+            const completedTaskIds = parseCompletedTaskIdsFromMessage(lastMessage, inProgressTasks)
+            if (completedTaskIds.length === 0) continue
+
+            completionDetectedRef.current.add(completionMarkerId)
+            moveTasksToStatus(completedTaskIds, 'review')
+
+            const completedTaskIdSet = new Set(completedTaskIds)
+            const remainingTaskCount = inProgressTasks.filter(
+              (task) => !completedTaskIdSet.has(task.id),
+            ).length
+            if (remainingTaskCount === 0) {
+              delete dispatchStartTimeRef.current[agentId]
+              warnedTimeoutRef.current.delete(agentId)
             }
 
+            const completedTitles = inProgressTasks
+              .filter((task) => completedTaskIdSet.has(task.id))
+              .map((task) => task.title)
+            const completedLabel =
+              completedTitles.length === 1
+                ? `: ${completedTitles[0]}`
+                : ` (${completedTitles.length} tasks)`
             const agentName = readSessionName(session) || agentId
             emitFeedEvent({
               type: 'task_completed',
-              message: `${agentName} completed — tasks moved to review`,
+              message: `${agentName} signaled completion${completedLabel} — moved to review`,
               agentName,
             })
           }
 
           // ── 10-min timeout warning ─────────────────────────────────────────
-          for (const agentId of Object.keys(dispatchedTaskIdsByAgent)) {
-            const sessionKey = agentSessionMap[agentId]
-            if (!sessionKey) continue
-            if (completionDetectedRef.current.has(sessionKey)) continue
+          const nowForWarnings = Date.now()
+          for (const [agentId, startTime] of Object.entries(dispatchStartTimeRef.current)) {
+            const hasInProgressTasks = missionTasksRef.current.some(
+              (task) => task.agentId === agentId && task.status === 'in_progress',
+            )
+            if (!hasInProgressTasks) {
+              warnedTimeoutRef.current.delete(agentId)
+              delete dispatchStartTimeRef.current[agentId]
+              continue
+            }
             if (warnedTimeoutRef.current.has(agentId)) continue
-            const startTime = dispatchStartTimeRef.current[agentId]
-            if (!startTime || Date.now() - startTime <= 600_000) continue
+            if (nowForWarnings - startTime <= 600_000) continue
             warnedTimeoutRef.current.add(agentId)
             const member = teamRef.current.find((m) => m.id === agentId)
             const name = member?.name ?? agentId
@@ -2179,7 +2435,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         }
       } catch {
         // Ignore polling errors; mission dispatch and local events still work.
-        setGatewayOk(false)
+        setGatewayConnection('disconnected')
+        setGatewayAuthStatus(null)
+        setGatewayErrorDetail('network error')
       }
     }
 
@@ -2248,9 +2506,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     dispatchingRef.current = true
+    const executionId = missionExecutionIdRef.current + 1
+    missionExecutionIdRef.current = executionId
+    missionProcessTypeRef.current = processType
 
     // Save initial checkpoint
     const missionId = newMissionId
+    missionIdRef.current = missionId
     missionStartedAtRef.current = Date.now()
     saveMissionCheckpoint({
       id: missionId,
@@ -2281,11 +2543,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     setMissionActive(true)
     setShowNewMission(false)
+    missionStateRef.current = 'running'
     setMissionState('running')
     setView('board')
     setActiveMissionGoal(trimmedGoal)
     setMissionTasks(createdTasks)
     setDispatchedTaskIdsByAgent({})
+    dispatchedTaskIdsRef.current = new Set()
+    completionDetectedRef.current = new Set()
+    dispatchStartTimeRef.current = {}
+    warnedTimeoutRef.current = new Set()
     const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
     setSelectedOutputAgentId(firstAssignedAgentId)
     sessionActivityRef.current = new Map()
@@ -2299,8 +2566,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     toast(`Mission started with ${createdTasks.length} tasks`, { type: 'success' })
 
     window.setTimeout(() => {
-      void executeMission(createdTasks, teamWithRuntimeStatus, trimmedGoal, processType).finally(() => {
-        dispatchingRef.current = false
+      if (missionExecutionIdRef.current !== executionId) return
+      void executeMission(
+        createdTasks,
+        teamWithRuntimeStatus,
+        trimmedGoal,
+        processType,
+        executionId,
+      ).finally(() => {
+        if (missionExecutionIdRef.current === executionId) {
+          dispatchingRef.current = false
+        }
       })
     }, 0)
   }
@@ -2328,26 +2604,62 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }, [boardTasks, missionTasks, dispatchedTaskIdsByAgent])
 
   // ── Stop mission helper ───────────────────────────────────────────────────
-  function handleStopMission() {
+  async function handleStopMission() {
+    missionExecutionIdRef.current += 1
+    dispatchingRef.current = false
+
+    const stoppedAt = Date.now()
+    const cancelledTaskIds = missionTasksRef.current
+      .filter((task) => task.status === 'in_progress')
+      .map((task) => task.id)
+    const cancelledMissionTasks = missionTasksRef.current.map((task) =>
+      task.status === 'in_progress'
+        ? { ...task, status: 'inbox' as const, updatedAt: stoppedAt }
+        : task,
+    )
+    missionTasksRef.current = cancelledMissionTasks
+    if (cancelledTaskIds.length > 0) {
+      taskBoardRef.current?.moveTasks(cancelledTaskIds, 'inbox')
+    }
+
     const currentCp = loadMissionCheckpoint()
     if (currentCp) {
-      archiveMissionToHistory({ ...currentCp, status: 'aborted' })
+      archiveMissionToHistory({
+        ...currentCp,
+        status: 'aborted',
+        updatedAt: stoppedAt,
+        tasks: currentCp.tasks.map((task) =>
+          task.status === 'in_progress'
+            ? { ...task, status: 'inbox' }
+            : task,
+        ),
+      })
       clearMissionCheckpoint()
     }
-    // Best-effort abort: signal each agent session to stop current inference
-    Object.values(agentSessionMap).forEach((sessionKey) => {
-      fetch('/api/chat-abort', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionKey }),
-      }).catch(() => {})
-    })
-    // Then tear down the sessions
-    Object.values(agentSessionMap).forEach((sessionKey) => {
-      fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
-        method: 'DELETE',
-      }).catch(() => {})
-    })
+
+    const activeSessionKeys = Array.from(
+      new Set(Object.values(agentSessionMap).filter((sessionKey): sessionKey is string => Boolean(sessionKey))),
+    )
+
+    // Spec 4: abort active runs before deleting sessions.
+    await Promise.allSettled(
+      activeSessionKeys.map((sessionKey) =>
+        fetch('/api/chat-abort', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionKey }),
+        }),
+      ),
+    )
+
+    await Promise.allSettled(
+      activeSessionKeys.map((sessionKey) =>
+        fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
+          method: 'DELETE',
+        }),
+      ),
+    )
+
     setAgentSessionMap({})
     setSpawnState({})
     setAgentSessionStatus({})
@@ -2355,17 +2667,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       window.localStorage.removeItem('clawsuite:hub-agent-sessions')
     }
     setMissionState('stopped')
+    missionStateRef.current = 'stopped'
     setMissionActive(false)
     setShowNewMission(false)
     setActiveMissionGoal('')
-    setMissionTasks([])
+    setMissionTasks(cancelledMissionTasks)
     setDispatchedTaskIdsByAgent({})
     setSelectedOutputAgentId(undefined)
-    dispatchingRef.current = false
     pendingTaskMovesRef.current = []
     sessionActivityRef.current = new Map()
     taskBoardRef.current = null
     missionIdRef.current = ''
+    dispatchedTaskIdsRef.current = new Set()
+    completionDetectedRef.current = new Set()
+    dispatchStartTimeRef.current = {}
+    warnedTimeoutRef.current = new Set()
   }
 
   // ── Mission tab content ────────────────────────────────────────────────────
@@ -2486,7 +2802,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={handleStopMission}
+                  onClick={() => { void handleStopMission() }}
                   className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-200 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/40"
                 >
                   ■ Stop
@@ -2578,13 +2894,42 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     placeholder="Example: Ship a release plan and implementation tasks for authentication hardening"
                     className="w-full resize-none rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                   />
-                  <div className="mt-1 flex w-full justify-between px-1">
-                    <span className="text-[10px] text-primary-400">{missionGoal.length} chars</span>
-                    {suggestedTemplateName ? (
-                      <span className="text-[10px] font-medium text-accent-500 dark:text-accent-400">
-                        Team: {suggestedTemplateName}
+                  <div className="rounded-lg border border-primary-200 bg-primary-50/60 px-3 py-2 text-left dark:border-neutral-700 dark:bg-neutral-800/50">
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-primary-500 dark:text-neutral-400">
+                      <span>{missionGoal.length} chars</span>
+                      <span>
+                        {missionPreviewTitles.length} task
+                        {missionPreviewTitles.length === 1 ? '' : 's'} preview
                       </span>
-                    ) : null}
+                    </div>
+                    {suggestedTemplate ? (
+                      <p className="mt-1 text-[11px] text-primary-600 dark:text-neutral-300">
+                        Template preview:{' '}
+                        <span className="font-semibold text-accent-600 dark:text-accent-400">
+                          {suggestedTemplate.icon} {suggestedTemplate.name}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-primary-400 dark:text-neutral-500">
+                        Template preview updates as you type.
+                      </p>
+                    )}
+                    {missionPreviewTitles.length > 0 ? (
+                      <ul className="mt-2 space-y-1">
+                        {missionPreviewTitles.map((title, index) => (
+                          <li
+                            key={`${index}-${title}`}
+                            className="truncate rounded bg-white/80 px-2 py-1 text-[10px] text-primary-700 dark:bg-neutral-900/70 dark:text-neutral-300"
+                          >
+                            {index + 1}. {title}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-[10px] text-primary-400 dark:text-neutral-500">
+                        Task preview will appear here.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center justify-center gap-2">
@@ -2600,11 +2945,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     ))}
                   </div>
 
-                  {suggestedTemplateName ? (
+                  {suggestedTemplate ? (
                     <p className="text-[11px] text-primary-400 dark:text-neutral-500">
                       Will use:{' '}
                       <span className="font-semibold text-accent-600 dark:text-accent-400">
-                        {suggestedTemplateName}
+                        {suggestedTemplate.name}
                       </span>
                     </p>
                   ) : null}
@@ -2745,13 +3090,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </h1>
           <p className="font-mono text-[10px] text-neutral-500">// Mission Control</p>
         </div>
-        {/* Status pill lives in the header */}
-        <GatewayStatusPill
-          status={effectiveGatewayStatus}
-          spawnErrorNames={spawnErrorNames}
-          onRetry={spawnErrorNames.length > 0 ? handleRetryAllSpawnErrors : undefined}
-        />
       </div>
+
+      <GatewayStatusBar
+        status={gatewayStatusBar.status}
+        message={gatewayStatusBar.message}
+        authStatus={gatewayStatusBar.authStatus}
+        onRetry={gatewayStatusBar.showRetry ? handleRetryAllSpawnErrors : undefined}
+      />
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
       <div className="flex shrink-0 items-center border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
@@ -2819,32 +3165,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </button>
         </div>
       </div>
-
-      {/* ── Gateway health banner ─────────────────────────────────────────── */}
-      {!gatewayOk ? (
-        <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-4 py-1.5 text-xs text-red-600 dark:text-red-400">
-          ⚠️ Gateway disconnected — retrying…
-        </div>
-      ) : null}
-
-      {/* ── Spawn-failed banners ──────────────────────────────────────────── */}
-      {teamRef.current
-        .filter((agent) => spawnState[agent.id] === 'error')
-        .map((agent) => (
-          <div
-            key={agent.id}
-            className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 py-1.5 text-xs text-amber-700 dark:text-amber-400"
-          >
-            ⚠️ {agent.name} failed to spawn —{' '}
-            <button
-              type="button"
-              onClick={() => { void handleRetrySpawn(agent) }}
-              className="font-semibold underline hover:no-underline"
-            >
-              retry
-            </button>
-          </div>
-        ))}
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 overflow-hidden">

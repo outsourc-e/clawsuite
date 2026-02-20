@@ -45,10 +45,93 @@ function stripThinkBlocks(content: string): string {
 }
 
 function truncateArgs(args: unknown, maxLength = 80): string {
-  const raw = typeof args === 'string' ? args : JSON.stringify(args)
+  let raw = ''
+  if (typeof args === 'string') {
+    raw = args
+  } else {
+    try {
+      raw = JSON.stringify(args)
+    } catch {
+      raw = ''
+    }
+  }
   if (!raw || raw === '{}' || raw === 'undefined') return ''
   if (raw.length <= maxLength) return raw
   return `${raw.slice(0, maxLength - 1)}…`
+}
+
+function extractTextFromMessage(message: unknown): string {
+  const row = toRecord(message)
+  if (!row) return ''
+
+  const direct = readString(row.text) || readString(row.content)
+  if (direct) return direct
+
+  const content = row.content
+  if (!Array.isArray(content)) return ''
+
+  return content
+    .map((block) => {
+      const item = toRecord(block)
+      if (!item) return ''
+      if (readString(item.type) !== 'text') return ''
+      return readString(item.text)
+    })
+    .filter(Boolean)
+    .join('')
+}
+
+function readEventText(payload: Record<string, unknown>): string {
+  return (
+    readString(payload.text) ||
+    readString(payload.content) ||
+    readString(payload.chunk) ||
+    extractTextFromMessage(payload.message)
+  )
+}
+
+function readEventRole(payload: Record<string, unknown>): 'assistant' | 'user' | '' {
+  const direct = readString(payload.role).toLowerCase()
+  if (direct === 'assistant' || direct === 'user') {
+    return direct
+  }
+
+  const message = toRecord(payload.message)
+  const nested = readString(message?.role).toLowerCase()
+  if (nested === 'assistant' || nested === 'user') {
+    return nested
+  }
+  return ''
+}
+
+function upsertAssistantStream(
+  previous: OutputMessage[],
+  text: string,
+  replace: boolean,
+): OutputMessage[] {
+  const last = previous[previous.length - 1]
+  if (last && last.role === 'assistant' && !last.done) {
+    return [
+      ...previous.slice(0, -1),
+      { ...last, content: replace ? text : `${last.content}${text}` },
+    ]
+  }
+  return [...previous, { role: 'assistant', content: text, timestamp: Date.now() }]
+}
+
+function appendAssistantMessage(previous: OutputMessage[], text: string): OutputMessage[] {
+  const last = previous[previous.length - 1]
+  if (last && last.role === 'assistant' && !last.done) {
+    // Avoid duplicate final frames when providers send both chunk stream and final message.
+    if (last.content === text) return previous
+    if (text.startsWith(last.content) || last.content.startsWith(text)) {
+      return [
+        ...previous.slice(0, -1),
+        { ...last, content: text },
+      ]
+    }
+  }
+  return [...previous, { role: 'assistant', content: text, timestamp: Date.now() }]
 }
 
 export function AgentOutputPanel({
@@ -90,23 +173,16 @@ export function AgentOutputPanel({
       if (!(event instanceof MessageEvent)) return
       const payload = parseSsePayload(event.data as string)
       if (!payload) return
-      const text = readString(payload.text) || readString(payload.content) || readString(payload.chunk)
+      const text = readEventText(payload)
       if (!text) return
+      const fullReplace = payload.fullReplace === true
 
       // Approximate token count: ~4 chars per token
-      setTokenCount((n) => n + Math.ceil(text.length / 4))
+      if (!fullReplace) {
+        setTokenCount((n) => n + Math.ceil(text.length / 4))
+      }
 
-      setMessages((prev) => {
-        const last = prev[prev.length - 1]
-        if (last && last.role === 'assistant' && !last.done) {
-          // Append to last assistant message (only if not a done marker)
-          return [
-            ...prev.slice(0, -1),
-            { ...last, content: last.content + text },
-          ]
-        }
-        return [...prev, { role: 'assistant', content: text, timestamp: Date.now() }]
-      })
+      setMessages((prev) => upsertAssistantStream(prev, text, fullReplace))
     })
 
     // 'tool' — tool call event
@@ -124,12 +200,23 @@ export function AgentOutputPanel({
       ])
     })
 
-    // 'done' — session/run completed: add inline ✓ Done marker
-    source.addEventListener('done', () => {
+    // 'done' — session/run completed: add status marker
+    source.addEventListener('done', (event) => {
+      let doneLabel = 'Session ended'
+      if (event instanceof MessageEvent) {
+        const payload = parseSsePayload(event.data as string)
+        const state = readString(payload?.state).toLowerCase()
+        const error = readString(payload?.errorMessage)
+        if (state === 'error') {
+          doneLabel = error ? `Session ended with error: ${error}` : 'Session ended with error'
+        } else if (state === 'aborted') {
+          doneLabel = 'Session aborted'
+        }
+      }
       setSessionEnded(true)
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: '✓ Done', timestamp: Date.now(), done: true },
+        { role: 'assistant', content: doneLabel, timestamp: Date.now(), done: true },
       ])
     })
 
@@ -138,7 +225,7 @@ export function AgentOutputPanel({
       if (!(event instanceof MessageEvent)) return
       const payload = parseSsePayload(event.data as string)
       if (!payload) return
-      const text = readString(payload.text) || readString(payload.content) || readString(payload.message)
+      const text = readEventText(payload)
       if (!text) return
       setMessages((prev) => [
         ...prev,
@@ -146,13 +233,13 @@ export function AgentOutputPanel({
       ])
     })
 
-    // 'message' — generic fallback for unnamed SSE lines (also handles user turns)
-    source.onmessage = (event) => {
+    // 'message' — final/standalone message payload from gateway
+    source.addEventListener('message', (event) => {
       if (!(event instanceof MessageEvent)) return
       const payload = parseSsePayload(event.data as string)
       if (!payload) return
-      const role = readString(payload.role)
-      const text = readString(payload.text) || readString(payload.content)
+      const role = readEventRole(payload)
+      const text = readEventText(payload)
       if (!text) return
       if (role === 'user') {
         setMessages((prev) => [
@@ -161,17 +248,8 @@ export function AgentOutputPanel({
         ])
         return
       }
-      setMessages((prev) => {
-        const last = prev[prev.length - 1]
-        if (last && last.role === 'assistant' && !last.done) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, content: last.content + text },
-          ]
-        }
-        return [...prev, { role: 'assistant', content: text, timestamp: Date.now() }]
-      })
-    }
+      setMessages((prev) => appendAssistantMessage(prev, text))
+    })
 
     return () => {
       source.close()
