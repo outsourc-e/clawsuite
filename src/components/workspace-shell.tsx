@@ -24,6 +24,7 @@ import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
+import { ErrorBoundary } from '@/components/error-boundary'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
 
@@ -218,8 +219,14 @@ export function WorkspaceShell() {
             ].join(' ')}
             data-tour="chat-area"
           >
-            <div key={pathname} className="page-transition h-full">
-              <Outlet />
+            <div className="page-transition h-full">
+              <ErrorBoundary
+                className="h-full"
+                title="Something went wrong"
+                description="This page failed to render. Reload to try again."
+              >
+                <Outlet />
+              </ErrorBoundary>
             </div>
           </main>
 
