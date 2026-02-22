@@ -5,6 +5,80 @@ import type { GatewayFrame } from '../../server/gateway'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function readNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  return undefined
+}
+
+function stripDataUrlPrefix(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const commaIndex = trimmed.indexOf(',')
+  if (trimmed.toLowerCase().startsWith('data:') && commaIndex >= 0) {
+    return trimmed.slice(commaIndex + 1).trim()
+  }
+  return trimmed
+}
+
+function normalizeAttachments(
+  attachments: unknown,
+): Array<Record<string, unknown>> | undefined {
+  if (!Array.isArray(attachments) || attachments.length === 0) {
+    return undefined
+  }
+
+  const normalized: Array<Record<string, unknown>> = []
+  for (const attachment of attachments) {
+    if (!attachment || typeof attachment !== 'object') continue
+    const source = attachment as Record<string, unknown>
+
+    const id = readString(source.id)
+    const name = readString(source.name) || readString(source.fileName)
+    const mimeType =
+      readString(source.contentType) ||
+      readString(source.mimeType) ||
+      readString(source.mediaType)
+    const size = readNumber(source.size)
+
+    const base64Raw =
+      readString(source.content) ||
+      readString(source.data) ||
+      readString(source.base64) ||
+      readString(source.dataUrl)
+    const content = stripDataUrlPrefix(base64Raw)
+    if (!content) continue
+
+    const type =
+      readString(source.type) ||
+      (mimeType.toLowerCase().startsWith('image/') ? 'image' : 'file')
+
+    const dataUrl =
+      readString(source.dataUrl) ||
+      (mimeType ? `data:${mimeType};base64,${content}` : '')
+
+    normalized.push({
+      id: id || undefined,
+      name: name || undefined,
+      fileName: name || undefined,
+      type,
+      contentType: mimeType || undefined,
+      mimeType: mimeType || undefined,
+      mediaType: mimeType || undefined,
+      content,
+      data: content,
+      base64: content,
+      dataUrl: dataUrl || undefined,
+      size,
+    })
+  }
+
+  return normalized.length > 0 ? normalized : undefined
+}
+
 export const Route = createFileRoute('/api/send-stream')({
   server: {
     handlers: {
@@ -29,9 +103,7 @@ export const Route = createFileRoute('/api/send-stream')({
         const message = String(body.message ?? '')
         const thinking =
           typeof body.thinking === 'string' ? body.thinking : undefined
-        const attachments = Array.isArray(body.attachments)
-          ? body.attachments
-          : undefined
+        const attachments = normalizeAttachments(body.attachments)
         const idempotencyKey =
           typeof body.idempotencyKey === 'string'
             ? body.idempotencyKey

@@ -28,6 +28,8 @@ import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import type { SessionMeta } from '@/screens/chat/types'
 
 type SessionsListResponse = Array<SessionMeta>
+export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
+  'fixed inset-y-0 left-0 w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
 
 async function fetchSessions(): Promise<SessionsListResponse> {
   const res = await fetch('/api/sessions')
@@ -233,7 +235,7 @@ export function WorkspaceShell() {
             type="button"
             aria-label="Collapse navigation sidebar"
             onClick={() => setSidebarCollapsed(true)}
-            className="fixed inset-0 z-10 bg-black/10 backdrop-blur-[1px]"
+            className={DESKTOP_SIDEBAR_BACKDROP_CLASS}
           />
         ) : null}
       </div>

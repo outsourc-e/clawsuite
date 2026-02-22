@@ -3,7 +3,6 @@ import { cn } from '@/lib/utils'
 import type { AgentWorkingRow, AgentWorkingStatus } from './agents-working-panel'
 import { AgentOutputPanel } from './agent-output-panel'
 import type { HubTask } from './task-board'
-import type { ModelPresetId } from './team-panel'
 
 export type LiveActivityPanelProps = {
   agents: AgentWorkingRow[]
@@ -13,13 +12,15 @@ export type LiveActivityPanelProps = {
   onViewAgent: (agentId: string) => void
   onKillAgent: (agentId: string) => void
   onRespawnAgent: (agentId: string) => void
+  onPauseAgent?: (agentId: string, pause: boolean) => void
+  onSteerAgent?: (agentId: string, message: string) => void
   onCloseOutput: () => void
   missionRunning: boolean
 }
 
 type PanelTab = 'activity' | 'output'
 
-const MODEL_BADGE: Record<ModelPresetId, string> = {
+const MODEL_BADGE: Record<string, string> = {
   auto:          'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
   opus:          'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
   sonnet:        'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
@@ -34,7 +35,7 @@ const MODEL_BADGE: Record<ModelPresetId, string> = {
   'pc1-devstral': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
 }
 
-const MODEL_LABEL: Record<ModelPresetId, string> = {
+const MODEL_LABEL: Record<string, string> = {
   auto:          'Auto',
   opus:          'Opus',
   sonnet:        'Sonnet',
@@ -80,12 +81,16 @@ function AgentCard({
   onView,
   onKill,
   onRespawn,
+  onPause,
+  onSteer,
 }: {
   agent: AgentWorkingRow
   isSelected: boolean
   onView: () => void
   onKill: () => void
   onRespawn: () => void
+  onPause?: (pause: boolean) => void
+  onSteer?: (message: string) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -202,14 +207,26 @@ function AgentCard({
                     </p>
                     <button
                       type="button"
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        setMenuOpen(false)
+                        if (!onSteer) return
+                        const directive = window.prompt(
+                          `Send directive to ${agent.name}`,
+                          '',
+                        )
+                        if (!directive || !directive.trim()) return
+                        onSteer(directive.trim())
+                      }}
                       className="block w-full px-3 py-1.5 text-left text-[11px] text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
                     >
                       Steer
                     </button>
                     <button
                       type="button"
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        setMenuOpen(false)
+                        onPause?.(agent.status !== 'paused')
+                      }}
                       className="block w-full px-3 py-1.5 text-left text-[11px] text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
                     >
                       {agent.status === 'paused' ? 'Resume' : 'Pause'}
@@ -244,6 +261,8 @@ export function LiveActivityPanel({
   onViewAgent,
   onKillAgent,
   onRespawnAgent,
+  onPauseAgent,
+  onSteerAgent,
   onCloseOutput,
   missionRunning,
 }: LiveActivityPanelProps) {
@@ -371,6 +390,16 @@ export function LiveActivityPanel({
                   onView={() => handleViewAgent(agent.id)}
                   onKill={() => onKillAgent(agent.id)}
                   onRespawn={() => onRespawnAgent(agent.id)}
+                  onPause={
+                    onPauseAgent
+                      ? (pause) => onPauseAgent(agent.id, pause)
+                      : undefined
+                  }
+                  onSteer={
+                    onSteerAgent
+                      ? (message) => onSteerAgent(agent.id, message)
+                      : undefined
+                  }
                 />
               ))}
 

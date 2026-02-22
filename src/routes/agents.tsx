@@ -4,8 +4,8 @@ import { AgentsScreen } from '@/screens/gateway/agents-screen'
 
 export const Route = createFileRoute('/agents')({
   component: function AgentsRoute() {
-    usePageTitle('Gateway Agents')
-    return <AgentsScreen variant="registry" />
+    usePageTitle('Agent Hub')
+    return <AgentsScreen variant="mission-control" />
   },
   errorComponent: function AgentsError({ error }) {
     return (
