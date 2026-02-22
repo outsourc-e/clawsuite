@@ -116,6 +116,10 @@ export function initializeSettingsAppearance() {
   if (typeof window === 'undefined') return
 
   didInitializeSettingsAppearance = true
+
+  // Rehydrate persisted settings from localStorage (skipHydration: true requires manual call)
+  void useSettingsStore.persist.rehydrate()
+
   applySettingsAppearance(useSettingsStore.getState().settings)
 
   useSettingsStore.subscribe(
