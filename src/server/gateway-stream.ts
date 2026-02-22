@@ -26,7 +26,7 @@ class GatewayStreamConnection extends EventEmitter {
 
     await this.waitForOpen(ws)
 
-    ws.on('message', (data) => {
+    ws.on('message', (data: any) => {
       this.handleMessage(data)
     })
     ws.on('close', () => {
@@ -34,7 +34,7 @@ class GatewayStreamConnection extends EventEmitter {
       this.failPending(new Error('Gateway connection closed'))
       this.emit('close')
     })
-    ws.on('error', (err) => {
+    ws.on('error', (err: unknown) => {
       this.failPending(err instanceof Error ? err : new Error(String(err)))
       this.emit('error', err)
     })
@@ -101,7 +101,7 @@ class GatewayStreamConnection extends EventEmitter {
       throw new Error('Gateway connection not open')
     }
     await new Promise<void>((resolve, reject) => {
-      this.ws?.send(JSON.stringify(frame), (err) => {
+      this.ws?.send(JSON.stringify(frame), (err: unknown) => {
         if (err) reject(err)
         else resolve()
       })

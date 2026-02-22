@@ -21,13 +21,9 @@ type SystemGlanceProps = {
 
 function SystemGlanceCompact({
   sessions,
-  activeAgents: activeAgents,
   costToday,
   uptimeFormatted,
   healthStatus,
-  gatewayConnected: gatewayConnected,
-  sessionPercent: sessionPercent,
-  currentModel: currentModel,
 }: SystemGlanceProps) {
   return (
     <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/70 px-3 py-2 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-neutral-950/60">
@@ -54,19 +50,6 @@ function SystemGlanceCompact({
   )
 }
 
-function StatItem({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="flex items-baseline gap-1">
-      <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">
-        {label}
-      </span>
-      <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">
-        {value}
-      </span>
-    </span>
-  )
-}
-
 // ─── Full desktop variant ─────────────────────────────────────────────────────
 
 export function SystemGlance(props: SystemGlanceProps) {
@@ -75,9 +58,9 @@ export function SystemGlance(props: SystemGlanceProps) {
     uptimeFormatted,
     updatedAgo,
     healthStatus,
-    gatewayConnected: gatewayConnected,
-    sessionPercent: sessionPercent,
-    currentModel: currentModel,
+    gatewayConnected,
+    sessionPercent,
+    currentModel,
     compact = false,
   } = props
 
