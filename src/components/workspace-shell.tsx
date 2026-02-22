@@ -26,6 +26,8 @@ import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
+import { DesktopAgentRosterSidebar } from '@/components/desktop-agent-roster-sidebar'
+import { DesktopLiveFeedPanel } from '@/components/desktop-live-feed-panel'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
 
@@ -91,8 +93,8 @@ export function WorkspaceShell() {
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
-  const showDesktopSidebarBackdrop =
-    !isMobile && !isOnChatRoute && !sidebarCollapsed
+  // Desktop nav now uses hover expansion rail, so no backdrop click-target is needed.
+  const showDesktopSidebarBackdrop = false
 
   // Sessions query — shared across sidebar and chat
   const sessionsQuery = useQuery({
@@ -186,7 +188,7 @@ export function WorkspaceShell() {
         className="relative overflow-hidden bg-surface text-primary-900"
         style={{ height: 'calc(var(--vvh, 100dvh) + var(--kb-inset, 0px))' }}
       >
-        <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]">
+        <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr] lg:grid-cols-[auto_auto_1fr] xl:grid-cols-[auto_auto_1fr_auto]">
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
           {!isMobile && (
@@ -207,6 +209,8 @@ export function WorkspaceShell() {
               />
             </div>
           )}
+
+          {!isMobile ? <DesktopAgentRosterSidebar /> : null}
 
           {/* Main content area — renders the matched route */}
           <main
@@ -234,6 +238,8 @@ export function WorkspaceShell() {
               </ErrorBoundary>
             </div>
           </main>
+
+          {!isOnChatRoute && !isMobile ? <DesktopLiveFeedPanel /> : null}
 
           {/* Chat panel — visible on non-chat routes */}
           {!isOnChatRoute && !isMobile && <ChatPanel />}

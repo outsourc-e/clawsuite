@@ -1,49 +1,49 @@
 declare module 'ws' {
-  import { EventEmitter } from 'node:events'
-  import type { Server } from 'node:http'
-  import type { Socket } from 'node:net'
+  export type RawData = any
 
-  export type RawData = string | Buffer | ArrayBuffer | Buffer[]
+  type WsListener = (...args: Array<any>) => void
 
-  export default class WebSocket extends EventEmitter {
-    static readonly CONNECTING: number
-    static readonly OPEN: number
-    static readonly CLOSING: number
-    static readonly CLOSED: number
-    readonly CONNECTING: number
-    readonly OPEN: number
-    readonly CLOSING: number
-    readonly CLOSED: number
+  class WebSocket {
+    static OPEN: number
+    static CONNECTING: number
+    static CLOSING: number
+    static CLOSED: number
+    OPEN: number
+    CONNECTING: number
+    CLOSING: number
+    CLOSED: number
     readyState: number
 
-    constructor(
-      address: string | URL,
-      options?: Record<string, unknown>,
-    )
+    constructor(url: string, options?: Record<string, unknown>)
 
     send(
-      data: string | Buffer,
-      cb?: (err?: Error | null) => void,
+      data: string | Buffer | ArrayBuffer | ArrayBufferView,
+      cb?: (err?: unknown) => void,
     ): void
-    ping(): void
-    close(code?: number, data?: string | Buffer): void
+    close(code?: number, reason?: string): void
     terminate(): void
+    ping(data?: unknown, mask?: boolean, cb?: (err?: unknown) => void): void
+
+    on(event: string, listener: WsListener): this
+    once(event: string, listener: WsListener): this
+    off(event: string, listener: WsListener): this
+    removeListener(event: string, listener: WsListener): this
+    removeAllListeners(event?: string): this
   }
 
-  export class WebSocketServer extends EventEmitter {
-    constructor(options?: {
-      port?: number
-      server?: Server
-      noServer?: boolean
-      [key: string]: unknown
-    })
-    clients: Set<WebSocket>
-    close(cb?: (err?: Error) => void): void
-    handleUpgrade(
-      request: unknown,
-      socket: Socket,
-      head: Buffer,
-      cb: (ws: WebSocket) => void,
-    ): void
+  namespace WebSocket {
+    export type RawData = any
   }
+
+  export class WebSocketServer {
+    constructor(options?: Record<string, unknown>)
+    on(event: string, listener: WsListener): this
+    once(event: string, listener: WsListener): this
+    off(event: string, listener: WsListener): this
+    close(cb?: () => void): void
+    handleUpgrade(...args: Array<any>): void
+    emit(event: string, ...args: Array<any>): boolean
+  }
+
+  export default WebSocket
 }

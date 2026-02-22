@@ -540,7 +540,7 @@ class GatewayClient {
     }
 
     await new Promise<void>((resolve, reject) => {
-      this.ws?.send(JSON.stringify(frame), (err?: Error | null) => {
+      this.ws?.send(JSON.stringify(frame), (err: unknown) => {
         if (err) {
           reject(err)
           return
@@ -564,10 +564,9 @@ class GatewayClient {
         resolve()
       }
 
-      function onError(error: unknown) {
+      function onError(error: Error) {
         cleanup()
-        const message = error instanceof Error ? error.message : String(error)
-        reject(new Error(`WebSocket error: ${message}`))
+        reject(new Error(`WebSocket error: ${String(error.message)}`))
       }
 
       function cleanup() {

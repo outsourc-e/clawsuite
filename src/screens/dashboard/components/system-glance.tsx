@@ -58,9 +58,9 @@ export function SystemGlance(props: SystemGlanceProps) {
     uptimeFormatted,
     updatedAgo,
     healthStatus,
-    gatewayConnected: gatewayConnected,
-    sessionPercent: sessionPercent,
-    currentModel: currentModel,
+    gatewayConnected,
+    sessionPercent,
+    currentModel,
     compact = false,
   } = props
 
