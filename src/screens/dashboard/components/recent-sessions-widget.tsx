@@ -1,17 +1,16 @@
 import { ArrowRight01Icon, Clock01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import type { RecentSession } from './dashboard-types'
-import type { SessionMeta } from '@/screens/chat/types'
+import type { SessionInfo } from '../hooks/use-dashboard-data'
 import { Button } from '@/components/ui/button'
-import { chatQueryKeys, fetchSessions } from '@/screens/chat/chat-queries'
-import { getMessageTimestamp, textFromMessage } from '@/screens/chat/utils'
 import { cn } from '@/lib/utils'
 
 type RecentSessionsWidgetProps = {
   onOpenSession: (sessionKey: string) => void
+  sessions: SessionInfo[]
+  activeCount: number
+  loading?: boolean
   draggable?: boolean
   onRemove?: () => void
 }
@@ -28,94 +27,21 @@ function formatSessionTimestamp(value: number): string {
   }).format(date)
 }
 
-function cleanTitle(raw: string): string {
-  if (!raw) return ''
-  if (/^a new session was started/i.test(raw)) return ''
-  let cleaned = raw.replace(/^\[.*?\]\s*/, '')
-  cleaned = cleaned.replace(/\[?message_id:\s*\S+\]?/gi, '').trim()
-  return cleaned
-}
-
-function toSessionTitle(session: SessionMeta): string {
-  const label = cleanTitle(session.label ?? '')
-  if (label) return label
-  const title = cleanTitle(session.title ?? '')
-  if (title) return title
-  const derived = cleanTitle(session.derivedTitle ?? '')
-  if (derived) return derived
-  return session.friendlyId === 'main'
-    ? 'Main Session'
-    : `Session ${session.friendlyId}`
-}
-
-function toSessionPreview(session: SessionMeta): string {
-  if (session.lastMessage) {
-    const preview = textFromMessage(session.lastMessage)
-    if (preview.length > 0 && !/^a new session was started/i.test(preview)) {
-      return preview.length > 120 ? `${preview.slice(0, 117)}…` : preview
-    }
-  }
-  const title = (session.label ?? session.title ?? '').toLowerCase()
-  if (title.startsWith('cron:') || title.includes('cron'))
-    return 'Scheduled task'
-  return 'New session'
-}
-
-function toSessionUpdatedAt(session: SessionMeta): number {
-  if (typeof session.updatedAt === 'number') return session.updatedAt
-  if (session.lastMessage) return getMessageTimestamp(session.lastMessage)
-  return 0
-}
-
-function isSubagentSession(session: { key?: string; label?: string }): boolean {
-  const key = session.key ?? ''
-  const label = session.label ?? ''
-  return (
-    key.startsWith('agent:main:subagent:') ||
-    key.includes('subagent') ||
-    label.toLowerCase().includes('subagent')
-  )
-}
-
 export function RecentSessionsWidget({
   onOpenSession,
+  sessions,
+  activeCount,
+  loading = false,
   draggable = false,
   onRemove,
 }: RecentSessionsWidgetProps) {
-  const sessionsQuery = useQuery({
-    queryKey: chatQueryKeys.sessions,
-    queryFn: fetchSessions,
-    refetchInterval: 30_000,
-  })
-
-  const sessions = useMemo(
-    function buildRecentSessions() {
-      const rows = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
-
-      const filtered = rows.filter((s) => !isSubagentSession(s))
-
-      const sorted = [...filtered].sort(function sortByMostRecent(a, b) {
-        return toSessionUpdatedAt(b) - toSessionUpdatedAt(a)
-      })
-
-      // Prefer sessions active in the last 24h; fall back to all if none qualify
-      const oneDayAgo = Date.now() - 86_400_000
-      const recentRows = sorted.filter((s) => toSessionUpdatedAt(s) > oneDayAgo)
-      const displayRows = recentRows.length > 0 ? recentRows : sorted
-
-      return displayRows.slice(0, 5).map(function mapSession(session): RecentSession {
-        return {
-          friendlyId: session.friendlyId,
-          title: toSessionTitle(session),
-          preview: toSessionPreview(session),
-          updatedAt: toSessionUpdatedAt(session),
-        }
-      })
-    },
-    [sessionsQuery.data],
-  )
-
-  const isLoading = sessionsQuery.isLoading && sessions.length === 0
+  const displaySessions: RecentSession[] = sessions.slice(0, 5).map((session) => ({
+    friendlyId: session.friendlyId || session.key,
+    title: session.label,
+    preview: session.preview || 'New session',
+    updatedAt: session.updatedAt,
+  }))
+  const isLoading = loading && displaySessions.length === 0
 
   return (
     <DashboardGlassCard
@@ -124,7 +50,7 @@ export function RecentSessionsWidget({
       icon={Clock01Icon}
       titleAccessory={
         <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 font-mono text-[11px] font-medium text-neutral-200 tabular-nums">
-          {sessions.length} active
+          {activeCount} active
         </span>
       }
       draggable={draggable}
@@ -140,7 +66,7 @@ export function RecentSessionsWidget({
           />
           <span className="text-sm text-neutral-400">Loading sessions…</span>
         </div>
-      ) : sessions.length === 0 ? (
+      ) : displaySessions.length === 0 ? (
         <div className="flex h-32 flex-col items-center justify-center gap-1 rounded-lg border border-neutral-800 bg-neutral-950">
           <p className="text-sm font-semibold text-neutral-100">No sessions yet</p>
           <p className="text-xs text-neutral-400">
@@ -149,7 +75,7 @@ export function RecentSessionsWidget({
         </div>
       ) : (
         <div className="space-y-2.5">
-          {sessions.map(function mapSession(session, index) {
+          {displaySessions.map(function mapSession(session, index) {
             return (
               <Button
                 key={session.friendlyId}
