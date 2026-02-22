@@ -70,7 +70,7 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
     [data.timeseries.sessionsByDay],
   )
 
-  const activeSessions = data.sessions.active || data.agents.active || 0
+  const activeSessions = data.sessions.active || data.agents.active || data.sessions.total || 0
   const topModels = useMemo(() => {
     const top = data.cost.byModel.slice(0, 3)
     const maxCost = Math.max(1, ...top.map((m) => m.cost))

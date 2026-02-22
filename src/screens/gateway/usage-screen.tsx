@@ -87,8 +87,8 @@ export function UsageScreen() {
     : null
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-primary-200">
+    <div className="flex h-full flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary-200 px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <h1 className="text-[15px] font-semibold text-ink">Usage</h1>
           {query.isFetching && !query.isLoading ? (
@@ -109,7 +109,7 @@ export function UsageScreen() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-6 py-4">
+      <div className="flex-1 overflow-auto px-4 py-4 sm:px-6">
         {query.isLoading ? (
           <div className="flex items-center justify-center h-32">
             <div className="flex items-center gap-2 text-primary-500">
@@ -150,7 +150,7 @@ export function UsageScreen() {
             ) : null}
 
             {/* Summary cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard
                 label="Total Cost"
                 value={formatCost(usage?.totalCost)}
@@ -176,67 +176,69 @@ export function UsageScreen() {
             <h2 className="text-[13px] font-semibold text-ink mb-3">
               Cost Breakdown
             </h2>
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="border-b border-primary-200 text-left">
-                  <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider text-right">
-                    Tokens
-                  </th>
-                  <th className="pb-2 text-[11px] font-medium text-primary-500 uppercase tracking-wider text-right">
-                    Cost
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  {
-                    label: 'Input',
-                    tokens: usage?.input,
-                    cost: usage?.inputCost,
-                  },
-                  {
-                    label: 'Output',
-                    tokens: usage?.output,
-                    cost: usage?.outputCost,
-                  },
-                  {
-                    label: 'Cache Read',
-                    tokens: usage?.cacheRead,
-                    cost: usage?.cacheReadCost,
-                  },
-                  {
-                    label: 'Cache Write',
-                    tokens: usage?.cacheWrite,
-                    cost: usage?.cacheWriteCost,
-                  },
-                ].map((row) => (
-                  <tr
-                    key={row.label}
-                    className="border-b border-primary-100 hover:bg-primary-50"
-                  >
-                    <td className="py-2.5 text-ink">{row.label}</td>
-                    <td className="py-2.5 text-primary-600 text-right tabular-nums">
-                      {formatTokens(row.tokens)}
+            <div className="overflow-x-auto">
+              <table className="min-w-[420px] w-full text-[13px]">
+                <thead>
+                  <tr className="border-b border-primary-200 text-left">
+                    <th className="pb-2 text-[11px] font-medium uppercase tracking-wider text-primary-500">
+                      Category
+                    </th>
+                    <th className="pb-2 text-right text-[11px] font-medium uppercase tracking-wider text-primary-500">
+                      Tokens
+                    </th>
+                    <th className="pb-2 text-right text-[11px] font-medium uppercase tracking-wider text-primary-500">
+                      Cost
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    {
+                      label: 'Input',
+                      tokens: usage?.input,
+                      cost: usage?.inputCost,
+                    },
+                    {
+                      label: 'Output',
+                      tokens: usage?.output,
+                      cost: usage?.outputCost,
+                    },
+                    {
+                      label: 'Cache Read',
+                      tokens: usage?.cacheRead,
+                      cost: usage?.cacheReadCost,
+                    },
+                    {
+                      label: 'Cache Write',
+                      tokens: usage?.cacheWrite,
+                      cost: usage?.cacheWriteCost,
+                    },
+                  ].map((row) => (
+                    <tr
+                      key={row.label}
+                      className="border-b border-primary-100 hover:bg-primary-50"
+                    >
+                      <td className="py-2.5 text-ink">{row.label}</td>
+                      <td className="py-2.5 text-right tabular-nums text-primary-600">
+                        {formatTokens(row.tokens)}
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums text-primary-600">
+                        {formatCost(row.cost)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="font-medium">
+                    <td className="py-2.5 text-ink">Total</td>
+                    <td className="py-2.5 text-right tabular-nums text-ink">
+                      {formatTokens(usage?.totalTokens)}
                     </td>
-                    <td className="py-2.5 text-primary-600 text-right tabular-nums">
-                      {formatCost(row.cost)}
+                    <td className="py-2.5 text-right tabular-nums text-ink">
+                      {formatCost(usage?.totalCost)}
                     </td>
                   </tr>
-                ))}
-                <tr className="font-medium">
-                  <td className="py-2.5 text-ink">Total</td>
-                  <td className="py-2.5 text-ink text-right tabular-nums">
-                    {formatTokens(usage?.totalTokens)}
-                  </td>
-                  <td className="py-2.5 text-ink text-right tabular-nums">
-                    {formatCost(usage?.totalCost)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>

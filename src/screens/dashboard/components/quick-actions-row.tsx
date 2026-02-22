@@ -25,8 +25,8 @@ export function QuickActionsRow({ className }: QuickActionsRowProps) {
   const navigate = useNavigate()
 
   return (
-    <div className={cn('-mx-1 overflow-x-auto px-1 scrollbar-none', className)}>
-      <div className="flex min-w-max items-center gap-2 py-0.5">
+    <div className={cn('overflow-x-auto px-1 scrollbar-none', className)}>
+      <div className="flex min-w-max items-center gap-2 px-0.5 py-0.5">
         {ACTIONS.map((action) => (
           <button
             key={action.label}

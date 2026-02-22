@@ -75,6 +75,10 @@ function isSubagentSession(session: Record<string, unknown>): boolean {
   )
 }
 
+function getSessionActivityTimestamp(session: SessionStatusSession): number {
+  return normalizeTimestamp(session.updatedAt ?? session.usage?.lastActivity ?? 0)
+}
+
 // ─── API fetch functions ─────────────────────────────────────────────────────
 
 type SessionStatusSession = {
@@ -87,7 +91,14 @@ type SessionStatusSession = {
     firstActivity?: number
     lastActivity?: number
     totalCost?: number
-    dailyBreakdown?: Array<{ date: string; tokens: number; cost: number }>
+    dailyBreakdown?: Array<{
+      date: string
+      tokens?: number
+      totalTokens?: number
+      inputTokens?: number
+      outputTokens?: number
+      cost?: number
+    }>
     dailyMessageCounts?: Array<{
       date: string
       total: number
@@ -381,11 +392,11 @@ export function useDashboardData(): UseDashboardDataResult {
     const fiveMinAgo = now - 5 * 60 * 1000
 
     const activeSessions24h = ssSessions.filter((s) => {
-      const ts = normalizeTimestamp(s.updatedAt ?? 0)
+      const ts = getSessionActivityTimestamp(s)
       return ts > oneDayAgo
     })
     const activeSessions5m = ssSessions.filter((s) => {
-      const ts = normalizeTimestamp(s.updatedAt ?? 0)
+      const ts = getSessionActivityTimestamp(s)
       return ts > fiveMinAgo
     })
 
@@ -439,15 +450,16 @@ export function useDashboardData(): UseDashboardDataResult {
     const roster: AgentInfo[] = ssSessions
       .map((s, i): AgentInfo => {
         const updatedAtMs = normalizeTimestamp(s.updatedAt ?? 0)
-        const isActive = updatedAtMs > fiveMinAgo
-        const isIdle = updatedAtMs > oneDayAgo && !isActive
+        const activityAtMs = getSessionActivityTimestamp(s)
+        const isActive = activityAtMs > fiveMinAgo
+        const isIdle = activityAtMs > oneDayAgo && !isActive
         return {
           id: readString(s.key) || readString(s.agentId) || `agent-${i}`,
           name: toSessionDisplayName(s as Record<string, unknown>),
           status: isActive ? 'active' : isIdle ? 'idle' : 'available',
           model: readString(s.model),
           modelFormatted: formatModelName(readString(s.model)),
-          updatedAt: updatedAtMs,
+          updatedAt: activityAtMs || updatedAtMs,
         }
       })
       .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -460,7 +472,7 @@ export function useDashboardData(): UseDashboardDataResult {
     let stalledAgent: string | null = null
     let maxStalledMs = 0
     for (const s of ssSessions) {
-      const ts = normalizeTimestamp(s.updatedAt ?? 0)
+      const ts = getSessionActivityTimestamp(s)
       if (ts <= 0) continue
       const staleMs = now - ts
       if (staleMs > stalledThreshold && staleMs > maxStalledMs) {
@@ -510,7 +522,12 @@ export function useDashboardData(): UseDashboardDataResult {
       for (const entry of breakdown) {
         if (!entry.date?.startsWith(todayKey)) continue
         todayCostTotal += readNumber(entry.cost)
-        todayTokensTotal += readNumber(entry.tokens)
+        const inputTokens = readNumber(entry.inputTokens)
+        const outputTokens = readNumber(entry.outputTokens)
+        todayTokensTotal +=
+          readNumber(entry.tokens) ||
+          readNumber(entry.totalTokens) ||
+          (inputTokens + outputTokens)
       }
 
       // Model usage for provider/model breakdown
@@ -518,7 +535,11 @@ export function useDashboardData(): UseDashboardDataResult {
       for (const entry of modelUsage) {
         if (!entry.date?.startsWith(todayKey)) continue
         const provider = readString(entry.provider)
-        const modelRaw = readString(entry.model)
+        const modelRaw =
+          readString(entry.model) ||
+          readString(session.model) ||
+          provider ||
+          'unknown'
         const cost = readNumber(entry.cost)
         const tokens = readNumber(entry.tokens)
         const count = readNumber(entry.count)
@@ -527,14 +548,12 @@ export function useDashboardData(): UseDashboardDataResult {
           const prev = providerMap.get(provider) ?? { cost: 0, tokens: 0 }
           providerMap.set(provider, { cost: prev.cost + cost, tokens: prev.tokens + tokens })
         }
-        if (modelRaw) {
-          const prev = modelMap.get(modelRaw) ?? { cost: 0, tokens: 0, count: 0 }
-          modelMap.set(modelRaw, {
-            cost: prev.cost + cost,
-            tokens: prev.tokens + tokens,
-            count: prev.count + count,
-          })
-        }
+        const prev = modelMap.get(modelRaw) ?? { cost: 0, tokens: 0, count: 0 }
+        modelMap.set(modelRaw, {
+          cost: prev.cost + cost,
+          tokens: prev.tokens + tokens,
+          count: prev.count + count,
+        })
       }
     }
 
@@ -758,7 +777,7 @@ export function useDashboardData(): UseDashboardDataResult {
       updatedAt,
       sessions: {
         total: sessionTotal,
-        active: activeSessions5m.length,
+        active: activeSessions5m.length || activeAgentCount || 0,
         list: sessionList,
       },
       agents: {
