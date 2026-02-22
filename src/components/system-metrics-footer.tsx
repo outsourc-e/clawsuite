@@ -27,7 +27,7 @@ export function SystemMetricsFooter() {
   const uptimeDot = 'bg-sky-400'
 
   return (
-    <footer className="pointer-events-none fixed inset-x-0 bottom-[var(--tabbar-h,0px)] z-30 h-6 border-t border-neutral-800 bg-neutral-950 md:bottom-0">
+    <footer className="pointer-events-none fixed inset-x-0 z-30 hidden h-6 border-t border-neutral-800 bg-neutral-950 md:block md:bottom-0">
       <div className="flex h-full items-center justify-between px-2 md:px-3">
         <div className="flex items-center gap-2 md:hidden" aria-label="System status indicators">
           <MetricDot className={cpuDot} />
