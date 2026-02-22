@@ -32,7 +32,6 @@ import { ServicesHealthWidget } from './components/services-health-widget'
 import { ScheduledJobsWidget } from './components/scheduled-jobs-widget'
 import { SkillsWidget } from './components/skills-widget'
 import { TasksWidget } from './components/tasks-widget'
-import { UsageMeterWidget } from './components/usage-meter-widget'
 import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
 import { QuickActionsRow } from './components/quick-actions-row'
@@ -41,7 +40,7 @@ import { WidgetGrid, type WidgetGridItem } from './components/widget-grid'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
 import { useVisibleWidgets } from './hooks/use-visible-widgets'
-import { useDashboardData, buildUsageSummaryText } from './hooks/use-dashboard-data'
+import { useDashboardData } from './hooks/use-dashboard-data'
 import { formatMoney, formatRelativeTime } from './lib/formatters'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -229,9 +228,6 @@ export function DashboardScreen() {
     return dashboardData.connection.connected ? 'Active' : '—'
   }, [dashboardData.uptime.formatted, dashboardData.connection.connected, dashboardData.updatedAt])
 
-  const usageSummaryText = buildUsageSummaryText(dashboardData)
-  const usageSummaryIsError = dashboardData.usageStatus === 'error' || dashboardData.usageStatus === 'timeout'
-
   const visibleAlerts = dashboardData.alerts.filter((c) => !dismissedChips.has(c.id))
 
   // Timeseries data for micro charts
@@ -347,7 +343,6 @@ export function DashboardScreen() {
       return {
         showServices: visibleWidgetSet.has('services-health'),
         showScheduledJobs: visibleWidgetSet.has('scheduled-jobs'),
-        showUsage: visibleWidgetSet.has('usage-meter'),
         showSquad: visibleWidgetSet.has('agent-status'),
         showSessions: visibleWidgetSet.has('recent-sessions'),
         showTasks: visibleWidgetSet.has('tasks'),
@@ -364,7 +359,7 @@ export function DashboardScreen() {
     function buildMobileDeepSections() {
       const sections: Array<MobileWidgetSection> = []
       const deepTierOrder = widgetOrder.filter((id) =>
-        ['services', 'scheduled-jobs', 'activity', 'agents', 'sessions', 'tasks', 'skills', 'usage'].includes(id),
+        ['services', 'scheduled-jobs', 'activity', 'agents', 'sessions', 'tasks', 'skills'].includes(id),
       )
 
       for (const widgetId of deepTierOrder) {
@@ -426,7 +421,10 @@ export function DashboardScreen() {
             label: 'Agents',
             content: (
               <div className="w-full">
-                <SquadStatusWidget />
+                <SquadStatusWidget
+                  agents={dashboardData.agents.roster}
+                  loading={dashboardData.status === 'loading'}
+                />
               </div>
             ),
           })
@@ -441,6 +439,9 @@ export function DashboardScreen() {
             content: (
               <div className="w-full">
                 <RecentSessionsWidget
+                  sessions={dashboardData.sessions.list}
+                  activeCount={dashboardData.sessions.active || dashboardData.agents.active || 0}
+                  loading={dashboardData.status === 'loading'}
                   onOpenSession={(sessionKey) =>
                     navigate({
                       to: '/chat/$sessionKey',
@@ -495,48 +496,6 @@ export function DashboardScreen() {
           continue
         }
 
-        if (widgetId === 'usage') {
-          if (!visibleWidgetSet.has('usage-meter')) continue
-          sections.push({
-            id: widgetId,
-            label: 'Usage',
-            content: (
-              <div className="w-full">
-                <CollapsibleWidget
-                  title="Usage Meter"
-                  summary={usageSummaryText}
-                  defaultOpen={false}
-                  action={
-                    usageSummaryIsError ? (
-                      <button
-                        type="button"
-                        onClick={refetch}
-                        className="rounded-md border border-red-200 bg-red-50/80 px-1.5 py-0.5 text-[10px] font-medium text-red-700 transition-colors hover:bg-red-100"
-                      >
-                        Retry
-                      </button>
-                    ) : null
-                  }
-                >
-                  {usageSummaryIsError ? (
-                    <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-700">
-                      <p className="font-medium">Usage unavailable</p>
-                      <button
-                        type="button"
-                        onClick={refetch}
-                        className="mt-2 rounded-md border border-red-200 bg-red-100/80 px-2 py-1 text-xs font-medium transition-colors hover:bg-red-100"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  ) : (
-                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
-                  )}
-                </CollapsibleWidget>
-              </div>
-            ),
-          })
-        }
       }
 
       return sections
@@ -549,8 +508,6 @@ export function DashboardScreen() {
       navigate,
       refetch,
       removeWidget,
-      usageSummaryIsError,
-      usageSummaryText,
       visibleWidgetSet,
       widgetOrder,
     ],
@@ -972,16 +929,12 @@ export function DashboardScreen() {
                 </button>
               </div>
 
-              {/* 3. Two-up: Usage Today + Squad Status */}
-              {(desktopLayout.showUsage || desktopLayout.showSquad) && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {desktopLayout.showUsage && (
-                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
-                  )}
-                  {desktopLayout.showSquad && (
-                    <SquadStatusWidget />
-                  )}
-                </div>
+              {/* 3. Squad Status */}
+              {desktopLayout.showSquad && (
+                <SquadStatusWidget
+                  agents={dashboardData.agents.roster}
+                  loading={dashboardData.status === 'loading'}
+                />
               )}
 
               {/* 4. Two-up: Recent Sessions + Tasks */}
@@ -989,6 +942,9 @@ export function DashboardScreen() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {desktopLayout.showSessions && (
                     <RecentSessionsWidget
+                      sessions={dashboardData.sessions.list}
+                      activeCount={dashboardData.sessions.active || dashboardData.agents.active || 0}
+                      loading={dashboardData.status === 'loading'}
                       onOpenSession={(sessionKey) =>
                         navigate({
                           to: '/chat/$sessionKey',
