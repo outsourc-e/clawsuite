@@ -3,6 +3,7 @@ import { json } from '@tanstack/react-start'
 import { writeFile, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { discoverGateway } from '../../server/gateway-discovery'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 export const Route = createFileRoute('/api/gateway-discover')({
   server: {
@@ -13,7 +14,11 @@ export const Route = createFileRoute('/api/gateway-discover')({
        * Auto-discover local OpenClaw gateway, configure .env, and test connection.
        * Returns { ok, url, source, error } — if ok=true, gateway is ready to use.
        */
-      POST: async () => {
+      POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
         try {
           const result = await discoverGateway()
 

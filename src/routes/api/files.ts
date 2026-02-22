@@ -11,6 +11,7 @@ import {
   rateLimitResponse,
   safeErrorMessage,
 } from '../../server/rate-limit'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 const execFileAsync = promisify(execFile)
 
@@ -226,6 +227,10 @@ export const Route = createFileRoute('/api/files')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
         try {
           const url = new URL(request.url)
           const action = url.searchParams.get('action') || 'list'
@@ -290,6 +295,10 @@ export const Route = createFileRoute('/api/files')({
         }
       },
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
         const ip = getClientIp(request)
         if (!rateLimit(`files:${ip}`, 30, 60_000)) {
           return rateLimitResponse()
