@@ -627,7 +627,7 @@ function OfficeView({
             <div
               key={agent.id}
               className={cn(
-            'relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 transition-all',
+            'relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 transition-all hover:shadow-[0_0_15px_rgba(249,115,22,0.15)]',
             isSelected
                   ? 'shadow-lg ring-1 ring-emerald-500/50 shadow-emerald-500/10'
                   : '',
@@ -2792,7 +2792,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-neutral-950">
+    <div className="flex h-full min-h-0 flex-col bg-white dark:bg-neutral-950">
       {/* ── Brand top accent border ──────────────────────────────────────── */}
       <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
 
@@ -2885,7 +2885,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div className="min-w-0 flex-1 overflow-hidden">
           {/* Office tab */}
           <div
-            className="h-full min-h-0 bg-neutral-950"
+            className="h-full min-h-0 bg-white dark:bg-neutral-950"
             style={{ display: activeTab === 'office' ? 'block' : 'none' }}
           >
             <OfficeView
@@ -2904,7 +2904,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* Mission tab */}
           <div
-            className="h-full min-h-0 bg-neutral-950"
+            className="h-full min-h-0 bg-white dark:bg-neutral-950"
             style={{ display: activeTab === 'mission' ? 'block' : 'none' }}
           >
             {renderMissionContent()}
@@ -2912,7 +2912,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* History tab */}
           <div
-            className="h-full min-h-0 bg-neutral-950"
+            className="h-full min-h-0 bg-white dark:bg-neutral-950"
             style={{ display: activeTab === 'history' ? 'block' : 'none' }}
           >
             <HistoryView />
@@ -2920,7 +2920,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* Approvals tab */}
           <div
-            className="h-full min-h-0 bg-neutral-950"
+            className="h-full min-h-0 bg-white dark:bg-neutral-950"
             style={{ display: activeTab === 'approvals' ? 'block' : 'none' }}
           >
             <ApprovalsPanel
@@ -2932,7 +2932,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* Team tab */}
           <div
-            className="h-full min-h-0 bg-neutral-950"
+            className="h-full min-h-0 bg-white dark:bg-neutral-950"
             style={{ display: activeTab === 'team' ? 'block' : 'none' }}
           >
             <div

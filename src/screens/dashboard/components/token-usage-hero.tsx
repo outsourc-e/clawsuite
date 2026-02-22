@@ -91,10 +91,14 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
   return (
     <section
       className={cn(
-        'rounded-2xl border border-neutral-800 bg-neutral-950 p-4 text-neutral-100 shadow-[0_12px_36px_rgba(0,0,0,0.28)]',
+        'relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 p-4 text-neutral-100 shadow-[0_12px_36px_rgba(0,0,0,0.28)]',
         className,
       )}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+      />
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.18em] text-neutral-400">TOKEN USAGE</p>

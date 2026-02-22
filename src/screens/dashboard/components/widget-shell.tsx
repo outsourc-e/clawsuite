@@ -110,6 +110,10 @@ export function WidgetShell({
         className,
       )}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+      />
       {/* Header */}
       <header
         className={cn(

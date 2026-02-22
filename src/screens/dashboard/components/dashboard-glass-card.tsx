@@ -50,7 +50,7 @@ export function DashboardGlassCard({
       role="region"
       aria-label={title}
       className={cn(
-        'group flex h-full flex-col overflow-hidden rounded-xl border transition-colors',
+        'group relative flex h-full flex-col overflow-hidden rounded-xl border transition-colors',
         tier === 'primary' &&
           'border-primary-200 bg-primary-50 px-4 py-3.5 hover:border-primary-300 dark:bg-primary-50/95 md:px-5 md:py-4',
         tier === 'secondary' &&
@@ -60,6 +60,10 @@ export function DashboardGlassCard({
         className,
       )}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+      />
       <header className="mb-2 flex shrink-0 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <HugeiconsIcon

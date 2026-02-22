@@ -64,7 +64,11 @@ function KpiCard({
   delta?: { value: number; text: string }
 }) {
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+    <div className="relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+      />
       <div className="text-[11px] uppercase tracking-wider text-neutral-400">
         {label}
       </div>
@@ -186,7 +190,11 @@ export function CostsScreen() {
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-              <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+              <section className="relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+                />
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-neutral-100">
                     Per-Model Usage
@@ -259,7 +267,11 @@ export function CostsScreen() {
                 </div>
               </section>
 
-              <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+              <section className="relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+                />
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-neutral-100">
                     Daily Cost Trend
@@ -305,7 +317,11 @@ export function CostsScreen() {
               </section>
             </div>
 
-            <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+            <section className="relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+              />
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-semibold text-neutral-100">
