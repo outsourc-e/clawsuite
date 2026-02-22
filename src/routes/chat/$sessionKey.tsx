@@ -1,9 +1,13 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { ChatScreen } from '../../screens/chat/chat-screen'
 import { moveHistoryMessages } from '../../screens/chat/chat-queries'
+
+const ChatScreen = lazy(async () => {
+  const module = await import('../../screens/chat/chat-screen')
+  return { default: module.ChatScreen }
+})
 
 export const Route = createFileRoute('/chat/$sessionKey')({
   component: ChatRoute,
@@ -30,7 +34,9 @@ export const Route = createFileRoute('/chat/$sessionKey')({
               Try Again
             </button>
             <button
-              onClick={() => (window.location.href = '/chat/main')}
+              onClick={() => {
+                if (typeof window !== 'undefined') window.location.href = '/chat/main'
+              }}
               className="px-4 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors"
             >
               Return to Main
@@ -106,12 +112,20 @@ function ChatRoute() {
 
   return (
     <ErrorBoundary>
-      <ChatScreen
-        activeFriendlyId={activeFriendlyId}
-        isNewChat={isNewChat}
-        forcedSessionKey={forcedSessionKey}
-        onSessionResolved={isNewChat ? handleSessionResolved : undefined}
-      />
+      <Suspense
+        fallback={
+          <div className="flex h-full items-center justify-center text-primary-400">
+            Loading chat…
+          </div>
+        }
+      >
+        <ChatScreen
+          activeFriendlyId={activeFriendlyId}
+          isNewChat={isNewChat}
+          forcedSessionKey={forcedSessionKey}
+          onSessionResolved={isNewChat ? handleSessionResolved : undefined}
+        />
+      </Suspense>
     </ErrorBoundary>
   )
 }

@@ -589,8 +589,7 @@ function OfficeView({
       <div
         className={cn(
           'grid gap-3',
-          agentRows.length <= 2 ? 'grid-cols-2' :
-          agentRows.length === 4 ? 'grid-cols-2' :
+          agentRows.length <= 3 ? 'grid-cols-1 sm:grid-cols-2' :
           'grid-cols-2 md:grid-cols-3',
         )}
       >
@@ -660,9 +659,9 @@ function OfficeView({
                 </h3>
 
                 {/* Role / model row */}
-                <div className="mt-1 flex items-center gap-1.5">
+                <div className="mt-1 flex items-start gap-1.5">
                   {agent.roleDescription ? (
-                    <span className="truncate text-[10px] text-neutral-500 dark:text-neutral-600">
+                    <span className="line-clamp-2 min-w-0 text-[10px] text-neutral-500 dark:text-neutral-600">
                       {agent.roleDescription}
                     </span>
                   ) : null}
@@ -2814,7 +2813,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       </div>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="hidden shrink-0 items-center overflow-x-auto border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 md:flex">
         {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'approvals'
             ? approvals.filter(a => a.status === 'pending').length
@@ -2826,7 +2825,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all',
+                'relative flex items-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-all sm:px-4',
                 isActive
                   ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
                   : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-200',
@@ -2837,7 +2836,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <span className="absolute inset-x-0 bottom-0 h-[2px] bg-orange-500" />
               ) : null}
               <span aria-hidden className="text-base leading-none">{tab.icon}</span>
-              <span>{tab.label}</span>
+              <span className="shrink-0 whitespace-nowrap">{tab.label}</span>
               {/* Mission tab: animated running indicator */}
               {tab.id === 'mission' && isMissionRunning ? (
                 <span className="relative ml-0.5 flex size-1.5">
