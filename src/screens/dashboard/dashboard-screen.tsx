@@ -580,7 +580,7 @@ export function DashboardScreen() {
     <>
       <main
         ref={mainScrollRef as RefObject<HTMLElement>}
-        className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-4 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8"
+        className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-4 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8 lg:px-5 lg:pt-6 lg:pb-6"
       >
         {/* Pull-to-refresh indicator (mobile) */}
         {isMobile && isPulling ? (
@@ -884,7 +884,7 @@ export function DashboardScreen() {
             </div>
           ) : (
             /* ── Desktop enterprise layout (C2) ─────────────────────────────── */
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 lg:gap-3">
               {/* 1. SystemGlance */}
               <SystemGlance
                 sessions={dashboardData.sessions.total}
@@ -944,7 +944,7 @@ export function DashboardScreen() {
 
               {/* 3. Metric cards row — Sessions · Active Agents · Cost Today · Uptime */}
               {/* These complement SystemGlance: they add micro charts, trend pills & time-range selectors */}
-              <WidgetGrid items={metricItems} className="gap-4" />
+              <WidgetGrid items={metricItems} className="gap-4 lg:gap-3" />
 
               {desktopLayout.showServices ? (
                 <ServicesHealthWidget
@@ -972,22 +972,19 @@ export function DashboardScreen() {
                 </button>
               </div>
 
-              {/* 3. Two-up: Usage Today + Squad Status */}
-              {(desktopLayout.showUsage || desktopLayout.showSquad) && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {desktopLayout.showUsage && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-3 xl:grid-cols-4">
+                {desktopLayout.showUsage && (
+                  <div className="min-w-0 xl:col-span-2">
                     <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
-                  )}
-                  {desktopLayout.showSquad && (
+                  </div>
+                )}
+                {desktopLayout.showSquad && (
+                  <div className="min-w-0">
                     <SquadStatusWidget />
-                  )}
-                </div>
-              )}
-
-              {/* 4. Two-up: Recent Sessions + Tasks */}
-              {(desktopLayout.showSessions || desktopLayout.showTasks) && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {desktopLayout.showSessions && (
+                  </div>
+                )}
+                {desktopLayout.showSessions && (
+                  <div className="min-w-0">
                     <RecentSessionsWidget
                       onOpenSession={(sessionKey) =>
                         navigate({
@@ -997,29 +994,29 @@ export function DashboardScreen() {
                       }
                       onRemove={() => removeWidget('recent-sessions')}
                     />
-                  )}
-                  {desktopLayout.showTasks && (
+                  </div>
+                )}
+                {desktopLayout.showTasks && (
+                  <div className="min-w-0">
                     <TasksWidget onRemove={() => removeWidget('tasks')} />
-                  )}
-                </div>
-              )}
-
-              {/* 5. Full-width: Activity Log */}
-              {desktopLayout.showActivity && (
-                <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
-              )}
-
-              {/* 6. Skills + Notifications */}
-              {(desktopLayout.showSkills || desktopLayout.showNotifications) && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {desktopLayout.showSkills && (
+                  </div>
+                )}
+                {desktopLayout.showActivity && (
+                  <div className="min-w-0 lg:col-span-2 xl:col-span-2">
+                    <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+                  </div>
+                )}
+                {desktopLayout.showSkills && (
+                  <div className="min-w-0">
                     <SkillsWidget onRemove={() => removeWidget('skills')} />
-                  )}
-                  {desktopLayout.showNotifications && (
+                  </div>
+                )}
+                {desktopLayout.showNotifications && (
+                  <div className="min-w-0">
                     <NotificationsWidget onRemove={() => removeWidget('notifications')} />
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </section>
