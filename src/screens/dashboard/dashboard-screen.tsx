@@ -766,13 +766,33 @@ export function DashboardScreen() {
                     <span
                       key={chip.id}
                       className={cn(
-                        'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium',
+                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
                         chip.severity === 'red'
                           ? 'border-red-200 bg-red-100/75 text-red-700'
                           : 'border-amber-200 bg-amber-100/75 text-amber-700',
                       )}
                     >
                       {chip.text}
+                      {chip.dismissable !== false && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDismissedChips((prev) => {
+                              const next = new Set(prev)
+                              next.add(chip.id)
+                              try { window.localStorage.setItem('clawsuite-dismissed-chips', JSON.stringify([...next])) } catch {}
+                              return next
+                            })
+                          }}
+                          className={cn(
+                            'ml-0.5 rounded-full p-0.5 transition-colors',
+                            chip.severity === 'red' ? 'text-red-400 hover:text-red-700 active:bg-red-200' : 'text-amber-400 hover:text-amber-700 active:bg-amber-200',
+                          )}
+                          aria-label={`Dismiss ${chip.text}`}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg>
+                        </button>
+                      )}
                     </span>
                   ))}
                 </div>
