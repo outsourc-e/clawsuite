@@ -43,12 +43,12 @@ function SystemGlanceCompact({
       />
 
       {/* Stats — condensed for mobile */}
-      <div className="flex flex-1 items-center gap-x-2.5">
-        <StatItem label="Cost" value={costToday} />
+      <div className="flex flex-1 items-center justify-center gap-x-3">
+        <span className="text-sm font-bold tabular-nums text-neutral-900 dark:text-neutral-50">{costToday}</span>
         <span className="text-neutral-300 dark:text-neutral-600">·</span>
-        <StatItem label="" value={`${sessions} sessions`} />
+        <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">{sessions} sessions</span>
         <span className="text-neutral-300 dark:text-neutral-600">·</span>
-        <span className="text-[10px] font-medium text-neutral-500">{uptimeFormatted}</span>
+        <span className="text-xs text-neutral-400">{uptimeFormatted}</span>
       </div>
     </div>
   )
