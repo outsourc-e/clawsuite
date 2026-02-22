@@ -297,7 +297,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
   }
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-neutral-800 bg-neutral-950 px-4 py-3">
+      <div className="border-b border-neutral-800 bg-white dark:bg-neutral-950 px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-neutral-100">Tasks</h2>
@@ -322,12 +322,12 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
           ) : null}
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-x-auto bg-neutral-950 px-4 py-3">
+      <div className="min-h-0 flex-1 overflow-x-auto bg-white dark:bg-neutral-950 px-4 py-3">
         <div className="flex h-full w-full gap-3">
           {COLUMNS.map((column) => {
             const columnTasks = tasksByColumn[column.key]
             return (
-              <div key={column.key} className="min-w-[200px] max-w-[240px] flex-1 rounded-xl border border-neutral-800 bg-neutral-900 p-2">
+              <div key={column.key} className="min-w-[200px] max-w-[240px] flex-1 rounded-xl border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-800 dark:bg-neutral-900">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{column.label}</h3>
                   <div className="flex items-center gap-1.5">
@@ -366,13 +366,13 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                     setDragOverStatus(null)
                   }}
                   className={cn(
-                    'min-h-[240px] space-y-2 rounded-xl border border-dashed border-neutral-700 bg-neutral-950 p-2 transition-colors',
-                    dragOverStatus === column.key && 'border-emerald-500 bg-neutral-900',
+                    'min-h-[240px] space-y-2 rounded-xl border border-dashed border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-950 p-2 transition-colors',
+                    dragOverStatus === column.key && 'border-emerald-500 bg-emerald-50 dark:bg-neutral-900',
                   )}
                 >
                   {column.key === 'inbox' && isCreating ? (
                     <form
-                      className="space-y-2 rounded-lg border border-neutral-800 bg-neutral-900 p-2.5 shadow-sm"
+                      className="space-y-2 rounded-lg border border-neutral-200 bg-white p-2.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
                       onSubmit={(event) => {
                         event.preventDefault()
                         handleCreateTask()
@@ -472,7 +472,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                           }
                         }}
                         className={cn(
-                          'cursor-pointer rounded-lg border border-neutral-800 bg-neutral-900 p-2.5 shadow-sm transition-colors active:cursor-grabbing',
+                          'cursor-pointer rounded-lg border border-neutral-200 bg-white p-2.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 transition-colors active:cursor-grabbing',
                           dimmed && 'opacity-50',
                           isExpanded && 'border-emerald-700',
                         )}
@@ -491,7 +491,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                         {/* Inline slide-down task detail panel */}
                         {isExpanded && taskEditDraft ? (
                           <div
-                            className="mt-3 space-y-2 border-t border-neutral-800 pt-3"
+                            className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div>

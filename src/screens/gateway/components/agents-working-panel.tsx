@@ -139,7 +139,7 @@ function AgentRow({
       onClick={onSelect}
       className={cn(
         'group relative flex cursor-pointer items-stretch overflow-hidden rounded-lg border transition-all',
-        'border-neutral-800 bg-neutral-800 hover:bg-neutral-800/80',
+        'border-neutral-200 bg-neutral-100 hover:bg-neutral-200 dark:border-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-800/80',
         isSelected && 'border-neutral-700 bg-neutral-800 ring-1 ring-neutral-600/40',
       )}
     >
@@ -290,7 +290,7 @@ function AgentCompactCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        'relative w-40 shrink-0 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-800 px-2.5 py-2 text-left transition-colors hover:bg-neutral-800/80',
+        'relative w-40 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 px-2.5 py-2 text-left transition-colors hover:bg-neutral-200 dark:border-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-800/80',
         isSelected && 'border-neutral-700 ring-1 ring-neutral-600/40',
       )}
     >
@@ -350,7 +350,7 @@ export function AgentsWorkingPanel({
   return (
     <div
       className={cn(
-        'rounded-xl border border-neutral-800 bg-neutral-900 backdrop-blur-md',
+        'rounded-xl border border-neutral-200 bg-neutral-50 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-900',
         className,
       )}
     >
