@@ -15,6 +15,7 @@ import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { GatewaySetupWizard } from '@/components/gateway-setup-wizard'
 import { GatewayReconnectBanner } from '@/components/gateway-reconnect-banner'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
+import { applyAppTheme, getStoredTheme } from '@/lib/theme-system'
 
 const themeScript = `
 (() => {
@@ -45,17 +46,30 @@ const themeScript = `
   try {
     const stored = localStorage.getItem('openclaw-settings')
     const fallback = localStorage.getItem('chat-settings')
+    const storedAppTheme = localStorage.getItem('clawsuite-app-theme')
     let theme = 'light'
     let accent = 'orange'
+    let appTheme = 'ops-dark'
+    if (storedAppTheme === 'ops-dark' || storedAppTheme === 'premium-dark' || storedAppTheme === 'paper-light') {
+      appTheme = storedAppTheme
+    }
     if (stored) {
       const parsed = JSON.parse(stored)
       const storedTheme = parsed?.state?.settings?.theme
       const storedAccent = parsed?.state?.settings?.accentColor
+      const storedSettingsAppTheme = parsed?.state?.settings?.appTheme
       if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
         theme = storedTheme
       }
       if (storedAccent === 'orange' || storedAccent === 'purple' || storedAccent === 'blue' || storedAccent === 'green') {
         accent = storedAccent
+      }
+      if (
+        storedSettingsAppTheme === 'ops-dark' ||
+        storedSettingsAppTheme === 'premium-dark' ||
+        storedSettingsAppTheme === 'paper-light'
+      ) {
+        appTheme = storedSettingsAppTheme
       }
     } else if (fallback) {
       const parsed = JSON.parse(fallback)
@@ -74,9 +88,11 @@ const themeScript = `
       root.classList.remove('light', 'dark', 'system')
       root.classList.add(theme)
       root.setAttribute('data-accent', accent)
+      root.setAttribute('data-theme', appTheme)
       if (theme === 'system' && media.matches) {
         root.classList.add('dark')
       }
+      root.classList.toggle('dark', appTheme !== 'paper-light')
     }
     apply()
     media.addEventListener('change', () => {
@@ -191,6 +207,7 @@ function RootLayout() {
   // Unregister any existing service workers — they cause stale asset issues
   // after Docker image updates and behind reverse proxies (Pangolin, Cloudflare, etc.)
   useEffect(() => {
+    applyAppTheme(getStoredTheme())
     initializeSettingsAppearance()
 
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
