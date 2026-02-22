@@ -96,6 +96,7 @@ export function WorkspaceShell() {
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const isOnDashboardRoute = pathname === '/' || pathname === '/dashboard'
   // Desktop nav now uses hover expansion rail, so no backdrop click-target is needed.
   const showDesktopSidebarBackdrop = false
 
@@ -213,7 +214,7 @@ export function WorkspaceShell() {
             </div>
           )}
 
-          {!isMobile ? <DesktopAgentRosterSidebar /> : null}
+          {!isMobile && isOnDashboardRoute ? <DesktopAgentRosterSidebar /> : null}
 
           {/* Main content area — renders the matched route */}
           <main
@@ -242,7 +243,7 @@ export function WorkspaceShell() {
             </div>
           </main>
 
-          {!isOnChatRoute && !isMobile ? <DesktopLiveFeedPanel /> : null}
+          {!isMobile && isOnDashboardRoute ? <DesktopLiveFeedPanel /> : null}
 
           {/* Chat panel — visible on non-chat routes */}
           {!isOnChatRoute && !isMobile && <ChatPanel />}
