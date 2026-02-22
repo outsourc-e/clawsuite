@@ -33,30 +33,30 @@ const METRIC_COLOR_CLASSES: Record<
   NonNullable<MetricsWidgetProps['accent']>,
   string
 > = {
-  cyan: 'border-l-4 border-cyan-500/50 bg-cyan-50/30',
-  orange: 'border-l-4 border-orange-500/50 bg-orange-50/30',
-  emerald: 'border-l-4 border-emerald-500/50 bg-emerald-50/30',
-  violet: 'border-l-4 border-violet-500/50 bg-violet-50/30',
-  purple: 'border-l-4 border-purple-500/50 bg-purple-50/30',
-  red: 'border-l-4 border-red-500/50 bg-red-50/30',
+  cyan: 'border-neutral-800 bg-neutral-900',
+  orange: 'border-neutral-800 bg-neutral-900',
+  emerald: 'border-neutral-800 bg-neutral-900',
+  violet: 'border-neutral-800 bg-neutral-900',
+  purple: 'border-neutral-800 bg-neutral-900',
+  red: 'border-neutral-800 bg-neutral-900',
 }
 
 const MOBILE_ACCENT_BORDER: Record<MetricAccent, string> = {
-  cyan: 'border-l-4 border-cyan-500/50',
-  orange: 'border-l-4 border-orange-500/50',
-  emerald: 'border-l-4 border-emerald-500/50',
-  violet: 'border-l-4 border-violet-500/50',
-  purple: 'border-l-4 border-purple-500/50',
-  red: 'border-l-4 border-red-500/50',
+  cyan: 'border-neutral-800',
+  orange: 'border-neutral-800',
+  emerald: 'border-neutral-800',
+  violet: 'border-neutral-800',
+  purple: 'border-neutral-800',
+  red: 'border-neutral-800',
 }
 
 const CHART_ACCENT_DEFAULTS: Record<MetricAccent, string> = {
-  cyan: 'bg-cyan-500',
-  orange: 'bg-orange-500',
+  cyan: 'bg-blue-500',
+  orange: 'bg-purple-500',
   emerald: 'bg-emerald-500',
-  violet: 'bg-violet-500',
+  violet: 'bg-purple-500',
   purple: 'bg-purple-500',
-  red: 'bg-red-500',
+  red: 'bg-blue-500',
 }
 
 function toMetricId(title: string): string {
@@ -90,8 +90,8 @@ function getTrendUi(
   return {
     label: `${isUp ? '↑' : '↓'} ${rounded}%`,
     className: isGood
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : 'text-amber-600 dark:text-amber-400',
+      ? 'text-emerald-400'
+      : 'text-red-400',
   }
 }
 
@@ -121,7 +121,7 @@ function MicroBarChart({ data, days, accentClass }: MicroBarChartProps) {
               'flex-1 rounded-sm transition-[height] duration-300',
               isLatest
                 ? accentClass
-                : 'bg-neutral-200 dark:bg-neutral-700',
+                : 'bg-neutral-800',
               point.value === 0 && 'opacity-40',
             )}
             style={{ height: `${heightPx}px` }}
@@ -151,8 +151,8 @@ function TimeRangePills({ value, onChange }: TimeRangePillsProps) {
           className={cn(
             'rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase transition-colors',
             value === r
-              ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
-              : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300',
+              ? 'bg-neutral-800 text-neutral-100'
+              : 'text-neutral-500 hover:text-neutral-300',
           )}
         >
           {r.toUpperCase()}
@@ -201,17 +201,17 @@ function MetricCard({
       ref={anchorRef}
       onClick={onPress}
       className={cn(
-        'relative flex min-h-[92px] w-full flex-col justify-between rounded-2xl border border-white/30 bg-white/60 p-4 text-left shadow-sm backdrop-blur-md transition-transform duration-150 active:scale-[0.97] dark:border-white/10 dark:bg-neutral-950/60',
+        'relative flex min-h-[92px] w-full flex-col justify-between rounded-xl border bg-neutral-900 p-4 text-left shadow-sm transition-transform duration-150 active:scale-[0.97]',
         MOBILE_ACCENT_BORDER[accent],
       )}
       aria-label={`${label} details`}
       aria-description={`${description}${rawValue ? ` Raw value: ${rawValue}` : ''}`}
     >
-      <p className="text-[11px] font-medium tracking-wide text-neutral-500 dark:text-neutral-400">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
         {label}
       </p>
 
-      <p className="mt-1 truncate text-3xl font-semibold leading-none text-neutral-900 dark:text-neutral-50">
+      <p className="mt-1 truncate font-mono text-2xl sm:text-3xl font-semibold leading-none tabular-nums text-neutral-100">
         {formatMetricValue(value)}
       </p>
 
@@ -231,7 +231,7 @@ function MetricCard({
               {trendLabel ? ` ${trendLabel}` : ''}
             </p>
           ) : null}
-          <span className="ml-auto text-lg leading-none text-neutral-400 dark:text-neutral-500">
+          <span className="ml-auto text-lg leading-none text-neutral-500">
             ›
           </span>
         </div>
@@ -329,7 +329,7 @@ export function MetricsWidget({
               aria-label={`Close ${title} details`}
             />
             <div
-              className="fixed left-4 right-4 top-24 z-50 rounded-2xl border border-white/30 bg-white/90 p-4 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-neutral-950/90 md:hidden"
+              className="fixed left-4 right-4 top-24 z-50 rounded-xl border border-neutral-800 bg-neutral-900 p-4 shadow-lg md:hidden"
               style={{ top: `${popoverTop}px` }}
             >
               <button
@@ -340,14 +340,14 @@ export function MetricsWidget({
               >
                 ×
               </button>
-              <p className="pr-8 text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+              <p className="pr-8 text-sm font-semibold text-neutral-100">
                 {title}
               </p>
-              <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
+              <p className="mt-1 text-sm text-neutral-400">
                 {metricDescription}
               </p>
-              <p className="mt-3 text-sm text-neutral-700 dark:text-neutral-200">
-                Raw value: <span className="font-medium">{rawMetricValue}</span>
+              <p className="mt-3 text-sm text-neutral-300">
+                Raw value: <span className="font-mono font-medium tabular-nums">{rawMetricValue}</span>
               </p>
               {isError && onRetry ? (
                 <button
@@ -357,7 +357,7 @@ export function MetricsWidget({
                     onRetry()
                     closeMobilePopover()
                   }}
-                  className="mt-3 rounded-lg border border-red-200 bg-red-50/80 px-2 py-1 text-xs font-medium text-red-700"
+                  className="mt-3 rounded-lg border border-red-900 bg-red-950/40 px-2 py-1 text-xs font-medium text-red-300"
                 >
                   Retry
                 </button>
@@ -372,7 +372,11 @@ export function MetricsWidget({
         size="small"
         title={title}
         icon={icon}
-        className={cn('hidden h-full md:flex', METRIC_COLOR_CLASSES[accent], className)}
+        className={cn(
+          'hidden h-full rounded-xl border bg-neutral-900 p-4 sm:p-5 md:flex [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500',
+          METRIC_COLOR_CLASSES[accent],
+          className,
+        )}
         action={
           isError && onRetry ? (
             <button
@@ -381,7 +385,7 @@ export function MetricsWidget({
                 event.stopPropagation()
                 onRetry()
               }}
-              className="inline-flex size-5 items-center justify-center rounded-md text-red-600 transition-colors hover:bg-red-100"
+              className="inline-flex size-5 items-center justify-center rounded-md text-red-400 transition-colors hover:bg-red-950/40"
               aria-label={`Retry ${title}`}
               title={`Retry ${title}`}
             >
@@ -397,12 +401,12 @@ export function MetricsWidget({
             <p
               className={cn(
                 'truncate font-mono text-2xl font-semibold leading-none tabular-nums',
-                isError ? 'text-primary-300' : 'text-ink',
+                isError ? 'text-neutral-500' : 'text-neutral-100',
               )}
             >
               {isError ? '—' : value}
             </p>
-            <p className="mt-1 text-[11px] leading-tight text-primary-500">
+            <p className="mt-1 text-[11px] leading-tight text-neutral-400">
               {isError ? value : subtitle}
             </p>
             {trend && !chartData ? (

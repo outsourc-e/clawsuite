@@ -147,7 +147,7 @@ function parseKnownJsonEvent(event: ActivityEvent): ActivityPreviewRow | null {
     return {
       id: event.id,
       icon: '•',
-      iconClassName: 'text-primary-500',
+      iconClassName: 'text-blue-400',
       sourceLabel: summarySource,
       summary: modelLabel !== 'Custom' || parsedModel ? `Session started: ${modelLabel}` : 'Session started',
       timestamp: event.timestamp,
@@ -192,7 +192,7 @@ function toPreviewRow(event: ActivityEvent): ActivityPreviewRow | null {
     return {
       id: event.id,
       icon: '•',
-      iconClassName: 'text-primary-500',
+      iconClassName: 'text-blue-400',
       sourceLabel,
       summary: sanitizeEventText(readString(event.title) || 'Session started'),
       timestamp: event.timestamp,
@@ -205,7 +205,7 @@ function toPreviewRow(event: ActivityEvent): ActivityPreviewRow | null {
   return {
     id: event.id,
     icon: '•',
-    iconClassName: 'text-primary-500',
+    iconClassName: 'text-blue-400',
     sourceLabel,
     summary: fallbackSummary,
     timestamp: event.timestamp,
@@ -249,7 +249,7 @@ function activityStatusDotClass(statusIcon: ParsedActivityItem['statusIcon']): s
   if (statusIcon === 'success') return 'bg-emerald-500'
   if (statusIcon === 'warning') return 'bg-amber-500'
   if (statusIcon === 'error') return 'bg-red-500'
-  return 'bg-primary-400'
+  return 'bg-blue-400'
 }
 
 export function ActivityLogWidget({

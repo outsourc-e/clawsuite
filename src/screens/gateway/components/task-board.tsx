@@ -297,11 +297,11 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
   }
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-primary-200 px-4 py-3">
+      <div className="border-b border-neutral-800 bg-neutral-950 px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">Tasks</h2>
-            <p className="truncate text-[11px] text-primary-500">
+            <h2 className="text-sm font-semibold text-neutral-100">Tasks</h2>
+            <p className="truncate text-[11px] text-neutral-400">
               {selectedAgentName ? `Focused agent: ${selectedAgentName}` : 'Showing all agents'}
             </p>
           </div>
@@ -312,8 +312,8 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
               className={cn(
                 'shrink-0 rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors',
                 showAllTasks
-                  ? 'border-neutral-300 bg-neutral-100 text-neutral-700 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
-                  : 'border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-500 dark:hover:border-neutral-600',
+                  ? 'border-neutral-700 bg-neutral-800 text-neutral-300'
+                  : 'border-neutral-800 bg-neutral-900 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300',
               )}
               title={showAllTasks ? 'Show only current mission tasks' : 'Show tasks from all missions'}
             >
@@ -322,14 +322,14 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
           ) : null}
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-x-auto px-4 py-3">
+      <div className="min-h-0 flex-1 overflow-x-auto bg-neutral-950 px-4 py-3">
         <div className="flex h-full w-full gap-3">
           {COLUMNS.map((column) => {
             const columnTasks = tasksByColumn[column.key]
             return (
-              <div key={column.key} className="min-w-[200px] max-w-[240px] flex-1">
+              <div key={column.key} className="min-w-[200px] max-w-[240px] flex-1 rounded-xl border border-neutral-800 bg-neutral-900 p-2">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-500">{column.label}</h3>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{column.label}</h3>
                   <div className="flex items-center gap-1.5">
                     {column.key === 'inbox' ? (
                       <button
@@ -338,14 +338,14 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                         className={cn(
                           'inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors',
                           isCreating
-                            ? 'bg-primary-200 text-primary-700 hover:bg-primary-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600'
-                            : 'bg-accent-500 text-white hover:bg-accent-600',
+                            ? 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'
+                            : 'bg-emerald-600 text-white hover:bg-emerald-500',
                         )}
                       >
                         {isCreating ? 'Cancel' : '+ New Task'}
                       </button>
                     ) : null}
-                    <span className="rounded-full bg-primary-100 px-1.5 text-[10px] text-primary-500 dark:bg-neutral-800 dark:text-neutral-300">
+                    <span className="rounded-full bg-neutral-800 px-1.5 text-[10px] text-neutral-300">
                       {columnTasks.length}
                     </span>
                   </div>
@@ -366,13 +366,13 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                     setDragOverStatus(null)
                   }}
                   className={cn(
-                    'min-h-[240px] space-y-2 rounded-xl border border-primary-200 bg-primary-50/40 p-2 transition-colors dark:border-neutral-800 dark:bg-neutral-900/30',
-                    dragOverStatus === column.key && 'border-accent-400 bg-accent-50/60 dark:border-accent-500 dark:bg-accent-950/20',
+                    'min-h-[240px] space-y-2 rounded-xl border border-dashed border-neutral-700 bg-neutral-950 p-2 transition-colors',
+                    dragOverStatus === column.key && 'border-emerald-500 bg-neutral-900',
                   )}
                 >
                   {column.key === 'inbox' && isCreating ? (
                     <form
-                      className="space-y-2 rounded-lg border border-primary-200 bg-white p-2.5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+                      className="space-y-2 rounded-lg border border-neutral-800 bg-neutral-900 p-2.5 shadow-sm"
                       onSubmit={(event) => {
                         event.preventDefault()
                         handleCreateTask()
@@ -439,7 +439,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                     </form>
                   ) : null}
                   {columnTasks.length === 0 ? (
-                    <p className="py-8 text-center text-[11px] text-primary-400">Drop tasks here</p>
+                    <p className="py-8 text-center text-[11px] text-neutral-500">Drop tasks here</p>
                   ) : null}
                   {columnTasks.map((task) => {
                     const priority = PRIORITIES.find((item) => item.key === task.priority)
@@ -472,30 +472,30 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                           }
                         }}
                         className={cn(
-                          'cursor-pointer rounded-lg border border-primary-200 bg-white p-2.5 shadow-sm transition-colors active:cursor-grabbing dark:border-neutral-700 dark:bg-neutral-900',
+                          'cursor-pointer rounded-lg border border-neutral-800 bg-neutral-900 p-2.5 shadow-sm transition-colors active:cursor-grabbing',
                           dimmed && 'opacity-50',
-                          isExpanded && 'border-accent-300 dark:border-accent-700',
+                          isExpanded && 'border-emerald-700',
                         )}
                       >
-                        <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">{task.title}</p>
+                        <p className="text-xs font-semibold text-neutral-100">{task.title}</p>
                         {task.description && !isExpanded ? (
-                          <p className="mt-1 line-clamp-3 text-[11px] text-primary-500 dark:text-neutral-400">{task.description}</p>
+                          <p className="mt-1 line-clamp-3 text-[11px] text-neutral-400">{task.description}</p>
                         ) : null}
                         <div className="mt-2 flex items-center justify-between gap-2">
                           <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', priority?.badge)}>
                             {priority?.label ?? 'Normal'}
                           </span>
-                          <span className="truncate text-[10px] text-primary-500 dark:text-neutral-400">{assignee}</span>
+                          <span className="truncate text-[10px] text-neutral-400">{assignee}</span>
                         </div>
 
                         {/* Inline slide-down task detail panel */}
                         {isExpanded && taskEditDraft ? (
                           <div
-                            className="mt-3 space-y-2 border-t border-primary-200 pt-3 dark:border-neutral-700"
+                            className="mt-3 space-y-2 border-t border-neutral-800 pt-3"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div>
-                              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                                 Title
                               </label>
                               <input
@@ -510,7 +510,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                               />
                             </div>
                             <div>
-                              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                                 Description
                               </label>
                               <textarea
@@ -525,12 +525,12 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                                 className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                               />
                             </div>
-                            <p className="text-[10px] text-primary-500">
+                            <p className="text-[11px] text-neutral-400">
                               <span className="font-semibold uppercase tracking-wide">Agent:</span>{' '}
                               {assignee}
                             </p>
                             <div>
-                              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                                 Priority
                               </label>
                               <select
@@ -552,7 +552,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                               </select>
                             </div>
                             <div>
-                              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                                 Status
                               </label>
                               <select
@@ -577,14 +577,14 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                               <button
                                 type="button"
                                 onClick={() => saveTaskDetail(task.id)}
-                                className="rounded-md bg-accent-500 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-accent-600"
+                                className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-500"
                               >
                                 Save
                               </button>
                               <button
                                 type="button"
                                 onClick={closeTaskDetail}
-                                className="rounded-md px-2 py-1 text-[11px] font-medium text-primary-500 transition-colors hover:bg-primary-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                                className="rounded-md px-2 py-1 text-[11px] font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
                               >
                                 Cancel
                               </button>

@@ -146,7 +146,7 @@ function GatewayStatusPill({
   }
 
   return (
-    <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-400">
+    <span className="flex items-center gap-1 rounded-full border border-emerald-800 bg-emerald-900/50 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-400">
       <span className="size-1.5 rounded-full bg-emerald-500" />
       Connected
     </span>
@@ -472,11 +472,11 @@ const AGENT_ACCENT_COLORS = [
 
 // ── Model badge styling ────────────────────────────────────────────────────────
 const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
-  auto:   'bg-neutral-200 text-neutral-700 dark:bg-neutral-600 dark:text-neutral-200',
-  opus:   'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
-  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
-  codex:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
-  flash:  'bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-400',
+  auto:   'rounded-full bg-neutral-800 text-neutral-400',
+  opus:   'bg-orange-950/60 text-orange-300',
+  sonnet: 'bg-blue-950/60 text-blue-300',
+  codex:  'bg-emerald-950/60 text-emerald-300',
+  flash:  'bg-violet-950/60 text-violet-300',
 }
 
 const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
@@ -627,11 +627,11 @@ function OfficeView({
             <div
               key={agent.id}
               className={cn(
-                'relative overflow-hidden rounded-xl border bg-white transition-all dark:bg-neutral-900',
-                isSelected
-                  ? 'border-neutral-300 shadow-lg ring-1 ring-emerald-500/50 shadow-emerald-500/10 dark:border-neutral-600'
-                  : 'border-neutral-200 dark:border-neutral-800',
-                isActive && missionRunning && !isSelected && 'ring-1 ring-neutral-300 dark:ring-neutral-700',
+            'relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 transition-all',
+            isSelected
+                  ? 'shadow-lg ring-1 ring-emerald-500/50 shadow-emerald-500/10'
+                  : '',
+                isActive && missionRunning && !isSelected && 'ring-1 ring-neutral-700',
               )}
             >
               {/* Top accent bar (3px) */}
@@ -643,7 +643,7 @@ function OfficeView({
                   {/* Avatar */}
                   <div
                     className={cn(
-                      'flex size-12 items-center justify-center rounded-full text-lg font-bold text-white',
+                      'flex size-12 items-center justify-center rounded-full border border-neutral-950/80 text-lg font-bold text-white',
                       accent.avatar,
                     )}
                   >
@@ -654,20 +654,20 @@ function OfficeView({
                 </div>
 
                 {/* Agent name */}
-                <h3 className="mt-3 truncate text-sm font-bold tracking-tight text-neutral-900 dark:text-white">
+                <h3 className="mt-3 truncate text-sm font-semibold tracking-tight text-neutral-100">
                   {agent.name}
                 </h3>
 
                 {/* Role / model row */}
                 <div className="mt-1 flex items-start gap-1.5">
                   {agent.roleDescription ? (
-                    <span className="line-clamp-2 min-w-0 text-[10px] text-neutral-500 dark:text-neutral-600">
+                    <span className="line-clamp-2 min-w-0 text-xs text-neutral-400">
                       {agent.roleDescription}
                     </span>
                   ) : null}
                   <span
                     className={cn(
-                      'shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-medium',
+                      'shrink-0 px-2 py-0.5 font-mono text-[10px] font-medium',
                       OFFICE_MODEL_BADGE[agent.modelId],
                     )}
                   >
@@ -676,14 +676,14 @@ function OfficeView({
                 </div>
 
                 {/* Activity line (monospace) */}
-                <p className="mt-2 line-clamp-2 min-h-[2.4em] font-mono text-[10px] leading-relaxed text-neutral-500 dark:text-neutral-600">
+                <p className="mt-2 line-clamp-2 min-h-[2.4em] font-mono text-xs leading-relaxed text-neutral-500">
                   {agent.lastLine ?? (agent.status === 'none' ? '// no session' : '// waiting for mission…')}
                 </p>
 
                 {/* Footer: task count badge */}
                 {agent.taskCount > 0 ? (
                   <div className="mt-2">
-                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                    <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[9px] font-semibold text-neutral-400">
                       {agent.taskCount} task{agent.taskCount !== 1 ? 's' : ''}
                     </span>
                   </div>
@@ -694,10 +694,10 @@ function OfficeView({
                   type="button"
                   onClick={() => onViewOutput(agent.id)}
                   className={cn(
-                    'mt-3 w-full rounded-lg px-2 py-2 text-[11px] font-medium transition-colors',
+                    'mt-3 w-full rounded-lg border px-2 py-2 text-[11px] font-medium transition-colors',
                     isSelected
-                      ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-700 dark:text-white'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-200',
+                      ? 'border-neutral-700 bg-neutral-800 text-neutral-100'
+                      : 'border-neutral-700 text-neutral-300 hover:bg-neutral-800',
                   )}
                 >
                   {isSelected ? '✓ Viewing Output' : 'View Output'}
@@ -710,16 +710,16 @@ function OfficeView({
 
       {/* Fix 2: Status dot legend */}
       <div className="mt-3 flex items-center justify-end gap-3 px-1">
-        <span className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600">
+        <span className="flex items-center gap-1 text-[10px] text-neutral-400">
           <span className="size-2 rounded-full bg-emerald-500" /> Active
         </span>
-        <span className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600">
+        <span className="flex items-center gap-1 text-[10px] text-neutral-400">
           <span className="size-2 rounded-full bg-yellow-500" /> Idle
         </span>
-        <span className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600">
+        <span className="flex items-center gap-1 text-[10px] text-neutral-400">
           <span className="size-2 rounded-full bg-neutral-400" /> No session
         </span>
-        <span className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600">
+        <span className="flex items-center gap-1 text-[10px] text-neutral-400">
           <span className="size-2 rounded-full bg-red-500" /> Error
         </span>
       </div>
@@ -2630,12 +2630,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             {!missionActive ? (
               <div className="flex min-h-0 h-full flex-1">
                 <div className="min-h-0 flex-1">
-                  <div className="flex items-center justify-between border-b border-primary-200 px-4 py-2.5">
+                  <div className="flex items-center justify-between border-b border-neutral-800 bg-neutral-950 px-4 py-2.5">
                     <div>
-                      <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                      <h2 className="text-sm font-semibold text-neutral-100">
                         Task Board
                       </h2>
-                      <p className="text-[11px] text-primary-500">
+                      <p className="text-[11px] text-neutral-400">
                         Capture notes and tasks before launching.
                       </p>
                     </div>
@@ -2657,20 +2657,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </div>
                 </div>
                 {!isMobileHub ? (
-                  <aside className="w-80 shrink-0 border-l border-primary-200 bg-primary-50/40 p-4 dark:border-neutral-700 dark:bg-neutral-900/20">
+                  <aside className="w-80 shrink-0 border-l border-neutral-800 bg-neutral-950 p-4">
                     <div className="space-y-4">
-                      <section className="rounded-lg border border-primary-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                        <h3 className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                      <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-3">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                           Team Ready
                         </h3>
-                        <p className="mt-1 text-xs text-primary-500">
+                        <p className="mt-1 text-xs text-neutral-400">
                           {team.length} member{team.length === 1 ? '' : 's'} configured
                         </p>
                         <ul className="mt-2 space-y-1.5">
                           {team.slice(0, 5).map((member) => (
                             <li
                               key={member.id}
-                              className="truncate text-[11px] text-primary-700 dark:text-neutral-200"
+                              className="truncate text-[11px] text-neutral-200"
                             >
                               {member.name}
                             </li>
@@ -2678,8 +2678,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         </ul>
                       </section>
 
-                      <section className="rounded-lg border border-primary-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                        <h3 className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                      <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-3">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                           Mission Notes
                         </h3>
                         <textarea
@@ -2691,12 +2691,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         />
                       </section>
 
-                      <section className="rounded-lg border border-primary-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                        <h3 className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+                      <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-3">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                           Recent Reports
                         </h3>
                         {recentReports.length === 0 ? (
-                          <p className="mt-1 text-[11px] text-primary-400">
+                          <p className="mt-1 text-[11px] text-neutral-400">
                             No past missions yet.
                           </p>
                         ) : (
@@ -2704,7 +2704,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             {recentReports.map((entry) => (
                               <li
                                 key={entry.id}
-                                className="truncate text-[11px] text-primary-700 dark:text-neutral-200"
+                                className="truncate text-[11px] text-neutral-200"
                               >
                                 {entry.label}
                               </li>
@@ -2717,25 +2717,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 ) : null}
               </div>
             ) : view === 'timeline' ? (
-              <div className="flex min-h-0 h-full flex-1 items-center justify-center px-6">
-                <div className="rounded-xl border border-dashed border-primary-300 bg-white/60 px-6 py-5 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
-                  <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+              <div className="flex min-h-0 h-full flex-1 items-center justify-center bg-neutral-950 px-6">
+                <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900 px-6 py-5 text-center">
+                  <h3 className="text-sm font-semibold text-neutral-100">
                     Timeline view coming soon
                   </h3>
-                  <p className="mt-1 text-xs text-primary-500">
+                  <p className="mt-1 text-xs text-neutral-400">
                     Switch back to Board for active mission orchestration.
                   </p>
                 </div>
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col h-full">
-                <div className="flex items-center justify-between border-b border-emerald-200 bg-emerald-50/40 px-4 py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/15">
-                  <p className="truncate text-xs font-medium text-emerald-800 dark:text-emerald-200">
+                <div className="flex items-center justify-between border-b border-neutral-800 bg-neutral-950 px-4 py-2.5">
+                  <p className="truncate text-xs font-medium text-neutral-200">
                     Mission: {truncateMissionGoal(activeMissionGoal || missionGoal.trim())}
                   </p>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
                     {/* Board/Timeline toggle — use string cast to avoid TS narrowing in else branch */}
-                    <div className="flex items-center rounded-lg border border-primary-200 bg-white p-0.5 dark:border-neutral-700 dark:bg-neutral-900">
+                    <div className="flex items-center rounded-lg border border-neutral-800 bg-neutral-900 p-0.5">
                       {(['board', 'timeline'] as const).map((v) => (
                         <button
                           key={v}
@@ -2743,8 +2743,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           className={cn(
                             'rounded-md px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
                             (view as string) === v
-                              ? 'bg-primary-100 text-primary-800 dark:bg-neutral-800 dark:text-neutral-100'
-                              : 'text-primary-500 hover:text-primary-700',
+                              ? 'bg-neutral-800 text-neutral-100'
+                              : 'text-neutral-500 hover:text-neutral-300',
                           )}
                           onClick={() => setView(v)}
                         >
@@ -2777,7 +2777,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* Inline agent output panel (desktop, right of task board) */}
           {!isMobileHub && missionActive && selectedOutputAgentId ? (
-            <div className="w-72 shrink-0 border-l border-primary-200 dark:border-neutral-700">
+            <div className="w-72 shrink-0 border-l border-neutral-800 bg-neutral-950">
               <AgentOutputPanel
                 agentName={selectedOutputAgentName}
                 sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
@@ -2792,14 +2792,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white dark:bg-gradient-to-br dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950">
+    <div className="flex h-full min-h-0 flex-col bg-neutral-950">
       {/* ── Brand top accent border ──────────────────────────────────────── */}
       <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-5 py-3 dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 bg-neutral-900 px-5 py-3">
         <div>
-          <h1 className="text-base font-semibold tracking-tight text-neutral-900 dark:text-white">
+          <h1 className="text-base font-semibold tracking-tight text-neutral-100">
             Agent Hub
           </h1>
           <p className="font-mono text-[10px] text-neutral-500">// Mission Control</p>
@@ -2885,7 +2885,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div className="min-w-0 flex-1 overflow-hidden">
           {/* Office tab */}
           <div
-            className="h-full min-h-0"
+            className="h-full min-h-0 bg-neutral-950"
             style={{ display: activeTab === 'office' ? 'block' : 'none' }}
           >
             <OfficeView
@@ -2904,7 +2904,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* Mission tab */}
           <div
-            className="h-full min-h-0"
+            className="h-full min-h-0 bg-neutral-950"
             style={{ display: activeTab === 'mission' ? 'block' : 'none' }}
           >
             {renderMissionContent()}
@@ -2912,7 +2912,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* History tab */}
           <div
-            className="h-full min-h-0"
+            className="h-full min-h-0 bg-neutral-950"
             style={{ display: activeTab === 'history' ? 'block' : 'none' }}
           >
             <HistoryView />
@@ -2920,7 +2920,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* Approvals tab */}
           <div
-            className="h-full min-h-0"
+            className="h-full min-h-0 bg-neutral-950"
             style={{ display: activeTab === 'approvals' ? 'block' : 'none' }}
           >
             <ApprovalsPanel
@@ -2932,7 +2932,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* Team tab */}
           <div
-            className="h-full min-h-0"
+            className="h-full min-h-0 bg-neutral-950"
             style={{ display: activeTab === 'team' ? 'block' : 'none' }}
           >
             <div

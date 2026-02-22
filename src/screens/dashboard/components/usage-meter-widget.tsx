@@ -290,13 +290,13 @@ function getProviderBarColor(provider: string): string {
 
 function getProviderTextColor(provider: string): string {
   const p = provider.toLowerCase()
-  if (p.includes('anthropic')) return 'text-purple-600 dark:text-purple-400'
-  if (p.includes('openrouter')) return 'text-emerald-600 dark:text-emerald-400'
-  if (p.includes('openclaw')) return 'text-blue-600 dark:text-blue-400'
-  if (p.includes('openai')) return 'text-amber-600 dark:text-amber-400'
-  if (p.includes('google')) return 'text-red-600 dark:text-red-400'
-  if (p.includes('gemini')) return 'text-red-600 dark:text-red-400'
-  return 'text-neutral-600 dark:text-neutral-400'
+  if (p.includes('anthropic')) return 'text-purple-400'
+  if (p.includes('openrouter')) return 'text-emerald-400'
+  if (p.includes('openclaw')) return 'text-blue-400'
+  if (p.includes('openai')) return 'text-amber-400'
+  if (p.includes('google')) return 'text-red-400'
+  if (p.includes('gemini')) return 'text-red-400'
+  return 'text-neutral-400'
 }
 
 function capitalizeProvider(name: string): string {
@@ -376,7 +376,7 @@ export function UsageMeterWidget({
   const hasAnyData = displayCost > 0 || displayTokens > 0 || topProviders.length > 0
 
   const tabSwitcher = (
-    <div className="hidden items-center gap-0.5 rounded-full border border-primary-200 bg-primary-100/70 p-0.5 text-[10px] md:inline-flex">
+    <div className="hidden items-center gap-0.5 rounded-full border border-neutral-800 bg-neutral-950 p-0.5 text-[10px] md:inline-flex">
       {(['cost', 'tokens'] as const).map((tab) => (
         <button
           key={tab}
@@ -388,8 +388,8 @@ export function UsageMeterWidget({
           className={cn(
             'rounded-full px-2 py-0.5 font-medium transition-colors',
             view === tab
-              ? 'bg-accent-100 text-accent-700 shadow-sm'
-              : 'text-primary-500 hover:text-primary-700',
+              ? 'bg-neutral-800 text-neutral-100 shadow-sm'
+              : 'text-neutral-500 hover:text-neutral-300',
           )}
         >
           {tab === 'tokens' ? 'Tokens' : 'Cost'}
@@ -411,12 +411,12 @@ export function UsageMeterWidget({
       onRemove={onRemove}
       editMode={editMode}
       loading={showSkeleton && !timedOut}
-      className="h-full"
+      className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
     >
       {showTimeoutOrError ? (
-        <div className="flex flex-col items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-3 dark:border-amber-900/40 dark:bg-amber-950/15">
-          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Usage unavailable</p>
-          <p className="text-[11px] text-amber-700 dark:text-amber-400">
+        <div className="flex flex-col items-start gap-2 rounded-lg border border-red-900 bg-red-950/30 px-3 py-3">
+          <p className="text-sm font-medium text-red-300">Usage unavailable</p>
+          <p className="text-[11px] text-red-400">
             {queryResult?.kind === 'unavailable'
               ? queryResult.message
               : timedOut
@@ -426,22 +426,22 @@ export function UsageMeterWidget({
           <button
             type="button"
             onClick={() => { setTimedOut(false); void usageQuery.refetch() }}
-            className="rounded-md border border-amber-300 bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/50"
+            className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-900"
           >
             Retry
           </button>
         </div>
       ) : showEmptyState ? (
         <div className="flex h-full flex-col items-center justify-center gap-1.5 py-4 text-center">
-          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">No usage yet today</p>
-          <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
+          <p className="text-sm font-medium text-neutral-300">No usage yet today</p>
+          <p className="text-[11px] text-neutral-500">
             Usage will appear once your first session is active.
           </p>
           {isSettled && (
             <button
               type="button"
               onClick={() => void usageQuery.refetch()}
-              className="mt-1 rounded-md border border-neutral-200 bg-neutral-100/80 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300 dark:hover:bg-neutral-700"
+              className="mt-1 rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-900"
             >
               Refresh
             </button>
@@ -452,13 +452,13 @@ export function UsageMeterWidget({
           {/* Mobile layout */}
           <div className="space-y-3 md:hidden">
             <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold leading-none tabular-nums text-neutral-900 dark:text-neutral-50">
+              <p className="font-mono text-2xl sm:text-3xl font-bold leading-none tabular-nums text-neutral-100">
                 {view === 'cost' ? formatUsd(displayCost) : formatTokens(displayTokens)}
               </p>
               <span className="text-xs text-neutral-400">{view === 'cost' ? 'today' : 'tokens'}</span>
             </div>
 
-            <div className="inline-flex rounded-full bg-neutral-100/70 p-1 dark:bg-neutral-800/50 gap-1">
+            <div className="inline-flex gap-1 rounded-full border border-neutral-800 bg-neutral-950 p-1">
               {(['cost', 'tokens'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -470,8 +470,8 @@ export function UsageMeterWidget({
                   className={cn(
                     'px-3 py-1 text-xs rounded-full transition-colors',
                     view === tab
-                      ? 'bg-white shadow-sm dark:bg-neutral-900'
-                      : 'text-neutral-600 dark:text-neutral-300',
+                      ? 'bg-neutral-800 text-neutral-100 shadow-sm'
+                      : 'text-neutral-500',
                   )}
                 >
                   {tab === 'tokens' ? 'Tokens' : 'Cost'}
@@ -488,11 +488,11 @@ export function UsageMeterWidget({
                       <span className={cn('text-[11px] font-semibold', getProviderTextColor(p.provider))}>
                         {capitalizeProvider(p.provider)}
                       </span>
-                      <span className="text-[11px] tabular-nums text-neutral-700 dark:text-neutral-300">
+                      <span className="font-mono text-[11px] tabular-nums text-neutral-300">
                         {view === 'cost' ? formatUsd(p.cost) : formatTokens(p.total)}
                       </span>
                     </div>
-                    <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-200/60 dark:bg-neutral-800/60">
+                    <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-800">
                       <div
                         className={cn('h-1 rounded-full transition-[width] duration-500', getProviderBarColor(p.provider))}
                         style={{ width: `${p.barWidth}%` }}
@@ -509,18 +509,18 @@ export function UsageMeterWidget({
             {/* Hero numbers */}
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-mono text-2xl font-bold leading-none text-ink tabular-nums">
+                <p className="font-mono text-2xl sm:text-3xl font-bold leading-none text-neutral-100 tabular-nums">
                   {view === 'cost' ? formatUsd(displayCost) : formatTokens(displayTokens)}
                 </p>
-                <p className="mt-1 text-[11px] text-primary-500">
+                <p className="mt-1 text-[11px] uppercase tracking-wider text-neutral-500">
                   {view === 'cost' ? 'today\'s spend' : 'tokens today'}
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-sm font-semibold tabular-nums text-neutral-700 dark:text-neutral-300">
+                <p className="font-mono text-sm font-semibold tabular-nums text-neutral-300">
                   {view === 'cost' ? formatTokens(displayTokens) : formatUsd(displayCost)}
                 </p>
-                <p className="mt-0.5 text-[11px] text-primary-400">
+                <p className="mt-0.5 text-[11px] uppercase tracking-wider text-neutral-500">
                   {view === 'cost' ? 'tokens' : 'spend'}
                 </p>
               </div>
@@ -529,7 +529,7 @@ export function UsageMeterWidget({
             {/* Provider breakdown bars */}
             {topProviders.length > 0 ? (
               <div className="space-y-2">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-400">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
                   By Provider
                 </p>
                 {topProviders.map((p) => (
@@ -539,15 +539,15 @@ export function UsageMeterWidget({
                         {capitalizeProvider(p.provider)}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] tabular-nums text-neutral-400">
+                        <span className="font-mono text-[10px] tabular-nums text-neutral-500">
                           {formatTokens(p.total)} tok
                         </span>
-                        <span className="text-[11px] font-semibold tabular-nums text-neutral-800 dark:text-neutral-200">
+                        <span className="font-mono text-[11px] font-semibold tabular-nums text-neutral-200">
                           {formatUsd(p.cost)}
                         </span>
                       </div>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200/80 dark:bg-neutral-700/70">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-800">
                       <div
                         className={cn(
                           'h-1.5 rounded-full transition-[width] duration-500',
@@ -562,11 +562,11 @@ export function UsageMeterWidget({
             ) : (
               <div className="space-y-1">
                 {view === 'cost' ? (
-                  <p className="text-xs text-primary-600">
+                  <p className="text-xs text-neutral-400">
                     Direct: {formatUsd(usageData.totalDirectCost)} • Total: {formatUsd(displayCost)}
                   </p>
                 ) : (
-                  <p className="text-xs text-primary-600">
+                  <p className="text-xs text-neutral-400">
                     In/Out: {formatTokens(usageData.totalInputOutput)} • Cached: {formatTokens(usageData.totalCached)}
                   </p>
                 )}
@@ -575,7 +575,7 @@ export function UsageMeterWidget({
 
             {/* Session count if available */}
             {typeof usageData.sessionCount === 'number' && usageData.sessionCount > 0 && (
-              <p className="text-[10px] text-neutral-400">
+              <p className="text-[10px] text-neutral-500">
                 {usageData.sessionCount} active session{usageData.sessionCount !== 1 ? 's' : ''}
               </p>
             )}

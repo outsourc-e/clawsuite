@@ -27,8 +27,8 @@ function StatusBadge({
       className={cn(
         'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide',
         status === 'up'
-          ? 'border-emerald-700/60 bg-emerald-950/70 text-emerald-300'
-          : 'border-red-700/60 bg-red-950/70 text-red-300',
+          ? 'border-emerald-900 bg-emerald-950/60 text-emerald-400'
+          : 'border-red-900 bg-red-950/60 text-red-400',
       )}
     >
       {status === 'up' ? 'UP' : 'DOWN'}
