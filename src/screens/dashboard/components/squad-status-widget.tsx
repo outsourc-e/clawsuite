@@ -14,6 +14,16 @@ type SquadAgentRow = { id: string; name: string; status: AgentStatus; taskPrevie
 
 const STATUS_LABEL: Record<AgentStatus, string> = { active: 'Active', idle: 'Idle', available: 'Available', paused: 'Paused' }
 const STATUS_DOT: Record<AgentStatus, string> = { active: 'bg-emerald-500', idle: 'bg-yellow-500', available: 'bg-neutral-400', paused: 'bg-red-500' }
+const MOBILE_ROW_STRIP: Record<AgentStatus, string> = {
+  active:
+    'max-[767px]:before:bg-gradient-to-r max-[767px]:before:from-orange-500 max-[767px]:before:via-orange-400/60 max-[767px]:before:to-transparent',
+  idle:
+    'max-[767px]:before:bg-gradient-to-r max-[767px]:before:from-primary-400 max-[767px]:before:via-primary-300/50 max-[767px]:before:to-transparent',
+  available:
+    'max-[767px]:before:bg-gradient-to-r max-[767px]:before:from-primary-400 max-[767px]:before:via-primary-300/50 max-[767px]:before:to-transparent',
+  paused:
+    'max-[767px]:before:bg-gradient-to-r max-[767px]:before:from-red-500 max-[767px]:before:via-red-400/60 max-[767px]:before:to-transparent',
+}
 
 function truncateText(text: string, maxLength: number): string {
   if (!text || text.length <= maxLength) return text
@@ -76,18 +86,26 @@ export function SquadStatusWidget({
       ) : (
         <div className="space-y-1.5">
           {visibleAgents.map((agent) => (
-            <div key={agent.id} className="flex items-center gap-2 rounded-lg border border-transparent bg-neutral-950/70 px-2 py-1.5 transition-colors hover:border-neutral-800 hover:bg-neutral-950">
+            <div
+              key={agent.id}
+              className={cn(
+                'relative flex items-center gap-2 rounded-lg border border-transparent bg-neutral-950/70 px-2 py-1.5 transition-colors hover:border-neutral-800 hover:bg-neutral-950',
+                'max-[767px]:gap-1.5 max-[767px]:px-2 max-[767px]:py-1.5',
+                'max-[767px]:before:absolute max-[767px]:before:inset-x-0 max-[767px]:before:top-0 max-[767px]:before:h-[2px] max-[767px]:before:rounded-t-lg max-[767px]:before:content-[\"\"]',
+                MOBILE_ROW_STRIP[agent.status],
+              )}
+            >
               <span className={cn('size-2 shrink-0 rounded-full', STATUS_DOT[agent.status])} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-neutral-100">{agent.name}</p>
-                <p className="truncate text-[11px] text-neutral-500">{STATUS_LABEL[agent.status]}</p>
+                <p className="truncate text-sm font-medium text-neutral-100 max-[767px]:text-[13px]">{agent.name}</p>
+                <p className="truncate text-[11px] text-neutral-500 max-[767px]:text-[10px]">{STATUS_LABEL[agent.status]}</p>
               </div>
               <p className="hidden max-w-[120px] truncate text-[11px] italic text-neutral-500 sm:block">{agent.taskPreview || '—'}</p>
-              <span className="shrink-0 text-[11px] text-neutral-400 tabular-nums">{agent.timeAgo}</span>
+              <span className="shrink-0 text-[11px] text-neutral-400 tabular-nums max-[767px]:text-[10px]">{agent.timeAgo}</span>
               {agent.tokens > 0 && (
-                <span className="shrink-0 text-[10px] tabular-nums text-neutral-400">{formatTokenCompact(agent.tokens)}</span>
+                <span className="shrink-0 text-[10px] tabular-nums text-neutral-400 max-[767px]:text-[9px]">{formatTokenCompact(agent.tokens)}</span>
               )}
-              <span className="shrink-0 rounded-full border border-neutral-800 bg-neutral-900 px-1.5 py-0.5 text-[10px] font-medium text-neutral-300">{agent.modelShort}</span>
+              <span className="shrink-0 rounded-full border border-neutral-800 bg-neutral-900 px-1.5 py-0.5 text-[10px] font-medium text-neutral-300 max-[767px]:px-1.25 max-[767px]:text-[9px]">{agent.modelShort}</span>
             </div>
           ))}
           {rows.length > 6 ? (
