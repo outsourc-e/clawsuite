@@ -78,6 +78,30 @@ const DEFAULT_CATEGORIES = [
   'Finance & Crypto',
 ]
 
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message?: string
+  onRetry: () => void
+}) {
+  return (
+    <div className="h-full overflow-y-auto bg-surface pb-24 text-ink md:pb-8">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8">
+        <section className="rounded-2xl border border-primary-200 bg-primary-50/85 p-5 backdrop-blur-xl">
+          <h1 className="text-lg font-medium text-ink">Failed to load skills</h1>
+          <p className="mt-2 text-sm text-primary-600">
+            {message || 'Something went wrong while fetching skills.'}
+          </p>
+          <div className="mt-4">
+            <Button onClick={onRetry}>Retry</Button>
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
 function resolveSkillSearchTier(
   skill: SkillSummary,
   query: string,
@@ -262,6 +286,21 @@ export function SkillsScreen() {
   function handleSortChange(value: SkillsSort) {
     setSort(value)
     setPage(1)
+  }
+
+  if (skillsQuery.isError) {
+    return (
+      <ErrorState
+        message={
+          skillsQuery.error instanceof Error
+            ? skillsQuery.error.message
+            : 'Something went wrong while fetching skills.'
+        }
+        onRetry={() => {
+          void skillsQuery.refetch()
+        }}
+      />
+    )
   }
 
   return (

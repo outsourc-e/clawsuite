@@ -1,19 +1,11 @@
 import { ComputerIcon, Moon01Icon, Sun01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useChatSettingsStore } from '@/hooks/use-chat-settings'
-import type { ThemeMode } from '@/hooks/use-chat-settings'
+import {
+  applyTheme,
+  type SettingsThemeMode,
+  useSettingsStore,
+} from '@/hooks/use-settings'
 import { cn } from '@/lib/utils'
-
-function applyTheme(theme: ThemeMode) {
-  if (typeof document === 'undefined') return
-  const root = document.documentElement
-  const media = window.matchMedia('(prefers-color-scheme: dark)')
-  root.classList.remove('light', 'dark', 'system')
-  root.classList.add(theme)
-  if (theme === 'system' && media.matches) {
-    root.classList.add('dark')
-  }
-}
 
 function resolvedIsDark(): boolean {
   if (typeof document === 'undefined') return false
@@ -21,7 +13,7 @@ function resolvedIsDark(): boolean {
 }
 
 const MODES: Array<{
-  value: ThemeMode
+  value: SettingsThemeMode
   icon: typeof ComputerIcon
   label: string
 }> = [
@@ -36,12 +28,15 @@ type ThemeToggleProps = {
 }
 
 export function ThemeToggle({ variant = 'pill' }: ThemeToggleProps) {
-  const { settings, updateSettings } = useChatSettingsStore()
+  const settings = useSettingsStore((state) => state.settings)
+  const updateSettings = useSettingsStore((state) => state.updateSettings)
   const isDark =
     settings.theme === 'dark' ||
     (settings.theme === 'system' && resolvedIsDark())
+  const currentThemeLabel =
+    MODES.find((mode) => mode.value === settings.theme)?.label ?? 'System'
 
-  function setTheme(theme: ThemeMode) {
+  function setTheme(theme: SettingsThemeMode) {
     applyTheme(theme)
     updateSettings({ theme })
   }
@@ -52,7 +47,7 @@ export function ThemeToggle({ variant = 'pill' }: ThemeToggleProps) {
         type="button"
         onClick={() => setTheme(isDark ? 'light' : 'dark')}
         className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
-        aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-label={`Theme is ${currentThemeLabel}. Switch to ${isDark ? 'light' : 'dark'} mode`}
         title={isDark ? 'Light mode' : 'Dark mode'}
       >
         <HugeiconsIcon
@@ -65,7 +60,11 @@ export function ThemeToggle({ variant = 'pill' }: ThemeToggleProps) {
   }
 
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-full border border-primary-200 bg-primary-100/70 p-0.5 dark:border-primary-700 dark:bg-primary-800/80">
+    <div
+      className="inline-flex items-center gap-0.5 rounded-full border border-primary-200 bg-primary-100/70 p-0.5 dark:border-primary-700 dark:bg-primary-800/80"
+      role="group"
+      aria-label={`Theme mode. Current: ${currentThemeLabel}`}
+    >
       {MODES.map((mode) => {
         const active = settings.theme === mode.value
         return (
@@ -79,7 +78,9 @@ export function ThemeToggle({ variant = 'pill' }: ThemeToggleProps) {
                 ? 'bg-accent-500 text-white shadow-sm'
                 : 'text-primary-500 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-200',
             )}
-            aria-label={mode.label}
+            aria-label={
+              active ? `${mode.label} theme (current)` : `${mode.label} theme`
+            }
             title={mode.label}
           >
             <HugeiconsIcon icon={mode.icon} size={14} strokeWidth={1.8} />

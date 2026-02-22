@@ -111,7 +111,8 @@ function MicroBarChart({ data, days, accentClass }: MicroBarChartProps) {
   return (
     <div className="flex items-end gap-[2px]" style={{ height: 28 }}>
       {slice.map((point, i) => {
-        const heightPx = Math.max(2, Math.round((point.value / maxVal) * 28))
+        const rawHeightPx = Math.round((point.value / maxVal) * 28)
+        const heightPx = point.value > 0 ? Math.max(2, rawHeightPx) : 0
         const isLatest = i === slice.length - 1
         return (
           <div
@@ -121,6 +122,7 @@ function MicroBarChart({ data, days, accentClass }: MicroBarChartProps) {
               isLatest
                 ? accentClass
                 : 'bg-neutral-200 dark:bg-neutral-700',
+              point.value === 0 && 'opacity-40',
             )}
             style={{ height: `${heightPx}px` }}
             title={`${point.date}: ${point.value}`}

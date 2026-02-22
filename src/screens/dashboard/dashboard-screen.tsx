@@ -722,6 +722,26 @@ export function DashboardScreen() {
             </div>
           </header>
 
+          {dashboardData.status === 'error' ? (
+            <div className="mb-3 rounded-xl border border-red-200 bg-red-50/85 px-3 py-2 text-sm text-red-800 shadow-sm md:mb-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium">Dashboard data failed to load</p>
+                  <p className="text-xs text-red-700/90">
+                    One or more dashboard queries failed. Retry to refresh data.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={refetch}
+                  className="shrink-0 rounded-md border border-red-200 bg-white/80 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-white"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {/* ── Mobile layout ───────────────────────────────────────────────── */}
           {isMobile ? (
             <div className="flex flex-col gap-3">
@@ -740,9 +760,9 @@ export function DashboardScreen() {
               />
 
               {/* Alert signal chips — only one top-of-page clutter element */}
-              {dashboardData.alerts.length > 0 ? (
+              {visibleAlerts.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {dashboardData.alerts.map((chip) => (
+                  {visibleAlerts.map((chip) => (
                     <span
                       key={chip.id}
                       className={cn(

@@ -176,7 +176,10 @@ function AgentCard({
                 onClick={() => setMenuOpen(false)}
                 aria-hidden
               />
-              <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] overflow-hidden rounded-xl border border-neutral-200 bg-white py-1 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
+              <div
+                className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-xl border border-neutral-200 bg-white py-1 shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
+                style={{ overflow: 'visible' }}
+              >
                 <button
                   type="button"
                   onClick={() => {

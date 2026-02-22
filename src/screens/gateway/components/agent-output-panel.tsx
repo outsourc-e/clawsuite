@@ -145,6 +145,7 @@ export function AgentOutputPanel({
   const [messages, setMessages] = useState<OutputMessage[]>([])
   const [sessionEnded, setSessionEnded] = useState(false)
   const [tokenCount, setTokenCount] = useState(0)
+  const [streamDisconnected, setStreamDisconnected] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Reset state when sessionKey changes
@@ -152,6 +153,7 @@ export function AgentOutputPanel({
     setMessages([])
     setSessionEnded(false)
     setTokenCount(0)
+    setStreamDisconnected(false)
   }, [sessionKey])
 
   // Auto-scroll to bottom when messages update
@@ -167,6 +169,12 @@ export function AgentOutputPanel({
     if (!sessionKey) return
 
     const source = new EventSource(`/api/chat-events?sessionKey=${encodeURIComponent(sessionKey)}`)
+    source.onopen = () => {
+      setStreamDisconnected(false)
+    }
+    source.onerror = () => {
+      setStreamDisconnected(true)
+    }
 
     // 'chunk' — streaming text from assistant
     source.addEventListener('chunk', (event) => {
@@ -214,6 +222,7 @@ export function AgentOutputPanel({
         }
       }
       setSessionEnded(true)
+      setStreamDisconnected(false)
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', content: doneLabel, timestamp: Date.now(), done: true },
@@ -285,6 +294,11 @@ export function AgentOutputPanel({
       )}
 
       {/* Terminal output */}
+      {sessionKey && streamDisconnected && !sessionEnded ? (
+        <div className="mb-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300">
+          Stream disconnected
+        </div>
+      ) : null}
       {sessionKey ? (
         <div
           ref={scrollRef}

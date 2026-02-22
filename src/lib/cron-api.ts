@@ -149,13 +149,37 @@ async function readError(response: Response): Promise<string> {
   }
 }
 
+function readPayloadErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  if ('error' in payload && typeof payload.error === 'string') {
+    return payload.error
+  }
+  if ('message' in payload && typeof payload.message === 'string') {
+    return payload.message
+  }
+  return null
+}
+
+function throwIfPayloadNotOk(payload: unknown): void {
+  if (!payload || typeof payload !== 'object') return
+  if ('ok' in payload && payload.ok === false) {
+    throw new Error(readPayloadErrorMessage(payload) ?? 'Request failed')
+  }
+}
+
+async function readJsonAndCheckOk<T>(response: Response): Promise<T> {
+  const payload = (await response.json()) as T
+  throwIfPayloadNotOk(payload)
+  return payload
+}
+
 export async function fetchCronJobs(): Promise<Array<CronJob>> {
   const response = await fetch('/api/cron')
   if (!response.ok) {
     throw new Error(await readError(response))
   }
 
-  const payload = (await response.json()) as CronJobsResponse
+  const payload = await readJsonAndCheckOk<CronJobsResponse>(response)
   const rows = Array.isArray(payload.jobs) ? payload.jobs : []
   return rows.map(function mapJob(job, index) {
     return normalizeJob(job, index)
@@ -170,7 +194,7 @@ export async function fetchCronRuns(jobId: string): Promise<Array<CronRun>> {
     throw new Error(await readError(response))
   }
 
-  const payload = (await response.json()) as CronRunsResponse
+  const payload = await readJsonAndCheckOk<CronRunsResponse>(response)
   const rows = Array.isArray(payload.runs) ? payload.runs : []
   return rows.map(function mapRun(run, index) {
     return normalizeRun(run, index)
@@ -190,7 +214,7 @@ export async function runCronJob(jobId: string): Promise<RunCronPayload> {
     throw new Error(await readError(response))
   }
 
-  return (await response.json()) as RunCronPayload
+  return readJsonAndCheckOk<RunCronPayload>(response)
 }
 
 export async function toggleCronJob(payload: {
@@ -209,7 +233,7 @@ export async function toggleCronJob(payload: {
     throw new Error(await readError(response))
   }
 
-  return (await response.json()) as ToggleCronPayload
+  return readJsonAndCheckOk<ToggleCronPayload>(response)
 }
 
 export async function upsertCronJob(
@@ -227,7 +251,7 @@ export async function upsertCronJob(
     throw new Error(await readError(response))
   }
 
-  return (await response.json()) as UpsertCronPayload
+  return readJsonAndCheckOk<UpsertCronPayload>(response)
 }
 
 export async function deleteCronJob(jobId: string): Promise<{ ok?: boolean }> {
@@ -243,5 +267,5 @@ export async function deleteCronJob(jobId: string): Promise<{ ok?: boolean }> {
     throw new Error(await readError(response))
   }
 
-  return (await response.json()) as { ok?: boolean }
+  return readJsonAndCheckOk<{ ok?: boolean }>(response)
 }

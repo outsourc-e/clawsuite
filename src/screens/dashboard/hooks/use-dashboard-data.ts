@@ -131,13 +131,12 @@ async function fetchSessionStatus(): Promise<SessionStatusPayload> {
   try {
     const res = await fetch('/api/session-status')
     if (!res.ok) {
-      toast('Failed to fetch session status', { type: 'error' })
-      return {}
+      throw new Error(`Failed to fetch session status (HTTP ${res.status})`)
     }
     return res.json() as Promise<SessionStatusPayload>
-  } catch {
+  } catch (error) {
     toast('Failed to fetch session status', { type: 'error' })
-    return {}
+    throw error instanceof Error ? error : new Error('Failed to fetch session status')
   }
 }
 
@@ -157,8 +156,8 @@ async function fetchCostTimeseries(): Promise<Array<CostPoint>> {
         amount: readNumber(p.amount),
       }))
       .filter((p) => p.date.length > 0)
-  } catch {
-    return []
+  } catch (error) {
+    throw error instanceof Error ? error : new Error('Unable to load cost summary')
   }
 }
 
@@ -345,8 +344,7 @@ export function useDashboardData(): UseDashboardDataResult {
     const todayKey = toLocalDateKey(new Date(now))
 
     // ── Connection ──────────────────────────────────────────────────────────
-    const connected =
-      gatewayStatusQuery.data?.ok ?? !gatewayStatusQuery.isError
+    const connected = gatewayStatusQuery.data?.ok === true
     const syncing = !gatewayStatusQuery.isLoading && connected
 
     // ── Session-status payload ──────────────────────────────────────────────
@@ -708,9 +706,10 @@ export function useDashboardData(): UseDashboardDataResult {
       sessionsQuery.isLoading ||
       gatewayStatusQuery.isLoading
     const isError =
-      sessionStatusQuery.isError &&
-      sessionsQuery.isError &&
-      gatewayStatusQuery.isError
+      sessionStatusQuery.isError ||
+      sessionsQuery.isError ||
+      gatewayStatusQuery.isError ||
+      costTimeseriesQuery.isError
 
     const status: DashboardData['status'] = isError
       ? 'error'
@@ -810,6 +809,7 @@ export function useDashboardData(): UseDashboardDataResult {
     sessionStatusQuery.isError,
     costTimeseriesQuery.data,
     costTimeseriesQuery.isLoading,
+    costTimeseriesQuery.isError,
     cronJobsQuery.data,
     skillsSummaryQuery.data,
     usageSummaryQuery.data,

@@ -1390,9 +1390,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       streams.set(sessionKey, source)
       lastAtMap.set(sessionKey, Date.now())
 
+      const markStreamAlive = () => {
+        lastAtMap.set(sessionKey, Date.now())
+      }
+
       const handleUpdate = (text: string, type: AgentActivityEntry['lastEventType']) => {
         if (!text) return
-        lastAtMap.set(sessionKey, Date.now())
+        markStreamAlive()
         setAgentActivity((prev) => ({
           ...prev,
           [agentId]: {
@@ -1405,6 +1409,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       source.addEventListener('chunk', (event) => {
         if (!(event instanceof MessageEvent)) return
+        markStreamAlive()
         try {
           const data = JSON.parse(event.data as string) as Record<string, unknown>
           const text = String(data.text ?? data.content ?? data.chunk ?? '').trim()
@@ -1428,17 +1433,31 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       source.addEventListener('tool', (event) => {
         if (!(event instanceof MessageEvent)) return
+        markStreamAlive()
         try {
           const data = JSON.parse(event.data as string) as Record<string, unknown>
           const name = String(data.name ?? 'tool')
           handleUpdate(`${name}()`, 'tool')
         } catch { /* ignore parse errors */ }
       })
+
+      source.addEventListener('message', () => {
+        markStreamAlive()
+      })
+      source.addEventListener('done', () => {
+        markStreamAlive()
+      })
+      source.addEventListener('open', () => {
+        markStreamAlive()
+      })
+      source.addEventListener('error', () => {
+        markStreamAlive()
+      })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentSessionStatus, agentSessionMap]) // intentionally omit teamRef (stable ref)
 
-  // Stale SSE stream pruner (30s inactivity → close) + unmount cleanup
+  // Stale SSE stream pruner (60s inactivity → close) + unmount cleanup
   useEffect(() => {
     const interval = window.setInterval(() => {
       const streams = agentStreamsRef.current
@@ -1446,7 +1465,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       const now = Date.now()
       for (const [sessionKey, source] of streams) {
         const lastAt = lastAtMap.get(sessionKey) ?? 0
-        if (now - lastAt > 30_000) {
+        if (now - lastAt > 60_000) {
           source.close()
           streams.delete(sessionKey)
           lastAtMap.delete(sessionKey)
@@ -1470,12 +1489,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     function handleKeyDown(event: KeyboardEvent) {
       const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
       const modKey = isMac ? event.metaKey : event.ctrlKey
-      const target = event.target as HTMLElement | null
+      const target = event.target instanceof Element ? event.target : null
       const tagName = target?.tagName ?? ''
       const isTypingTarget =
-        tagName === 'INPUT' ||
-        tagName === 'TEXTAREA' ||
-        target?.isContentEditable === true
+        !!target?.closest('button, select, a, [role=button], input, textarea, [contenteditable]')
 
       // Cmd/Ctrl+Enter: Start Mission when textarea is focused and has content
       if (modKey && event.key === 'Enter') {
@@ -1963,18 +1980,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     saveApprovals(updated)
   }, [approvals, agentSessionMap])
 
-  const ensureAgentSessions = useCallback(async (teamMembers: TeamMember[]): Promise<Record<string, string>> => {
+  const ensureAgentSessions = useCallback(async (
+    teamMembers: TeamMember[],
+    launchMissionId?: string,
+  ): Promise<Record<string, string>> => {
     const currentMap = { ...agentSessionMap }
     const spawnPromises: Array<Promise<void>> = []
+    const isStaleLaunch = () =>
+      Boolean(launchMissionId) && missionIdRef.current !== launchMissionId
 
     for (const member of teamMembers) {
+      if (isStaleLaunch()) break
       if (currentMap[member.id]) continue
 
       setSpawnState((prev) => ({ ...prev, [member.id]: 'spawning' }))
 
-      spawnPromises.push(
-        spawnAgentSession(member)
+        spawnPromises.push(
+          spawnAgentSession(member)
           .then((sessionKey) => {
+            if (isStaleLaunch()) return
             currentMap[member.id] = sessionKey
             setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
             // Track model used at spawn time
@@ -1991,6 +2015,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             })
           })
           .catch((err: unknown) => {
+            if (isStaleLaunch()) return
             setSpawnState((prev) => ({ ...prev, [member.id]: 'error' }))
             emitFeedEvent({
               type: 'system',
@@ -2002,6 +2027,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     await Promise.allSettled(spawnPromises)
+    if (isStaleLaunch()) return currentMap
     setAgentSessionMap(currentMap)
     return currentMap
   }, [agentSessionMap, spawnAgentSession])
@@ -2011,9 +2037,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     teamMembers: Array<TeamMember>,
     missionGoalValue: string,
     mode: 'sequential' | 'hierarchical' | 'parallel' = 'parallel',
+    launchMissionId?: string,
   ) => {
+    const isStaleLaunch = () =>
+      Boolean(launchMissionId) && missionIdRef.current !== launchMissionId
+
+    if (isStaleLaunch()) return
     // STEP A: Ensure all agents have isolated gateway sessions
-    const sessionMap = await ensureAgentSessions(teamMembers)
+    const sessionMap = await ensureAgentSessions(teamMembers, launchMissionId)
+    if (isStaleLaunch()) return
 
     // STEP B: Group tasks by agent
     const tasksByAgent = new Map<string, Array<HubTask>>()
@@ -2067,6 +2099,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           throw new Error(errorMessage)
         }
 
+        if (isStaleLaunch()) return
         const taskIds = agentTasks.map((task) => task.id)
         setDispatchedTaskIdsByAgent((previous) => ({
           ...previous,
@@ -2083,6 +2116,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           })
         })
       } catch (error) {
+        if (isStaleLaunch()) return
         emitFeedEvent({
           type: 'system',
           message: `Failed to dispatch to ${member?.name || agentId}: ${error instanceof Error ? error.message : String(error)}`,
@@ -2093,7 +2127,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     // ── HIERARCHICAL mode ─────────────────────────────────────────────────
     if (mode === 'hierarchical') {
       const [leadMember, ...workerMembers] = teamMembers
-      if (!leadMember) return
+      if (!leadMember || isStaleLaunch()) return
 
       const leadSessionKey = sessionMap[leadMember.id]
       if (leadSessionKey) {
@@ -2114,9 +2148,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           updatedAt: Date.now(),
         }]
         await dispatchToAgent(leadMember.id, effectiveLeadTasks, leadMessage)
+        if (isStaleLaunch()) return
 
         // Dispatch to workers with delegation prefix
         for (const worker of workerMembers) {
+          if (isStaleLaunch()) return
           const workerTasks = tasksByAgent.get(worker.id)
           if (!workerTasks || workerTasks.length === 0) continue
           const workerContext = buildAgentContext(worker)
@@ -2134,6 +2170,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (mode === 'sequential') {
       const agentEntries = Array.from(tasksByAgent.entries())
       for (let i = 0; i < agentEntries.length; i++) {
+        if (isStaleLaunch()) return
         const [agentId, agentTasks] = agentEntries[i]
         const member = teamMembers.find((entry) => entry.id === agentId)
         const agentContext = member ? buildAgentContext(member) : ''
@@ -2145,6 +2182,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         // Stagger: wait 30 seconds between agents (except after the last one)
         if (i < agentEntries.length - 1) {
           await new Promise<void>((resolve) => window.setTimeout(resolve, 30_000))
+          if (isStaleLaunch()) return
         }
       }
       return
@@ -2152,6 +2190,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     // ── PARALLEL mode (default) ────────────────────────────────────────────
     for (const [agentId, agentTasks] of tasksByAgent) {
+      if (isStaleLaunch()) return
       const member = teamMembers.find((entry) => entry.id === agentId)
       const agentContext = member ? buildAgentContext(member) : ''
       const taskList = agentTasks.map((task, index) => `${index + 1}. ${task.title}`).join('\n')
@@ -2411,6 +2450,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   function handleCreateMission() {
     if (dispatchingRef.current) return
+    if (missionActiveRef.current) {
+      toast('Mission already running. Stop the current mission before launching another.', {
+        type: 'warning',
+      })
+      return
+    }
     if (gatewayStatus === 'disconnected') {
       toast('Connect gateway before launching a mission', { type: 'error' })
       setWizardOpen(true)
@@ -2430,6 +2475,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     // Save initial checkpoint
     const missionId = newMissionId
+    missionIdRef.current = missionId
     missionStartedAtRef.current = Date.now()
     saveMissionCheckpoint({
       id: missionId,
@@ -2469,7 +2515,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setPausedByAgentId({})
     sessionActivityRef.current = new Map()
     // ── Auto-switch to Mission tab and show live feed ──────────────────────
-    setActiveTab('office')
+    setActiveTab('mission')
     setLiveFeedVisible(true)
     setWizardOpen(false)
     emitFeedEvent({
@@ -2479,7 +2525,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     toast(`Mission started with ${createdTasks.length} tasks`, { type: 'success' })
 
     window.setTimeout(() => {
-      void executeMission(createdTasks, teamWithRuntimeStatus, trimmedGoal, processType).finally(() => {
+      if (missionIdRef.current !== missionId) {
+        dispatchingRef.current = false
+        return
+      }
+      void executeMission(
+        createdTasks,
+        teamWithRuntimeStatus,
+        trimmedGoal,
+        processType,
+        missionId,
+      ).finally(() => {
+        if (missionIdRef.current !== missionId) return
         dispatchingRef.current = false
       })
     }, 0)
@@ -2828,7 +2885,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         {/* ── Tab content area ── */}
         <div className="min-w-0 flex-1 overflow-hidden">
           {/* Office tab */}
-          {activeTab === 'office' ? (
+          <div
+            className="h-full min-h-0"
+            style={{ display: activeTab === 'office' ? 'block' : 'none' }}
+          >
             <OfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
@@ -2841,25 +2901,41 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 setActiveTab('mission')
               }}
             />
-          ) : null}
+          </div>
 
           {/* Mission tab */}
-          {activeTab === 'mission' ? renderMissionContent() : null}
+          <div
+            className="h-full min-h-0"
+            style={{ display: activeTab === 'mission' ? 'block' : 'none' }}
+          >
+            {renderMissionContent()}
+          </div>
 
           {/* History tab */}
-          {activeTab === 'history' ? <HistoryView /> : null}
+          <div
+            className="h-full min-h-0"
+            style={{ display: activeTab === 'history' ? 'block' : 'none' }}
+          >
+            <HistoryView />
+          </div>
 
           {/* Approvals tab */}
-          {activeTab === 'approvals' ? (
+          <div
+            className="h-full min-h-0"
+            style={{ display: activeTab === 'approvals' ? 'block' : 'none' }}
+          >
             <ApprovalsPanel
               approvals={approvals}
               onApprove={handleApprove}
               onDeny={handleDeny}
             />
-          ) : null}
+          </div>
 
           {/* Team tab */}
-          {activeTab === 'team' ? (
+          <div
+            className="h-full min-h-0"
+            style={{ display: activeTab === 'team' ? 'block' : 'none' }}
+          >
             <div
               className={cn(
                 'h-full overflow-y-auto',
@@ -2938,7 +3014,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 onSelectAgent={handleAgentSelection}
               />
             </div>
-          ) : null}
+          </div>
         </div>
 
         {/* ── Collapsible Live Feed + Mission Controls sidebar ── */}
@@ -3392,7 +3468,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <button
                   type="button"
                   onClick={handleCreateMission}
-                  disabled={missionGoal.trim().length === 0 || dispatchingRef.current}
+                  disabled={missionGoal.trim().length === 0 || dispatchingRef.current || missionActive}
                   className="rounded-md bg-accent-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Launch Mission

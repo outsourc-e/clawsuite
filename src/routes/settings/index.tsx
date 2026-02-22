@@ -116,6 +116,7 @@ function SettingsRoute() {
   usePageTitle('Settings')
   const { settings, updateSettings } = useSettings()
   const gatewaySetup = useGatewaySetupStore()
+  const [gatewayUrlInput, setGatewayUrlInput] = useState(settings.gatewayUrl)
   const [connectionStatus, setConnectionStatus] = useState<
     'idle' | 'testing' | 'connected' | 'failed'
   >('idle')
@@ -151,6 +152,10 @@ function SettingsRoute() {
     void fetchModels()
   }, [])
 
+  useEffect(() => {
+    setGatewayUrlInput(settings.gatewayUrl)
+  }, [settings.gatewayUrl])
+
   async function handleTestConnection() {
     setConnectionStatus('testing')
 
@@ -168,18 +173,22 @@ function SettingsRoute() {
     }
   }
 
-  function validateAndUpdateUrl(value: string) {
-    if (value && value.length > 0) {
-      try {
-        new URL(value)
-        setUrlError(null)
-      } catch {
-        setUrlError('Invalid URL format')
-      }
-    } else {
-      setUrlError(null)
+  function validateGatewayUrl(value: string): string | null {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    try {
+      new URL(trimmed)
+      return null
+    } catch {
+      return 'Invalid URL format'
     }
-    updateSettings({ gatewayUrl: value })
+  }
+
+  function persistGatewayUrl(value: string) {
+    const error = validateGatewayUrl(value)
+    setUrlError(error)
+    if (error) return
+    updateSettings({ gatewayUrl: value.trim() })
   }
 
   function handleThemeChange(value: string) {
@@ -474,8 +483,21 @@ function SettingsRoute() {
                     <input
                       type="url"
                       placeholder="https://api.openclaw.ai"
-                      value={settings.gatewayUrl}
-                      onChange={(e) => validateAndUpdateUrl(e.target.value)}
+                      value={gatewayUrlInput}
+                      onChange={(e) => {
+                        const nextValue = e.target.value
+                        setGatewayUrlInput(nextValue)
+                        if (urlError) {
+                          setUrlError(validateGatewayUrl(nextValue))
+                        }
+                      }}
+                      onBlur={(e) => persistGatewayUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return
+                        e.preventDefault()
+                        persistGatewayUrl((e.target as HTMLInputElement).value)
+                        ;(e.target as HTMLInputElement).blur()
+                      }}
                       className="h-9 w-full rounded-lg border border-primary-200 dark:border-gray-600 bg-primary-50 dark:bg-gray-800 px-3 text-sm text-primary-900 dark:text-gray-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
                       aria-label="Gateway URL"
                       aria-invalid={!!urlError}

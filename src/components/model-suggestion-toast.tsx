@@ -33,8 +33,8 @@ export function ModelSuggestionToast({
   }, [autoDismissMs, onDismiss])
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-2">
-      <div className="flex w-[380px] flex-col gap-3 rounded-xl border border-primary-200 bg-primary-50/95 p-4 shadow-lg backdrop-blur-xl">
+    <div className="fixed bottom-[calc(var(--tabbar-h,0px)+1.5rem)] right-4 z-50 animate-in slide-in-from-bottom-2">
+      <div className="flex max-w-[380px] w-[calc(100vw-2rem)] flex-col gap-3 rounded-xl border border-primary-200 bg-primary-50/95 p-4 shadow-lg backdrop-blur-xl">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2">
             <span className="text-lg">💡</span>

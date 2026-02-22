@@ -68,6 +68,14 @@ export function MobileSessionsPanel({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, onClose])
 
+  useEffect(() => {
+    if (!open) return
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [open])
+
   if (!open) return null
 
   return (

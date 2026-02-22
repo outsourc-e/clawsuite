@@ -159,7 +159,7 @@ export function MobileTabBar() {
                 }}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[10px] font-medium transition-transform duration-150 active:scale-90',
+                  'flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[10px] font-medium transition-transform duration-150 active:scale-90',
                   isCenterChat ? '-mt-2' : '',
                 )}
               >

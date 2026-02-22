@@ -160,7 +160,7 @@ function ChatHeaderComponent({
           <button
             type="button"
             onClick={onOpenSessions}
-            className="shrink-0 rounded-lg transition-transform active:scale-95"
+            className="shrink-0 min-h-11 min-w-11 rounded-lg transition-transform active:scale-95"
             aria-label="Open sessions"
           >
             <OpenClawStudioIcon className="size-8 rounded-lg" />
@@ -174,7 +174,7 @@ function ChatHeaderComponent({
           <button
             type="button"
             onClick={handleOpenAgentDetails}
-            className="relative rounded-full transition-transform active:scale-90"
+            className="relative min-h-11 min-w-11 rounded-full transition-transform active:scale-90"
             aria-label="Open agent details"
           >
             <OrchestratorAvatar size={28} compact />

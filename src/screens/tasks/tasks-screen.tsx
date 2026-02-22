@@ -11,6 +11,7 @@ import {
   type TaskPriority,
 } from '@/stores/task-store'
 import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/toast'
 
 /* ── Helpers ── */
 
@@ -57,7 +58,7 @@ function AddTaskDialog({
     (e: React.FormEvent) => {
       e.preventDefault()
       if (!title.trim()) return
-      onAdd({
+      void onAdd({
         title: title.trim(),
         description: description.trim(),
         status,
@@ -467,6 +468,53 @@ export function TasksScreen() {
     void syncFromApi()
   }, [syncFromApi])
 
+  const handleAddTask = useCallback(
+    (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+      void addTask(task).catch((error) => {
+        toast(
+          error instanceof Error ? error.message : 'Failed to create task',
+          { type: 'error' },
+        )
+      })
+    },
+    [addTask],
+  )
+
+  const handleMoveTask = useCallback(
+    (id: string, status: TaskStatus) => {
+      void moveTask(id, status).catch((error) => {
+        toast(error instanceof Error ? error.message : 'Failed to move task', {
+          type: 'error',
+        })
+      })
+    },
+    [moveTask],
+  )
+
+  const handleUpdateTask = useCallback(
+    (id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>) => {
+      void updateTask(id, updates).catch((error) => {
+        toast(
+          error instanceof Error ? error.message : 'Failed to update task',
+          { type: 'error' },
+        )
+      })
+    },
+    [updateTask],
+  )
+
+  const handleDeleteTask = useCallback(
+    (id: string) => {
+      void deleteTask(id).catch((error) => {
+        toast(
+          error instanceof Error ? error.message : 'Failed to delete task',
+          { type: 'error' },
+        )
+      })
+    },
+    [deleteTask],
+  )
+
   const columns = STATUS_ORDER.map((status) => ({
     status,
     label: STATUS_LABELS[status],
@@ -538,8 +586,8 @@ export function TasksScreen() {
                     <TaskCard
                       key={task.id}
                       task={task}
-                      onMove={moveTask}
-                      onDelete={deleteTask}
+                      onMove={handleMoveTask}
+                      onDelete={handleDeleteTask}
                       onSelect={setSelectedTask}
                     />
                   ))
@@ -551,17 +599,17 @@ export function TasksScreen() {
       </section>
 
       {showAdd ? (
-        <AddTaskDialog onAdd={addTask} onClose={() => setShowAdd(false)} />
+        <AddTaskDialog onAdd={handleAddTask} onClose={() => setShowAdd(false)} />
       ) : null}
       {selectedTask ? (
         <TaskDetailPanel
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           onMove={(id, status) => {
-            moveTask(id, status)
+            handleMoveTask(id, status)
             setSelectedTask(null)
           }}
-          onUpdate={updateTask}
+          onUpdate={handleUpdateTask}
         />
       ) : null}
     </main>

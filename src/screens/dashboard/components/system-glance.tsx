@@ -55,7 +55,7 @@ function SystemGlanceCompact({
 
       {/* Model pill */}
       {currentModel ? (
-        <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[9px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+        <span className="max-w-[120px] shrink-0 truncate rounded bg-neutral-100 px-1.5 py-0.5 text-[9px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
           {currentModel}
         </span>
       ) : null}
