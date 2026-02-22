@@ -33,7 +33,6 @@ import {
   type SlashCommandDefinition,
   type SlashCommandMenuHandle,
 } from '@/components/slash-command-menu'
-import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
 import { fetchModels, switchModel } from '@/lib/gateway-api'
@@ -494,8 +493,6 @@ function ChatComposerComponent({
   composerRef,
   focusKey,
 }: ChatComposerProps) {
-  const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
-  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const setMobileKeyboardOpen = useWorkspaceStore((s) => s.setMobileKeyboardOpen)
   const setMobileKeyboardInset = useWorkspaceStore(
     (s) => s.setMobileKeyboardInset,
@@ -1249,21 +1246,16 @@ function ChatComposerComponent({
     [wrapperRef],
   )
 
-  const keyboardOrFocusActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const composerWrapperStyle = useMemo(
     () => {
-      const tabBarOffset = keyboardOrFocusActive
-        ? '0px'
-        : 'max(0px, calc(var(--mobile-tab-bar-offset) - 0.375rem))'
-      const mobileTranslate = `translateY(calc(-1 * (${tabBarOffset} + var(--kb-inset, 0px))))`
       return {
         maxWidth: 'min(768px, 100%)',
-        '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
-        transform: isMobileViewport ? mobileTranslate : undefined,
-        WebkitTransform: isMobileViewport ? mobileTranslate : undefined,
+        bottom: isMobileViewport
+          ? 'calc(var(--kb-inset, 0px) + env(safe-area-inset-bottom) + 12px)'
+          : undefined,
       } as CSSProperties
     },
-    [isMobileViewport, keyboardOrFocusActive],
+    [isMobileViewport],
   )
 
   return (
@@ -1271,10 +1263,11 @@ function ChatComposerComponent({
       className={cn(
         'no-swipe pointer-events-auto mx-auto w-full bg-surface px-3 pt-2 sm:px-5 touch-manipulation',
         isMobileViewport
-          ? 'fixed inset-x-0 bottom-0 z-[70] transition-transform duration-200'
+          ? 'fixed z-[70] left-3 right-3 bottom-0 w-auto max-w-none bg-transparent px-0 pt-0 pb-0 transition-[bottom] duration-200'
           : 'relative z-40 shrink-0',
         'pb-[max(var(--safe-b),0px)] md:pb-[calc(var(--safe-b)+0.75rem)]',
         'md:bg-surface/95 md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
+        'max-[767px]:pb-0',
       )}
       style={composerWrapperStyle}
       ref={setWrapperRefs}
@@ -1295,6 +1288,7 @@ function ChatComposerComponent({
         disabled={disabled}
         className={cn(
           'relative z-50 transition-all duration-300',
+          'max-[767px]:rounded-[28px] max-[767px]:border max-[767px]:border-white/10 max-[767px]:bg-black/60 max-[767px]:py-2 max-[767px]:outline-white/10 max-[767px]:shadow-[0_10px_40px_rgba(0,0,0,0.5)] max-[767px]:backdrop-blur-xl',
           isDraggingOver &&
             'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
           isLoading &&
