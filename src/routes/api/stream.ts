@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import WebSocket from 'ws'
+import type { RawData } from 'ws'
 import { isAuthenticated } from '../../server/auth-middleware'
 
 type GatewayFrame =
@@ -152,7 +153,7 @@ export const Route = createFileRoute('/api/stream')({
                 }
               })
 
-              ws.on('message', (data) => {
+              ws.on('message', (data: RawData) => {
                 try {
                   const parsed = JSON.parse(data.toString()) as GatewayFrame
 
@@ -286,8 +287,10 @@ export const Route = createFileRoute('/api/stream')({
                 }
               })
 
-              ws.on('error', (err) => {
-                sendSSE('error', { message: String(err.message || err) })
+              ws.on('error', (err: unknown) => {
+                const message =
+                  err instanceof Error ? err.message : String(err)
+                sendSSE('error', { message })
                 cleanup()
                 controller.close()
               })
