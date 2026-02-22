@@ -173,7 +173,7 @@ function AgentRow({
           </span>
 
           {/* Name */}
-          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-neutral-100">
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100">
             {agent.name}
           </span>
 
@@ -312,7 +312,7 @@ function AgentCompactCard({
             )}
           />
         )}
-        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-neutral-100">
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">
           {agent.name}
         </span>
         <span
