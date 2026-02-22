@@ -288,24 +288,19 @@ function ChatMessageListComponent({
       return true
     })
 
-    const seenUserFingerprints = new Map<string, number>()
+    const seenUserIds = new Set<string>()
     return filteredMessages.filter((message) => {
       if (message.role !== 'user') return true
 
-      const trimmedText = textFromMessage(message).trim()
-      if (trimmedText.length === 0) return true
-
-      const fingerprint = `${message.role}:${trimmedText}`
-      const timestamp = getMessageTimestamp(message)
-      const previousTimestamp = seenUserFingerprints.get(fingerprint)
-      if (
-        typeof previousTimestamp === 'number' &&
-        Math.abs(timestamp - previousTimestamp) <= 5000
-      ) {
-        return false
+      const messageId =
+        (message as any).id ||
+        (message as any).messageId ||
+        (message as any).clientId
+      if (typeof messageId !== 'string' || messageId.trim().length === 0) {
+        return true
       }
-
-      seenUserFingerprints.set(fingerprint, timestamp)
+      if (seenUserIds.has(messageId)) return false
+      seenUserIds.add(messageId)
       return true
     })
   }, [hideSystemMessages, messages])
@@ -657,7 +652,14 @@ function ChatMessageListComponent({
     return () => {
       if (frameId !== null) window.cancelAnimationFrame(frameId)
     }
-  }, [loading, displayMessages.length, sessionKey, scrollToBottom])
+  }, [
+    loading,
+    displayMessages.length,
+    isStreaming,
+    sessionKey,
+    scrollToBottom,
+    streamingText,
+  ])
 
   useEffect(() => {
     setExpandAllToolSections(false)

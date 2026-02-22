@@ -97,9 +97,23 @@ export function useRealtimeChatHistory({
 
   const { mergeHistoryMessages, clearSession, lastEventAt } =
     useGatewayChatStore()
+  const clearRealtimeBuffer = useGatewayChatStore((s) => s.clearRealtimeBuffer)
+  const realtimeMessages = useGatewayChatStore(
+    (s) => s.realtimeMessages.get(sessionKey) ?? [],
+  )
 
   // Subscribe directly to streaming state — useMemo with stable fn ref was stale (bug #1)
   const streamingState = useGatewayChatStore((s) => s.streamingState.get(sessionKey) ?? null)
+  const streamingStateRef = useRef(streamingState)
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const delayedClearSessionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activeSessionKeyRef = useRef(sessionKey)
+  const isUnmountingRef = useRef(false)
+  activeSessionKeyRef.current = sessionKey
+
+  useEffect(() => {
+    streamingStateRef.current = streamingState
+  }, [streamingState])
 
   // Merge history with real-time messages
   // Re-merge when realtime events arrive (lastEventAt changes)
@@ -109,14 +123,27 @@ export function useRealtimeChatHistory({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey, historyMessages, mergeHistoryMessages, lastEventAt])
 
+  // History has caught up — cleanup realtime buffer outside render
+  useEffect(() => {
+    if (!sessionKey || sessionKey === 'new') return
+    if (realtimeMessages.length === 0) return
+    if (mergedMessages.length !== historyMessages.length) return
+    clearRealtimeBuffer(sessionKey)
+  }, [
+    clearRealtimeBuffer,
+    historyMessages.length,
+    mergedMessages.length,
+    realtimeMessages.length,
+    sessionKey,
+  ])
+
   // Periodic history sync — catch missed messages every 30s
   // Skip during active streaming to prevent race conditions
-  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   useEffect(() => {
     if (!sessionKey || sessionKey === 'new' || !enabled) return
     syncIntervalRef.current = setInterval(() => {
       // Don't poll during active streaming — causes flicker/overwrites
-      if (streamingState !== null) return
+      if (streamingStateRef.current !== null) return
       const key = chatQueryKeys.history(friendlyId, sessionKey)
       queryClient.invalidateQueries({ queryKey: key })
     }, 30000)
@@ -128,15 +155,37 @@ export function useRealtimeChatHistory({
   // Clear realtime buffer when session changes
   useEffect(() => {
     if (!sessionKey || sessionKey === 'new') return undefined
+    if (delayedClearSessionTimeoutRef.current) {
+      clearTimeout(delayedClearSessionTimeoutRef.current)
+      delayedClearSessionTimeoutRef.current = null
+    }
 
     // Clear on unmount/session change after a delay
     // to allow history to catch up
     return () => {
-      setTimeout(() => {
+      if (isUnmountingRef.current) return
+      if (delayedClearSessionTimeoutRef.current) {
+        clearTimeout(delayedClearSessionTimeoutRef.current)
+      }
+      delayedClearSessionTimeoutRef.current = setTimeout(() => {
+        delayedClearSessionTimeoutRef.current = null
+        if (activeSessionKeyRef.current === sessionKey) return
         clearSession(sessionKey)
       }, 5000)
     }
   }, [sessionKey, clearSession])
+
+  useEffect(() => {
+    isUnmountingRef.current = false
+    return () => {
+      isUnmountingRef.current = true
+      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current)
+      if (delayedClearSessionTimeoutRef.current) {
+        clearTimeout(delayedClearSessionTimeoutRef.current)
+        delayedClearSessionTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   // Compute streaming UI state
   const isRealtimeStreaming =

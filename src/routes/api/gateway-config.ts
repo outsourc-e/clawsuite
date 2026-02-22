@@ -3,6 +3,43 @@ import { json } from '@tanstack/react-start'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { gatewayReconnect } from '../../server/gateway'
+import { isAuthenticated } from '../../server/auth-middleware'
+
+function sanitizeEnvValue(value: unknown, field: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${field} must be a string`)
+  }
+
+  const sanitized = value
+    .replace(/[\r\n]/g, '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+
+  if (sanitized.length > 500) {
+    throw new Error(`${field} is too long`)
+  }
+
+  return sanitized
+}
+
+function sanitizeGatewayUrl(value: unknown): string {
+  const sanitized = sanitizeEnvValue(value, 'url')
+
+  if (!sanitized) return sanitized
+
+  let parsed: URL
+  try {
+    parsed = new URL(sanitized)
+  } catch {
+    throw new Error('Invalid gateway URL')
+  }
+
+  if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
+    throw new Error('Gateway URL must use ws:// or wss://')
+  }
+
+  return sanitized
+}
 
 export const Route = createFileRoute('/api/gateway-config')({
   server: {
@@ -14,19 +51,39 @@ export const Route = createFileRoute('/api/gateway-config')({
           const hasToken = Boolean(process.env.CLAWDBOT_GATEWAY_TOKEN?.trim())
           return json({ ok: true, url, hasToken })
         } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          const isValidationError =
+            message === 'Invalid gateway URL' ||
+            message === 'Gateway URL must use ws:// or wss://' ||
+            message === 'url must be a string' ||
+            message === 'token must be a string' ||
+            message === 'url is too long' ||
+            message === 'token is too long'
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
-            { status: 500 },
+            { ok: false, error: message },
+            { status: isValidationError ? 400 : 500 },
           )
         }
       },
 
       // POST: update gateway URL and/or token in .env file
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
         try {
-          const body = (await request.json().catch(() => ({}))) as {
-            url?: string
-            token?: string
+          const rawBody = (await request.json().catch(() => ({}))) as Record<
+            string,
+            unknown
+          >
+          const body: { url?: string; token?: string } = {}
+
+          if (Object.prototype.hasOwnProperty.call(rawBody, 'url')) {
+            body.url = sanitizeGatewayUrl(rawBody.url)
+          }
+          if (Object.prototype.hasOwnProperty.call(rawBody, 'token')) {
+            body.token = sanitizeEnvValue(rawBody.token, 'token')
           }
 
           const envPath = join(process.cwd(), '.env')

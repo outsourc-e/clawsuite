@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../../server/gateway'
+import { isAuthenticated } from '../../../server/auth-middleware'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -105,7 +106,11 @@ function normalizeStatusPayload(payload: unknown): BrowserStatusResponse {
 export const Route = createFileRoute('/api/browser/status')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
         try {
           const payload = await gatewayRpc('browser.status')
           return json(normalizeStatusPayload(payload))

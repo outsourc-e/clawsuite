@@ -17,7 +17,11 @@ export const Route = createFileRoute('/api/chat-abort')({
         }
 
         try {
-          const body = (await request.json()) as AbortRequestBody
+          const body = (await request.json().catch(() => null)) as AbortRequestBody | null
+          if (!body) {
+            return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
+          }
+
           const sessionKey = body.sessionKey?.trim() || undefined
 
           await gatewayRpc('chat.abort', { sessionKey })
