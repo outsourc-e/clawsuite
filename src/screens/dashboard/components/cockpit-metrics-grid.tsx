@@ -16,7 +16,7 @@ type MetricTile = {
 
 function MetricTile({ label, value, tone = 'default' }: MetricTile) {
   return (
-    <div className="rounded-xl border border-primary-200/80 bg-primary-100 p-2.5 dark:bg-primary-50">
+    <div className="always-dark-card rounded-xl border border-primary-200/80 bg-primary-100 p-2.5 dark:bg-primary-50">
       <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-primary-500">
         {label}
       </p>

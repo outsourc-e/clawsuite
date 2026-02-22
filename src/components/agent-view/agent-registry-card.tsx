@@ -156,7 +156,7 @@ export function AgentRegistryCard({
       whileTap={mobileOptimized ? { scale: 1, y: -2 } : undefined}
       transition={mobileOptimized ? { duration: 0.15, ease: 'easeOut' } : undefined}
       className={cn(
-        `relative overflow-hidden rounded-2xl p-4 shadow-sm border border-white/20 ${CARD_GRADIENT_CLASS[agent.color]}`,
+        `always-dark-card relative overflow-hidden rounded-2xl p-4 shadow-sm border border-white/20 ${CARD_GRADIENT_CLASS[agent.color]}`,
         mobileOptimized && [
           'max-[767px]:border-primary-200 max-[767px]:bg-primary-100 max-[767px]:shadow-[0_6px_18px_rgba(0,0,0,0.12)] max-[767px]:dark:bg-primary-50',
           'max-[767px]:before:absolute max-[767px]:before:inset-x-0 max-[767px]:before:top-0 max-[767px]:before:h-[2px] max-[767px]:before:content-[\"\"] max-[767px]:before:bg-gradient-to-r',
