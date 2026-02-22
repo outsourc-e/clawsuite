@@ -688,7 +688,7 @@ function ChatSidebarComponent({
 
   const asideProps = {
     className: cn(
-      'border-r border-primary-200 h-full overflow-hidden bg-primary-50 dark:bg-primary-100 flex flex-col',
+      'theme-panel theme-border border-r border-primary-200 h-full overflow-hidden bg-primary-50 dark:bg-primary-100 flex flex-col',
       isMobile && 'fixed inset-y-0 left-0 z-50 shadow-2xl',
       isMobile && isCollapsed && 'pointer-events-none',
     ),

@@ -168,7 +168,7 @@ export function WorkspaceShell() {
   // Show loading indicator while checking auth
   if (!authState.checked) {
     return (
-      <div className="flex items-center justify-center h-screen bg-surface">
+      <div className="theme-bg theme-text flex h-screen items-center justify-center">
         <div className="text-center">
           <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent mb-4" />
           <p className="text-sm text-primary-500">Initializing ClawSuite...</p>
@@ -185,7 +185,7 @@ export function WorkspaceShell() {
   return (
     <>
       <div
-        className="relative overflow-hidden bg-surface text-primary-900"
+        className="theme-bg theme-text relative overflow-hidden bg-surface text-primary-900"
         style={{ height: 'calc(var(--vvh, 100dvh) + var(--kb-inset, 0px))' }}
       >
         <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr] lg:grid-cols-[auto_auto_1fr] xl:grid-cols-[auto_auto_1fr_auto]">
