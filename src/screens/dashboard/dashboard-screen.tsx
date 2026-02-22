@@ -789,19 +789,7 @@ export function DashboardScreen() {
           {/* ── Mobile layout ───────────────────────────────────────────────── */}
           {isMobile ? (
             <div className="flex flex-col gap-3">
-              {/* Mobile hero: SystemGlance compact — single source of truth for Sessions/Agents/Cost/Uptime */}
-              <SystemGlance
-                sessions={dashboardData.sessions.total}
-                activeAgents={dashboardData.agents.active || dashboardData.agents.total}
-                costToday={costTodayDisplay}
-                uptimeFormatted={uptimeDisplay}
-                updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
-                healthStatus={healthStatus}
-                gatewayConnected={dashboardData.connection.connected}
-                sessionPercent={dashboardData.usage.contextPercent ?? undefined}
-                currentModel={dashboardData.model.current}
-                compact
-              />
+              {/* SystemGlance compact removed on mobile — redundant with Token Usage widget below */}
 
               {/* Alert signal chips — only one top-of-page clutter element */}
               {visibleAlerts.length > 0 ? (
