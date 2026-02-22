@@ -343,12 +343,12 @@ export function SkillsScreen() {
                 </TabsTab>
               </TabsList>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 max-[767px]:sticky max-[767px]:top-0 max-[767px]:z-20 max-[767px]:-mx-1 max-[767px]:rounded-xl max-[767px]:border max-[767px]:border-primary-200 max-[767px]:bg-primary-50/95 max-[767px]:px-1 max-[767px]:py-1">
                 <input
                   value={searchInput}
                   onChange={(event) => handleSearchChange(event.target.value)}
                   placeholder="Search skills..."
-                  className="h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px] sm:w-auto"
+                  className="h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary max-[767px]:h-10 max-[767px]:bg-primary-100 sm:min-w-[220px] sm:w-auto"
                 />
 
                 {tab === 'marketplace' ? (
@@ -825,40 +825,138 @@ function SkillsGrid({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18 }}
-              className="flex flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-3 shadow-sm backdrop-blur-sm md:min-h-[220px] md:p-4"
+              className="flex flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-3 shadow-sm backdrop-blur-sm max-[767px]:rounded-xl max-[767px]:bg-primary-100 max-[767px]:p-3 max-[767px]:shadow-none max-[767px]:backdrop-blur-none dark:max-[767px]:bg-primary-50 md:min-h-[220px] md:p-4"
             >
-              {/* Header: icon + name + badge */}
-              <div className="mb-1.5 flex items-start gap-2.5 md:mb-2">
-                <span className="mt-0.5 text-2xl leading-none md:text-xl">{skill.icon}</span>
+              <div className="flex items-start gap-3 md:hidden">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-primary-200 bg-primary-50 text-xl dark:bg-primary-100">
+                  <span aria-hidden>{skill.icon}</span>
+                </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="line-clamp-1 text-sm font-medium text-ink md:text-base">
-                      {skill.name}
-                    </h3>
-                    <span
-                      className={cn(
-                        'shrink-0 rounded-md border text-[10px] px-1.5 py-0 md:px-2 md:py-0.5 md:text-xs tabular-nums',
-                        skill.installed
-                          ? 'border-primary/40 bg-primary/15 text-primary'
-                          : 'border-primary-200 bg-primary-100/60 text-primary-500',
-                      )}
-                    >
-                      {skill.installed ? 'Installed' : 'Available'}
-                    </span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="line-clamp-1 text-sm font-medium text-ink">
+                        {skill.name}
+                      </h3>
+                      <p className="mt-0.5 line-clamp-1 text-[11px] text-primary-500">
+                        {skill.description}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span
+                        className={cn(
+                          'rounded-full border px-2 py-0.5 text-[10px] font-medium tabular-nums',
+                          skill.installed
+                            ? 'border-primary/40 bg-primary/15 text-primary'
+                            : 'border-primary-200 bg-primary-50 text-primary-500 dark:bg-primary-100',
+                        )}
+                      >
+                        {skill.installed ? 'Installed' : 'Install'}
+                      </span>
+                      <span className="rounded-full border border-primary-200 bg-primary-50 px-2 py-0.5 text-[10px] text-primary-500 tabular-nums dark:bg-primary-100">
+                        {skill.fileCount} files
+                      </span>
+                    </div>
                   </div>
-                  <p className="line-clamp-1 text-[11px] text-primary-500 md:text-xs">
-                    by {skill.author}
-                  </p>
+
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-[10px] text-primary-500">
+                        {skill.author}
+                      </span>
+                      {skill.security && <SecurityBadge security={skill.security} />}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-[11px]"
+                        onClick={() => onOpenDetails(skill)}
+                      >
+                        Details
+                      </Button>
+                      {tab === 'installed' ? (
+                        <>
+                          {!skill.builtin && (
+                            <div className="flex items-center gap-1 text-[10px] text-primary-500">
+                              <Switch
+                                checked={skill.enabled}
+                                disabled={isActing}
+                                onCheckedChange={(checked) =>
+                                  onToggle(skill.id, checked)
+                                }
+                                aria-label={`Toggle ${skill.name}`}
+                              />
+                            </div>
+                          )}
+                          {!skill.builtin && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-[11px]"
+                              disabled={isActing}
+                              onClick={() => onUninstall(skill.id)}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </>
+                      ) : skill.installed ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-[11px]"
+                          disabled={isActing}
+                          onClick={() => onUninstall(skill.id)}
+                        >
+                          Uninstall
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-7 px-2 text-[11px]"
+                          disabled={isActing}
+                          onClick={() => onInstall(skill.id)}
+                        >
+                          Install
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Description: 1 line mobile, 3 lines desktop */}
-              <p className="line-clamp-1 text-xs text-primary-500 md:line-clamp-3 md:min-h-[58px] md:text-sm">
-                {skill.description}
-              </p>
+              <div className="hidden md:flex md:flex-1 md:flex-col">
+                {/* Header: icon + name + badge */}
+                <div className="mb-1.5 flex items-start gap-2.5 md:mb-2">
+                  <span className="mt-0.5 text-2xl leading-none md:text-xl">{skill.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="line-clamp-1 text-sm font-medium text-ink md:text-base">
+                        {skill.name}
+                      </h3>
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-md border text-[10px] px-1.5 py-0 md:px-2 md:py-0.5 md:text-xs tabular-nums',
+                          skill.installed
+                            ? 'border-primary/40 bg-primary/15 text-primary'
+                            : 'border-primary-200 bg-primary-100/60 text-primary-500',
+                        )}
+                      >
+                        {skill.installed ? 'Installed' : 'Available'}
+                      </span>
+                    </div>
+                    <p className="line-clamp-1 text-[11px] text-primary-500 md:text-xs">
+                      by {skill.author}
+                    </p>
+                  </div>
+                </div>
 
-              {/* Tags: hidden on mobile, shown on desktop */}
-              <div className="mt-2 hidden flex-wrap items-center gap-1.5 md:flex">
+                <p className="line-clamp-1 text-xs text-primary-500 md:line-clamp-3 md:min-h-[58px] md:text-sm">
+                  {skill.description}
+                </p>
+
+                <div className="mt-2 hidden flex-wrap items-center gap-1.5 md:flex">
                 {skill.builtin && (
                   <span className="rounded-md border border-accent-300 bg-accent-100/50 px-2 py-0.5 text-xs font-medium text-accent-600">
                     Built-in
@@ -876,66 +974,66 @@ function SkillsGrid({
                     {trigger}
                   </span>
                 ))}
-              </div>
+                </div>
 
-              {/* Actions row */}
-              <div className="mt-2 flex items-center justify-between gap-2 md:mt-auto md:pt-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs md:h-9 md:text-sm"
-                  onClick={() => onOpenDetails(skill)}
-                >
-                  Details
-                </Button>
-
-                {tab === 'installed' ? (
-                  <div className="flex items-center gap-2">
-                    {!skill.builtin && (
-                      <div className="flex items-center gap-1.5 text-[11px] text-primary-500 md:text-xs">
-                        <Switch
-                          checked={skill.enabled}
-                          disabled={isActing}
-                          onCheckedChange={(checked) =>
-                            onToggle(skill.id, checked)
-                          }
-                          aria-label={`Toggle ${skill.name}`}
-                        />
-                        <span className="hidden sm:inline">{skill.enabled ? 'Enabled' : 'Disabled'}</span>
-                      </div>
-                    )}
-                    {!skill.builtin && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs md:h-9 md:text-sm"
-                        disabled={isActing}
-                        onClick={() => onUninstall(skill.id)}
-                      >
-                        Uninstall
-                      </Button>
-                    )}
-                  </div>
-                ) : skill.installed ? (
+                <div className="mt-2 flex items-center justify-between gap-2 md:mt-auto md:pt-3">
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-8 text-xs md:h-9 md:text-sm"
-                    disabled={isActing}
-                    onClick={() => onUninstall(skill.id)}
+                    onClick={() => onOpenDetails(skill)}
                   >
-                    Uninstall
+                    Details
                   </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs md:h-9 md:text-sm"
-                    disabled={isActing}
-                    onClick={() => onInstall(skill.id)}
-                  >
-                    Install
-                  </Button>
-                )}
+
+                  {tab === 'installed' ? (
+                    <div className="flex items-center gap-2">
+                      {!skill.builtin && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-primary-500 md:text-xs">
+                          <Switch
+                            checked={skill.enabled}
+                            disabled={isActing}
+                            onCheckedChange={(checked) =>
+                              onToggle(skill.id, checked)
+                            }
+                            aria-label={`Toggle ${skill.name}`}
+                          />
+                          <span className="hidden sm:inline">{skill.enabled ? 'Enabled' : 'Disabled'}</span>
+                        </div>
+                      )}
+                      {!skill.builtin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs md:h-9 md:text-sm"
+                          disabled={isActing}
+                          onClick={() => onUninstall(skill.id)}
+                        >
+                          Uninstall
+                        </Button>
+                      )}
+                    </div>
+                  ) : skill.installed ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs md:h-9 md:text-sm"
+                      disabled={isActing}
+                      onClick={() => onUninstall(skill.id)}
+                    >
+                      Uninstall
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs md:h-9 md:text-sm"
+                      disabled={isActing}
+                      onClick={() => onInstall(skill.id)}
+                    >
+                      Install
+                    </Button>
+                  )}
+                </div>
               </div>
             </motion.article>
           )
