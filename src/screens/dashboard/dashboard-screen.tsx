@@ -36,6 +36,7 @@ import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
 import { QuickActionsRow } from './components/quick-actions-row'
 import { TokenUsageHero } from './components/token-usage-hero'
+import { CockpitMetricsGrid } from './components/cockpit-metrics-grid'
 import { WidgetGrid, type WidgetGridItem } from './components/widget-grid'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
@@ -796,7 +797,14 @@ export function DashboardScreen() {
                 className="bg-primary-50/70"
                 contentClassName="pt-2"
               >
-                <TokenUsageHero data={dashboardData} />
+                <div className="max-[767px]:hidden">
+                  <TokenUsageHero data={dashboardData} />
+                </div>
+                <CockpitMetricsGrid
+                  data={dashboardData}
+                  uptimeDisplay={uptimeDisplay}
+                  className="hidden max-[767px]:grid"
+                />
               </CollapsibleWidget>
 
               {/* MetricCards intentionally omitted on mobile — SystemGlance above is the canonical hero */}
