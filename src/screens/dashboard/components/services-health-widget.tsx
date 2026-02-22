@@ -51,11 +51,11 @@ export function ServicesHealthWidget({
       icon={Activity01Icon}
       onRemove={onRemove}
       action={
-        <span className="inline-flex items-center rounded-full border border-neutral-700 bg-neutral-900/90 px-2 py-0.5 font-mono text-[11px] text-neutral-300">
+        <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 font-mono text-[11px] tabular-nums text-neutral-200">
           {upCount}/{totalCount}
         </span>
       }
-      className="h-full border-neutral-800/90 bg-neutral-950/95 shadow-[0_6px_20px_rgba(0,0,0,0.25)]"
+      className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
     >
       <div className="space-y-1.5">
         {services.map((service) => {
@@ -69,7 +69,7 @@ export function ServicesHealthWidget({
           return (
             <div
               key={service.name}
-              className="flex items-center gap-2 rounded-lg border border-neutral-800/70 bg-neutral-900/60 px-2.5 py-1.5"
+              className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950 px-2.5 py-1.5"
             >
               <span className={cn('size-2 shrink-0 rounded-full', dotClass)} />
               <div className="min-w-0 flex-1">
@@ -77,7 +77,7 @@ export function ServicesHealthWidget({
                   {service.name}
                 </p>
                 {typeof service.latencyMs === 'number' ? (
-                  <p className="font-mono text-[10px] text-neutral-500">
+                  <p className="font-mono text-[10px] tabular-nums text-neutral-500">
                     {service.latencyMs}ms
                   </p>
                 ) : null}

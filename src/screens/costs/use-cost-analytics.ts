@@ -3,12 +3,19 @@ import { useQuery } from '@tanstack/react-query'
 
 type ApiSessionRow = {
   sessionKey?: string
+  key?: string
+  id?: string
   model?: string
+  modelName?: string
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
   costUsd?: number
+  totalCost?: number
   lastActiveAt?: number | null
+  updatedAt?: number | string | null
+  usage?: Record<string, unknown>
+  [key: string]: unknown
 }
 
 type ApiModelRow = {
@@ -17,6 +24,11 @@ type ApiModelRow = {
   outputTokens?: number
   totalTokens?: number
   costUsd?: number
+  totalCost?: number
+  input?: number
+  output?: number
+  totals?: Record<string, unknown>
+  [key: string]: unknown
 }
 
 type ApiCostPoint = {
@@ -32,13 +44,23 @@ type ApiPayload = {
     daily?: Array<ApiCostPoint>
     timeseries?: Array<ApiCostPoint>
     totals?: Record<string, unknown>
+    sessions?: Array<ApiSessionRow>
+    models?:
+      | Array<ApiModelRow>
+      | {
+          rows?: Array<ApiModelRow>
+          totals?: Record<string, unknown>
+        }
     [key: string]: unknown
   }
-  models?: {
-    rows?: Array<ApiModelRow>
-    totals?: Record<string, unknown>
-  }
+  models?:
+    | Array<ApiModelRow>
+    | {
+        rows?: Array<ApiModelRow>
+        totals?: Record<string, unknown>
+      }
   error?: string
+  [key: string]: unknown
 }
 
 export type CostKpis = {
@@ -96,6 +118,13 @@ function readNumber(value: unknown): number {
   return 0
 }
 
+function toRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
 function toTimestampMs(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     if (value <= 0) return null
@@ -148,44 +177,87 @@ function buildDailySeries(rawCost: ApiPayload['cost']): Array<CostDayRow> {
   return result
 }
 
-function normalizeModels(payload: ApiPayload['models']): Array<CostModelRow> {
-  const rows = Array.isArray(payload?.rows) ? payload.rows : []
+function normalizeModels(
+  payload: ApiPayload['models'] | ApiPayload['cost'] | undefined,
+): Array<CostModelRow> {
+  const root = toRecord(payload)
+  const rows: Array<ApiModelRow> = Array.isArray(payload)
+    ? payload
+    : Array.isArray(root.rows)
+      ? root.rows
+      : Array.isArray(toRecord(root.models).rows)
+        ? (toRecord(root.models).rows as Array<ApiModelRow>)
+        : []
+
   return rows
     .map((row) => {
-      const model = typeof row?.model === 'string' ? row.model : 'unknown'
-      const inputTokens = readNumber(row?.inputTokens)
-      const outputTokens = readNumber(row?.outputTokens)
+      const record = toRecord(row)
+      const totals = toRecord(record.totals)
+      const model =
+        typeof record.model === 'string' && record.model.length > 0
+          ? record.model
+          : 'unknown'
+      const inputTokens = readNumber(
+        record.inputTokens ?? record.input ?? totals.input ?? totals.inputTokens,
+      )
+      const outputTokens = readNumber(
+        record.outputTokens ?? record.output ?? totals.output ?? totals.outputTokens,
+      )
       const totalTokens =
-        readNumber(row?.totalTokens) || inputTokens + outputTokens
-      const costUsd = readNumber(row?.costUsd)
+        readNumber(record.totalTokens ?? totals.totalTokens) || inputTokens + outputTokens
+      const costUsd = readNumber(
+        record.costUsd ?? record.totalCost ?? totals.totalCost ?? totals.costUsd,
+      )
       return { model, inputTokens, outputTokens, totalTokens, costUsd }
     })
     .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens)
 }
 
-function normalizeSessions(payload: Array<ApiSessionRow> | undefined) {
-  const rows = Array.isArray(payload) ? payload : []
+function normalizeSessions(
+  payload: Array<ApiSessionRow> | ApiPayload['cost'] | undefined,
+) {
+  const root = toRecord(payload)
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray(root.sessions)
+      ? (root.sessions as Array<ApiSessionRow>)
+      : []
   return rows
     .map((row) => {
+      const record = toRecord(row)
+      const usage = toRecord(record.usage)
       const sessionKey =
-        typeof row?.sessionKey === 'string' && row.sessionKey.length > 0
-          ? row.sessionKey
+        typeof record.sessionKey === 'string' && record.sessionKey.length > 0
+          ? record.sessionKey
+          : typeof record.key === 'string' && record.key.length > 0
+            ? record.key
+            : typeof record.id === 'string' && record.id.length > 0
+              ? record.id
           : 'session'
-      const inputTokens = readNumber(row?.inputTokens)
-      const outputTokens = readNumber(row?.outputTokens)
+      const inputTokens = readNumber(
+        record.inputTokens ?? usage.inputTokens ?? usage.input ?? usage.promptTokens,
+      )
+      const outputTokens = readNumber(
+        record.outputTokens ??
+          usage.outputTokens ??
+          usage.output ??
+          usage.completionTokens,
+      )
       const totalTokens =
-        readNumber(row?.totalTokens) || inputTokens + outputTokens
+        readNumber(record.totalTokens ?? usage.totalTokens) || inputTokens + outputTokens
       return {
         sessionKey,
         model:
-          typeof row?.model === 'string' && row.model.length > 0
-            ? row.model
+          typeof record.model === 'string' && record.model.length > 0
+            ? record.model
+            : typeof record.modelName === 'string' && record.modelName.length > 0
+              ? record.modelName
             : 'unknown',
         inputTokens,
         outputTokens,
         totalTokens,
-        costUsd: readNumber(row?.costUsd),
-        lastActiveAt: toTimestampMs(row?.lastActiveAt),
+        costUsd: readNumber(record.costUsd ?? record.totalCost ?? usage.totalCost ?? usage.costUsd),
+        lastActiveAt: toTimestampMs(record.lastActiveAt ?? record.updatedAt),
       } satisfies CostSessionRow
     })
     .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens)
@@ -236,8 +308,8 @@ function buildKpis(
 }
 
 function derive(payload: ApiPayload): DerivedCostAnalytics {
-  const models = normalizeModels(payload.models)
-  const sessions = normalizeSessions(payload.sessions)
+  const models = normalizeModels(payload.models ?? payload.cost)
+  const sessions = normalizeSessions(payload.sessions ?? payload.cost)
   const daily = buildDailySeries(payload.cost)
   const kpis = buildKpis(daily, sessions, models)
   const totalTokens = models.reduce((sum, m) => sum + m.totalTokens, 0)
@@ -279,4 +351,3 @@ export function useCostAnalytics() {
     analytics: derived,
   }
 }
-

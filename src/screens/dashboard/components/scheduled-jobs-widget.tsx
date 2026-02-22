@@ -23,16 +23,16 @@ export function ScheduledJobsWidget({ onRemove }: Props) {
       loading={jobsQuery.isLoading}
       error={jobsQuery.error instanceof Error ? jobsQuery.error.message : undefined}
       action={
-        <span className="inline-flex items-center rounded-full border border-neutral-700 bg-neutral-900/90 px-2 py-0.5 font-mono text-[11px] text-neutral-300">
+        <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 font-mono text-[11px] tabular-nums text-neutral-200">
           {jobs.length}
         </span>
       }
-      className="h-full border-neutral-800/90 bg-neutral-950/95 shadow-[0_6px_20px_rgba(0,0,0,0.25)]"
+      className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
     >
       <div className="flex h-full flex-col gap-2">
         <div className="space-y-1.5">
           {visibleJobs.length === 0 ? (
-            <div className="rounded-lg border border-neutral-800/70 bg-neutral-900/60 px-3 py-3 text-xs text-neutral-400">
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-3 text-xs text-neutral-400">
               No scheduled jobs found.
             </div>
           ) : (
@@ -41,7 +41,7 @@ export function ScheduledJobsWidget({ onRemove }: Props) {
                 key={job.id}
                 type="button"
                 onClick={() => void navigate({ to: '/cron' })}
-                className="flex w-full items-center gap-2 rounded-lg border border-neutral-800/70 bg-neutral-900/60 px-2.5 py-1.5 text-left transition-colors hover:border-neutral-700 hover:bg-neutral-900"
+                className="flex w-full items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-left transition-colors hover:border-neutral-700 hover:bg-neutral-900"
               >
                 <span
                   className={cn(
@@ -59,10 +59,10 @@ export function ScheduledJobsWidget({ onRemove }: Props) {
                       {job.schedule}
                     </span>
                   </div>
-                  <div className="mt-0.5 flex items-center gap-3 font-mono text-[10px] text-neutral-500">
-                    <span>Next {job.nextRelative}</span>
-                    <span>Last {job.lastRelative}</span>
-                  </div>
+                    <div className="mt-0.5 flex items-center gap-3 font-mono text-[10px] tabular-nums text-neutral-500">
+                      <span>Next {job.nextRelative}</span>
+                      <span>Last {job.lastRelative}</span>
+                    </div>
                 </div>
               </button>
             ))
@@ -73,7 +73,7 @@ export function ScheduledJobsWidget({ onRemove }: Props) {
           <button
             type="button"
             onClick={() => void navigate({ to: '/cron' })}
-            className="text-xs font-medium text-accent-400 transition-colors hover:text-accent-300"
+            className="text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-300"
           >
             View all →
           </button>
