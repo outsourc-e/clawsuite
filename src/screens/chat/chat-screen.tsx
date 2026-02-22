@@ -546,7 +546,7 @@ export function ChatScreen({
   const terminalPanelInset =
     !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
   const mobileComposerInsetBase =
-    'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px) + var(--safe-b) + 12px)'
+    'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px) + var(--safe-b) + 84px)'
   const mobileScrollBottomOffset = useMemo(() => {
     if (!isMobile) return 0
     return mobileComposerInsetBase
