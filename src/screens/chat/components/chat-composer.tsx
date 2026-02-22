@@ -46,6 +46,7 @@ import { usePinnedModels } from '@/hooks/use-pinned-models'
 import { cn } from '@/lib/utils'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
+import { toast } from '@/components/ui/toast'
 
 type ChatComposerAttachment = {
   id: string
@@ -100,6 +101,55 @@ type ModelSwitchNotice = {
   retryModel?: string
 }
 
+/** Maximum image file size allowed before processing (10MB). */
+const MAX_ATTACHMENT_FILE_SIZE = 10 * 1024 * 1024
+/** Maximum dimension (width or height) for resized images. */
+const MAX_IMAGE_DIMENSION = 1280
+/** Initial JPEG compression quality (0-1). */
+const IMAGE_QUALITY = 0.75
+/**
+ * Target compressed image size in bytes (~300KB).
+ * Base64 adds overhead, so this keeps websocket payloads under gateway limits.
+ */
+const TARGET_IMAGE_SIZE = 300 * 1024
+/** Hard attachment payload guard after encoding (base64 decoded size). */
+const MAX_TRANSPORT_IMAGE_SIZE = 450 * 1024
+
+const IMAGE_EXTENSION_TO_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  svg: 'image/svg+xml',
+  avif: 'image/avif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+}
+
+function normalizeMimeType(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function isImageMimeType(value: string): boolean {
+  const normalized = normalizeMimeType(value)
+  return normalized.startsWith('image/')
+}
+
+function inferMimeTypeFromFileName(name: string): string {
+  const match = /\.([a-z0-9]+)$/i.exec(name.trim())
+  if (!match?.[1]) return ''
+  return IMAGE_EXTENSION_TO_MIME[match[1].toLowerCase()] || ''
+}
+
+function isImageFile(file: File): boolean {
+  if (isImageMimeType(file.type)) return true
+  return inferMimeTypeFromFileName(file.name).length > 0
+}
+
 function formatFileSize(size: number): string {
   if (!Number.isFinite(size) || size <= 0) return ''
   const units = ['B', 'KB', 'MB', 'GB'] as const
@@ -117,11 +167,42 @@ function hasImageData(dt: DataTransfer | null): boolean {
   if (!dt) return false
   const items = Array.from(dt.items)
   if (
-    items.some((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    items.some(
+      (item) =>
+        item.kind === 'file' &&
+        (isImageMimeType(item.type) || item.type.trim().length === 0),
+    )
   )
     return true
   const files = Array.from(dt.files)
-  return files.some((file) => file.type.startsWith('image/'))
+  return files.some(
+    (file) => isImageFile(file) || file.type.trim().length === 0,
+  )
+}
+
+function collectFilesFromDataTransfer(dt: DataTransfer | null): Array<File> {
+  if (!dt) return []
+  const files: Array<File> = []
+  const seen = new Set<string>()
+
+  const pushFile = (file: File | null) => {
+    if (!file) return
+    const key = `${file.name}:${file.size}:${file.lastModified}:${file.type}`
+    if (seen.has(key)) return
+    seen.add(key)
+    files.push(file)
+  }
+
+  for (const item of Array.from(dt.items)) {
+    if (item.kind !== 'file') continue
+    pushFile(item.getAsFile())
+  }
+
+  for (const file of Array.from(dt.files)) {
+    pushFile(file)
+  }
+
+  return files
 }
 
 async function readFileAsDataUrl(file: File): Promise<string | null> {
@@ -137,6 +218,97 @@ async function readFileAsDataUrl(file: File): Promise<string | null> {
 
 function readText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function isCanvasSupported(): boolean {
+  if (typeof document === 'undefined') return false
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(canvas.getContext('2d'))
+  } catch {
+    return false
+  }
+}
+
+function estimateDataUrlBytes(dataUrl: string): number {
+  const commaIndex = dataUrl.indexOf(',')
+  const base64 = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl
+  if (!base64) return 0
+  const padding =
+    base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding)
+}
+
+function readDataUrlMimeType(dataUrl: string): string | null {
+  const match = /^data:([^;]+);base64,/.exec(dataUrl)
+  return match?.[1]?.trim() || null
+}
+
+async function compressImageToDataUrl(file: File): Promise<string> {
+  if (!isCanvasSupported()) {
+    throw new Error('Image compression not available')
+  }
+
+  return await new Promise((resolve, reject) => {
+    const image = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    const cleanup = () => URL.revokeObjectURL(objectUrl)
+
+    image.onload = () => {
+      try {
+        let width = image.width
+        let height = image.height
+
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+          if (width > height) {
+            height = Math.round((height * MAX_IMAGE_DIMENSION) / width)
+            width = MAX_IMAGE_DIMENSION
+          } else {
+            width = Math.round((width * MAX_IMAGE_DIMENSION) / height)
+            height = MAX_IMAGE_DIMENSION
+          }
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const context = canvas.getContext('2d')
+        if (!context) {
+          cleanup()
+          reject(new Error('Failed to get canvas context'))
+          return
+        }
+
+        context.drawImage(image, 0, 0, width, height)
+
+        const outputType =
+          file.type === 'image/png' ? 'image/png' : 'image/jpeg'
+        let quality = IMAGE_QUALITY
+        let dataUrl = canvas.toDataURL(outputType, quality)
+
+        if (outputType === 'image/jpeg') {
+          const targetDataUrlLength = TARGET_IMAGE_SIZE * 1.37
+          while (dataUrl.length > targetDataUrlLength && quality > 0.3) {
+            quality -= 0.1
+            dataUrl = canvas.toDataURL(outputType, quality)
+          }
+        }
+
+        cleanup()
+        resolve(dataUrl)
+      } catch (error) {
+        cleanup()
+        reject(error instanceof Error ? error : new Error('Compression failed'))
+      }
+    }
+
+    image.onerror = () => {
+      cleanup()
+      reject(new Error('Failed to load image'))
+    }
+
+    image.src = objectUrl
+  })
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -713,23 +885,43 @@ function ChatComposerComponent({
   const addAttachments = useCallback(
     async (files: Array<File>) => {
       if (disabled) return
-      const imageFiles = files.filter((file) => file.type.startsWith('image/'))
-      if (imageFiles.length === 0) return
 
       const timestamp = Date.now()
       const prepared = await Promise.all(
-        imageFiles.map(
+        files.map(
           async (file, index): Promise<ChatComposerAttachment | null> => {
-            const dataUrl = await readFileAsDataUrl(file)
+            // Some clipboard/drop sources omit MIME and filename; keep them for probing.
+            if (!isImageFile(file) && file.type.trim().length > 0) {
+              return null
+            }
+            if (file.size > MAX_ATTACHMENT_FILE_SIZE) {
+              return null
+            }
+            const dataUrl =
+              (await compressImageToDataUrl(file).catch(() => null)) ||
+              (await readFileAsDataUrl(file))
             if (!dataUrl) return null
+            const dataUrlMimeType = readDataUrlMimeType(dataUrl)
+            if (!isImageMimeType(dataUrlMimeType || '')) {
+              return null
+            }
+            const transportBytes = estimateDataUrlBytes(dataUrl)
+            if (transportBytes > MAX_TRANSPORT_IMAGE_SIZE) {
+              return null
+            }
             const name =
               file.name && file.name.trim().length > 0
                 ? file.name.trim()
                 : `pasted-image-${timestamp}-${index + 1}.png`
+            const detectedMimeType =
+              dataUrlMimeType ||
+              (isImageMimeType(file.type) ? normalizeMimeType(file.type) : '') ||
+              inferMimeTypeFromFileName(name) ||
+              'image/jpeg'
             return {
               id: crypto.randomUUID(),
               name,
-              contentType: file.type || 'image/png',
+              contentType: detectedMimeType,
               size: file.size,
               dataUrl,
               previewUrl: dataUrl,
@@ -743,6 +935,16 @@ function ChatComposerComponent({
           attachment !== null,
       )
 
+      const skippedCount = prepared.length - valid.length
+      if (skippedCount > 0) {
+        toast(
+          skippedCount === 1
+            ? '1 image could not be attached (unsupported or too large).'
+            : `${skippedCount} images could not be attached (unsupported or too large).`,
+          { type: 'warning' },
+        )
+      }
+
       if (valid.length === 0) return
 
       setAttachments((prev) => [...prev, ...valid])
@@ -754,15 +956,7 @@ function ChatComposerComponent({
   const handlePaste = useCallback(
     (event: React.ClipboardEvent<HTMLDivElement>) => {
       if (disabled) return
-      const items = Array.from(event.clipboardData.items)
-      const files: Array<File> = []
-      for (const item of items) {
-        if (item.kind !== 'file') continue
-        const file = item.getAsFile()
-        if (file && file.type.startsWith('image/')) {
-          files.push(file)
-        }
-      }
+      const files = collectFilesFromDataTransfer(event.clipboardData)
       if (files.length === 0) return
 
       const text = event.clipboardData.getData('text/plain')
@@ -813,7 +1007,7 @@ function ChatComposerComponent({
     (event: React.DragEvent<HTMLDivElement>) => {
       if (disabled) return
       event.preventDefault()
-      const files = Array.from(event.dataTransfer.files)
+      const files = collectFilesFromDataTransfer(event.dataTransfer)
       resetDragState()
       if (files.length === 0) return
       void addAttachments(files)
@@ -935,12 +1129,13 @@ function ChatComposerComponent({
   const isLongPressRef = useRef(false)
   const handleMicPointerDown = useCallback(() => {
     isLongPressRef.current = false
-    // Don't start long-press recording if voice-to-text is active (user is tapping to stop)
-    if (voiceInput.isListening) return
-    longPressTimerRef.current = setTimeout(() => {
-      isLongPressRef.current = true
-      voiceRecorder.start()
-    }, 500) // 500ms = long press threshold
+    // Start long-press timer for voice note recording (only if not already doing voice-to-text)
+    if (!voiceInput.isListening && !voiceRecorder.isRecording) {
+      longPressTimerRef.current = setTimeout(() => {
+        isLongPressRef.current = true
+        voiceRecorder.start()
+      }, 500)
+    }
   }, [voiceRecorder, voiceInput.isListening])
   const handleMicPointerUp = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -948,20 +1143,12 @@ function ChatComposerComponent({
       longPressTimerRef.current = null
     }
     if (isLongPressRef.current) {
-      // Was a long press — stop recording
+      // Was a long press — stop voice note recording
       voiceRecorder.stop()
       isLongPressRef.current = false
-    } else {
-      // Was a tap — toggle voice-to-text
-      if (voiceRecorder.isRecording) {
-        voiceRecorder.stop()
-      } else if (voiceInput.isListening) {
-        voiceInput.stop()
-      } else {
-        voiceInput.start()
-      }
     }
-  }, [voiceInput, voiceRecorder])
+    // Short taps are handled by onClick for voice-to-text toggle
+  }, [voiceRecorder])
 
   const handleAbort = useCallback(
     async function handleAbort() {
@@ -1519,6 +1706,16 @@ function ChatComposerComponent({
                 }
               >
                 <Button
+                  onClick={() => {
+                    // Toggle voice input on click
+                    if (voiceInput.isListening) {
+                      voiceInput.stop()
+                    } else if (voiceRecorder.isRecording) {
+                      voiceRecorder.stop()
+                    } else {
+                      voiceInput.start()
+                    }
+                  }}
                   onPointerDown={handleMicPointerDown}
                   onPointerUp={handleMicPointerUp}
                   onPointerLeave={handleMicPointerUp}

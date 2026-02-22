@@ -1,18 +1,34 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { isAuthenticated } from '../../server/auth-middleware'
 import { getTerminalSession } from '../../server/terminal-sessions'
 
 export const Route = createFileRoute('/api/terminal-resize')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
+
         const body = (await request.json().catch(() => ({}))) as Record<
           string,
           unknown
         >
         const sessionId =
-          typeof body.sessionId === 'string' ? body.sessionId : ''
-        const cols = typeof body.cols === 'number' ? body.cols : 80
-        const rows = typeof body.rows === 'number' ? body.rows : 24
+          typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
+        const colsRaw = typeof body.cols === 'number' ? body.cols : 80
+        const rowsRaw = typeof body.rows === 'number' ? body.rows : 24
+        const cols = Math.max(20, Math.min(500, Math.floor(colsRaw)))
+        const rows = Math.max(5, Math.min(300, Math.floor(rowsRaw)))
+        if (!sessionId) {
+          return new Response(JSON.stringify({ ok: false, error: 'sessionId required' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
         const session = getTerminalSession(sessionId)
         if (!session) {
           return new Response(JSON.stringify({ ok: false }), {

@@ -30,6 +30,8 @@ type AgentsWorkingPanelProps = {
   onSelectAgent?: (agentId: string) => void
   onKillAgent?: (agentId: string) => void
   onRespawnAgent?: (agentId: string) => void
+  onPauseAgent?: (agentId: string, pause: boolean) => void
+  onSteerAgent?: (agentId: string, message: string) => void
   selectedAgentId?: string
 }
 
@@ -43,7 +45,7 @@ const ACCENT_COLORS = [
   { bar: 'bg-amber-500',  text: 'text-amber-400' },
 ]
 
-const MODEL_BADGE: Record<ModelPresetId, string> = {
+const MODEL_BADGE: Record<string, string> = {
   auto:          'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
   opus:          'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
   sonnet:        'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
@@ -58,7 +60,7 @@ const MODEL_BADGE: Record<ModelPresetId, string> = {
   'pc1-devstral': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
 }
 
-const MODEL_LABEL: Record<ModelPresetId, string> = {
+const MODEL_LABEL: Record<string, string> = {
   auto:          'Auto',
   opus:          'Opus',
   sonnet:        'Sonnet',
@@ -104,6 +106,8 @@ function AgentRow({
   onSelect,
   onKill,
   onRespawn,
+  onPause,
+  onSteer,
 }: {
   agent: AgentWorkingRow
   accentIndex: number
@@ -111,11 +115,17 @@ function AgentRow({
   onSelect: () => void
   onKill?: () => void
   onRespawn?: () => void
+  onPause?: (pause: boolean) => void
+  onSteer?: (message: string) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const accent = ACCENT_COLORS[accentIndex % ACCENT_COLORS.length]
   const isActive = agent.status === 'active'
   const isSpawning = agent.status === 'spawning'
+  const canSteer =
+    agent.status !== 'none' &&
+    agent.status !== 'error' &&
+    agent.status !== 'spawning'
 
   const statusLine = agent.lastLine
     ? agent.lastLine
@@ -207,6 +217,37 @@ function AgentRow({
                     aria-hidden
                   />
                   <div className="absolute bottom-full right-0 z-20 mb-1 min-w-[110px] rounded-lg border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
+                    {canSteer && onSteer ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMenuOpen(false)
+                          const directive = window.prompt(
+                            `Send directive to ${agent.name}`,
+                            '',
+                          )
+                          if (!directive || !directive.trim()) return
+                          onSteer(directive.trim())
+                        }}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                      >
+                        Send directive
+                      </button>
+                    ) : null}
+                    {canSteer && onPause ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMenuOpen(false)
+                          onPause(agent.status !== 'paused')
+                        }}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                      >
+                        {agent.status === 'paused' ? 'Resume' : 'Pause'}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onKill() }}
@@ -297,6 +338,8 @@ export function AgentsWorkingPanel({
   onSelectAgent,
   onKillAgent,
   onRespawnAgent,
+  onPauseAgent,
+  onSteerAgent,
   selectedAgentId,
 }: AgentsWorkingPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
@@ -370,6 +413,14 @@ export function AgentsWorkingPanel({
                   onSelect={() => onSelectAgent?.(agent.id)}
                   onKill={onKillAgent ? () => onKillAgent(agent.id) : undefined}
                   onRespawn={onRespawnAgent ? () => onRespawnAgent(agent.id) : undefined}
+                  onPause={
+                    onPauseAgent ? (pause) => onPauseAgent(agent.id, pause) : undefined
+                  }
+                  onSteer={
+                    onSteerAgent
+                      ? (message) => onSteerAgent(agent.id, message)
+                      : undefined
+                  }
                 />
               ))}
             </div>

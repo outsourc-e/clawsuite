@@ -3,19 +3,11 @@ import { cn } from '@/lib/utils'
 import type { HubTask } from './task-board'
 
 export const MODEL_PRESETS = [
-  { id: 'auto',        label: 'Auto',        desc: 'Best model for the task' },
-  { id: 'opus',        label: 'Opus 4.6',    desc: 'Deep reasoning' },
-  { id: 'sonnet',      label: 'Sonnet 4.6',  desc: 'Fast & capable' },
-  { id: 'codex',       label: 'Codex',       desc: 'Code specialist' },
-  { id: 'flash',       label: 'Gemini Flash', desc: 'Quick & cheap' },
-  // PC1 local models (RTX 4090 · free · fixed Modelfiles)
-  { id: 'pc1-planner',  label: 'PC1 Planner',  desc: 'qwen3:14b · local' },
-  { id: 'pc1-coder',    label: 'PC1 Coder',    desc: 'qwen3-coder:30b · local' },
-  { id: 'pc1-devstral', label: 'PC1 Devstral', desc: 'devstral:22b · local' },
-  { id: 'pc1-critic',   label: 'PC1 Critic',   desc: 'deepseek-r1:32b · local' },
-  { id: 'pc1-fast',     label: 'PC1 Fast',     desc: 'qwen3:14b · local' },
-  { id: 'pc1-heavy',    label: 'PC1 Heavy',    desc: 'qwen3:30b · local' },
-  { id: 'pc1-fmt',      label: 'PC1 Fmt',      desc: 'gpt-oss:20b · local' },
+  { id: 'auto', label: 'Auto', desc: 'Best model for the task' },
+  { id: 'opus', label: 'Opus 4.6', desc: 'Deep reasoning' },
+  { id: 'sonnet', label: 'Sonnet 4.6', desc: 'Fast & capable' },
+  { id: 'codex', label: 'Codex', desc: 'Code specialist' },
+  { id: 'flash', label: 'Gemini Flash', desc: 'Quick & cheap' },
 ] as const
 
 export const TEAM_TEMPLATES = [
@@ -36,12 +28,6 @@ export const TEAM_TEMPLATES = [
     name: 'Content Pipeline',
     agents: ['researcher', 'writer', 'editor'],
     icon: '📝',
-  },
-  {
-    id: 'loop-lite',
-    name: 'Loop Lite 🔁',
-    agents: ['planner', 'coder', 'reviewer'],
-    icon: '🔁',
   },
 ] as const
 
@@ -85,18 +71,11 @@ type TeamPanelProps = {
 }
 
 const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
-  auto:          'bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200',
-  opus:          'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  sonnet:        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  codex:         'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  flash:         'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-  'pc1-planner': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-  'pc1-coder':   'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  'pc1-critic':  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-  'pc1-fast':    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  'pc1-heavy':   'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
-  'pc1-fmt':      'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-  'pc1-devstral': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+  auto: 'bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200',
+  opus: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  codex: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  flash: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
 }
 
 type SessionDotState = 'active' | 'idle' | 'stale' | 'dead' | 'spawning' | 'none'

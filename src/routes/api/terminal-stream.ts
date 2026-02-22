@@ -1,19 +1,39 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { isAuthenticated } from '../../server/auth-middleware'
 import { createTerminalSession } from '../../server/terminal-sessions'
 
 export const Route = createFileRoute('/api/terminal-stream')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Unauthorized' }),
+            {
+              status: 401,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
+        }
+
         const body = (await request.json().catch(() => ({}))) as Record<
           string,
           unknown
         >
-        const cwd = typeof body.cwd === 'string' ? body.cwd : undefined
-        const cols = typeof body.cols === 'number' ? body.cols : undefined
-        const rows = typeof body.rows === 'number' ? body.rows : undefined
+        const cwd =
+          typeof body.cwd === 'string' && body.cwd.trim().length > 0
+            ? body.cwd.trim()
+            : undefined
+        const cols =
+          typeof body.cols === 'number'
+            ? Math.max(20, Math.min(500, Math.floor(body.cols)))
+            : undefined
+        const rows =
+          typeof body.rows === 'number'
+            ? Math.max(5, Math.min(300, Math.floor(body.rows)))
+            : undefined
         const command = Array.isArray(body.command)
-          ? body.command.map(String)
+          ? body.command.slice(0, 32).map((part) => String(part).slice(0, 2000))
           : undefined
 
         const encoder = new TextEncoder()

@@ -839,6 +839,21 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
     ? new Date(agentsQuery.dataUpdatedAt).toLocaleTimeString()
     : null
 
+  if (missionControlEnabled) {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-x-hidden">
+        {usingFallbackRegistry ? (
+          <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
+            Gateway registry unavailable. Showing fallback definitions.
+          </div>
+        ) : null}
+        <div className="min-h-0 flex-1">
+          <AgentHubLayout agents={runtimeAgents} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-x-hidden md:hidden">
@@ -937,109 +952,96 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
       </div>
 
       <div className="hidden h-full min-h-0 flex-col overflow-x-hidden md:flex">
-        {missionControlEnabled ? (
-          <div className="flex min-h-0 flex-1 flex-col">
-            {usingFallbackRegistry ? (
-              <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
-                Gateway registry unavailable. Showing fallback definitions.
-              </div>
-            ) : null}
-            <div className="min-h-0 flex-1">
-              <AgentHubLayout agents={runtimeAgents} />
+        <>
+          <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
+            <div className="flex items-center gap-3">
+              <h1 className="text-sm font-semibold text-ink md:text-[15px]">
+                Gateway Agents
+              </h1>
+              <span className="text-xs font-medium text-primary-500">
+                Registry
+              </span>
+              {agentsQuery.isFetching && !agentsQuery.isLoading ? (
+                <span className="text-[10px] text-primary-500 animate-pulse">
+                  syncing...
+                </span>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2 md:gap-3">
+              {lastUpdated ? (
+                <span className="text-[10px] text-primary-500">
+                  Updated {lastUpdated}
+                </span>
+              ) : null}
+              <span
+                className={`inline-block size-2 rounded-full ${agentsQuery.isError ? 'bg-red-500' : agentsQuery.isSuccess ? 'bg-emerald-500' : 'bg-amber-500'}`}
+              />
             </div>
           </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
-              <div className="flex items-center gap-3">
-                <h1 className="text-sm font-semibold text-ink md:text-[15px]">
-                  Gateway Agents
-                </h1>
-                <span className="text-xs font-medium text-primary-500">
-                  Registry
-                </span>
-                {agentsQuery.isFetching && !agentsQuery.isLoading ? (
-                  <span className="text-[10px] text-primary-500 animate-pulse">
-                    syncing...
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-2 md:gap-3">
-                {lastUpdated ? (
-                  <span className="text-[10px] text-primary-500">
-                    Updated {lastUpdated}
-                  </span>
-                ) : null}
-                <span
-                  className={`inline-block size-2 rounded-full ${agentsQuery.isError ? 'bg-red-500' : agentsQuery.isSuccess ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                />
-              </div>
+
+          {usingFallbackRegistry ? (
+            <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
+              Gateway registry unavailable. Showing fallback definitions.
             </div>
+          ) : null}
 
-            {usingFallbackRegistry ? (
-              <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
-                Gateway registry unavailable. Showing fallback definitions.
-              </div>
-            ) : null}
+          <div className="flex-1 min-h-0">
+            <div className="h-full overflow-auto px-6 py-4">
+              {registryDefinitions.length === 0 ? (
+                <div className="rounded-2xl bg-white/60 dark:bg-neutral-900/50 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-sm p-5">
+                  <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                    Add your first agent
+                  </h2>
+                  <ul className="mt-3 space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
+                    <li>Create an agent profile</li>
+                    <li>Connect a gateway</li>
+                    <li>Spawn your first session</li>
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigate({ to: '/settings' })
+                    }}
+                    className="mt-4 inline-flex h-9 items-center rounded-xl bg-accent-500 px-4 text-sm font-medium text-white shadow-sm hover:bg-accent-600"
+                  >
+                    Open Settings
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {groupedSections.map((section) => (
+                    <section key={section.category} className="space-y-2">
+                      <div className="flex items-center justify-between px-1">
+                        <h2 className="text-xs font-semibold tracking-wide text-neutral-500 dark:text-neutral-400">
+                          {section.category}
+                        </h2>
+                        <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                          {section.agents.length}
+                        </span>
+                      </div>
 
-            <div className="flex-1 min-h-0">
-              <div className="h-full overflow-auto px-6 py-4">
-                {registryDefinitions.length === 0 ? (
-                  <div className="rounded-2xl bg-white/60 dark:bg-neutral-900/50 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-sm p-5">
-                    <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
-                      Add your first agent
-                    </h2>
-                    <ul className="mt-3 space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
-                      <li>Create an agent profile</li>
-                      <li>Connect a gateway</li>
-                      <li>Spawn your first session</li>
-                    </ul>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void navigate({ to: '/settings' })
-                      }}
-                      className="mt-4 inline-flex h-9 items-center rounded-xl bg-accent-500 px-4 text-sm font-medium text-white shadow-sm hover:bg-accent-600"
-                    >
-                      Open Settings
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {groupedSections.map((section) => (
-                      <section key={section.category} className="space-y-2">
-                        <div className="flex items-center justify-between px-1">
-                          <h2 className="text-xs font-semibold tracking-wide text-neutral-500 dark:text-neutral-400">
-                            {section.category}
-                          </h2>
-                          <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-                            {section.agents.length}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                          {section.agents.map((agent) => (
-                            <AgentRegistryCard
-                              key={agent.id}
-                              agent={agent}
-                              isSpawning={Boolean(spawningByAgentId[agent.id])}
-                              onTap={handleStreamTap}
-                              onChat={handleChat}
-                              onSpawn={handleSpawn}
-                              onHistory={handleHistory}
-                              onPauseToggle={handlePauseToggle}
-                              onKilled={handleKilled}
-                            />
-                          ))}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                        {section.agents.map((agent) => (
+                          <AgentRegistryCard
+                            key={agent.id}
+                            agent={agent}
+                            isSpawning={Boolean(spawningByAgentId[agent.id])}
+                            onTap={handleStreamTap}
+                            onChat={handleChat}
+                            onSpawn={handleSpawn}
+                            onHistory={handleHistory}
+                            onPauseToggle={handlePauseToggle}
+                            onKilled={handleKilled}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              )}
             </div>
-          </>
-        )}
+          </div>
+        </>
       </div>
 
       {!missionControlEnabled && streamingAgent ? (

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../../server/auth-middleware'
 import { gatewayCronRpc, normalizeCronBool } from '@/server/cron'
 
 function readString(value: unknown): string {
@@ -65,6 +66,10 @@ export const Route = createFileRoute('/api/cron/upsert')({
     handlers: {
       POST: async ({ request }) => {
         try {
+          if (!isAuthenticated(request)) {
+            return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          }
+
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
             unknown

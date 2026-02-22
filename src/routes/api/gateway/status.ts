@@ -12,7 +12,7 @@ export const Route = createFileRoute('/api/gateway/status')({
             typeof status === 'object' && status !== null ? status : {}
           return json({ connected: true, ok: true, ...data })
         } catch {
-          return json({ connected: true, ok: true })
+          return json({ connected: false, ok: false }, { status: 503 })
         }
       },
     },

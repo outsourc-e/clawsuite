@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Joyride, { CallBackProps, STATUS, Styles } from 'react-joyride'
+import Joyride, { ACTIONS, CallBackProps, STATUS, Styles } from 'react-joyride'
 import { tourSteps } from './tour-steps'
 import { useSettingsStore } from '@/hooks/use-settings'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
@@ -14,6 +14,14 @@ const ACCENT_COLORS = {
   purple: '#a855f7',
   blue: '#3b82f6',
   green: '#10b981',
+}
+
+export function shouldCompleteOnboardingTour(
+  action: string,
+  status: string,
+): boolean {
+  const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED]
+  return finishedStatuses.includes(status) || action === ACTIONS.CLOSE
 }
 
 export function OnboardingTour() {
@@ -63,10 +71,10 @@ export function OnboardingTour() {
   if (!mounted) return null
 
   const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status } = data
-    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED]
+    const { action, status } = data
+    const shouldCompleteTour = shouldCompleteOnboardingTour(action, status)
 
-    if (finishedStatuses.includes(status)) {
+    if (shouldCompleteTour) {
       try {
         localStorage.setItem(TOUR_STORAGE_KEY, 'true')
       } catch {

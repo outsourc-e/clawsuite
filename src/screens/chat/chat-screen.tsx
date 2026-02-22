@@ -79,6 +79,33 @@ type ChatScreenProps = {
   compact?: boolean
 }
 
+function normalizeMimeType(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return value.trim().toLowerCase()
+}
+
+function isImageMimeType(value: unknown): boolean {
+  const normalized = normalizeMimeType(value)
+  return normalized.startsWith('image/')
+}
+
+function readDataUrlMimeType(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const match = /^data:([^;,]+)[^,]*,/i.exec(value.trim())
+  return match?.[1]?.trim().toLowerCase() || ''
+}
+
+function stripDataUrlPrefix(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const commaIndex = trimmed.indexOf(',')
+  if (trimmed.toLowerCase().startsWith('data:') && commaIndex >= 0) {
+    return trimmed.slice(commaIndex + 1).trim()
+  }
+  return trimmed
+}
+
 function normalizeMessageValue(value: unknown): string {
   if (typeof value !== 'string') return ''
   const trimmed = value.trim()
@@ -755,16 +782,28 @@ export function ChatScreen({
       streamFinish()
     }, 120_000)
 
-    // Map to gateway-expected field names:
-    // gateway wants: mimeType, fileName, content (base64 without data: prefix)
-    const payloadAttachments = normalizedAttachments.map((attachment) => ({
-      id: attachment.id,
-      fileName: attachment.name,
-      mimeType: attachment.contentType,
-      type: attachment.contentType?.startsWith('image/') ? 'image' : 'file',
-      content: attachment.dataUrl?.replace(/^data:[^;]+;base64,/, '') ?? '',
-      size: attachment.size,
-    }))
+    // Send a compatibility shape for gateway attachment parsing.
+    // Different gateway/channel versions read different keys.
+    const payloadAttachments = normalizedAttachments.map((attachment) => {
+      const mimeType =
+        normalizeMimeType(attachment.contentType) ||
+        readDataUrlMimeType(attachment.dataUrl)
+      const encodedContent = stripDataUrlPrefix(attachment.dataUrl)
+      return {
+        id: attachment.id,
+        name: attachment.name,
+        fileName: attachment.name,
+        contentType: mimeType || undefined,
+        mimeType: mimeType || undefined,
+        mediaType: mimeType || undefined,
+        type: isImageMimeType(mimeType) ? 'image' : 'file',
+        content: encodedContent,
+        data: encodedContent,
+        base64: encodedContent,
+        dataUrl: attachment.dataUrl,
+        size: attachment.size,
+      }
+    })
 
     fetch('/api/send', {
       method: 'POST',

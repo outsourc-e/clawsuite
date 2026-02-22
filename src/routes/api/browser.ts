@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 import {
   launchBrowser,
   closeBrowser,
@@ -26,6 +27,10 @@ export const Route = createFileRoute('/api/browser')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
         const url = new URL(request.url)
         const action = url.searchParams.get('action') || 'status'
 
@@ -55,6 +60,10 @@ export const Route = createFileRoute('/api/browser')({
 
       POST: async ({ request }) => {
         try {
+          if (!isAuthenticated(request)) {
+            return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          }
+
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
             unknown
@@ -82,14 +91,17 @@ export const Route = createFileRoute('/api/browser')({
             }
 
             case 'click': {
-              const x = typeof body.x === 'number' ? body.x : 0
-              const y = typeof body.y === 'number' ? body.y : 0
+              const xRaw = typeof body.x === 'number' ? body.x : 0
+              const yRaw = typeof body.y === 'number' ? body.y : 0
+              const x = Math.max(0, Math.min(10_000, Math.floor(xRaw)))
+              const y = Math.max(0, Math.min(10_000, Math.floor(yRaw)))
               const state = await cdpMouseClick(x, y)
               return json({ ok: true, ...state })
             }
 
             case 'type': {
-              const text = typeof body.text === 'string' ? body.text : ''
+              const text =
+                typeof body.text === 'string' ? body.text.slice(0, 20_000) : ''
               const submit = body.submit === true
               const state = await typeText(text, submit)
               return json({ ok: true, ...state })
@@ -120,7 +132,9 @@ export const Route = createFileRoute('/api/browser')({
 
             case 'scroll': {
               const direction = body.direction === 'up' ? 'up' : 'down'
-              const amount = typeof body.amount === 'number' ? body.amount : 400
+              const amountRaw =
+                typeof body.amount === 'number' ? body.amount : 400
+              const amount = Math.max(10, Math.min(5000, Math.floor(amountRaw)))
               const state = await scrollPage(direction, amount)
               return json({ ok: true, ...state })
             }
