@@ -50,6 +50,13 @@ export const WIDGET_META: WidgetMeta[] = [
     defaultVisible: true,
   },
   {
+    id: 'services-health',
+    label: 'Services',
+    scope: 'dashboard',
+    tier: 'secondary',
+    defaultVisible: true,
+  },
+  {
     id: 'notifications',
     label: 'Notifications',
     scope: 'dashboard',

@@ -24,6 +24,7 @@ import { Route as FilesRouteImport } from './routes/files'
 import { Route as DebugRouteImport } from './routes/debug'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CronRouteImport } from './routes/cron'
+import { Route as CostsRouteImport } from './routes/costs'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as BrowserRouteImport } from './routes/browser'
@@ -38,12 +39,14 @@ import { Route as SettingsProvidersRouteImport } from './routes/settings/provide
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
+import { Route as ApiUsageAnalyticsRouteImport } from './routes/api/usage-analytics'
 import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as ApiUpdateCheckRouteImport } from './routes/api/update-check'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
+import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
 import { Route as ApiStreamRouteImport } from './routes/api/stream'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
@@ -176,6 +179,11 @@ const CronRoute = CronRouteImport.update({
   path: '/cron',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CostsRoute = CostsRouteImport.update({
+  id: '/costs',
+  path: '/costs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConnectRoute = ConnectRouteImport.update({
   id: '/connect',
   path: '/connect',
@@ -246,6 +254,11 @@ const ApiValidateProviderRoute = ApiValidateProviderRouteImport.update({
   path: '/api/validate-provider',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUsageAnalyticsRoute = ApiUsageAnalyticsRouteImport.update({
+  id: '/api/usage-analytics',
+  path: '/api/usage-analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiUsageRoute = ApiUsageRouteImport.update({
   id: '/api/usage',
   path: '/api/usage',
@@ -274,6 +287,11 @@ const ApiTerminalInputRoute = ApiTerminalInputRouteImport.update({
 const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
   id: '/api/terminal-close',
   path: '/api/terminal-close',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSystemMetricsRoute = ApiSystemMetricsRouteImport.update({
+  id: '/api/system-metrics',
+  path: '/api/system-metrics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiStreamRoute = ApiStreamRouteImport.update({
@@ -567,6 +585,7 @@ export interface FileRoutesByFullPath {
   '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
+  '/costs': typeof CostsRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
@@ -616,12 +635,14 @@ export interface FileRoutesByFullPath {
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
   '/api/stream': typeof ApiStreamRoute
+  '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -660,6 +681,7 @@ export interface FileRoutesByTo {
   '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
+  '/costs': typeof CostsRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
@@ -708,12 +730,14 @@ export interface FileRoutesByTo {
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
   '/api/stream': typeof ApiStreamRoute
+  '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -753,6 +777,7 @@ export interface FileRoutesById {
   '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
+  '/costs': typeof CostsRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
@@ -802,12 +827,14 @@ export interface FileRoutesById {
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
   '/api/stream': typeof ApiStreamRoute
+  '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -848,6 +875,7 @@ export interface FileRouteTypes {
     | '/browser'
     | '/channels'
     | '/connect'
+    | '/costs'
     | '/cron'
     | '/dashboard'
     | '/debug'
@@ -897,12 +925,14 @@ export interface FileRouteTypes {
     | '/api/sessions'
     | '/api/skills'
     | '/api/stream'
+    | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/update-check'
     | '/api/usage'
+    | '/api/usage-analytics'
     | '/api/validate-provider'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -941,6 +971,7 @@ export interface FileRouteTypes {
     | '/browser'
     | '/channels'
     | '/connect'
+    | '/costs'
     | '/cron'
     | '/dashboard'
     | '/debug'
@@ -989,12 +1020,14 @@ export interface FileRouteTypes {
     | '/api/sessions'
     | '/api/skills'
     | '/api/stream'
+    | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/update-check'
     | '/api/usage'
+    | '/api/usage-analytics'
     | '/api/validate-provider'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -1033,6 +1066,7 @@ export interface FileRouteTypes {
     | '/browser'
     | '/channels'
     | '/connect'
+    | '/costs'
     | '/cron'
     | '/dashboard'
     | '/debug'
@@ -1082,12 +1116,14 @@ export interface FileRouteTypes {
     | '/api/sessions'
     | '/api/skills'
     | '/api/stream'
+    | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/update-check'
     | '/api/usage'
+    | '/api/usage-analytics'
     | '/api/validate-provider'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -1127,6 +1163,7 @@ export interface RootRouteChildren {
   BrowserRoute: typeof BrowserRoute
   ChannelsRoute: typeof ChannelsRoute
   ConnectRoute: typeof ConnectRoute
+  CostsRoute: typeof CostsRoute
   CronRoute: typeof CronRoute
   DashboardRoute: typeof DashboardRoute
   DebugRoute: typeof DebugRoute
@@ -1176,12 +1213,14 @@ export interface RootRouteChildren {
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRoute
   ApiStreamRoute: typeof ApiStreamRoute
+  ApiSystemMetricsRoute: typeof ApiSystemMetricsRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiUpdateCheckRoute: typeof ApiUpdateCheckRoute
   ApiUsageRoute: typeof ApiUsageRoute
+  ApiUsageAnalyticsRoute: typeof ApiUsageAnalyticsRoute
   ApiValidateProviderRoute: typeof ApiValidateProviderRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
@@ -1305,6 +1344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CronRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/costs': {
+      id: '/costs'
+      path: '/costs'
+      fullPath: '/costs'
+      preLoaderRoute: typeof CostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/connect': {
       id: '/connect'
       path: '/connect'
@@ -1403,6 +1449,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiValidateProviderRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/usage-analytics': {
+      id: '/api/usage-analytics'
+      path: '/api/usage-analytics'
+      fullPath: '/api/usage-analytics'
+      preLoaderRoute: typeof ApiUsageAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/usage': {
       id: '/api/usage'
       path: '/api/usage'
@@ -1443,6 +1496,13 @@ declare module '@tanstack/react-router' {
       path: '/api/terminal-close'
       fullPath: '/api/terminal-close'
       preLoaderRoute: typeof ApiTerminalCloseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/system-metrics': {
+      id: '/api/system-metrics'
+      path: '/api/system-metrics'
+      fullPath: '/api/system-metrics'
+      preLoaderRoute: typeof ApiSystemMetricsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/stream': {
@@ -1926,6 +1986,7 @@ const rootRouteChildren: RootRouteChildren = {
   BrowserRoute: BrowserRoute,
   ChannelsRoute: ChannelsRoute,
   ConnectRoute: ConnectRoute,
+  CostsRoute: CostsRoute,
   CronRoute: CronRoute,
   DashboardRoute: DashboardRoute,
   DebugRoute: DebugRoute,
@@ -1975,12 +2036,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRoute,
   ApiStreamRoute: ApiStreamRoute,
+  ApiSystemMetricsRoute: ApiSystemMetricsRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiUpdateCheckRoute: ApiUpdateCheckRoute,
   ApiUsageRoute: ApiUsageRoute,
+  ApiUsageAnalyticsRoute: ApiUsageAnalyticsRoute,
   ApiValidateProviderRoute: ApiValidateProviderRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,

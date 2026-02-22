@@ -4,6 +4,7 @@ import {
   BotIcon,
   BrainIcon,
   ChartLineData01Icon,
+  ChartLineData02Icon,
   Chat01Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
@@ -545,6 +546,7 @@ function ChatSidebarComponent({
   const isChannelsActive = pathname === '/channels'
   const isSessionsActive = pathname === '/sessions'
   const isUsageActive = pathname === '/usage'
+  const isCostsActive = pathname === '/costs'
   const isInstancesActive = pathname === '/instances'
   // Agent
   const isAgentsActive = pathname === '/agents'
@@ -576,6 +578,7 @@ function ChatSidebarComponent({
     '/instances',
     '/sessions',
     '/usage',
+    '/costs',
     '/agents',
     '/nodes',
   ]
@@ -865,6 +868,13 @@ function ChatSidebarComponent({
       icon: ChartLineData01Icon,
       label: 'Usage',
       active: isUsageActive,
+    },
+    {
+      kind: 'link',
+      to: '/costs',
+      icon: ChartLineData02Icon,
+      label: 'Costs',
+      active: isCostsActive,
     },
     {
       kind: 'link',

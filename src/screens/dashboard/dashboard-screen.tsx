@@ -28,6 +28,7 @@ import { CollapsibleWidget } from './components/collapsible-widget'
 import { MetricsWidget } from './components/metrics-widget'
 import { NotificationsWidget } from './components/notifications-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
+import { ServicesHealthWidget } from './components/services-health-widget'
 import { SkillsWidget } from './components/skills-widget'
 import { TasksWidget } from './components/tasks-widget'
 import { UsageMeterWidget } from './components/usage-meter-widget'
@@ -341,6 +342,7 @@ export function DashboardScreen() {
   const desktopLayout = useMemo(
     function buildDesktopLayout() {
       return {
+        showServices: visibleWidgetSet.has('services-health'),
         showUsage: visibleWidgetSet.has('usage-meter'),
         showSquad: visibleWidgetSet.has('agent-status'),
         showSessions: visibleWidgetSet.has('recent-sessions'),
@@ -358,10 +360,33 @@ export function DashboardScreen() {
     function buildMobileDeepSections() {
       const sections: Array<MobileWidgetSection> = []
       const deepTierOrder = widgetOrder.filter((id) =>
-        ['activity', 'agents', 'sessions', 'tasks', 'skills', 'usage'].includes(id),
+        ['services', 'activity', 'agents', 'sessions', 'tasks', 'skills', 'usage'].includes(id),
       )
 
       for (const widgetId of deepTierOrder) {
+        if (widgetId === 'services') {
+          if (!visibleWidgetSet.has('services-health')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Services',
+            content: (
+              <div className="w-full">
+                <CollapsibleWidget
+                  title="Services"
+                  summary={dashboardData.connection.connected ? 'Gateway connected' : 'Gateway disconnected'}
+                  defaultOpen={false}
+                >
+                  <ServicesHealthWidget
+                    gatewayConnected={dashboardData.connection.connected}
+                    onRemove={() => removeWidget('services-health')}
+                  />
+                </CollapsibleWidget>
+              </div>
+            ),
+          })
+          continue
+        }
+
         if (widgetId === 'activity') {
           if (!visibleWidgetSet.has('activity-log')) continue
           sections.push({
@@ -501,6 +526,7 @@ export function DashboardScreen() {
     [
       dashboardData.cron.done,
       dashboardData.cron.inProgress,
+      dashboardData.connection.connected,
       dashboardData.skills.enabled,
       navigate,
       refetch,
@@ -897,6 +923,13 @@ export function DashboardScreen() {
               {/* 3. Metric cards row — Sessions · Active Agents · Cost Today · Uptime */}
               {/* These complement SystemGlance: they add micro charts, trend pills & time-range selectors */}
               <WidgetGrid items={metricItems} className="gap-4" />
+
+              {desktopLayout.showServices ? (
+                <ServicesHealthWidget
+                  gatewayConnected={dashboardData.connection.connected}
+                  onRemove={() => removeWidget('services-health')}
+                />
+              ) : null}
 
               {/* D1: Widget edit controls — inline row above widgets */}
               <div className="flex items-center justify-end gap-2">
