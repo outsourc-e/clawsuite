@@ -365,28 +365,48 @@ export const Route = createFileRoute('/api/usage-analytics')({
         }
 
         try {
-          const [sessionsPayload, costPayload] = await withTimeout(
-            Promise.all([
-              gatewayRpc<Record<string, unknown>>('sessions.usage', {
-                limit: 1000,
-                includeContextWeight: true,
-              }),
-              gatewayRpc<Record<string, unknown>>('usage.cost', {}),
-            ]),
+          const costPayload = await withTimeout(
+            gatewayRpc<Record<string, unknown>>('usage.cost', {}),
             REQUEST_TIMEOUT_MS,
             'Usage analytics request timed out',
           )
 
-          const configuredPricing = readConfiguredModelPricing()
-          const parsed = normalizeSessionsUsage(sessionsPayload, configuredPricing)
+          // usage.cost already includes sessions, models, and daily breakdowns
+          // No need for the slower sessions.usage RPC
+          const costRoot = toRecord(costPayload)
+          const modelsRoot = toRecord(costRoot.models)
+          const modelRows = Array.isArray(modelsRoot.rows) ? modelsRoot.rows : []
+          const rawSessions = Array.isArray(costRoot.sessions)
+            ? costRoot.sessions
+            : []
 
           return json({
             ok: true,
-            sessions: parsed.sessions,
-            cost: costPayload,
+            sessions: rawSessions.map((s: unknown) => {
+              const row = toRecord(s)
+              return {
+                sessionKey: readString(row.sessionKey ?? row.key ?? ''),
+                model: readString(row.model ?? ''),
+                inputTokens: readNumber(row.inputTokens),
+                outputTokens: readNumber(row.outputTokens),
+                totalTokens: readNumber(row.totalTokens),
+                costUsd: readNumber(row.costUsd ?? row.totalCost),
+                lastActiveAt: toTimestampMs(row.lastActiveAt ?? row.updatedAt),
+              }
+            }),
+            cost: costRoot.cost ?? costRoot,
             models: {
-              rows: parsed.models,
-              totals: parsed.totals,
+              rows: modelRows.map((m: unknown) => {
+                const row = toRecord(m)
+                return {
+                  model: readString(row.model ?? ''),
+                  inputTokens: readNumber(row.inputTokens),
+                  outputTokens: readNumber(row.outputTokens),
+                  totalTokens: readNumber(row.totalTokens),
+                  costUsd: readNumber(row.costUsd ?? row.totalCost),
+                }
+              }),
+              totals: toRecord(modelsRoot.totals),
             },
           })
         } catch (error) {
