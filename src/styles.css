@@ -260,6 +260,16 @@ body {
   white-space: nowrap;
 }
 
+@keyframes subtle-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
 .code-block .shiki {
   background: transparent !important;
   margin: 0;
