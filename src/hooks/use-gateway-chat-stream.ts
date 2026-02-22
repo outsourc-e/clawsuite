@@ -28,14 +28,12 @@ export function useGatewayChatStream(
     onDone,
   } = options
 
-  const {
-    connectionState,
-    setConnectionState,
-    processEvent,
-    clearStreamingSession,
-    clearAllStreaming,
-    lastError,
-  } = useGatewayChatStore()
+  const connectionState = useGatewayChatStore((s) => s.connectionState)
+  const setConnectionState = useGatewayChatStore((s) => s.setConnectionState)
+  const processEvent = useGatewayChatStore((s) => s.processEvent)
+  const clearStreamingSession = useGatewayChatStore((s) => s.clearStreamingSession)
+  const clearAllStreaming = useGatewayChatStore((s) => s.clearAllStreaming)
+  const lastError = useGatewayChatStore((s) => s.lastError)
 
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)

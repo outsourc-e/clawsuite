@@ -6,6 +6,9 @@ import { appendHistoryMessage, chatQueryKeys } from '../chat-queries'
 import { toast } from '../../../components/ui/toast'
 import type { GatewayMessage } from '../types'
 
+const EMPTY_MESSAGES: GatewayMessage[] = []
+const EMPTY_TOOL_CALLS: Array<{ id: string; name: string; phase: string; args?: unknown }> = []
+
 type UseRealtimeChatHistoryOptions = {
   sessionKey: string
   friendlyId: string
@@ -95,11 +98,12 @@ export function useRealtimeChatHistory({
     ),
   })
 
-  const { mergeHistoryMessages, clearSession, lastEventAt } =
-    useGatewayChatStore()
+  const mergeHistoryMessages = useGatewayChatStore((s) => s.mergeHistoryMessages)
+  const clearSession = useGatewayChatStore((s) => s.clearSession)
+  const lastEventAt = useGatewayChatStore((s) => s.lastEventAt)
   const clearRealtimeBuffer = useGatewayChatStore((s) => s.clearRealtimeBuffer)
   const realtimeMessages = useGatewayChatStore(
-    (s) => s.realtimeMessages.get(sessionKey) ?? [],
+    (s) => s.realtimeMessages.get(sessionKey) ?? EMPTY_MESSAGES,
   )
 
   // Subscribe directly to streaming state — useMemo with stable fn ref was stale (bug #1)
@@ -202,7 +206,7 @@ export function useRealtimeChatHistory({
     realtimeStreamingText,
     realtimeStreamingThinking,
     streamingRunId: streamingState?.runId ?? null,
-    activeToolCalls: streamingState?.toolCalls ?? [],
+    activeToolCalls: streamingState?.toolCalls ?? EMPTY_TOOL_CALLS,
     lastCompletedRunAt, // Parent watches this to clear waitingForResponse
   }
 }
