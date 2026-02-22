@@ -5,23 +5,19 @@ import {
   Cancel01Icon,
   CheckmarkCircle02Icon,
   CloudIcon,
-  ComputerIcon,
-  Moon01Icon,
   Notification03Icon,
   PaintBoardIcon,
   Settings02Icon,
   SourceCodeSquareIcon,
-  Sun01Icon,
   UserIcon,
   MessageMultiple01Icon,
 } from '@hugeicons/core-free-icons'
 import { useState, useEffect, Component } from 'react'
 import type * as React from 'react'
-import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
+import type { AccentColor } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
-import { applyTheme, useSettings } from '@/hooks/use-settings'
+import { useSettings } from '@/hooks/use-settings'
 import { THEMES, type AppTheme } from '@/lib/theme-system'
 import { cn } from '@/lib/utils'
 import {
@@ -249,12 +245,6 @@ function AppearanceContent() {
   const { settings, updateSettings } = useSettings()
   const { appTheme } = settings
 
-  function handleThemeChange(value: string) {
-    const theme = value as SettingsThemeMode
-    applyTheme(theme)
-    updateSettings({ theme })
-  }
-
   function badgeClass(color: AccentColor): string {
     if (color === 'orange') return 'bg-orange-500'
     if (color === 'purple') return 'bg-purple-500'
@@ -299,24 +289,7 @@ function AppearanceContent() {
           </p>
         </div>
       </Row>
-      <Row label="Mode">
-        <Tabs value={settings.theme} onValueChange={handleThemeChange}>
-          <TabsList variant="default" className="gap-1">
-            <TabsTab value="system">
-              <HugeiconsIcon icon={ComputerIcon} size={16} strokeWidth={1.5} />
-              <span>System</span>
-            </TabsTab>
-            <TabsTab value="light">
-              <HugeiconsIcon icon={Sun01Icon} size={16} strokeWidth={1.5} />
-              <span>Light</span>
-            </TabsTab>
-            <TabsTab value="dark">
-              <HugeiconsIcon icon={Moon01Icon} size={16} strokeWidth={1.5} />
-              <span>Dark</span>
-            </TabsTab>
-          </TabsList>
-        </Tabs>
-      </Row>
+
       <Row label="Accent color">
         <div className="flex gap-1.5">
           {(['orange', 'purple', 'blue', 'green'] as const).map((color) => (

@@ -72,7 +72,7 @@
 }
 
 [data-theme='ops-dark'] {
-  /* dense structural dark, crisp borders, minimal shadows */
+  /* dense structural dark, crisp borders, minimal shadows — warm neutral */
   --theme-bg: oklch(0.11 0.005 80);
   --theme-panel: oklch(0.15 0.006 80);
   --theme-card: oklch(0.19 0.006 80);
@@ -84,10 +84,24 @@
   --theme-shadow-2: 0 2px 6px rgba(0, 0, 0, 0.4);
   --theme-shadow-3: 0 4px 12px rgba(0, 0, 0, 0.5);
   --theme-glass: rgba(12, 12, 12, 0.8);
+  /* override primary scale: warm dark (same hue as default .dark) */
+  --color-primary-50: oklch(0.13 0.006 80);
+  --color-primary-100: oklch(0.17 0.006 80);
+  --color-primary-200: oklch(0.24 0.008 80);
+  --color-primary-300: oklch(0.32 0.008 80);
+  --color-primary-400: oklch(0.44 0.008 80);
+  --color-primary-500: oklch(0.55 0.008 80);
+  --color-primary-600: oklch(0.66 0.007 80);
+  --color-primary-700: oklch(0.77 0.006 80);
+  --color-primary-800: oklch(0.85 0.004 80);
+  --color-primary-900: oklch(0.92 0.003 80);
+  --color-primary-950: oklch(0.96 0.002 80);
+  --color-surface: oklch(0.11 0.005 80);
+  --color-ink: oklch(0.95 0.002 80);
 }
 
 [data-theme='premium-dark'] {
-  /* deeper shadows, soft inner highlight, vignette feel */
+  /* deeper shadows, cool blue-slate tint — Nuxt premium feel */
   --theme-bg: oklch(0.09 0.008 260);
   --theme-panel: oklch(0.13 0.01 260);
   --theme-card: oklch(0.17 0.01 260);
@@ -99,6 +113,20 @@
   --theme-shadow-2: 0 6px 20px rgba(0, 0, 0, 0.7);
   --theme-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.8);
   --theme-glass: rgba(10, 10, 20, 0.8);
+  /* override primary scale: cool blue-slate (hue 250) */
+  --color-primary-50: oklch(0.13 0.012 250);
+  --color-primary-100: oklch(0.18 0.014 250);
+  --color-primary-200: oklch(0.25 0.016 250);
+  --color-primary-300: oklch(0.33 0.018 250);
+  --color-primary-400: oklch(0.44 0.018 250);
+  --color-primary-500: oklch(0.55 0.016 250);
+  --color-primary-600: oklch(0.66 0.014 250);
+  --color-primary-700: oklch(0.76 0.012 250);
+  --color-primary-800: oklch(0.84 0.008 250);
+  --color-primary-900: oklch(0.91 0.006 250);
+  --color-primary-950: oklch(0.96 0.004 250);
+  --color-surface: oklch(0.09 0.008 260);
+  --color-ink: oklch(0.96 0.004 260);
 }
 
 [data-theme='paper-light'] {

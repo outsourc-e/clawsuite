@@ -67,6 +67,9 @@ export const useSettingsStore = create<SettingsState>()(
           ) {
             applyAppTheme(nextSettings.appTheme)
             saveTheme(nextSettings.appTheme)
+            // Sync legacy theme mode so .dark class is always consistent
+            nextSettings.theme = nextSettings.appTheme === 'paper-light' ? 'light' : 'dark'
+            applyTheme(nextSettings.theme)
           }
 
           set({ settings: nextSettings })
