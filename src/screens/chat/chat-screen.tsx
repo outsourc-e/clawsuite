@@ -265,7 +265,7 @@ export function ChatScreen({
   // Re-apply display filter to realtime messages
   const finalDisplayMessages = useMemo(() => {
     // Rebuild display filter on merged messages
-    return realtimeMessages.filter((msg) => {
+    const filtered = realtimeMessages.filter((msg) => {
       if (msg.role === 'user') {
         const text = textFromMessage(msg)
         if (text.startsWith('A subagent task')) return false
@@ -286,6 +286,15 @@ export function ChatScreen({
         return hasText
       }
       return false
+    })
+    // Dedup: SSE + history merge can produce duplicates — remove by role+text
+    const seen = new Set<string>()
+    return filtered.filter((msg) => {
+      const text = textFromMessage(msg)
+      const key = `${msg.role}:${text.slice(0, 200)}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
     })
   }, [realtimeMessages])
 
