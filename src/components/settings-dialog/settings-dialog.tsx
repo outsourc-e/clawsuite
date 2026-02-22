@@ -312,6 +312,29 @@ function AppearanceContent() {
           ))}
         </div>
       </Row>
+      <Row label="System metrics bar">
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-primary-500">
+            {settings.showSystemMetrics ? 'Visible' : 'Hidden'}
+          </span>
+          <button
+            type="button"
+            onClick={() => updateSettings({ showSystemMetrics: !settings.showSystemMetrics })}
+            className={cn(
+              'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+              settings.showSystemMetrics ? 'bg-accent-500' : 'bg-primary-200 dark:bg-neutral-700',
+            )}
+            aria-label="Toggle system metrics bar"
+          >
+            <span
+              className={cn(
+                'inline-block size-3.5 rounded-full bg-white shadow transition-transform',
+                settings.showSystemMetrics ? 'translate-x-4' : 'translate-x-0.5',
+              )}
+            />
+          </button>
+        </div>
+      </Row>
       <LoaderContent />
     </div>
   )

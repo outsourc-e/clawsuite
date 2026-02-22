@@ -25,6 +25,7 @@ export type StudioSettings = {
   preferredBudgetModel: string
   preferredPremiumModel: string
   onlySuggestCheaper: boolean
+  showSystemMetrics: boolean
 }
 
 type SettingsState = {
@@ -47,6 +48,7 @@ export const defaultStudioSettings: StudioSettings = {
   preferredBudgetModel: '',
   preferredPremiumModel: '',
   onlySuggestCheaper: false,
+  showSystemMetrics: true,
 }
 
 export const useSettingsStore = create<SettingsState>()(

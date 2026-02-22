@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
 import { TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
@@ -985,6 +986,8 @@ function HistoryView() {
 }
 
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
+  const navigate = useNavigate()
+
   // ── Tab + sidebar state ────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<ActiveTab>('mission')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
@@ -2798,11 +2801,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 bg-neutral-900 px-5 py-3">
-        <div>
-          <h1 className="text-base font-semibold tracking-tight text-neutral-100">
-            Agent Hub
-          </h1>
-          <p className="font-mono text-[10px] text-neutral-500">// Mission Control</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate({ to: '/' })}
+            className="flex items-center justify-center size-7 rounded-md text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-100"
+            aria-label="Go back to dashboard"
+          >
+            ←
+          </button>
+          <div>
+            <h1 className="text-base font-semibold tracking-tight text-neutral-100">
+              Agent Hub
+            </h1>
+            <p className="font-mono text-[10px] text-neutral-500">// Mission Control</p>
+          </div>
         </div>
         {/* Status pill lives in the header */}
         <GatewayStatusPill

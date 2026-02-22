@@ -18,6 +18,7 @@ import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
+import { useSettings } from '@/hooks/use-settings'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
@@ -55,6 +56,8 @@ export function WorkspaceShell() {
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
+  const { settings } = useSettings()
+  const showSystemMetrics = settings.showSystemMetrics ?? true
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
 
   // ChatGPT-style: track visual viewport height for keyboard-aware layout
@@ -258,7 +261,7 @@ export function WorkspaceShell() {
         ) : null}
       </div>
 
-      <SystemMetricsFooter />
+      {showSystemMetrics ? <SystemMetricsFooter /> : null}
       {isMobile ? <MobileTabBar /> : null}
     </>
   )
