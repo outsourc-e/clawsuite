@@ -788,24 +788,13 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
-              <QuickActionsRow />
+              {/* 2x2 cockpit grid — above the fold, always visible on mobile */}
+              <CockpitMetricsGrid
+                data={dashboardData}
+                uptimeDisplay={uptimeDisplay}
+              />
 
-              <CollapsibleWidget
-                title="Token Usage"
-                summary={`${costTodayDisplay} today • ${dashboardData.sessions.active || dashboardData.agents.active || 0} active sessions`}
-                defaultOpen={false}
-                className="bg-primary-50/70"
-                contentClassName="pt-2"
-              >
-                <div className="max-[767px]:hidden">
-                  <TokenUsageHero data={dashboardData} />
-                </div>
-                <CockpitMetricsGrid
-                  data={dashboardData}
-                  uptimeDisplay={uptimeDisplay}
-                  className="hidden max-[767px]:grid"
-                />
-              </CollapsibleWidget>
+              <QuickActionsRow />
 
               {/* MetricCards intentionally omitted on mobile — SystemGlance above is the canonical hero */}
 
