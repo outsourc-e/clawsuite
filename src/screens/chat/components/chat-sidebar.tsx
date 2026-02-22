@@ -181,7 +181,7 @@ function NavItem({
     'w-full h-auto min-h-11 gap-2.5 py-2 md:min-h-0',
     isCollapsed ? 'justify-center px-0' : 'justify-start px-3',
     item.active
-      ? 'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15'
+      ? 'bg-[#FF6B2B]/12 text-[#FF6B2B] hover:bg-[#FF6B2B]/18'
       : 'text-primary-900 hover:bg-primary-200',
   )
 
@@ -592,11 +592,6 @@ function ChatSidebarComponent({
   const suiteNav = getLastRoute('suite') || '/dashboard'
   const gatewayNav = getLastRoute('gateway') || '/channels'
 
-  const transition = {
-    duration: 0.15,
-    ease: isCollapsed ? 'easeIn' : 'easeOut',
-  } as const
-
   const recentIssuesQuery = useQuery({
     queryKey: ['activity', 'recent-issues-indicator'],
     queryFn: fetchHasRecentIssues,
@@ -630,8 +625,15 @@ function ChatSidebarComponent({
   const [deleteSessionTitle, setDeleteSessionTitle] = useState('')
   const [providersOpen, setProvidersOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [desktopRailHovered, setDesktopRailHovered] = useState(false)
   const sidebarRef = useRef<HTMLElement | null>(null)
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
+  const uiCollapsed = isMobile ? isCollapsed : !desktopRailHovered
+
+  const transition = {
+    duration: 0.15,
+    ease: uiCollapsed ? 'easeIn' : 'easeOut',
+  } as const
 
   function handleOpenRename(session: SessionMeta) {
     setRenameSessionKey(session.key)
@@ -917,12 +919,14 @@ function ChatSidebarComponent({
       }}
       initial={false}
       animate={{
-        width: isCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
+        width: uiCollapsed ? (isMobile ? 0 : 60) : isMobile ? '85vw' : 300,
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
+      onMouseEnter={isMobile ? undefined : () => setDesktopRailHovered(true)}
+      onMouseLeave={isMobile ? undefined : () => setDesktopRailHovered(false)}
       aria-hidden={isMobile && isCollapsed ? true : undefined}
       {...(isMobile && isCollapsed ? { inert: '' as unknown as boolean } : {})}
     >
@@ -932,11 +936,11 @@ function ChatSidebarComponent({
         transition={{ layout: transition }}
         className={cn(
           'flex items-center h-12 px-2',
-          isCollapsed ? 'justify-center' : 'justify-between',
+          uiCollapsed ? 'justify-center' : 'justify-between',
         )}
       >
         <AnimatePresence initial={false}>
-          {!isCollapsed ? (
+          {!uiCollapsed ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -956,35 +960,37 @@ function ChatSidebarComponent({
             </motion.div>
           ) : null}
         </AnimatePresence>
-        <TooltipProvider>
-          <TooltipRoot>
-            <TooltipTrigger
-              onClick={onToggleCollapse}
-              render={
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label={isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
-                  className="shrink-0"
-                  data-tour="sidebar-collapse-toggle"
-                >
-                  {isCollapsed ? (
-                    <OpenClawStudioIcon className="size-5 rounded-sm" />
-                  ) : (
-                    <HugeiconsIcon
-                      icon={SidebarLeft01Icon}
-                      size={20}
-                      strokeWidth={1.5}
-                    />
-                  )}
-                </Button>
-              }
-            />
-            <TooltipContent side="right">
-              {isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
-            </TooltipContent>
-          </TooltipRoot>
-        </TooltipProvider>
+        {isMobile ? (
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                onClick={onToggleCollapse}
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label={uiCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                    className="shrink-0"
+                    data-tour="sidebar-collapse-toggle"
+                  >
+                    {uiCollapsed ? (
+                      <OpenClawStudioIcon className="size-5 rounded-sm" />
+                    ) : (
+                      <HugeiconsIcon
+                        icon={SidebarLeft01Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                    )}
+                  </Button>
+                }
+              />
+              <TooltipContent side="right">
+                {uiCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+              </TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        ) : null}
       </motion.div>
 
       {/* ── Search (ChatGPT-style, above sections) ─────────────────── */}
@@ -996,7 +1002,7 @@ function ChatSidebarComponent({
         >
           <NavItem
             item={searchItem}
-            isCollapsed={isCollapsed}
+            isCollapsed={uiCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
           />
@@ -1004,7 +1010,7 @@ function ChatSidebarComponent({
       </div>
 
       {/* ── New Session button ──────────────────────────────────────── */}
-      {!isCollapsed && (
+      {!uiCollapsed && (
         <div className="px-2 pb-1">
           <Link
             to="/chat/$sessionKey"
@@ -1016,7 +1022,7 @@ function ChatSidebarComponent({
               buttonVariants({ variant: 'ghost', size: 'sm' }),
               'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200',
               isNewSessionActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15',
+                'bg-[#FF6B2B]/12 text-[#FF6B2B] hover:bg-[#FF6B2B]/18',
             )}
             data-tour="new-session"
           >
@@ -1040,7 +1046,7 @@ function ChatSidebarComponent({
               {/* SUITE */}
               <SectionLabel
                 label="Suite"
-                isCollapsed={isCollapsed}
+                isCollapsed={uiCollapsed}
                 transition={transition}
                 collapsible
                 expanded={suiteExpanded || isAnySuiteActive}
@@ -1048,9 +1054,9 @@ function ChatSidebarComponent({
                 navigateTo={suiteNav}
               />
               <CollapsibleSection
-                expanded={suiteExpanded || isAnySuiteActive || isCollapsed}
+                expanded={suiteExpanded || isAnySuiteActive || uiCollapsed}
                 items={suiteItems}
-                isCollapsed={isCollapsed}
+                isCollapsed={uiCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
               />
@@ -1061,16 +1067,16 @@ function ChatSidebarComponent({
             <>
               <SectionLabel
                 label="System"
-                isCollapsed={isCollapsed}
+                isCollapsed={uiCollapsed}
                 transition={transition}
                 collapsible
                 expanded={systemExpanded || isAnySystemActive}
                 onToggle={toggleSystem}
               />
               <CollapsibleSection
-                expanded={systemExpanded || isAnySystemActive || isCollapsed}
+                expanded={systemExpanded || isAnySystemActive || uiCollapsed}
                 items={mobileSecondarySuite}
-                isCollapsed={isCollapsed}
+                isCollapsed={uiCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
               />
@@ -1080,7 +1086,7 @@ function ChatSidebarComponent({
           {/* GATEWAY */}
           <SectionLabel
             label="Gateway"
-            isCollapsed={isCollapsed}
+            isCollapsed={uiCollapsed}
             transition={transition}
             collapsible
             expanded={gatewayExpanded || isAnyGatewayActive}
@@ -1088,9 +1094,9 @@ function ChatSidebarComponent({
             navigateTo={gatewayNav}
           />
           <CollapsibleSection
-            expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
+            expanded={gatewayExpanded || isAnyGatewayActive || uiCollapsed}
             items={gatewayItems}
-            isCollapsed={isCollapsed}
+            isCollapsed={uiCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
           />
@@ -1104,7 +1110,7 @@ function ChatSidebarComponent({
           )}
         >
           <AnimatePresence initial={false}>
-            {!isCollapsed && (
+            {!uiCollapsed && (
               <motion.div
                 key="content"
                 initial={{ opacity: 0 }}
@@ -1138,7 +1144,7 @@ function ChatSidebarComponent({
         {/* User card + actions */}
         <div className={cn(
           'flex items-center rounded-lg transition-colors',
-          isCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
+          uiCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
         )}>
           {/* User menu trigger */}
           <MenuRoot>
@@ -1146,7 +1152,7 @@ function ChatSidebarComponent({
               data-tour="settings"
               className={cn(
                 'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200/70 dark:hover:bg-neutral-800 flex-1 min-w-0',
-                isCollapsed ? 'justify-center px-0' : 'px-1.5',
+                uiCollapsed ? 'justify-center px-0' : 'px-1.5',
               )}
             >
               <UserAvatar
@@ -1155,7 +1161,7 @@ function ChatSidebarComponent({
                 alt={profileDisplayName}
               />
               <AnimatePresence initial={false} mode="wait">
-                {!isCollapsed && (
+                {!uiCollapsed && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -1208,7 +1214,7 @@ function ChatSidebarComponent({
           </MenuRoot>
 
           {/* Settings + Theme toggle */}
-          {!isCollapsed && (
+          {!uiCollapsed && (
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
