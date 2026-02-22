@@ -2813,7 +2813,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       </div>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="hidden shrink-0 items-center overflow-x-auto border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 md:flex">
+      <div className="flex shrink-0 items-center overflow-x-auto border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'approvals'
             ? approvals.filter(a => a.status === 'pending').length
