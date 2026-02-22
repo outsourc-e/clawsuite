@@ -10,11 +10,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 
 const ACTIONS = [
-  { label: 'New Chat', to: '/chat/new', icon: Chat01Icon },
-  { label: 'Spawn Agent', to: '/agent-swarm', icon: BotIcon },
-  { label: 'Run Skill', to: '/skills', icon: PuzzleIcon },
-  { label: 'View Costs', to: '/costs', icon: ChartLineData02Icon },
-  { label: 'Cron Jobs', to: '/cron', icon: Clock01Icon },
+  { label: 'Chat', to: '/chat/new', icon: Chat01Icon },
+  { label: 'Agent', to: '/agent-swarm', icon: BotIcon },
+  { label: 'Skills', to: '/skills', icon: PuzzleIcon },
+  { label: 'Costs', to: '/costs', icon: ChartLineData02Icon },
+  { label: 'Cron', to: '/cron', icon: Clock01Icon },
 ] as const
 
 type QuickActionsRowProps = {
@@ -25,21 +25,28 @@ export function QuickActionsRow({ className }: QuickActionsRowProps) {
   const navigate = useNavigate()
 
   return (
-    <div className={cn('overflow-x-auto px-1 scrollbar-none', className)}>
-      <div className="flex min-w-max items-center gap-2 px-0.5 py-0.5">
+    <div className={cn('', className)}>
+      <div className="flex items-center justify-between gap-1 px-1">
         {ACTIONS.map((action) => (
           <button
             key={action.label}
             type="button"
             onClick={() => void navigate({ to: action.to as any })}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-2 py-1.5 text-xs font-medium shadow-sm transition-colors sm:px-3',
-              'border-neutral-200 bg-neutral-100 text-neutral-700 hover:bg-neutral-200',
-              'dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700',
+              'flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 transition-colors',
+              'text-neutral-600 hover:bg-neutral-100 active:bg-neutral-200',
+              'dark:text-neutral-400 dark:hover:bg-neutral-800 dark:active:bg-neutral-700',
             )}
           >
-            <HugeiconsIcon icon={action.icon} size={14} strokeWidth={1.7} />
-            <span className="hidden whitespace-nowrap sm:inline">{action.label}</span>
+            <div
+              className={cn(
+                'flex size-9 items-center justify-center rounded-full',
+                'bg-neutral-100 dark:bg-neutral-800',
+              )}
+            >
+              <HugeiconsIcon icon={action.icon} size={18} strokeWidth={1.7} />
+            </div>
+            <span className="text-[10px] font-medium">{action.label}</span>
           </button>
         ))}
       </div>

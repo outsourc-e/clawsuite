@@ -42,26 +42,14 @@ function SystemGlanceCompact({
         )}
       />
 
-      {/* Stats */}
-      <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-0.5">
-        <StatItem label="Sessions" value={String(sessions)} />
-        <StatItem label="Agents" value={String(activeAgents)} />
+      {/* Stats — condensed for mobile */}
+      <div className="flex flex-1 items-center gap-x-2.5">
         <StatItem label="Cost" value={costToday} />
-        <StatItem label="Uptime" value={uptimeFormatted} />
-        {sessionPercent !== undefined ? (
-          <StatItem label="Ctx" value={`${Math.round(sessionPercent)}%`} />
-        ) : null}
+        <span className="text-neutral-300 dark:text-neutral-600">·</span>
+        <StatItem label="" value={`${sessions} sessions`} />
+        <span className="text-neutral-300 dark:text-neutral-600">·</span>
+        <span className="text-[10px] font-medium text-neutral-500">{uptimeFormatted}</span>
       </div>
-
-      {/* Model pill */}
-      {currentModel ? (
-        <span className="max-w-[120px] shrink-0 truncate rounded bg-neutral-100 px-1.5 py-0.5 text-[9px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-          {currentModel}
-        </span>
-      ) : null}
-
-      {/* Connected badge */}
-      <HealthBadge status={gatewayConnected ? 'healthy' : 'offline'} />
     </div>
   )
 }
