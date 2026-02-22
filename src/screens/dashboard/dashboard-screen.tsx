@@ -29,11 +29,14 @@ import { MetricsWidget } from './components/metrics-widget'
 import { NotificationsWidget } from './components/notifications-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
 import { ServicesHealthWidget } from './components/services-health-widget'
+import { ScheduledJobsWidget } from './components/scheduled-jobs-widget'
 import { SkillsWidget } from './components/skills-widget'
 import { TasksWidget } from './components/tasks-widget'
 import { UsageMeterWidget } from './components/usage-meter-widget'
 import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
+import { QuickActionsRow } from './components/quick-actions-row'
+import { TokenUsageHero } from './components/token-usage-hero'
 import { WidgetGrid, type WidgetGridItem } from './components/widget-grid'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
@@ -343,6 +346,7 @@ export function DashboardScreen() {
     function buildDesktopLayout() {
       return {
         showServices: visibleWidgetSet.has('services-health'),
+        showScheduledJobs: visibleWidgetSet.has('scheduled-jobs'),
         showUsage: visibleWidgetSet.has('usage-meter'),
         showSquad: visibleWidgetSet.has('agent-status'),
         showSessions: visibleWidgetSet.has('recent-sessions'),
@@ -360,7 +364,7 @@ export function DashboardScreen() {
     function buildMobileDeepSections() {
       const sections: Array<MobileWidgetSection> = []
       const deepTierOrder = widgetOrder.filter((id) =>
-        ['services', 'activity', 'agents', 'sessions', 'tasks', 'skills', 'usage'].includes(id),
+        ['services', 'scheduled-jobs', 'activity', 'agents', 'sessions', 'tasks', 'skills', 'usage'].includes(id),
       )
 
       for (const widgetId of deepTierOrder) {
@@ -381,6 +385,20 @@ export function DashboardScreen() {
                     onRemove={() => removeWidget('services-health')}
                   />
                 </CollapsibleWidget>
+              </div>
+            ),
+          })
+          continue
+        }
+
+        if (widgetId === 'scheduled-jobs') {
+          if (!visibleWidgetSet.has('scheduled-jobs')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Scheduled',
+            content: (
+              <div className="w-full">
+                <ScheduledJobsWidget onRemove={() => removeWidget('scheduled-jobs')} />
               </div>
             ),
           })
@@ -824,6 +842,18 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
+              <QuickActionsRow />
+
+              <CollapsibleWidget
+                title="Token Usage"
+                summary={`${costTodayDisplay} today • ${dashboardData.sessions.active || dashboardData.agents.active || 0} active sessions`}
+                defaultOpen={false}
+                className="bg-primary-50/70"
+                contentClassName="pt-2"
+              >
+                <TokenUsageHero data={dashboardData} />
+              </CollapsibleWidget>
+
               {/* MetricCards intentionally omitted on mobile — SystemGlance above is the canonical hero */}
 
               {/* Deep sections (reorderable) */}
@@ -920,6 +950,10 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
+              <QuickActionsRow />
+
+              <TokenUsageHero data={dashboardData} />
+
               {/* 3. Metric cards row — Sessions · Active Agents · Cost Today · Uptime */}
               {/* These complement SystemGlance: they add micro charts, trend pills & time-range selectors */}
               <WidgetGrid items={metricItems} className="gap-4" />
@@ -929,6 +963,10 @@ export function DashboardScreen() {
                   gatewayConnected={dashboardData.connection.connected}
                   onRemove={() => removeWidget('services-health')}
                 />
+              ) : null}
+
+              {desktopLayout.showScheduledJobs ? (
+                <ScheduledJobsWidget onRemove={() => removeWidget('scheduled-jobs')} />
               ) : null}
 
               {/* D1: Widget edit controls — inline row above widgets */}

@@ -13,6 +13,7 @@ export type WidgetId =
   | 'notifications'
   | 'activity-log'
   | 'services-health'
+  | 'scheduled-jobs'
 
 export type WidgetRegistryEntry = {
   id: WidgetId
@@ -26,6 +27,7 @@ export const WIDGET_REGISTRY: Array<WidgetRegistryEntry> = [
   { id: 'tasks', defaultSize: 'medium' },
   { id: 'skills', defaultSize: 'medium' },
   { id: 'services-health', defaultSize: 'medium' },
+  { id: 'scheduled-jobs', defaultSize: 'medium' },
   { id: 'activity-log', defaultSize: 'large' },
   { id: 'notifications', defaultSize: 'medium' },
 ]

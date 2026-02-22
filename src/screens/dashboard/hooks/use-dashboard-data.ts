@@ -221,7 +221,7 @@ export type DashboardData = {
     /** % change vs previous day, null if unknown */
     trend: number | null
     byProvider: Array<{ name: string; cost: number; tokens: number }>
-    byModel: Array<{ model: string; cost: number; count: number }>
+    byModel: Array<{ model: string; cost: number; tokens: number; count: number }>
   }
   usage: {
     /** Today's total tokens */
@@ -261,6 +261,8 @@ export type DashboardData = {
     costByDay: Array<{ date: string; amount: number }>
     /** Daily message counts aggregated across all sessions — up to last 28 days */
     messagesByDay: Array<{ date: string; count: number }>
+    /** Daily active session counts (sessions with usage activity on that date) — up to last 28 days */
+    sessionsByDay: Array<{ date: string; count: number }>
   }
 }
 
@@ -557,9 +559,10 @@ export function useDashboardData(): UseDashboardDataResult {
       .sort((a, b) => b.cost - a.cost)
 
     const byModel = Array.from(modelMap.entries())
-      .map(([model, { cost, count }]) => ({
+      .map(([model, { cost, tokens, count }]) => ({
         model: formatModelName(model),
         cost,
+        tokens,
         count,
       }))
       .sort((a, b) => b.cost - a.cost)
@@ -609,6 +612,7 @@ export function useDashboardData(): UseDashboardDataResult {
     let latencyAvg = 0
     let latencyP95 = 0
     let latencyCount = 0
+    const sessionsPerDayMap = new Map<string, number>()
 
     for (const session of ssSessions) {
       const usage = session.usage
@@ -634,6 +638,17 @@ export function useDashboardData(): UseDashboardDataResult {
           latencyCount += cnt
         }
       }
+
+      const activeDates = new Set<string>()
+      const dailyBreakdown = Array.isArray(usage.dailyBreakdown) ? usage.dailyBreakdown : []
+      for (const entry of dailyBreakdown) {
+        const date = readString(entry.date)
+        if (!date) continue
+        activeDates.add(date)
+      }
+      for (const date of activeDates) {
+        sessionsPerDayMap.set(date, (sessionsPerDayMap.get(date) ?? 0) + 1)
+      }
     }
 
     // ── Timeseries ───────────────────────────────────────────────────────────
@@ -653,6 +668,10 @@ export function useDashboardData(): UseDashboardDataResult {
       }
     }
     const messagesByDay = Array.from(messagesPerDayMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-28)
+      .map(([date, count]) => ({ date, count }))
+    const sessionsByDay = Array.from(sessionsPerDayMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-28)
       .map(([date, count]) => ({ date, count }))
@@ -795,6 +814,7 @@ export function useDashboardData(): UseDashboardDataResult {
       timeseries: {
         costByDay,
         messagesByDay,
+        sessionsByDay,
       },
     }
   }, [

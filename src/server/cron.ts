@@ -214,6 +214,16 @@ export function normalizeCronJobs(
                   : undefined,
             }
       })(),
+      nextRunAt: (() => {
+        const stateObj = asRecord(row.state)
+        return normalizeTimestamp(
+          stateObj.nextRunAtMs ??
+            stateObj.nextRunAt ??
+            row.nextRunAt ??
+            row.nextRunTime ??
+            row.nextExecutionAt,
+        )
+      })(),
     }
   })
 }

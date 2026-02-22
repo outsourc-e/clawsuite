@@ -84,6 +84,9 @@ import { Route as ApiAgentActivityRouteImport } from './routes/api/agent-activit
 import { Route as ApiTasksIndexRouteImport } from './routes/api/tasks/index'
 import { Route as ApiTasksTaskIdRouteImport } from './routes/api/tasks/$taskId'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
+import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
+import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
 import { Route as ApiGatewayUsageRouteImport } from './routes/api/gateway/usage'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway/status'
 import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
@@ -479,6 +482,21 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   path: '/send',
   getParentRoute: () => ApiSessionsRoute,
 } as any)
+const ApiMemorySearchRoute = ApiMemorySearchRouteImport.update({
+  id: '/api/memory/search',
+  path: '/api/memory/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMemoryReadRoute = ApiMemoryReadRouteImport.update({
+  id: '/api/memory/read',
+  path: '/api/memory/read',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMemoryListRoute = ApiMemoryListRouteImport.update({
+  id: '/api/memory/list',
+  path: '/api/memory/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGatewayUsageRoute = ApiGatewayUsageRouteImport.update({
   id: '/api/gateway/usage',
   path: '/api/gateway/usage',
@@ -666,6 +684,9 @@ export interface FileRoutesByFullPath {
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
   '/api/gateway/usage': typeof ApiGatewayUsageRoute
+  '/api/memory/list': typeof ApiMemoryListRoute
+  '/api/memory/read': typeof ApiMemoryReadRoute
+  '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
@@ -761,6 +782,9 @@ export interface FileRoutesByTo {
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
   '/api/gateway/usage': typeof ApiGatewayUsageRoute
+  '/api/memory/list': typeof ApiMemoryListRoute
+  '/api/memory/read': typeof ApiMemoryReadRoute
+  '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks': typeof ApiTasksIndexRoute
@@ -858,6 +882,9 @@ export interface FileRoutesById {
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
   '/api/gateway/usage': typeof ApiGatewayUsageRoute
+  '/api/memory/list': typeof ApiMemoryListRoute
+  '/api/memory/read': typeof ApiMemoryReadRoute
+  '/api/memory/search': typeof ApiMemorySearchRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
@@ -956,6 +983,9 @@ export interface FileRouteTypes {
     | '/api/gateway/sessions'
     | '/api/gateway/status'
     | '/api/gateway/usage'
+    | '/api/memory/list'
+    | '/api/memory/read'
+    | '/api/memory/search'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks/'
@@ -1051,6 +1081,9 @@ export interface FileRouteTypes {
     | '/api/gateway/sessions'
     | '/api/gateway/status'
     | '/api/gateway/usage'
+    | '/api/memory/list'
+    | '/api/memory/read'
+    | '/api/memory/search'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks'
@@ -1147,6 +1180,9 @@ export interface FileRouteTypes {
     | '/api/gateway/sessions'
     | '/api/gateway/status'
     | '/api/gateway/usage'
+    | '/api/memory/list'
+    | '/api/memory/read'
+    | '/api/memory/search'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks/'
@@ -1233,6 +1269,9 @@ export interface RootRouteChildren {
   ApiGatewaySessionsRoute: typeof ApiGatewaySessionsRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiGatewayUsageRoute: typeof ApiGatewayUsageRoute
+  ApiMemoryListRoute: typeof ApiMemoryListRoute
+  ApiMemoryReadRoute: typeof ApiMemoryReadRoute
+  ApiMemorySearchRoute: typeof ApiMemorySearchRoute
   ApiTasksTaskIdRoute: typeof ApiTasksTaskIdRoute
   ApiTasksIndexRoute: typeof ApiTasksIndexRoute
 }
@@ -1764,6 +1803,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSendRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/memory/search': {
+      id: '/api/memory/search'
+      path: '/api/memory/search'
+      fullPath: '/api/memory/search'
+      preLoaderRoute: typeof ApiMemorySearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/memory/read': {
+      id: '/api/memory/read'
+      path: '/api/memory/read'
+      fullPath: '/api/memory/read'
+      preLoaderRoute: typeof ApiMemoryReadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/memory/list': {
+      id: '/api/memory/list'
+      path: '/api/memory/list'
+      fullPath: '/api/memory/list'
+      preLoaderRoute: typeof ApiMemoryListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/gateway/usage': {
       id: '/api/gateway/usage'
       path: '/api/gateway/usage'
@@ -2056,6 +2116,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGatewaySessionsRoute: ApiGatewaySessionsRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiGatewayUsageRoute: ApiGatewayUsageRoute,
+  ApiMemoryListRoute: ApiMemoryListRoute,
+  ApiMemoryReadRoute: ApiMemoryReadRoute,
+  ApiMemorySearchRoute: ApiMemorySearchRoute,
   ApiTasksTaskIdRoute: ApiTasksTaskIdRoute,
   ApiTasksIndexRoute: ApiTasksIndexRoute,
 }
