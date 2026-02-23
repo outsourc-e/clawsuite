@@ -1045,9 +1045,10 @@ type ProviderEditModalProps = {
   availableModels: Array<{ value: string; label: string; provider: string }>
   onSave: (apiKey: string, defaultModel: string) => void
   onClose: () => void
+  onDelete?: () => Promise<void>
 }
 
-export function ProviderEditModal({ provider, currentModels, availableModels, onSave, onClose }: ProviderEditModalProps) {
+export function ProviderEditModal({ provider, currentModels, availableModels, onSave, onClose, onDelete }: ProviderEditModalProps) {
   const [apiKey, setApiKey] = useState('')
   const [defaultModel, setDefaultModel] = useState('')
   const meta = getProviderMeta(provider)
@@ -1131,18 +1132,31 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
         </div>
       </div>
 
-      <div className="flex justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
-        <button type="button" onClick={onClose}
-          className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => { onSave(apiKey, defaultModel); onClose() }}
-          className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
-        >
-          Update Provider
-        </button>
+      <div className="flex items-center justify-between gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+        <div>
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={() => void onDelete()}
+              className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 transition-colors"
+            >
+              Remove Provider
+            </button>
+          ) : null}
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose}
+            className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => { onSave(apiKey, defaultModel); onClose() }}
+            className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+          >
+            Update Provider
+          </button>
+        </div>
       </div>
     </WizardModal>
   )

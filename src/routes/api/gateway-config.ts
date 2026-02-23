@@ -245,6 +245,61 @@ export const Route = createFileRoute('/api/gateway-config')({
             return json({ ok: true })
           }
 
+          if (action === 'remove-provider') {
+            const provider = sanitizeProviderName(rawBody.provider)
+            const configDir = join(homedir(), '.openclaw')
+            const configPath = join(configDir, 'openclaw.json')
+            let config: Record<string, unknown> = {}
+
+            try {
+              const rawConfig = await readFile(configPath, 'utf-8')
+              const parsed = JSON.parse(rawConfig) as unknown
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                config = parsed as Record<string, unknown>
+              }
+            } catch (error) {
+              const code = (error as NodeJS.ErrnoException)?.code
+              if (code !== 'ENOENT') throw error
+            }
+
+            // Remove from models.providers
+            const models =
+              config.models && typeof config.models === 'object' && !Array.isArray(config.models)
+                ? (config.models as Record<string, unknown>)
+                : {}
+            const providers =
+              models.providers && typeof models.providers === 'object' && !Array.isArray(models.providers)
+                ? (models.providers as Record<string, unknown>)
+                : {}
+            if (Object.prototype.hasOwnProperty.call(providers, provider)) {
+              delete providers[provider]
+              models.providers = providers
+              config.models = models
+            }
+
+            // Remove from auth.profiles
+            const auth =
+              config.auth && typeof config.auth === 'object' && !Array.isArray(config.auth)
+                ? (config.auth as Record<string, unknown>)
+                : {}
+            const profiles =
+              auth.profiles && typeof auth.profiles === 'object' && !Array.isArray(auth.profiles)
+                ? (auth.profiles as Record<string, unknown>)
+                : {}
+            const profileKey = `${provider}:default`
+            if (Object.prototype.hasOwnProperty.call(profiles, profileKey)) {
+              delete profiles[profileKey]
+              auth.profiles = profiles
+              config.auth = auth
+            }
+
+            await mkdir(configDir, { recursive: true })
+            await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8')
+            invalidateCache()
+
+            return json({ ok: true })
+          }
+
           const body: { url?: string; token?: string } = {}
 
           if (Object.prototype.hasOwnProperty.call(rawBody, 'url')) {

@@ -1651,7 +1651,7 @@ function OfficeView({
             <div
               key={agent.id}
               className={cn(
-            'relative flex h-full min-h-[248px] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md',
+            'relative flex h-full min-h-[248px] cursor-pointer flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md hover:ring-1 hover:ring-orange-200',
             isSelected
                   ? 'shadow-md ring-1 ring-orange-300'
                   : '',
@@ -1729,12 +1729,13 @@ function OfficeView({
                 {/* Edit agent button — full-width */}
                 <button
                   type="button"
+                  title="Click to view agent output"
                   onClick={() => onViewOutput(agent.id)}
                   className={cn(
-                    'mt-auto w-full rounded-lg border px-2 py-2 text-[11px] font-medium transition-colors',
+                    'mt-auto w-full cursor-pointer rounded-lg border px-2 py-2 text-[11px] font-medium transition-colors',
                     isSelected
-                      ? 'border-orange-200 bg-orange-50 text-orange-700'
-                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50',
+                      ? 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
+                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700',
                   )}
                 >
                   Edit agent
@@ -4195,7 +4196,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             {getModelShortLabel(member.modelId, gatewayModelLabelById)}
                           </span>
                           <span className={cn('size-1.5 shrink-0 rounded-full',
-                            row?.status === 'active' ? 'bg-emerald-500' :
+                            row?.status === 'active' ? 'bg-emerald-500 animate-pulse' :
                             row?.status === 'idle' || row?.status === 'ready' ? 'bg-amber-400' :
                             row?.status === 'error' ? 'bg-red-500' : 'bg-neutral-300',
                           )} />
@@ -5109,6 +5110,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     }
                   }}
                   onClose={() => setProviderEditModalProvider(null)}
+                  onDelete={async () => {
+                    if (!window.confirm(`Remove provider "${providerEditModalProvider}"? This will delete the API key.`)) return
+                    try {
+                      const res = await fetch('/api/gateway-config', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ action: 'remove-provider', provider: providerEditModalProvider }),
+                      })
+                      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                      toast(`Provider removed`, { type: 'success' })
+                      setProviderEditModalProvider(null)
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : 'Remove failed', { type: 'error' })
+                    }
+                  }}
                 />
               ) : null}
             </div>
@@ -5583,6 +5599,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                 ↺
                               </button>
                             ) : null}
+                            {/* Kill button - only show when agent has active session */}
+                            {agentSessionMap[row.id] ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleKillAgent(row.id)}
+                                className="flex size-5 items-center justify-center rounded text-neutral-400 hover:text-red-500 transition-colors"
+                                title="Kill agent session"
+                              >
+                                ✕
+                              </button>
+                            ) : null}
                             <span className={cn(
                               'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
                               row.status === 'active' && 'bg-emerald-100 text-emerald-700',
@@ -5751,9 +5778,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       emptyIcon: string
       emptyText: string
     }> = [
-      { key: 'draft', title: 'Draft', subtitle: 'Configure and stage missions', cards: draftCards, accent: 'bg-neutral-400', tint: 'bg-neutral-50', emptyIcon: '📝', emptyText: 'Create a new mission to get started' },
-      { key: 'running', title: 'Running', subtitle: 'Active missions with live status', cards: runningCards, accent: 'bg-emerald-500', tint: 'bg-emerald-50/30', emptyIcon: '🚀', emptyText: 'Missions move here when launched' },
-      { key: 'review', title: 'Review', subtitle: 'Completed, awaiting review', cards: reviewCards, accent: 'bg-blue-500', tint: 'bg-blue-50/30', emptyIcon: '👁️', emptyText: 'Completed missions await your review' },
+      { key: 'draft', title: 'Draft', subtitle: 'Configure and stage missions', cards: draftCards, accent: 'bg-neutral-400', tint: 'bg-neutral-50', emptyIcon: '📝', emptyText: 'Hit + New Mission to plan your first mission' },
+      { key: 'running', title: 'Running', subtitle: 'Active missions with live status', cards: runningCards, accent: 'bg-emerald-500', tint: 'bg-emerald-50/30', emptyIcon: '🚀', emptyText: 'Start a mission to see it here' },
+      { key: 'review', title: 'Review', subtitle: 'Completed, awaiting review', cards: reviewCards, accent: 'bg-blue-500', tint: 'bg-blue-50/30', emptyIcon: '👁️', emptyText: 'Completed missions appear here for review' },
       { key: 'done', title: 'Done', subtitle: 'Archived mission reports', cards: doneCards, accent: 'bg-amber-500', tint: 'bg-amber-50/30', emptyIcon: '🏆', emptyText: 'Archived missions and reports' },
     ]
 
@@ -6119,9 +6146,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {/* Header */}
               <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-6 py-4">
                 <div>
-                  <p className="text-base font-bold text-neutral-900 dark:text-white">
-                    {isRunning ? (activeMissionName || 'Active Mission') : (reportEntry?.name || 'Mission Details')}
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-base font-bold text-neutral-900 dark:text-white">
+                      {isRunning ? (activeMissionName || 'Active Mission') : (reportEntry?.name || 'Mission Details')}
+                    </p>
+                    <span className={cn(
+                      'ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                      isRunning ? 'bg-emerald-100 text-emerald-700' : 'bg-neutral-100 text-neutral-600',
+                    )}>
+                      {isRunning ? '🟢 Running' : '✓ Complete'}
+                    </span>
+                  </div>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-1">
                     {isRunning ? activeMissionGoal : reportEntry?.goal}
                   </p>
@@ -6206,6 +6241,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             >
                               ✦
                             </button>
+                            {agentSessionMap[row.id] ? (
+                              <button
+                                type="button"
+                                onClick={() => { void handleKillAgent(row.id); setMaximizedMissionId(null) }}
+                                className="flex size-7 items-center justify-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors text-sm"
+                                title="Kill agent"
+                              >
+                                ✕
+                              </button>
+                            ) : null}
                           </div>
                         </div>
                       ))}
@@ -6304,6 +6349,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           {/* Live View toggle */}
           <button
             type="button"
+            aria-pressed={liveFeedVisible}
+            title={liveFeedVisible ? 'Hide live feed' : 'Show live feed (📡 activity log)'}
             onClick={() => {
               setLiveFeedVisible((v) => !v)
             }}
@@ -6462,7 +6509,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
                       )}
                     >
-                      Start
+                      Start<span className="ml-1 text-[9px] opacity-50">Space</span>
                     </button>
                     <button
                       type="button"
