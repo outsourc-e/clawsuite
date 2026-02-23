@@ -2452,6 +2452,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           provider,
           apiKey,
           defaultModel: defaultModel || undefined,
+          baseUrl: addProviderBaseUrl.trim() || undefined,
+          apiType: addProviderApiType.trim() || undefined,
         }),
       })
       const payload = (await response.json().catch(() => ({}))) as {
@@ -5061,12 +5063,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   provider={providerEditModalProvider}
                   currentModels={gatewayModels.filter((m) => m.provider === providerEditModalProvider)}
                   availableModels={gatewayModels.filter((m) => m.provider === providerEditModalProvider)}
-                  onSave={(_apiKey, _defaultModel) => {
-                    // Future: wire to gateway config update API
-                    void refreshGatewayStatus().then((connected) => {
-                      if (connected) return refreshConfiguredProviders()
-                      return Promise.resolve()
-                    })
+                  onSave={async (apiKey: string) => {
+                    try {
+                      const res = await fetch('/api/gateway-config', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ action: 'update-provider-key', provider: providerEditModalProvider, apiKey }),
+                      })
+                      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                      toast('Provider key updated', { type: 'success' })
+                      setProviderEditModalProvider(null)
+                      void refreshGatewayStatus().then((connected) => {
+                        if (connected) return refreshConfiguredProviders()
+                        return Promise.resolve()
+                      })
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : 'Failed to update provider key', { type: 'error' })
+                    }
                   }}
                   onClose={() => setProviderEditModalProvider(null)}
                 />
@@ -5604,13 +5617,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           { label: 'Failed', value: String(entry.taskStats.failed) },
         ],
         extraFooter: (
-          <button
-            type="button"
-            onClick={() => setSelectedReport(entry)}
-            className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-[10px] font-medium text-neutral-700 hover:bg-neutral-50"
-          >
-            View Report
-          </button>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setSelectedReport(entry)}
+              className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-[10px] font-medium text-neutral-700 hover:bg-neutral-50"
+            >
+              View Report
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMissionGoal(entry.goal)
+                setWizardOpen(true)
+              }}
+              className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[10px] font-medium text-neutral-600 hover:bg-neutral-50"
+            >
+              Re-run
+            </button>
+          </div>
         ),
         expandedContent: (
           <div className="space-y-1 text-[11px] text-neutral-600 dark:text-slate-400">
@@ -5641,13 +5666,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           { label: 'Failed', value: String(entry.taskStats.failed) },
         ],
         extraFooter: (
-          <button
-            type="button"
-            onClick={() => setSelectedReport(entry)}
-            className="rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50"
-          >
-            View Report
-          </button>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setSelectedReport(entry)}
+              className="rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50"
+            >
+              View Report
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMissionGoal(entry.goal)
+                setWizardOpen(true)
+              }}
+              className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[10px] font-medium text-neutral-600 hover:bg-neutral-50"
+            >
+              Re-run
+            </button>
+          </div>
         ),
         expandedContent: (
           <div className="space-y-2 text-[11px] text-neutral-600 dark:text-slate-400">

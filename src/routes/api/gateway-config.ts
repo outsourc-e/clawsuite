@@ -114,6 +114,14 @@ export const Route = createFileRoute('/api/gateway-config')({
             const provider = sanitizeProviderName(rawBody.provider)
             const apiKey = sanitizeApiKey(rawBody.apiKey)
             const defaultModel = sanitizeOptionalDefaultModel(rawBody.defaultModel)
+            const baseUrl =
+              typeof rawBody.baseUrl === 'string' && rawBody.baseUrl.trim()
+                ? rawBody.baseUrl.trim()
+                : null
+            const apiType =
+              typeof rawBody.apiType === 'string' && rawBody.apiType.trim()
+                ? rawBody.apiType.trim()
+                : null
 
             const configDir = join(homedir(), '.openclaw')
             const configPath = join(configDir, 'openclaw.json')
@@ -170,6 +178,12 @@ export const Route = createFileRoute('/api/gateway-config')({
                 existingProvider.defaultModel = normalizedDefaultModel
               }
             }
+            if (baseUrl) {
+              existingProvider.baseUrl = baseUrl
+            }
+            if (apiType) {
+              existingProvider.apiType = apiType
+            }
             providers[provider] = existingProvider
             models.providers = providers
             config.models = models
@@ -179,6 +193,56 @@ export const Route = createFileRoute('/api/gateway-config')({
             invalidateCache()
 
             return json({ ok: true, provider })
+          }
+
+          if (action === 'update-provider-key') {
+            const provider = sanitizeProviderName(rawBody.provider)
+            const apiKey = sanitizeApiKey(rawBody.apiKey)
+
+            const configDir = join(homedir(), '.openclaw')
+            const configPath = join(configDir, 'openclaw.json')
+            let config: Record<string, unknown> = {}
+
+            try {
+              const rawConfig = await readFile(configPath, 'utf-8')
+              const parsed = JSON.parse(rawConfig) as unknown
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                config = parsed as Record<string, unknown>
+              }
+            } catch (error) {
+              const code = (error as NodeJS.ErrnoException)?.code
+              if (code !== 'ENOENT') {
+                throw error
+              }
+            }
+
+            // Update auth profile api key
+            const auth =
+              config.auth && typeof config.auth === 'object' && !Array.isArray(config.auth)
+                ? (config.auth as Record<string, unknown>)
+                : {}
+            const profiles =
+              auth.profiles &&
+              typeof auth.profiles === 'object' &&
+              !Array.isArray(auth.profiles)
+                ? (auth.profiles as Record<string, unknown>)
+                : {}
+            const existingProfile =
+              profiles[`${provider}:default`] &&
+              typeof profiles[`${provider}:default`] === 'object' &&
+              !Array.isArray(profiles[`${provider}:default`])
+                ? (profiles[`${provider}:default`] as Record<string, unknown>)
+                : { provider }
+            existingProfile.apiKey = apiKey
+            profiles[`${provider}:default`] = existingProfile
+            auth.profiles = profiles
+            config.auth = auth
+
+            await mkdir(configDir, { recursive: true })
+            await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8')
+            invalidateCache()
+
+            return json({ ok: true })
           }
 
           const body: { url?: string; token?: string } = {}
