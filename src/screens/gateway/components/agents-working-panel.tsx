@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import type { ModelPresetId } from './team-panel'
-
 export type AgentWorkingStatus =
   | 'spawning'
   | 'ready'
@@ -14,7 +12,7 @@ export type AgentWorkingStatus =
 export type AgentWorkingRow = {
   id: string
   name: string
-  modelId: ModelPresetId
+  modelId: string
   status: AgentWorkingStatus
   lastLine?: string
   lastAt?: number
@@ -73,6 +71,15 @@ const MODEL_LABEL: Record<string, string> = {
   'pc1-heavy':   'PC1·Heavy',
   'pc1-fmt':      'PC1·Fmt',
   'pc1-devstral': 'PC1·Dev',
+}
+
+function getModelBadgeClass(modelId: string): string {
+  return MODEL_BADGE[modelId] ?? 'border border-neutral-200 bg-neutral-50 text-neutral-700'
+}
+
+function getModelLabel(modelId: string): string {
+  if (!modelId) return 'Unknown'
+  return MODEL_LABEL[modelId] ?? (modelId.split('/')[1] || modelId)
 }
 
 const STATUS_TEXT: Record<AgentWorkingStatus, string> = {
@@ -181,10 +188,10 @@ function AgentRow({
           <span
             className={cn(
               'shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-medium',
-              MODEL_BADGE[agent.modelId],
+              getModelBadgeClass(agent.modelId),
             )}
           >
-            {MODEL_LABEL[agent.modelId]}
+            {getModelLabel(agent.modelId)}
           </span>
 
           {/* Respawn on error */}

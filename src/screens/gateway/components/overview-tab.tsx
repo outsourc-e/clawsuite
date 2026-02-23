@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 import type { AgentWorkingRow } from './agents-working-panel'
 import type { TeamMember } from './team-panel'
 import { AGENT_ACCENT_COLORS, AgentAvatar, resolveAgentAvatarIndex } from './agent-avatar'
-import { getAgentStatusMeta, OFFICE_MODEL_LABEL, OfficeView } from './office-view'
+import { getAgentStatusMeta, getOfficeModelLabel, OfficeView } from './office-view'
 
 export interface OverviewTabProps {
   missionActive: boolean
@@ -237,7 +237,7 @@ export function OverviewTab({
                           isBusy ? 'bg-orange-100 text-orange-700' : 'bg-neutral-200 text-neutral-700',
                         )}
                       >
-                        {OFFICE_MODEL_LABEL[agent.modelId]}
+                        {getOfficeModelLabel(agent.modelId)}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center gap-2 text-[11px]">

@@ -41,7 +41,7 @@ export type TeamMember = {
   id: string
   name: string
   avatar?: number
-  modelId: ModelPresetId
+  modelId: string
   roleDescription: string
   goal: string        // What this agent is trying to achieve
   backstory: string   // Persona/context that shapes agent behavior
@@ -82,6 +82,9 @@ const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
   flash: 'bg-violet-100 text-violet-700',
   minimax: 'bg-amber-100 text-amber-700',
 }
+
+const DEFAULT_MODEL_BADGE_COLOR =
+  'bg-neutral-100 text-neutral-700'
 
 type SessionDotState = 'active' | 'idle' | 'stale' | 'dead' | 'spawning' | 'none'
 
@@ -143,6 +146,10 @@ export function TeamPanel({
       new Map<string, string>(MODEL_PRESETS.map((preset) => [preset.id, preset.label])),
     [],
   )
+
+  function getModelBadgeColor(modelId: string): string {
+    return MODEL_BADGE_COLOR[modelId as ModelPresetId] ?? DEFAULT_MODEL_BADGE_COLOR
+  }
 
   function handleToggleAgent(agentId: string) {
     setExpandedAgentId((current) => {
@@ -259,7 +266,7 @@ export function TeamPanel({
                       <span
                         className={cn(
                           'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                          MODEL_BADGE_COLOR[agent.modelId],
+                          getModelBadgeColor(agent.modelId),
                         )}
                       >
                         {modelLabel}
@@ -312,7 +319,7 @@ export function TeamPanel({
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-primary-50/60 px-2 py-1.5 text-[10px] dark:bg-neutral-800/60">
                     <span className="flex items-center gap-1">
                       <span className="text-primary-400 dark:text-neutral-500">Model:</span>
-                      <span className={cn('rounded px-1.5 py-0.5 font-medium', MODEL_BADGE_COLOR[agent.modelId])}>
+                      <span className={cn('rounded px-1.5 py-0.5 font-medium', getModelBadgeColor(agent.modelId))}>
                         {modelLabel}
                       </span>
                     </span>

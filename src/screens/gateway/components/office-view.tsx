@@ -30,6 +30,20 @@ export const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
   minimax: 'MiniMax',
 }
 
+const DEFAULT_OFFICE_MODEL_BADGE =
+  'border border-neutral-200 bg-neutral-50 text-neutral-700'
+
+export function getOfficeModelBadge(modelId: string): string {
+  return OFFICE_MODEL_BADGE[modelId as ModelPresetId] ?? DEFAULT_OFFICE_MODEL_BADGE
+}
+
+export function getOfficeModelLabel(modelId: string): string {
+  if (!modelId) return 'Unknown'
+  const presetLabel = OFFICE_MODEL_LABEL[modelId as ModelPresetId]
+  if (presetLabel) return presetLabel
+  return modelId.split('/')[1] || modelId
+}
+
 function toTitleCase(value: string): string {
   return value
     .split(/[-_\s]+/)
@@ -248,10 +262,10 @@ export function OfficeView({
                   <span
                     className={cn(
                       'shrink-0 px-2 py-0.5 font-mono text-[10px] font-medium',
-                      OFFICE_MODEL_BADGE[agent.modelId],
+                      getOfficeModelBadge(agent.modelId),
                     )}
                   >
-                    {OFFICE_MODEL_LABEL[agent.modelId]}
+                    {getOfficeModelLabel(agent.modelId)}
                   </span>
                 </div>
 

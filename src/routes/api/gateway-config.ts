@@ -1,9 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { gatewayReconnect } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { invalidateCache } from '../../server/providers'
 
 function sanitizeEnvValue(value: unknown, field: string): string {
   if (typeof value !== 'string') {
@@ -38,6 +40,28 @@ function sanitizeGatewayUrl(value: unknown): string {
     throw new Error('Gateway URL must use ws:// or wss://')
   }
 
+  return sanitized
+}
+
+function sanitizeProviderName(value: unknown): string {
+  const sanitized = sanitizeEnvValue(value, 'provider')
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+
+  if (!sanitized) {
+    throw new Error('Provider name is required')
+  }
+  if (!/^[a-z0-9][a-z0-9._-]*$/.test(sanitized)) {
+    throw new Error('Provider name contains invalid characters')
+  }
+  return sanitized
+}
+
+function sanitizeApiKey(value: unknown): string {
+  const sanitized = sanitizeEnvValue(value, 'apiKey')
+  if (!sanitized) {
+    throw new Error('API key is required')
+  }
   return sanitized
 }
 
@@ -77,6 +101,71 @@ export const Route = createFileRoute('/api/gateway-config')({
             string,
             unknown
           >
+          const action =
+            typeof rawBody.action === 'string' ? rawBody.action.trim().toLowerCase() : ''
+
+          if (action === 'add-provider') {
+            const provider = sanitizeProviderName(rawBody.provider)
+            const apiKey = sanitizeApiKey(rawBody.apiKey)
+
+            const configDir = join(homedir(), '.openclaw')
+            const configPath = join(configDir, 'openclaw.json')
+            let config: Record<string, unknown> = {}
+
+            try {
+              const rawConfig = await readFile(configPath, 'utf-8')
+              const parsed = JSON.parse(rawConfig) as unknown
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                config = parsed as Record<string, unknown>
+              }
+            } catch (error) {
+              const code = (error as NodeJS.ErrnoException)?.code
+              if (code !== 'ENOENT') {
+                throw error
+              }
+            }
+
+            const auth =
+              config.auth && typeof config.auth === 'object' && !Array.isArray(config.auth)
+                ? (config.auth as Record<string, unknown>)
+                : {}
+            const profiles =
+              auth.profiles &&
+              typeof auth.profiles === 'object' &&
+              !Array.isArray(auth.profiles)
+                ? (auth.profiles as Record<string, unknown>)
+                : {}
+            profiles[`${provider}:default`] = { provider, apiKey }
+            auth.profiles = profiles
+            config.auth = auth
+
+            const models =
+              config.models && typeof config.models === 'object' && !Array.isArray(config.models)
+                ? (config.models as Record<string, unknown>)
+                : {}
+            const providers =
+              models.providers &&
+              typeof models.providers === 'object' &&
+              !Array.isArray(models.providers)
+                ? (models.providers as Record<string, unknown>)
+                : {}
+            const existingProvider =
+              providers[provider] &&
+              typeof providers[provider] === 'object' &&
+              !Array.isArray(providers[provider])
+                ? (providers[provider] as Record<string, unknown>)
+                : {}
+            providers[provider] = existingProvider
+            models.providers = providers
+            config.models = models
+
+            await mkdir(configDir, { recursive: true })
+            await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8')
+            invalidateCache()
+
+            return json({ ok: true, provider })
+          }
+
           const body: { url?: string; token?: string } = {}
 
           if (Object.prototype.hasOwnProperty.call(rawBody, 'url')) {

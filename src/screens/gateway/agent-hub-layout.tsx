@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
 import { TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
@@ -54,8 +55,6 @@ const TEMPLATE_MODEL_SUGGESTIONS: Record<TeamTemplateId, Array<ModelPresetId>> =
   content: ['opus', 'sonnet', 'flash'],
 }
 
-const MODEL_IDS = new Set<string>(MODEL_PRESETS.map((preset) => preset.id))
-
 // Maps ModelPresetId → real model string for gateway. Empty string = omit (use gateway default).
 const MODEL_PRESET_MAP: Record<string, string> = {
   auto: '',
@@ -64,6 +63,40 @@ const MODEL_PRESET_MAP: Record<string, string> = {
   codex: 'openai/gpt-5.3-codex',
   flash: 'google/gemini-2.5-flash',
   minimax: 'minimax/MiniMax-M2.5',
+}
+
+type GatewayModelEntry = {
+  provider?: string
+  id?: string
+  name?: string
+}
+
+type GatewayModelsResponse = {
+  ok?: boolean
+  models?: GatewayModelEntry[]
+}
+
+function resolveGatewayModelId(modelId: string): string {
+  if (Object.prototype.hasOwnProperty.call(MODEL_PRESET_MAP, modelId)) {
+    return MODEL_PRESET_MAP[modelId] ?? ''
+  }
+  return modelId
+}
+
+function getModelDisplayLabel(modelId: string): string {
+  if (!modelId) return 'Unknown'
+  const preset = MODEL_PRESETS.find((entry) => entry.id === modelId)
+  if (preset) return preset.label
+  return modelId
+}
+
+function getModelShortLabel(modelId: string): string {
+  if (!modelId) return 'Unknown'
+  const preset = MODEL_PRESETS.find((entry) => entry.id === modelId)
+  if (preset) return OFFICE_MODEL_LABEL[preset.id]
+
+  const [, scopedModelId] = modelId.split('/', 2)
+  return scopedModelId || modelId
 }
 
 type AgentActivityEntry = {
@@ -365,10 +398,8 @@ function toTeamMember(value: unknown): TeamMember | null {
       : normalizeAgentAvatarIndex(row.avatar)
   const goal = typeof row.goal === 'string' ? row.goal : ''
   const backstory = typeof row.backstory === 'string' ? row.backstory : ''
-  const modelIdRaw = typeof row.modelId === 'string' ? row.modelId : 'auto'
-  const modelId = MODEL_IDS.has(modelIdRaw)
-    ? (modelIdRaw as ModelPresetId)
-    : 'auto'
+  const modelIdRaw = typeof row.modelId === 'string' ? row.modelId.trim() : 'auto'
+  const modelId = modelIdRaw || 'auto'
 
   if (!id || !name) return null
 
@@ -1075,6 +1106,13 @@ const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
   minimax: 'MiniMax',
 }
 
+const DEFAULT_OFFICE_MODEL_BADGE =
+  'border border-neutral-200 bg-neutral-50 text-neutral-700'
+
+function getOfficeModelBadge(modelId: string): string {
+  return OFFICE_MODEL_BADGE[modelId as ModelPresetId] ?? DEFAULT_OFFICE_MODEL_BADGE
+}
+
 function getAgentStatusMeta(status: AgentWorkingStatus): {
   label: string
   className: string
@@ -1312,10 +1350,10 @@ function OfficeView({
                   <span
                     className={cn(
                       'shrink-0 px-2 py-0.5 font-mono text-[10px] font-medium',
-                      OFFICE_MODEL_BADGE[agent.modelId],
+                      getOfficeModelBadge(agent.modelId),
                     )}
                   >
-                    {OFFICE_MODEL_LABEL[agent.modelId]}
+                    {getModelShortLabel(agent.modelId)}
                   </span>
                 </div>
 
@@ -1657,6 +1695,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [wizardStepIndex, setWizardStepIndex] = useState(0)
   const [wizardCheckingGateway, setWizardCheckingGateway] = useState(false)
   const [configuredProviders, setConfiguredProviders] = useState<string[]>([])
+  const [addProviderName, setAddProviderName] = useState('')
+  const [addProviderApiKey, setAddProviderApiKey] = useState('')
+  const [isAddingProvider, setIsAddingProvider] = useState(false)
 
   // ── Approvals state ────────────────────────────────────────────────────────
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(() => loadApprovals())
@@ -1925,6 +1966,40 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   const wizardStep = WIZARD_STEP_ORDER[wizardStepIndex] ?? 'gateway'
 
+  const modelsQuery = useQuery({
+    queryKey: ['gateway-models'],
+    queryFn: async (): Promise<GatewayModelsResponse> => {
+      const response = await fetch('/api/models')
+      if (!response.ok) {
+        throw new Error(`Failed to load models (${response.status})`)
+      }
+      return (await response.json()) as GatewayModelsResponse
+    },
+    staleTime: 30_000,
+    retry: 1,
+  })
+
+  const gatewayModels = useMemo(() => {
+    const rows = Array.isArray(modelsQuery.data?.models) ? modelsQuery.data.models : []
+    const seen = new Set<string>()
+    return rows
+      .map((entry) => {
+        const provider = typeof entry.provider === 'string' ? entry.provider.trim() : ''
+        const id = typeof entry.id === 'string' ? entry.id.trim() : ''
+        const name = typeof entry.name === 'string' ? entry.name.trim() : ''
+        if (!provider || !id) return null
+        const value = `${provider}/${id}`
+        if (seen.has(value)) return null
+        seen.add(value)
+        return {
+          value,
+          provider,
+          label: name || id,
+        }
+      })
+      .filter((entry): entry is { value: string; provider: string; label: string } => Boolean(entry))
+  }, [modelsQuery.data?.models])
+
   const refreshGatewayStatus = useCallback(async (): Promise<boolean> => {
     try {
       const res = await fetch('/api/gateway/status')
@@ -1961,6 +2036,56 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       setConfiguredProviders([])
     }
   }, [])
+
+  const handleAddProvider = useCallback(async () => {
+    const provider = addProviderName.trim()
+    const apiKey = addProviderApiKey.trim()
+
+    if (!provider) {
+      toast('Provider name is required', { type: 'error' })
+      return
+    }
+    if (!apiKey) {
+      toast('API key is required', { type: 'error' })
+      return
+    }
+
+    setIsAddingProvider(true)
+    try {
+      const response = await fetch('/api/gateway-config', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add-provider',
+          provider,
+          apiKey,
+        }),
+      })
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean
+        error?: unknown
+      }
+      if (!response.ok || payload.ok === false) {
+        throw new Error(
+          typeof payload.error === 'string' && payload.error
+            ? payload.error
+            : `Failed to add provider (${response.status})`,
+        )
+      }
+
+      setAddProviderApiKey('')
+      setAddProviderName('')
+      await refreshConfiguredProviders()
+      void modelsQuery.refetch()
+      toast(`Provider "${provider}" added`, { type: 'success' })
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to add provider', {
+        type: 'error',
+      })
+    } finally {
+      setIsAddingProvider(false)
+    }
+  }, [addProviderApiKey, addProviderName, modelsQuery, refreshConfiguredProviders])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -2557,7 +2682,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       // If the lookup fails, fall through to normal spawn
     }
 
-    const modelString = MODEL_PRESET_MAP[member.modelId] ?? ''
+    const modelString = resolveGatewayModelId(member.modelId)
     const requestBody: Record<string, string> = { friendlyId, label }
     if (modelString) requestBody.model = modelString
 
@@ -2606,7 +2731,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         return next
       })
       // Track model used at spawn time
-      const modelString = MODEL_PRESET_MAP[member.modelId] ?? ''
+      const modelString = resolveGatewayModelId(member.modelId)
       if (modelString) {
         setAgentSessionModelMap((prev) => ({ ...prev, [member.id]: modelString }))
       }
@@ -2615,8 +2740,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         ...prev,
         [member.id]: { status: 'idle', lastSeen: Date.now() },
       }))
-      const modelPreset = MODEL_PRESETS.find((p) => p.id === member.modelId)
-      const modelSuffix = member.modelId !== 'auto' && modelPreset ? ` (${modelPreset.label})` : ''
+      const modelLabel = getModelDisplayLabel(member.modelId)
+      const modelSuffix = member.modelId !== 'auto' ? ` (${modelLabel})` : ''
       emitFeedEvent({
         type: 'agent_spawned',
         message: `${member.name} session re-created${modelSuffix}`,
@@ -2822,12 +2947,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             currentMap[member.id] = sessionKey
             setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
             // Track model used at spawn time
-            const modelString = MODEL_PRESET_MAP[member.modelId] ?? ''
+            const modelString = resolveGatewayModelId(member.modelId)
             if (modelString) {
               setAgentSessionModelMap((prev) => ({ ...prev, [member.id]: modelString }))
             }
-            const modelPreset = MODEL_PRESETS.find((p) => p.id === member.modelId)
-            const modelSuffix = member.modelId !== 'auto' && modelPreset ? ` (${modelPreset.label})` : ''
+            const modelLabel = getModelDisplayLabel(member.modelId)
+            const modelSuffix = member.modelId !== 'auto' ? ` (${modelLabel})` : ''
             emitFeedEvent({
               type: 'agent_spawned',
               message: `spawned ${member.name}${modelSuffix}`,
@@ -4032,7 +4157,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           isBusy ? 'bg-orange-100 text-orange-700' : 'bg-neutral-200 text-neutral-700',
                         )}
                       >
-                        {OFFICE_MODEL_LABEL[agent.modelId]}
+                        {getModelShortLabel(agent.modelId)}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center gap-2 text-[11px]">
@@ -4266,18 +4391,29 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           setTeam((previous) =>
                             previous.map((row) =>
                               row.id === member.id
-                                ? { ...row, modelId: event.target.value as ModelPresetId }
+                                ? { ...row, modelId: event.target.value }
                                 : row,
                             ),
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
                       >
-                        {MODEL_PRESETS.map((preset) => (
-                          <option key={preset.id} value={preset.id}>
-                            {preset.label}
-                          </option>
-                        ))}
+                        <optgroup label="Presets">
+                          {MODEL_PRESETS.map((preset) => (
+                            <option key={preset.id} value={preset.id}>
+                              {preset.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                        {gatewayModels.length > 0 ? (
+                          <optgroup label="Available Models">
+                            {gatewayModels.map((model) => (
+                              <option key={model.value} value={model.value}>
+                                {model.provider} / {model.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : null}
                       </select>
                     </label>
                   </div>
@@ -4436,6 +4572,35 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               </div>
 
               <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+                <div className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                  <h3 className="text-xs font-semibold text-neutral-900">Add Provider</h3>
+                  <p className="mt-1 text-[11px] text-neutral-500">
+                    Add a provider profile and API key to the gateway config.
+                  </p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
+                    <input
+                      value={addProviderName}
+                      onChange={(event) => setAddProviderName(event.target.value)}
+                      placeholder="Provider name (e.g. openrouter)"
+                      className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                    />
+                    <input
+                      type="password"
+                      value={addProviderApiKey}
+                      onChange={(event) => setAddProviderApiKey(event.target.value)}
+                      placeholder="API key"
+                      className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleAddProvider()}
+                      disabled={isAddingProvider}
+                      className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isAddingProvider ? 'Adding…' : 'Add Provider'}
+                    </button>
+                  </div>
+                </div>
                 {configuredProviders.length === 0 ? (
                   <p className="text-sm text-neutral-500">No configured providers detected.</p>
                 ) : (
@@ -4449,8 +4614,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           <p className="text-sm font-medium text-neutral-900">{provider}</p>
                           <p className="text-[11px] text-neutral-500">Connected via gateway profile</p>
                         </div>
-                        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
-                          Connected
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                          Configured
                         </span>
                       </div>
                     ))}
