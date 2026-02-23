@@ -13,7 +13,7 @@ import { THEMES, applyTheme, getStoredTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
-import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal } from './components/config-wizards'
+import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
 import {
   saveMissionCheckpoint,
   loadMissionCheckpoint,
@@ -2074,6 +2074,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [showAddTeamModal, setShowAddTeamModal] = useState(false)
   const [providerEditModalProvider, setProviderEditModalProvider] = useState<string | null>(null)
   const [showAddProviderModal, setShowAddProviderModal] = useState(false)
+  const [newAgentDraft, setNewAgentDraft] = useState<(TeamMember & { backstory: string; roleDescription: string }) | null>(null)
   const [providerWizardStep, setProviderWizardStep] = useState<'select' | 'key'>('select')
   const [providerWizardSelected, setProviderWizardSelected] = useState('')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
@@ -3876,19 +3877,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }
 
   function handleAddAgent() {
-    setTeam((previous) => [
-      ...previous,
-      {
-        id: createMemberId(),
-        name: `Agent ${previous.length + 1}`,
-        avatar: getAgentAvatarForSlot(previous.length),
-        modelId: 'auto',
-        roleDescription: '',
-        goal: '',
-        backstory: '',
-        status: 'available',
-      },
-    ])
+    const nextIndex = team.length
+    setNewAgentDraft({
+      id: createMemberId(),
+      name: '',
+      avatar: getAgentAvatarForSlot(nextIndex),
+      modelId: 'auto',
+      roleDescription: '',
+      goal: '',
+      backstory: '',
+      status: 'available',
+    })
   }
 
   function handleAutoConfigure() {
@@ -4678,6 +4677,68 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   />
                 )
               })}
+
+              {/* ── New Agent Draft Wizard (configure BEFORE adding to team) ── */}
+              {newAgentDraft ? (() => {
+                const draftIndex = team.length
+                const draftAc = AGENT_ACCENT_COLORS[draftIndex % AGENT_ACCENT_COLORS.length]
+                const draftAvatarIdx = typeof newAgentDraft.avatar === 'number' ? newAgentDraft.avatar : getAgentAvatarForSlot(draftIndex)
+                const draftAvatarNode = (
+                  <div className="relative" data-avatar-picker>
+                    <div className={cn('flex size-14 items-center justify-center rounded-full shadow-md', draftAc.avatar)}>
+                      <AgentAvatar index={draftAvatarIdx} color={draftAc.hex} size={28} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAvatarPickerOpenId((prev) => prev === newAgentDraft.id ? null : newAgentDraft.id)}
+                      className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 shadow-sm text-neutral-500 hover:text-neutral-700 transition-colors"
+                    >
+                      <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    {avatarPickerOpenId === newAgentDraft.id ? (
+                      <div className="absolute left-0 top-full z-[60] mt-2 w-52 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 shadow-xl">
+                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Choose Avatar</p>
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {Array.from({ length: AGENT_AVATAR_COUNT }, (_, i) => {
+                            const aac = AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length]
+                            return (
+                              <button key={i} type="button"
+                                onClick={() => { setNewAgentDraft((prev) => prev ? { ...prev, avatar: i } : null); setAvatarPickerOpenId(null) }}
+                                className={cn('flex size-8 items-center justify-center rounded-full border-2 transition-all', draftAvatarIdx === i ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 scale-110' : 'border-transparent bg-neutral-100 dark:bg-neutral-800 hover:scale-105')}>
+                                <AgentAvatar index={i} color={aac.hex} size={16} />
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+                return (
+                  <AgentWizardModal
+                    key="new-agent-draft"
+                    member={newAgentDraft}
+                    memberIndex={draftIndex}
+                    accentBorderClass={draftAc.border}
+                    avatarNode={draftAvatarNode}
+                    gatewayModels={gatewayModels}
+                    modelPresets={MODEL_PRESETS}
+                    systemPromptTemplates={SYSTEM_PROMPT_TEMPLATES}
+                    addMode={true}
+                    onUpdate={(updates) => setNewAgentDraft((prev) => prev ? { ...prev, ...updates } : null)}
+                    onDelete={() => { setNewAgentDraft(null); setAvatarPickerOpenId(null) }}
+                    onClose={() => {
+                      // "Add Agent" clicked — add the configured draft to the team
+                      if (newAgentDraft) {
+                        const finalName = newAgentDraft.name.trim() || `Agent ${team.length + 1}`
+                        setTeam((prev) => [...prev, { ...newAgentDraft, name: finalName }])
+                      }
+                      setNewAgentDraft(null)
+                      setAvatarPickerOpenId(null)
+                    }}
+                  />
+                )
+              })() : null}
             </div>
           ) : null}
 
@@ -4925,22 +4986,33 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       />
                     </div>
 
-                    {/* Optional model select */}
-                    {addProviderName.trim() && addProviderAvailableModels.length > 0 ? (
-                      <div>
-                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Default Model <span className="font-normal normal-case text-neutral-300">(optional)</span></label>
-                        <select
-                          value={selectedModel}
-                          onChange={(event) => setSelectedModel(event.target.value)}
-                          className="h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
-                        >
-                          <option value="">Use gateway default</option>
-                          {addProviderAvailableModels.map((model) => (
-                            <option key={model.value} value={model.value}>{model.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    ) : null}
+                    {/* Model select — gateway models first, curated fallback for new providers */}
+                    {addProviderName.trim() ? (() => {
+                      const key = addProviderName.trim().toLowerCase()
+                      const curatedModels = (PROVIDER_COMMON_MODELS as Record<string, Array<{ value: string; label: string }>>)[key] ?? []
+                      const modelOptions = addProviderAvailableModels.length > 0 ? addProviderAvailableModels : curatedModels
+                      if (modelOptions.length === 0) return null
+                      return (
+                        <div>
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                            Default Model{' '}
+                            <span className="font-normal normal-case text-neutral-300">
+                              {addProviderAvailableModels.length === 0 ? '— common models' : '(optional)'}
+                            </span>
+                          </label>
+                          <select
+                            value={selectedModel}
+                            onChange={(event) => setSelectedModel(event.target.value)}
+                            className="h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
+                          >
+                            <option value="">Use gateway default</option>
+                            {modelOptions.map((model) => (
+                              <option key={model.value} value={model.value}>{model.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    })() : null}
 
                     <button
                       type="button"

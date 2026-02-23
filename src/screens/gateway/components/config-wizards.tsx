@@ -96,9 +96,12 @@ export function ProviderLogo({ provider, size = 28 }: { provider: string; size?:
   const hex = PROVIDER_HEX[key]
 
   if (!failed && slug) {
-    const src = hex
-      ? `https://cdn.simpleicons.org/${slug}/${hex}`
-      : `https://cdn.simpleicons.org/${slug}`
+    // Use no hex so the CDN returns the default brand color (avoids invisible black-on-dark issues)
+    const src = `https://cdn.simpleicons.org/${slug}`
+    // Invert in dark mode for brands with very dark logos (openai=000000, ollama=000000, xai=000000)
+    const isDarkLogo = hex
+      ? (parseInt(hex.slice(0, 2), 16) + parseInt(hex.slice(2, 4), 16) + parseInt(hex.slice(4, 6), 16)) < 120
+      : false
     return (
       <img
         src={src}
@@ -107,6 +110,7 @@ export function ProviderLogo({ provider, size = 28 }: { provider: string; size?:
         height={size}
         onError={() => setFailed(true)}
         style={{ width: size, height: size, objectFit: 'contain' }}
+        className={isDarkLogo ? 'dark:invert dark:opacity-90' : undefined}
         draggable={false}
       />
     )
@@ -132,6 +136,93 @@ export function ProviderLogo({ provider, size = 28 }: { provider: string; size?:
       {letters}
     </span>
   )
+}
+
+// ─── Common models per provider (shown when gateway hasn't loaded models yet) ─
+
+export const PROVIDER_COMMON_MODELS: Record<string, Array<{ value: string; label: string }>> = {
+  anthropic: [
+    { value: 'anthropic/claude-opus-4-6', label: 'Claude Opus 4.6' },
+    { value: 'anthropic/claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+    { value: 'anthropic/claude-haiku-3-5', label: 'Claude Haiku 3.5' },
+  ],
+  openai: [
+    { value: 'openai/gpt-5-codex', label: 'GPT-5 Codex' },
+    { value: 'openai/gpt-4o', label: 'GPT-4o' },
+    { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+    { value: 'openai/gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+    { value: 'openai/o3-mini', label: 'o3-mini' },
+    { value: 'openai/o1', label: 'o1' },
+  ],
+  'openai-codex': [
+    { value: 'openai/gpt-5-codex', label: 'GPT-5 Codex' },
+    { value: 'openai/gpt-5.1-codex', label: 'GPT-5.1 Codex' },
+    { value: 'openai/gpt-5.2-codex', label: 'GPT-5.2 Codex' },
+  ],
+  google: [
+    { value: 'google/gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+    { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { value: 'google/gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+  ],
+  'google-antigravity': [
+    { value: 'google-antigravity/gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { value: 'google-antigravity/gemini-2.5-flash-thinking', label: 'Gemini 2.5 Flash (Thinking)' },
+  ],
+  deepseek: [
+    { value: 'deepseek/deepseek-r1', label: 'DeepSeek R1' },
+    { value: 'deepseek/deepseek-v3', label: 'DeepSeek V3' },
+    { value: 'deepseek/deepseek-chat', label: 'DeepSeek Chat' },
+  ],
+  mistral: [
+    { value: 'mistral/mistral-large', label: 'Mistral Large' },
+    { value: 'mistral/mistral-small', label: 'Mistral Small' },
+    { value: 'mistral/codestral', label: 'Codestral' },
+    { value: 'mistral/mixtral-8x7b', label: 'Mixtral 8x7B' },
+  ],
+  groq: [
+    { value: 'groq/llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },
+    { value: 'groq/llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant' },
+    { value: 'groq/mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
+  ],
+  cohere: [
+    { value: 'cohere/command-r-plus', label: 'Command R+' },
+    { value: 'cohere/command-r', label: 'Command R' },
+    { value: 'cohere/command-light', label: 'Command Light' },
+  ],
+  perplexity: [
+    { value: 'perplexity/sonar-pro', label: 'Sonar Pro' },
+    { value: 'perplexity/sonar', label: 'Sonar' },
+    { value: 'perplexity/sonar-reasoning', label: 'Sonar Reasoning' },
+  ],
+  together: [
+    { value: 'together/meta-llama/Llama-3.3-70B-Instruct-Turbo', label: 'Llama 3.3 70B Turbo' },
+    { value: 'together/mistralai/Mixtral-8x7B-Instruct-v0.1', label: 'Mixtral 8x7B' },
+    { value: 'together/Qwen/Qwen2.5-72B-Instruct-Turbo', label: 'Qwen 2.5 72B' },
+  ],
+  fireworks: [
+    { value: 'fireworks/accounts/fireworks/models/llama-v3p1-70b-instruct', label: 'Llama 3.1 70B' },
+    { value: 'fireworks/accounts/fireworks/models/deepseek-r1', label: 'DeepSeek R1' },
+    { value: 'fireworks/accounts/fireworks/models/qwen2p5-72b-instruct', label: 'Qwen 2.5 72B' },
+  ],
+  minimax: [
+    { value: 'minimax/MiniMax-M2.5', label: 'MiniMax M2.5' },
+    { value: 'minimax/MiniMax-M2.5-Lightning', label: 'MiniMax M2.5 Lightning' },
+  ],
+  xai: [
+    { value: 'xai/grok-beta', label: 'Grok Beta' },
+    { value: 'xai/grok-2', label: 'Grok 2' },
+    { value: 'xai/grok-2-mini', label: 'Grok 2 Mini' },
+  ],
+  openrouter: [
+    { value: 'openrouter/anthropic/claude-opus-4-6', label: 'Claude Opus 4.6 (OR)' },
+    { value: 'openrouter/openai/gpt-4o', label: 'GPT-4o (OR)' },
+    { value: 'openrouter/google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash (OR)' },
+  ],
+  'github-copilot': [
+    { value: 'github-copilot/gpt-4o', label: 'GPT-4o (Copilot)' },
+    { value: 'github-copilot/o3-mini', label: 'o3-mini (Copilot)' },
+    { value: 'github-copilot/claude-sonnet-4-5', label: 'Claude Sonnet (Copilot)' },
+  ],
 }
 
 // ─── Shared Modal wrapper ─────────────────────────────────────────────────────
@@ -198,6 +289,8 @@ type AgentWizardProps = {
   gatewayModels: ReadonlyArray<{ value: string; label: string; provider: string }>
   modelPresets: ReadonlyArray<{ readonly id: string; readonly label: string; readonly desc?: string }>
   systemPromptTemplates: Array<{ id: string; label: string; icon: string; category: string; prompt: string }>
+  /** When true: "Done" → "Add Agent", "Remove Agent" → "Cancel". onClose acts as the add/confirm action. */
+  addMode?: boolean
   onUpdate: (updates: Partial<TeamMember & { avatar?: number; backstory: string; roleDescription: string }>) => void
   onDelete: () => void
   onClose: () => void
@@ -211,6 +304,7 @@ export function AgentWizardModal({
   gatewayModels,
   modelPresets,
   systemPromptTemplates,
+  addMode = false,
   onUpdate,
   onDelete,
   onClose,
@@ -319,17 +413,22 @@ export function AgentWizardModal({
         <button
           type="button"
           onClick={onDelete}
-          className="flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-800/50 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          className={cn(
+            'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
+            addMode
+              ? 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+              : 'border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20',
+          )}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M5 3V2h2v1M4 3v7h4V3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          Remove Agent
+          {addMode ? null : <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M5 3V2h2v1M4 3v7h4V3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+          {addMode ? 'Cancel' : 'Remove Agent'}
         </button>
         <button
           type="button"
           onClick={onClose}
           className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
         >
-          ✓ Done
+          {addMode ? '+ Add Agent' : '✓ Done'}
         </button>
       </div>
     </WizardModal>
@@ -806,16 +905,27 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
           </div>
         ) : null}
 
-        {/* Default model picker */}
-        {availableModels.length > 0 ? (
-          <div>
-            <FieldLabel>Default Model</FieldLabel>
-            <select value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)} className={SELECT_CLS}>
-              <option value="">Use gateway default</option>
-              {availableModels.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-          </div>
-        ) : null}
+        {/* Default model picker — gateway models first, then curated fallback */}
+        {(() => {
+          const key = provider.toLowerCase()
+          const curated = PROVIDER_COMMON_MODELS[key] ?? []
+          const combined = availableModels.length > 0 ? availableModels : curated
+          if (combined.length === 0) return null
+          return (
+            <div>
+              <FieldLabel>
+                Default Model{' '}
+                {availableModels.length === 0 ? (
+                  <span className="font-normal normal-case text-neutral-300 dark:text-neutral-600">— common models</span>
+                ) : null}
+              </FieldLabel>
+              <select value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)} className={SELECT_CLS}>
+                <option value="">Use gateway default</option>
+                {combined.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+          )
+        })()}
 
         {/* API key update */}
         <div>
