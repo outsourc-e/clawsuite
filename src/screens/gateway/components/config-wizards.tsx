@@ -96,23 +96,39 @@ export function ProviderLogo({ provider, size = 28 }: { provider: string; size?:
   const hex = PROVIDER_HEX[key]
 
   if (!failed && slug) {
-    // Use no hex so the CDN returns the default brand color (avoids invisible black-on-dark issues)
-    const src = `https://cdn.simpleicons.org/${slug}`
-    // Invert in dark mode for brands with very dark logos (openai=000000, ollama=000000, xai=000000)
-    const isDarkLogo = hex
-      ? (parseInt(hex.slice(0, 2), 16) + parseInt(hex.slice(2, 4), 16) + parseInt(hex.slice(4, 6), 16)) < 120
-      : false
+    const brandHex = hex ?? '555555'
+    // For very dark brand colors, show a white version in dark mode
+    const isDarkBrand = parseInt(brandHex.slice(0, 2), 16) + parseInt(brandHex.slice(2, 4), 16) + parseInt(brandHex.slice(4, 6), 16) < 120
+    const srcLight = `https://cdn.simpleicons.org/${slug}/${brandHex}`
+    const srcDark  = `https://cdn.simpleicons.org/${slug}/ffffff`
     return (
-      <img
-        src={src}
-        alt={meta.label}
-        width={size}
-        height={size}
-        onError={() => setFailed(true)}
-        style={{ width: size, height: size, objectFit: 'contain' }}
-        className={isDarkLogo ? 'dark:invert dark:opacity-90' : undefined}
-        draggable={false}
-      />
+      <>
+        {/* Light mode version (brand color) */}
+        <img
+          src={srcLight}
+          alt={meta.label}
+          width={size}
+          height={size}
+          onError={() => setFailed(true)}
+          style={{ width: size, height: size, objectFit: 'contain' }}
+          className={cn('object-contain', isDarkBrand ? 'block dark:hidden' : '')}
+          draggable={false}
+        />
+        {/* Dark mode version (white) — only rendered for dark brand colors */}
+        {isDarkBrand ? (
+          <img
+            src={srcDark}
+            alt=""
+            aria-hidden
+            width={size}
+            height={size}
+            onError={() => setFailed(true)}
+            style={{ width: size, height: size, objectFit: 'contain' }}
+            className="hidden dark:block object-contain"
+            draggable={false}
+          />
+        ) : null}
+      </>
     )
   }
 
@@ -651,19 +667,28 @@ type AddTeamModalProps = {
     id: string; icon: string; label: string; description: string;
     tier: string; agents: string[]; templateId?: string
   }>
+  /** Icons already in use by existing teams — new team will get a different one */
+  existingIcons?: string[]
   /** Called with team name, icon, and the IDs of agents to include */
   onSaveCurrentAs: (name: string, icon: string, selectedAgentIds: string[]) => void
   onApplyTemplate: (templateId: TeamTemplateId) => void
   onClose: () => void
 }
 
-export function AddTeamModal({ currentTeam, quickStartTemplates, onSaveCurrentAs, onApplyTemplate, onClose }: AddTeamModalProps) {
+function pickUniqueTeamIcon(existing: string[]): string {
+  const usedSet = new Set(existing)
+  const available = INLINE_TEAM_ICONS.filter((ic) => !usedSet.has(ic))
+  const pool = available.length > 0 ? available : INLINE_TEAM_ICONS
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons = [], onSaveCurrentAs, onApplyTemplate, onClose }: AddTeamModalProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(
     () => new Set(currentTeam.map((m) => m.id))
   )
   const [teamName, setTeamName] = useState('')
-  const [teamIcon, setTeamIcon] = useState('👥')
+  const [teamIcon, setTeamIcon] = useState(() => pickUniqueTeamIcon(existingIcons))
 
   // When a template is picked, pre-fill the name and select the matching agents by display name
   function handleSelectTemplate(tpl: AddTeamModalProps['quickStartTemplates'][number]) {

@@ -4844,6 +4844,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <AddTeamModal
                     currentTeam={team}
                     quickStartTemplates={TEAM_QUICK_TEMPLATES}
+                    existingIcons={teamConfigs.map((c) => c.icon ?? '').filter(Boolean)}
                     onSaveCurrentAs={(name, icon, selectedAgentIds) => {
                       const timestamp = Date.now()
                       const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -5038,30 +5039,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Connected Providers</h2>
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{configuredProviders.length} active · {gatewayModels.length} models available</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setProviderWizardStep('select'); setProviderWizardSelected(''); setAddProviderApiKey(''); setAddProviderName(''); setShowAddProviderModal(true) }}
-                      className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
-                    >
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-                      Add Provider
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void refreshGatewayStatus().then((connected) => {
-                          if (connected) return refreshConfiguredProviders()
-                          setConfiguredProviders([])
-                          return Promise.resolve()
-                        })
-                      }}
-                      className="flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 shadow-sm transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 6A4 4 0 1 1 6 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M10 2v4H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      Refresh
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setProviderWizardStep('select'); setProviderWizardSelected(''); setAddProviderApiKey(''); setAddProviderName(''); setShowAddProviderModal(true) }}
+                    className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                    Add Provider
+                  </button>
                 </div>
                 {configuredProviders.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-6 text-center">
