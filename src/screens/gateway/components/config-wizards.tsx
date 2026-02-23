@@ -7,45 +7,40 @@ import { TEAM_TEMPLATES } from './team-panel'
 
 // ─── Provider metadata ────────────────────────────────────────────────────────
 
-/** SimpleIcons slug for each provider key (used for CDN logos). */
+/** SimpleIcons slug for each provider key (used for CDN logos).
+ *  Only include providers confirmed to exist in simpleicons.org slugs.
+ *  Providers NOT in SimpleIcons (deepseek, minimax, fireworks, togetherai) fall back to custom SVG. */
 const SIMPLEICONS_SLUGS: Record<string, string> = {
-  anthropic:          'anthropic',
-  openai:             'openai',
-  'openai-codex':     'openai',
-  'github-copilot':   'githubcopilot',
-  google:             'google',
+  anthropic:            'anthropic',
+  openai:               'openai',
+  'openai-codex':       'openai',
+  'github-copilot':     'githubcopilot',
+  google:               'google',
   'google-antigravity': 'google',
-  deepseek:           'deepseek',
-  mistral:            'mistral',
-  groq:               'groq',
-  ollama:             'ollama',
-  perplexity:         'perplexity',
-  cohere:             'cohere',
-  xai:                'x',
-  together:           'togetherai',
-  fireworks:          'fireworks',
-  openrouter:         'openrouter',
+  mistral:              'mistral',
+  groq:                 'groq',
+  ollama:               'ollama',
+  perplexity:           'perplexity',
+  cohere:               'cohere',
+  xai:                  'x',
+  openrouter:           'openrouter',
 }
 
 /** Branded hex color per provider (passed to simpleicons CDN for colored SVGs). */
 const PROVIDER_HEX: Record<string, string> = {
   anthropic:          'D97757',
-  openai:             '10A37F',
-  'openai-codex':     '10A37F',
+  openai:             '000000',   // OpenAI brand is now black/white
+  'openai-codex':     '000000',
   'github-copilot':   '6E40C9',
   google:             '4285F4',
   'google-antigravity': '4285F4',
-  deepseek:           '4D6BFE',
-  mistral:            'F7501E',
+  mistral:            'FF7000',
   groq:               'F55036',
   ollama:             '000000',
   perplexity:         '20808D',
   cohere:             '39594D',
   xai:                '000000',
-  together:           'FF6BFF',
-  fireworks:          'FF4500',
   openrouter:         '6467F2',
-  minimax:            '7B2FBE',
 }
 
 export const PROVIDER_META: Record<string, {
@@ -117,10 +112,23 @@ export function ProviderLogo({ provider, size = 28 }: { provider: string; size?:
     )
   }
 
-  // Fallback: branded letter abbreviation
-  const letters = provider.slice(0, 2).toUpperCase()
+  // Custom inline SVG for providers not in SimpleIcons
+  const CUSTOM_PROVIDER_ICONS: Record<string, string> = {
+    deepseek:   '🐋',
+    minimax:    '⚡',
+    fireworks:  '🎆',
+    together:   '🤝',
+    togetherai: '🤝',
+  }
+  const customEmoji = CUSTOM_PROVIDER_ICONS[key]
+  if (customEmoji) {
+    return <span className="leading-none" style={{ fontSize: size * 0.55 }}>{customEmoji}</span>
+  }
+
+  // Fallback: branded letter abbreviation in 2 chars
+  const letters = provider.replace(/[-_.]/g, ' ').trim().slice(0, 2).toUpperCase()
   return (
-    <span className={cn('font-bold text-sm leading-none', meta.color)} style={{ fontSize: Math.max(10, size * 0.4) }}>
+    <span className={cn('font-black leading-none', meta.color)} style={{ fontSize: Math.max(10, size * 0.4) }}>
       {letters}
     </span>
   )
@@ -128,7 +136,7 @@ export function ProviderLogo({ provider, size = 28 }: { provider: string; size?:
 
 // ─── Shared Modal wrapper ─────────────────────────────────────────────────────
 
-function WizardModal({
+export function WizardModal({
   open,
   onClose,
   children,
@@ -187,8 +195,8 @@ type AgentWizardProps = {
   accentBorderClass: string
   /** Pre-rendered avatar node (includes the avatar + pencil button for changing it) */
   avatarNode: React.ReactNode
-  gatewayModels: Array<{ value: string; label: string; provider: string }>
-  modelPresets: Array<{ id: string; label: string }>
+  gatewayModels: ReadonlyArray<{ value: string; label: string; provider: string }>
+  modelPresets: ReadonlyArray<{ readonly id: string; readonly label: string; readonly desc?: string }>
   systemPromptTemplates: Array<{ id: string; label: string; icon: string; category: string; prompt: string }>
   onUpdate: (updates: Partial<TeamMember & { avatar?: number; backstory: string; roleDescription: string }>) => void
   onDelete: () => void
@@ -375,8 +383,11 @@ type TeamWizardProps = {
   teamIcon: string
   teamMembers: Array<{ id: string; name: string; modelId: string }>
   isActive: boolean
+  modelPresets: ReadonlyArray<{ readonly id: string; readonly label: string; readonly desc?: string }>
+  gatewayModels: ReadonlyArray<{ value: string; label: string; provider: string }>
   onRename: (name: string) => void
   onUpdateIcon: (icon: string) => void
+  onUpdateMembers: (updates: Array<{ id: string; modelId: string }>) => void
   onLoad: () => void
   onDelete: () => void
   onClose: () => void
@@ -388,8 +399,11 @@ export function TeamWizardModal({
   teamIcon,
   teamMembers,
   isActive,
+  modelPresets,
+  gatewayModels,
   onRename,
   onUpdateIcon,
+  onUpdateMembers,
   onLoad,
   onDelete,
   onClose,
@@ -397,19 +411,19 @@ export function TeamWizardModal({
   const [name, setName] = useState(teamName)
   const [icon, setIcon] = useState(teamIcon || '👥')
   const [showIconPicker, setShowIconPicker] = useState(false)
+  const [localMembers, setLocalMembers] = useState(teamMembers.map((m) => ({ ...m })))
 
-  const accentColors = [
-    'border-orange-400',
-    'border-blue-400',
-    'border-emerald-400',
-    'border-violet-400',
-  ]
-  const accentBorder = isActive ? accentColors[0] : accentColors[1]
+  const accentBorder = isActive ? 'border-orange-400' : 'border-blue-400'
 
   function handleSave() {
     onRename(name)
     onUpdateIcon(icon)
+    onUpdateMembers(localMembers.map((m) => ({ id: m.id, modelId: m.modelId })))
     onClose()
+  }
+
+  function setMemberModel(id: string, modelId: string) {
+    setLocalMembers((prev) => prev.map((m) => m.id === id ? { ...m, modelId } : m))
   }
 
   return (
@@ -440,7 +454,7 @@ export function TeamWizardModal({
 
         <div className="min-w-0 flex-1">
           <p className="text-lg font-bold text-neutral-900 dark:text-white">{name || 'Untitled Team'}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">{teamMembers.length} agent{teamMembers.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">{localMembers.length} agent{localMembers.length !== 1 ? 's' : ''}</p>
         </div>
         <button type="button" onClick={onClose}
           className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
@@ -472,19 +486,34 @@ export function TeamWizardModal({
           <input value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLS} />
         </div>
 
-        {/* Agents list */}
+        {/* Agents list with model selectors */}
         <div>
-          <FieldLabel>Agents ({teamMembers.length})</FieldLabel>
+          <FieldLabel>Agents &amp; Models ({localMembers.length})</FieldLabel>
           <div className="space-y-1.5">
-            {teamMembers.map((m, idx) => (
-              <div key={m.id} className="flex items-center gap-3 rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2.5">
+            {localMembers.map((m, idx) => (
+              <div key={m.id} className="flex items-center gap-2 rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700 text-[10px] font-bold text-neutral-600 dark:text-neutral-300">
                   {idx + 1}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-100 truncate">{m.name}</p>
-                  <p className="text-[10px] text-neutral-400 truncate">{m.modelId}</p>
-                </div>
+                <p className="min-w-0 flex-1 text-xs font-semibold text-neutral-800 dark:text-neutral-100 truncate">{m.name}</p>
+                <select
+                  value={m.modelId}
+                  onChange={(e) => setMemberModel(m.id, e.target.value)}
+                  className="h-7 w-40 shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 text-[10px] text-neutral-700 dark:text-neutral-300 outline-none focus:ring-1 ring-orange-400 cursor-pointer"
+                >
+                  <optgroup label="Presets">
+                    {modelPresets.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </optgroup>
+                  {gatewayModels.length > 0 ? (
+                    <optgroup label="Available Models">
+                      {gatewayModels.map((gm) => (
+                        <option key={gm.value} value={gm.value}>{gm.label} ({gm.provider})</option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                </select>
               </div>
             ))}
           </div>
@@ -514,48 +543,81 @@ export function TeamWizardModal({
 
 // ─── AddTeamModal ─────────────────────────────────────────────────────────────
 
+/** Icons shown in the inline picker row inside the New Team wizard */
+const INLINE_TEAM_ICONS = ['👥', '🚀', '⚡', '🔥', '🎯', '💡', '🛡️', '⚙️', '🔬', '📊', '🎨', '🏗️', '🧠', '💼', '🦾', '🌐', '🏆', '✨', '🤖', '🔐', '🧩', '🎓', '💎', '🌟', '🦅']
+
 type AddTeamModalProps = {
   currentTeam: Array<{ id: string; name: string; modelId: string }>
   quickStartTemplates: Array<{
     id: string; icon: string; label: string; description: string;
     tier: string; agents: string[]; templateId?: string
   }>
-  onSaveCurrentAs: (name: string) => void
+  /** Called with team name, icon, and the IDs of agents to include */
+  onSaveCurrentAs: (name: string, icon: string, selectedAgentIds: string[]) => void
   onApplyTemplate: (templateId: TeamTemplateId) => void
   onClose: () => void
 }
 
 export function AddTeamModal({ currentTeam, quickStartTemplates, onSaveCurrentAs, onApplyTemplate, onClose }: AddTeamModalProps) {
-  const [step, setStep] = useState<'choose' | 'name'>('choose')
-  const [newName, setNewName] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(
+    () => new Set(currentTeam.map((m) => m.id))
+  )
+  const [teamName, setTeamName] = useState('')
+  const [teamIcon, setTeamIcon] = useState('👥')
 
-  function handleSave() {
-    if (!newName.trim()) return
+  // When a template is picked, pre-fill the name and select the matching agents by display name
+  function handleSelectTemplate(tpl: AddTeamModalProps['quickStartTemplates'][number]) {
+    setSelectedTemplate(tpl.id)
+    setTeamName(tpl.label)
+    // Try to match agents by name — agent names that appear in the template agents list
+    const matched = new Set(
+      currentTeam
+        .filter((m) => tpl.agents.some((a) => a.toLowerCase() === m.name.toLowerCase()))
+        .map((m) => m.id)
+    )
+    // Fall back to all agents if none matched (template agents might have different names)
+    setSelectedAgents(matched.size > 0 ? matched : new Set(currentTeam.map((m) => m.id)))
+  }
+
+  function toggleAgent(id: string) {
+    setSelectedAgents((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  function handleCreate() {
+    const name = teamName.trim() || `Custom Team ${new Date().toLocaleDateString()}`
+    const agentIds = currentTeam.filter((m) => selectedAgents.has(m.id)).map((m) => m.id)
+    // Apply template if one was selected
     if (selectedTemplate) {
       const tpl = quickStartTemplates.find((t) => t.id === selectedTemplate)
       if (tpl?.templateId && tpl.templateId in TEAM_TEMPLATES) {
         onApplyTemplate(tpl.templateId as TeamTemplateId)
       }
     }
-    onSaveCurrentAs(newName.trim())
+    onSaveCurrentAs(name, teamIcon, agentIds)
     onClose()
   }
+
+  const canCreate = selectedAgents.size > 0
 
   return (
     <WizardModal open onClose={onClose} width="max-w-lg">
       {/* Header */}
       <div className="flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4 border-l-orange-400">
         <div className="flex size-12 items-center justify-center rounded-full bg-orange-50 dark:bg-orange-900/20 text-2xl shadow-sm">
-          {step === 'choose' ? '👥' : '✏️'}
+          {teamIcon}
         </div>
         <div className="flex-1">
-          <p className="text-base font-bold text-neutral-900 dark:text-white">
-            {step === 'choose' ? 'New Team' : 'Name Your Team'}
-          </p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            {step === 'choose' ? 'Start from a template or save your current agents' : 'Give this team a name to save it'}
-          </p>
+          <p className="text-base font-bold text-neutral-900 dark:text-white">New Team</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Configure agents, name, and icon</p>
         </div>
         <button type="button" onClick={onClose}
           className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
@@ -563,88 +625,126 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, onSaveCurrentAs
         </button>
       </div>
 
-      {step === 'choose' ? (
-        <div className="px-6 py-5">
-          {/* Current team option */}
-          <div className="mb-4">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Current Configuration</p>
-            <button
-              type="button"
-              onClick={() => { setSelectedTemplate(null); setStep('name') }}
-              className="w-full rounded-xl border-2 border-neutral-200 dark:border-neutral-700 p-3 text-left transition-all hover:border-orange-400 hover:bg-orange-50/30 dark:hover:bg-orange-900/10 hover:shadow-sm"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-lg">✨</span>
-                <div>
-                  <p className="text-xs font-semibold text-neutral-900 dark:text-white">Save current team</p>
-                  <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                    {currentTeam.length} agents: {currentTeam.slice(0, 3).map((m) => m.name).join(', ')}{currentTeam.length > 3 ? `…` : ''}
-                  </p>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {/* Templates */}
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Quick-Start Templates</p>
-          <div className="grid grid-cols-2 gap-2">
+      <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
+        {/* Quick-start templates — compact chips */}
+        <div>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Start from a Template</p>
+          <div className="grid grid-cols-2 gap-1.5">
             {quickStartTemplates.map((tpl) => (
               <button
                 key={tpl.id}
                 type="button"
-                onClick={() => { setSelectedTemplate(tpl.id); setStep('name'); setNewName(tpl.label) }}
-                className={cn('rounded-xl border-2 p-3 text-left transition-all hover:shadow-sm',
-                  selectedTemplate === tpl.id ? 'border-orange-400 bg-orange-50/30 dark:bg-orange-900/10' : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300')}
+                onClick={() => handleSelectTemplate(tpl)}
+                className={cn('flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all',
+                  selectedTemplate === tpl.id
+                    ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/15 shadow-sm'
+                    : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600')}
               >
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <span>{tpl.icon}</span>
-                  <p className="text-xs font-semibold text-neutral-900 dark:text-white">{tpl.label}</p>
+                <span className="shrink-0">{tpl.icon}</span>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-100 truncate">{tpl.label}</p>
+                  <p className="text-[9px] text-neutral-400 truncate">{tpl.description}</p>
                 </div>
-                <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mb-1.5">{tpl.description}</p>
-                <div className="flex flex-wrap gap-1">
-                  {tpl.agents.slice(0, 3).map((a) => (
-                    <span key={a} className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-500">{a}</span>
-                  ))}
-                  {tpl.agents.length > 3 ? <span className="text-[9px] text-neutral-400">+{tpl.agents.length - 3}</span> : null}
-                </div>
-                <div className="mt-1.5">
-                  <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-medium',
-                    tpl.tier === 'budget' ? 'bg-green-50 text-green-700' : tpl.tier === 'balanced' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700')}>
-                    {tpl.tier === 'budget' ? '💰 Budget' : tpl.tier === 'balanced' ? '⚖️ Balanced' : '🚀 Max'}
-                  </span>
-                </div>
+                <span className={cn('ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold',
+                  tpl.tier === 'budget' ? 'bg-green-100 text-green-700' : tpl.tier === 'balanced' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700')}>
+                  {tpl.tier === 'budget' ? '💰' : tpl.tier === 'balanced' ? '⚖️' : '🚀'}
+                </span>
               </button>
             ))}
           </div>
         </div>
-      ) : (
-        <div className="px-6 py-5">
-          <button type="button" onClick={() => setStep('choose')} className="flex items-center gap-1 mb-4 text-[11px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7 2L3 6l4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            Back
-          </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
+          <span className="text-[10px] text-neutral-400 font-medium">AGENTS TO INCLUDE</span>
+          <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
+        </div>
+
+        {/* Agent selector */}
+        <div className="space-y-1.5">
+          {currentTeam.length === 0 ? (
+            <p className="text-center text-xs text-neutral-400 py-3">No agents configured yet</p>
+          ) : currentTeam.map((m) => {
+            const checked = selectedAgents.has(m.id)
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => toggleAgent(m.id)}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all',
+                  checked
+                    ? 'border-orange-300 bg-orange-50/50 dark:border-orange-700/50 dark:bg-orange-900/10'
+                    : 'border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/30 opacity-60 hover:opacity-80',
+                )}
+              >
+                {/* Checkbox */}
+                <span className={cn(
+                  'flex size-4 shrink-0 items-center justify-center rounded border-2 transition-all',
+                  checked ? 'border-orange-500 bg-orange-500' : 'border-neutral-300 dark:border-neutral-600',
+                )}>
+                  {checked ? <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> : null}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-100 truncate">{m.name}</p>
+                  <p className="text-[10px] text-neutral-400 truncate">{m.modelId}</p>
+                </div>
+              </button>
+            )
+          })}
+          {selectedAgents.size === 0 ? (
+            <p className="text-[10px] text-red-500 text-center pt-1">Select at least one agent</p>
+          ) : (
+            <p className="text-[10px] text-neutral-400 text-center pt-1">{selectedAgents.size} of {currentTeam.length} agents selected</p>
+          )}
+        </div>
+
+        {/* Team Name */}
+        <div>
           <FieldLabel>Team Name</FieldLabel>
           <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
-            placeholder="e.g. Research Squad, Dev Team..."
-            autoFocus
+            value={teamName}
+            onChange={(e) => setTeamName(e.target.value)}
+            placeholder="e.g. Research Squad, Dev Team…"
             className={INPUT_CLS}
           />
         </div>
-      )}
+
+        {/* Team Icon — inline row */}
+        <div>
+          <FieldLabel>Team Icon</FieldLabel>
+          <div className="flex flex-wrap gap-1">
+            {INLINE_TEAM_ICONS.map((ic) => (
+              <button
+                key={ic}
+                type="button"
+                onClick={() => setTeamIcon(ic)}
+                className={cn(
+                  'flex size-8 items-center justify-center rounded-md text-lg transition-all hover:scale-110',
+                  teamIcon === ic ? 'bg-orange-100 dark:bg-orange-900/30 ring-1 ring-orange-400' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                )}
+              >
+                {ic}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       <div className="flex justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
-        <button type="button" onClick={onClose} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
+        <button type="button" onClick={onClose}
+          className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
           Cancel
         </button>
-        {step === 'name' ? (
-          <button type="button" onClick={handleSave} disabled={!newName.trim()}
-            className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors">
-            Create Team
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={!canCreate}
+          className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+        >
+          Create Team
+        </button>
       </div>
     </WizardModal>
   )

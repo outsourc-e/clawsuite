@@ -13,7 +13,7 @@ import { THEMES, applyTheme, getStoredTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
-import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META } from './components/config-wizards'
+import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal } from './components/config-wizards'
 import {
   saveMissionCheckpoint,
   loadMissionCheckpoint,
@@ -2073,6 +2073,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [teamWizardOpenId, setTeamWizardOpenId] = useState<string | null>(null)
   const [showAddTeamModal, setShowAddTeamModal] = useState(false)
   const [providerEditModalProvider, setProviderEditModalProvider] = useState<string | null>(null)
+  const [showAddProviderModal, setShowAddProviderModal] = useState(false)
   const [providerWizardStep, setProviderWizardStep] = useState<'select' | 'key'>('select')
   const [providerWizardSelected, setProviderWizardSelected] = useState('')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
@@ -4549,6 +4550,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     Edit agent identity, model, role description, and system prompt.
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleAddAgent}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                  Add Agent
+                </button>
               </div>
 
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -4721,7 +4730,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           </div>
                           <div className="border-t border-neutral-100 dark:border-neutral-800 flex">
                             <button type="button" onClick={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id) }}
-                              className="flex-1 py-2 text-[10px] font-semibold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors rounded-bl-xl">Load</button>
+                              className="flex-1 py-2 text-[10px] font-semibold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors rounded-bl-xl">Activate</button>
                             <div className="w-px bg-neutral-100 dark:bg-neutral-800" />
                             <button type="button" onClick={() => setTeamWizardOpenId(config.id)}
                               className="flex-1 py-2 text-[10px] font-medium text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors rounded-br-xl">Edit</button>
@@ -4739,22 +4748,62 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
                 {/* Team Wizard Modals */}
                 {teamConfigs.map((config) => teamWizardOpenId !== config.id ? null : (
-                  <TeamWizardModal key={config.id} teamId={config.id} teamName={config.name} teamIcon={config.icon ?? '👥'} teamMembers={config.team}
+                  <TeamWizardModal key={config.id}
+                    teamId={config.id}
+                    teamName={config.name}
+                    teamIcon={config.icon ?? '👥'}
+                    teamMembers={config.team}
                     isActive={selectedTeamConfigId === config.id}
+                    modelPresets={MODEL_PRESETS}
+                    gatewayModels={gatewayModels}
                     onRename={(name) => {
                       setTeamConfigs((prev) => prev.map((c) => c.id === config.id ? { ...c, name, updatedAt: Date.now() } : c))
                     }}
                     onUpdateIcon={(icon) => {
                       setTeamConfigs((prev) => prev.map((c) => c.id === config.id ? { ...c, icon, updatedAt: Date.now() } : c))
                     }}
+                    onUpdateMembers={(updates) => {
+                      setTeamConfigs((prev) => prev.map((c) => {
+                        if (c.id !== config.id) return c
+                        return {
+                          ...c,
+                          team: c.team.map((m) => {
+                            const upd = updates.find((u) => u.id === m.id)
+                            return upd ? { ...m, modelId: upd.modelId } : m
+                          }),
+                          updatedAt: Date.now(),
+                        }
+                      }))
+                    }}
                     onLoad={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id) }}
                     onDelete={() => { deleteTeamConfig(config.id); setTeamWizardOpenId(null) }}
                     onClose={() => setTeamWizardOpenId(null)} />
                 ))}
                 {showAddTeamModal ? (
-                  <AddTeamModal currentTeam={team} quickStartTemplates={TEAM_QUICK_TEMPLATES}
-                    onSaveCurrentAs={(name) => { setTeamConfigName(name); saveCurrentTeamConfig() }}
-                    onApplyTemplate={applyTemplate} onClose={() => setShowAddTeamModal(false)} />
+                  <AddTeamModal
+                    currentTeam={team}
+                    quickStartTemplates={TEAM_QUICK_TEMPLATES}
+                    onSaveCurrentAs={(name, icon, selectedAgentIds) => {
+                      const timestamp = Date.now()
+                      const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                        ? crypto.randomUUID()
+                        : `${timestamp}-${Math.random().toString(36).slice(2, 8)}`
+                      const selectedMembers = team.filter((m) => selectedAgentIds.includes(m.id))
+                      const entryName = name || `Custom Team ${new Date().toLocaleDateString()}`
+                      const nextEntry: SavedTeamConfig = {
+                        id: newId,
+                        name: entryName,
+                        icon,
+                        createdAt: timestamp,
+                        updatedAt: timestamp,
+                        team: selectedMembers.map((m) => ({ ...m })),
+                      }
+                      setTeamConfigs((prev) => [nextEntry, ...prev].slice(0, 30))
+                      setSelectedTeamConfigId(newId)
+                      toast(`Saved team: ${entryName}`, { type: 'success' })
+                    }}
+                    onApplyTemplate={applyTemplate}
+                    onClose={() => setShowAddTeamModal(false)} />
                 ) : null}
               </div>
 
@@ -4763,26 +4812,32 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {configSection === 'keys' ? (
             <div className="space-y-5">
-              {/* ── Add Provider Wizard ── */}
-              <div className="rounded-xl border-2 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden shadow-sm">
+              {/* ── Add Provider Wizard Modal ── */}
+              <WizardModal open={showAddProviderModal} onClose={() => { setShowAddProviderModal(false); setProviderWizardStep('select'); setProviderWizardSelected(''); setAddProviderApiKey('') }} width="max-w-2xl">
                 {/* Wizard header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100 dark:border-neutral-800">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-100 dark:border-neutral-800 border-l-4 border-l-orange-400">
                   <div>
-                    <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Add Provider</h2>
+                    <h2 className="text-base font-bold text-neutral-900 dark:text-white">Add Provider</h2>
                     <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
                       {providerWizardStep === 'select' ? 'Step 1 — Choose a provider' : `Step 2 — Enter your ${providerWizardSelected || addProviderName} API key`}
                     </p>
                   </div>
-                  {/* Step indicator */}
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn('size-2 rounded-full', providerWizardStep === 'select' ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
-                    <span className={cn('size-2 rounded-full', providerWizardStep === 'key' ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+                  {/* Step indicator + close */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn('size-2 rounded-full', providerWizardStep === 'select' ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+                      <span className={cn('size-2 rounded-full', providerWizardStep === 'key' ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+                    </div>
+                    <button type="button" onClick={() => { setShowAddProviderModal(false); setProviderWizardStep('select'); setProviderWizardSelected(''); setAddProviderApiKey('') }}
+                      className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                    </button>
                   </div>
                 </div>
 
                 {/* Step 1: Provider grid */}
                 {providerWizardStep === 'select' ? (
-                  <div className="p-4">
+                  <div className="px-6 py-5">
                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                       {([...KNOWN_GATEWAY_PROVIDERS, CUSTOM_PROVIDER_OPTION] as const).map((provider, pIdx) => {
                         const isCustom = provider === CUSTOM_PROVIDER_OPTION
@@ -4795,9 +4850,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           { border: 'border-pink-200 hover:border-pink-400', bg: 'bg-pink-50 dark:bg-pink-900/20', text: 'text-pink-600 dark:text-pink-400' },
                           { border: 'border-teal-200 hover:border-teal-400', bg: 'bg-teal-50 dark:bg-teal-900/20', text: 'text-teal-600 dark:text-teal-400' },
                         ]
-                        const pc = isCustom
-                          ? { border: 'border-neutral-200 hover:border-neutral-400', bg: 'bg-neutral-50 dark:bg-neutral-800', text: 'text-neutral-500 dark:text-neutral-400' }
-                          : pColors[pIdx % pColors.length]
+                        const pm = (PROVIDER_META as Record<string, { label: string; emoji: string; color: string; bg: string; border: string; description: string }>)[provider.toLowerCase()]
+                        const tileBorder = isCustom ? 'border-neutral-200 hover:border-neutral-400' : (pm?.border ?? pColors[pIdx % pColors.length].border)
+                        const tileBg = isCustom ? 'bg-neutral-50 dark:bg-neutral-800' : (pm?.bg ?? pColors[pIdx % pColors.length].bg)
                         return (
                           <button
                             key={provider}
@@ -4813,16 +4868,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               }
                               setProviderWizardStep('key')
                             }}
-                            className={cn('relative rounded-xl border-2 p-3 text-center transition-all hover:shadow-sm', pc.border)}
+                            className={cn('relative rounded-xl border-2 p-3 text-center transition-all hover:shadow-sm', tileBorder)}
                           >
                             {isAlreadyAdded ? (
                               <span className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-emerald-500 text-[8px] text-white font-bold">✓</span>
                             ) : null}
-                            <div className={cn('mx-auto mb-1.5 flex size-8 items-center justify-center rounded-full text-[10px] font-black', pc.bg, pc.text)}>
-                              {isCustom ? '⚙️' : provider.slice(0, 2).toUpperCase()}
+                            <div className={cn('mx-auto mb-1.5 flex size-8 items-center justify-center rounded-full', tileBg)}>
+                              {isCustom ? <span className="text-sm">⚙️</span> : <ProviderLogo provider={provider} size={18} />}
                             </div>
-                            <p className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300 truncate capitalize leading-tight">
-                              {isCustom ? 'Custom' : provider}
+                            <p className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300 truncate leading-tight">
+                              {isCustom ? 'Custom' : (pm?.label ?? provider)}
                             </p>
                           </button>
                         )
@@ -4833,7 +4888,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
                 {/* Step 2: Key entry */}
                 {providerWizardStep === 'key' ? (
-                  <div className="p-5 space-y-3">
+                  <div className="px-6 py-5 space-y-3">
                     {/* Back */}
                     <button
                       type="button"
@@ -4902,7 +4957,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </button>
                   </div>
                 ) : null}
-              </div>
+              </WizardModal>
 
               {/* Connected providers section */}
               <div>
@@ -4911,20 +4966,30 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Connected Providers</h2>
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{configuredProviders.length} active · {gatewayModels.length} models available</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void refreshGatewayStatus().then((connected) => {
-                        if (connected) return refreshConfiguredProviders()
-                        setConfiguredProviders([])
-                        return Promise.resolve()
-                      })
-                    }}
-                    className="flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 shadow-sm transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 6A4 4 0 1 1 6 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M10 2v4H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    Refresh
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setProviderWizardStep('select'); setProviderWizardSelected(''); setAddProviderApiKey(''); setAddProviderName(''); setShowAddProviderModal(true) }}
+                      className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                      Add Provider
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void refreshGatewayStatus().then((connected) => {
+                          if (connected) return refreshConfiguredProviders()
+                          setConfiguredProviders([])
+                          return Promise.resolve()
+                        })
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 shadow-sm transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 6A4 4 0 1 1 6 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M10 2v4H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Refresh
+                    </button>
+                  </div>
                 </div>
                 {configuredProviders.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-6 text-center">
