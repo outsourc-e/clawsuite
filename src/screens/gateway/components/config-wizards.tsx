@@ -528,6 +528,7 @@ type TeamWizardProps = {
   teamId: string
   teamName: string
   teamIcon: string
+  teamDescription?: string
   teamMembers: Array<{ id: string; name: string; modelId: string }>
   availableAgents: Array<{ id: string; name: string; role: string }>
   isActive: boolean
@@ -535,6 +536,7 @@ type TeamWizardProps = {
   gatewayModels: ReadonlyArray<{ value: string; label: string; provider: string }>
   onRename: (name: string) => void
   onUpdateIcon: (icon: string) => void
+  onUpdateDescription: (desc: string) => void
   onUpdateMembers: (members: Array<{ id: string; name: string; modelId: string }>) => void
   onLoad: () => void
   onDelete: () => void
@@ -545,13 +547,15 @@ export function TeamWizardModal({
   teamId: _teamId,
   teamName,
   teamIcon,
+  teamDescription,
   teamMembers,
   availableAgents,
   isActive,
-  modelPresets,
-  gatewayModels,
+  modelPresets: _modelPresets,
+  gatewayModels: _gatewayModels,
   onRename,
   onUpdateIcon,
+  onUpdateDescription,
   onUpdateMembers,
   onLoad,
   onDelete,
@@ -559,37 +563,35 @@ export function TeamWizardModal({
 }: TeamWizardProps) {
   const [name, setName] = useState(teamName)
   const [icon, setIcon] = useState(teamIcon || '👥')
+  const [description, setDescription] = useState(teamDescription ?? '')
   const [showIconPicker, setShowIconPicker] = useState(false)
   const [localMembers, setLocalMembers] = useState(teamMembers.map((m) => ({ ...m })))
 
   const accentBorder = isActive ? 'border-orange-400' : 'border-blue-400'
+  const notInTeam = availableAgents.filter((a) => !localMembers.some((m) => m.id === a.id))
 
   function handleSave() {
     onRename(name)
     onUpdateIcon(icon)
+    onUpdateDescription(description)
     onUpdateMembers(localMembers)
     onClose()
   }
 
-  function setMemberModel(id: string, modelId: string) {
-    setLocalMembers((prev) => prev.map((m) => m.id === id ? { ...m, modelId } : m))
+  function removeAgent(id: string) {
+    setLocalMembers((prev) => prev.filter((m) => m.id !== id))
   }
 
-  function toggleAgent(agentId: string) {
-    const isSelected = localMembers.some((m) => m.id === agentId)
-    if (isSelected) {
-      setLocalMembers((prev) => prev.filter((m) => m.id !== agentId))
-    } else {
-      const agent = availableAgents.find((a) => a.id === agentId)
-      if (agent) {
-        setLocalMembers((prev) => [...prev, { id: agent.id, name: agent.name, modelId: 'auto' }])
-      }
+  function addAgent(agentId: string) {
+    const agent = availableAgents.find((a) => a.id === agentId)
+    if (agent) {
+      setLocalMembers((prev) => [...prev, { id: agent.id, name: agent.name, modelId: 'auto' }])
     }
   }
 
   return (
     <WizardModal open onClose={onClose} width="max-w-lg">
-      {/* Header — matches agent wizard style */}
+      {/* Header */}
       <div className={cn('flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4', accentBorder)}>
         {/* Team icon with pencil */}
         <div className="relative shrink-0">
@@ -617,85 +619,85 @@ export function TeamWizardModal({
           <p className="text-lg font-bold text-neutral-900 dark:text-white">{name || 'Untitled Team'}</p>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">{localMembers.length} agent{localMembers.length !== 1 ? 's' : ''}</p>
         </div>
+
+        {/* Star — active team toggle */}
+        <button
+          type="button"
+          onClick={() => { if (!isActive) { onLoad(); onClose() } }}
+          title={isActive ? 'Active team' : 'Set as active team'}
+          className={cn('text-2xl leading-none transition-colors mr-1', isActive ? 'text-orange-400 cursor-default' : 'text-neutral-300 hover:text-orange-400 cursor-pointer')}
+        >
+          {isActive ? '⭐' : '☆'}
+        </button>
+
         <button type="button" onClick={onClose}
           className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
         </button>
       </div>
 
-      <div className="px-6 py-5 space-y-4">
-        {/* Active / Set main team */}
-        {isActive ? (
-          <div className="flex items-center gap-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50 px-3 py-2.5">
-            <span className="size-2 rounded-full bg-orange-500 shrink-0" />
-            <span className="text-xs font-semibold text-orange-700 dark:text-orange-400">Currently active team</span>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => { onLoad(); onClose() }}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-neutral-200 dark:border-neutral-700 px-3 py-2.5 text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:border-orange-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50/30 dark:hover:bg-orange-900/10 transition-all"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-            Set as Active Team
-          </button>
-        )}
-
+      <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
         {/* Team name */}
         <div>
           <FieldLabel>Team Name</FieldLabel>
           <input value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLS} />
         </div>
 
-        {/* Agents list with checkboxes and model selectors */}
+        {/* Specialty */}
         <div>
-          <FieldLabel>Team Members ({localMembers.length} / {availableAgents.length})</FieldLabel>
-          <div className="max-h-[400px] overflow-y-auto space-y-1.5">
-            {availableAgents.map((agent) => {
-              const member = localMembers.find((m) => m.id === agent.id)
-              const isSelected = !!member
-              return (
-                <div key={agent.id} className={cn(
-                  "flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors",
-                  isSelected 
-                    ? "border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20"
-                    : "border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50"
-                )}>
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleAgent(agent.id)}
-                    className="size-4 shrink-0 rounded border-neutral-300 text-orange-500 focus:ring-orange-500 cursor-pointer"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-100 truncate">{agent.name}</p>
-                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400">{agent.role}</p>
-                  </div>
-                  {isSelected && member ? (
-                    <select
-                      value={member.modelId}
-                      onChange={(e) => setMemberModel(member.id, e.target.value)}
-                      className="h-7 w-40 shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 text-[10px] text-neutral-700 dark:text-neutral-300 outline-none focus:ring-1 ring-orange-400 cursor-pointer"
-                    >
-                      <optgroup label="Presets">
-                        {modelPresets.map((p) => (
-                          <option key={p.id} value={p.id}>{p.label}</option>
-                        ))}
-                      </optgroup>
-                      {gatewayModels.length > 0 ? (
-                        <optgroup label="Available Models">
-                          {gatewayModels.map((gm) => (
-                            <option key={gm.value} value={gm.value}>{gm.label} ({gm.provider})</option>
-                          ))}
-                        </optgroup>
-                      ) : null}
-                    </select>
-                  ) : null}
+          <FieldLabel>Specialty</FieldLabel>
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="What is this team best at? e.g. Deep research & analysis"
+            className={INPUT_CLS}
+          />
+        </div>
+
+        {/* Section A: current team members */}
+        <div>
+          <FieldLabel>Team ({localMembers.length} agent{localMembers.length !== 1 ? 's' : ''})</FieldLabel>
+          <div className="space-y-1.5">
+            {localMembers.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 py-3 text-center text-xs text-neutral-400">No agents yet — add some below</p>
+            ) : localMembers.map((member) => (
+              <div key={member.id} className="flex items-center gap-2.5 rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2.5">
+                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                  {member.name[0]?.toUpperCase() ?? '?'}
                 </div>
-              )
-            })}
+                <p className="min-w-0 flex-1 text-xs font-semibold text-neutral-900 dark:text-white truncate">{member.name}</p>
+                <button type="button" onClick={() => removeAgent(member.id)}
+                  className="flex size-6 items-center justify-center rounded-full text-neutral-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors" title="Remove from team">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                </button>
+              </div>
+            ))}
           </div>
         </div>
+
+        {/* Section B: agents not in team */}
+        {notInTeam.length > 0 ? (
+          <div>
+            <FieldLabel>Add Agents</FieldLabel>
+            <div className="space-y-1.5">
+              {notInTeam.map((agent) => (
+                <div key={agent.id} className="flex items-center gap-2.5 rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-[11px] font-bold text-neutral-500">
+                    {agent.name[0]?.toUpperCase() ?? '?'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-neutral-600 dark:text-neutral-300 font-medium">{agent.name}</p>
+                    {agent.role ? <p className="text-[10px] text-neutral-400 truncate">{agent.role}</p> : null}
+                  </div>
+                  <button type="button" onClick={() => addAgent(agent.id)}
+                    className="flex size-6 items-center justify-center rounded-full text-neutral-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-500 transition-colors" title="Add to team">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex items-center justify-between gap-3 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">

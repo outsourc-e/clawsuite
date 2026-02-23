@@ -48,6 +48,7 @@ type SavedTeamConfig = {
   id: string
   name: string
   icon?: string
+  description?: string
   createdAt: number
   updatedAt: number
   team: TeamMember[]
@@ -4723,6 +4724,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     teamId={config.id}
                     teamName={config.name}
                     teamIcon={config.icon ?? '👥'}
+                    teamDescription={config.description ?? ''}
                     teamMembers={config.team}
                     availableAgents={team.map((m) => ({ id: m.id, name: m.name, role: m.roleDescription }))}
                     isActive={selectedTeamConfigId === config.id}
@@ -4733,6 +4735,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     }}
                     onUpdateIcon={(icon) => {
                       setTeamConfigs((prev) => prev.map((c) => c.id === config.id ? { ...c, icon, updatedAt: Date.now() } : c))
+                    }}
+                    onUpdateDescription={(desc) => {
+                      setTeamConfigs((prev) => prev.map((c) => c.id === config.id ? { ...c, description: desc, updatedAt: Date.now() } : c))
                     }}
                     onUpdateMembers={(members) => {
                       setTeamConfigs((prev) => prev.map((c) => {
