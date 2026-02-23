@@ -306,7 +306,108 @@ function AppearanceContent() {
           ))}
         </div>
       </Row>
+      <Row label="Enterprise Theme">
+        <EnterpriseThemePicker />
+      </Row>
       <LoaderContent />
+    </div>
+  )
+}
+
+const ENTERPRISE_THEMES = [
+  {
+    id: 'paper-light',
+    label: 'Paper Light',
+    icon: '☀️',
+    desc: 'Warm white, gentle shadows',
+    preview: { bg: '#fefdfb', panel: '#faf9f7', border: '#e8e5df', accent: '#ea580c', text: '#1c1917' },
+  },
+  {
+    id: 'ops-dark',
+    label: 'Ops Dark',
+    icon: '🖥️',
+    desc: 'Cold blue-steel, Grafana/Datadog',
+    preview: { bg: '#080c14', panel: '#0e1420', border: '#1e3a5f', accent: '#3b82f6', text: '#c8d8f0' },
+  },
+  {
+    id: 'premium-dark',
+    label: 'Premium Dark',
+    icon: '✨',
+    desc: 'Deep zinc, violet glow, Linear',
+    preview: { bg: '#05050a', panel: '#131319', border: '#2a1f4a', accent: '#7c6fdd', text: '#f0eeff' },
+  },
+] as const
+
+function ThemeSwatch({ colors }: { colors: typeof ENTERPRISE_THEMES[number]['preview'] }) {
+  return (
+    <div
+      className="w-full h-10 rounded-md overflow-hidden border flex"
+      style={{ borderColor: colors.border, backgroundColor: colors.bg }}
+    >
+      {/* Sidebar strip */}
+      <div className="w-4 h-full flex flex-col gap-0.5 p-0.5" style={{ backgroundColor: colors.panel }}>
+        {[1,2,3].map((i) => (
+          <div key={i} className="rounded-sm h-1.5 w-full" style={{ backgroundColor: colors.border }} />
+        ))}
+      </div>
+      {/* Content area */}
+      <div className="flex-1 p-1 flex flex-col gap-0.5">
+        <div className="h-1.5 rounded w-3/4" style={{ backgroundColor: colors.text, opacity: 0.8 }} />
+        <div className="h-1 rounded w-1/2" style={{ backgroundColor: colors.text, opacity: 0.3 }} />
+        <div className="mt-0.5 h-1.5 rounded-full w-6" style={{ backgroundColor: colors.accent }} />
+      </div>
+    </div>
+  )
+}
+
+function EnterpriseThemePicker() {
+  const [current, setCurrent] = useState(() => {
+    if (typeof window === 'undefined') return 'paper-light'
+    return localStorage.getItem('clawsuite-theme') || 'paper-light'
+  })
+
+  function applyEnterpriseTheme(id: string) {
+    const html = document.documentElement
+    html.setAttribute('data-theme', id)
+    if (id.includes('dark')) {
+      html.classList.add('dark')
+      html.classList.remove('light')
+    } else {
+      html.classList.add('light')
+      html.classList.remove('dark')
+    }
+    localStorage.setItem('clawsuite-theme', id)
+    setCurrent(id)
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-2 w-full">
+      {ENTERPRISE_THEMES.map((t) => {
+        const isActive = current === t.id
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => applyEnterpriseTheme(t.id)}
+            className={cn(
+              'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-all',
+              isActive
+                ? 'border-accent-500 bg-accent-50/30 ring-1 ring-accent-400/30'
+                : 'border-primary-200 bg-primary-50/50 hover:border-primary-300 hover:bg-primary-100/50',
+            )}
+          >
+            <ThemeSwatch colors={t.preview} />
+            <div className="flex items-center gap-1">
+              <span className="text-xs">{t.icon}</span>
+              <span className="text-xs font-semibold text-primary-900 dark:text-neutral-100">{t.label}</span>
+              {isActive && (
+                <span className="ml-auto text-[9px] font-bold text-accent-600 uppercase tracking-wide">Active</span>
+              )}
+            </div>
+            <p className="text-[10px] text-primary-500 dark:text-neutral-400 leading-tight">{t.desc}</p>
+          </button>
+        )
+      })}
     </div>
   )
 }

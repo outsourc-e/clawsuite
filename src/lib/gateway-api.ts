@@ -299,6 +299,62 @@ export async function killAgentSession(
   }
 }
 
+// ── Gateway Approvals ─────────────────────────────────────────────────────────
+
+export type GatewayApprovalEntry = {
+  id: string
+  sessionKey?: string
+  agentName?: string
+  action?: string
+  context?: string
+  tool?: string
+  input?: unknown
+  requestedAt?: number
+  status?: 'pending' | 'approved' | 'denied'
+}
+
+export type GatewayApprovalsResponse = {
+  ok?: boolean
+  approvals?: GatewayApprovalEntry[]
+  pending?: GatewayApprovalEntry[]
+}
+
+export async function fetchGatewayApprovals(): Promise<GatewayApprovalsResponse> {
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 6000)
+  try {
+    const response = await fetch(makeEndpoint('/api/gateway/approvals'), {
+      signal: controller.signal,
+    })
+    if (!response.ok) return { ok: false, approvals: [] }
+    return (await response.json()) as GatewayApprovalsResponse
+  } catch {
+    return { ok: false, approvals: [] }
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
+}
+
+export async function resolveGatewayApproval(
+  approvalId: string,
+  action: 'approve' | 'deny',
+): Promise<{ ok: boolean }> {
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 8000)
+  try {
+    const response = await fetch(makeEndpoint(`/api/gateway/approvals/${approvalId}/${action}`), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal: controller.signal,
+    })
+    return { ok: response.ok }
+  } catch {
+    return { ok: false }
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
+}
+
 export async function toggleAgentPause(
   sessionKey: string,
   pause: boolean,

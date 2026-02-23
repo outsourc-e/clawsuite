@@ -31,8 +31,7 @@ export const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
   minimax: 'MiniMax',
 }
 
-const DEFAULT_OFFICE_MODEL_BADGE =
-  'border border-neutral-200 bg-neutral-50 text-neutral-700'
+const DEFAULT_OFFICE_MODEL_BADGE = 'border border-neutral-200 bg-neutral-50 text-neutral-700'
 
 export function getOfficeModelBadge(modelId: string): string {
   return OFFICE_MODEL_BADGE[modelId as ModelPresetId] ?? DEFAULT_OFFICE_MODEL_BADGE
@@ -40,17 +39,7 @@ export function getOfficeModelBadge(modelId: string): string {
 
 export function getOfficeModelLabel(modelId: string): string {
   if (!modelId) return 'Unknown'
-  const presetLabel = OFFICE_MODEL_LABEL[modelId as ModelPresetId]
-  if (presetLabel) return presetLabel
-  return modelId.split('/')[1] || modelId
-}
-
-function toTitleCase(value: string): string {
-  return value
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
+  return OFFICE_MODEL_LABEL[modelId as ModelPresetId] ?? modelId.split('/')[1] ?? modelId
 }
 
 export function getAgentStatusMeta(status: AgentWorkingStatus): {
@@ -60,145 +49,134 @@ export function getAgentStatusMeta(status: AgentWorkingStatus): {
   pulse?: boolean
 } {
   switch (status) {
-    case 'active':
-      return {
-        label: 'Active',
-        className: 'text-blue-600',
-        dotClassName: 'bg-blue-500',
-        pulse: true,
-      }
+    case 'active': return { label: 'Active', className: 'text-blue-600', dotClassName: 'bg-blue-500', pulse: true }
     case 'ready':
-    case 'idle':
-      return {
-        label: 'Ready',
-        className: 'text-emerald-600',
-        dotClassName: 'bg-emerald-500',
-      }
-    case 'error':
-      return {
-        label: 'Error',
-        className: 'text-red-600',
-        dotClassName: 'bg-red-500',
-      }
-    case 'none':
-      return {
-        label: 'No session',
-        className: 'text-neutral-400',
-        dotClassName: 'bg-neutral-400',
-      }
-    case 'spawning':
-      return {
-        label: 'Spawning',
-        className: 'text-amber-600',
-        dotClassName: 'bg-amber-400',
-        pulse: true,
-      }
-    case 'paused':
-      return {
-        label: 'Paused',
-        className: 'text-amber-700',
-        dotClassName: 'bg-amber-500',
-      }
-    default:
-      return {
-        label: toTitleCase(String(status)),
-        className: 'text-neutral-600',
-        dotClassName: 'bg-neutral-400',
-      }
+    case 'idle': return { label: 'Ready', className: 'text-emerald-600', dotClassName: 'bg-emerald-500' }
+    case 'error': return { label: 'Error', className: 'text-red-600', dotClassName: 'bg-red-500' }
+    case 'none': return { label: 'No session', className: 'text-neutral-400', dotClassName: 'bg-neutral-400' }
+    case 'spawning': return { label: 'Spawning', className: 'text-amber-600', dotClassName: 'bg-amber-400', pulse: true }
+    case 'paused': return { label: 'Paused', className: 'text-amber-700', dotClassName: 'bg-amber-500' }
+    default: return { label: String(status), className: 'text-neutral-600', dotClassName: 'bg-neutral-400' }
   }
 }
 
-type OfficeDeskSlot = {
-  col: number
-  row: number
-}
-
-const OFFICE_DESK_SLOTS: OfficeDeskSlot[] = [
-  { col: 0, row: 0 },
-  { col: 1, row: 0 },
-  { col: 2, row: 0 },
-  { col: 0, row: 1 },
-  { col: 1, row: 1 },
-  { col: 2, row: 1 },
-  { col: -1, row: 1 },
-  { col: 3, row: 1 },
-  { col: 0, row: 2 },
-  { col: 2, row: 2 },
+// ── Office Layout: 12 desk positions with generous spacing ──
+const DESK_POSITIONS = [
+  { x: 120, y: 180 }, { x: 310, y: 180 }, { x: 500, y: 180 }, { x: 690, y: 180 },
+  { x: 120, y: 320 }, { x: 310, y: 320 }, { x: 500, y: 320 }, { x: 690, y: 320 },
+  { x: 215, y: 460 }, { x: 405, y: 460 }, { x: 595, y: 460 }, { x: 785, y: 460 },
 ]
 
-function getOfficeStatusDotClass(status: AgentWorkingStatus): string {
+// Social spots: coffee machine, water cooler, lounge, snack bar
+const SOCIAL_SPOTS = [
+  { x: 880, y: 140, type: 'coffee' as const },
+  { x: 880, y: 300, type: 'water' as const },
+  { x: 60, y: 440, type: 'plant' as const },
+  { x: 880, y: 460, type: 'snack' as const },
+]
+
+function truncateSpeech(text: string, max = 64): string {
+  const n = text.replace(/\s+/g, ' ').trim()
+  if (!n) return ''
+  return n.length <= max ? n : `${n.slice(0, max - 1).trimEnd()}…`
+}
+
+function getSpeechLine(agent: AgentWorkingRow, phase: number): string {
+  if (agent.status === 'active' && agent.lastLine) return truncateSpeech(agent.lastLine, 60)
+  if (agent.currentTask) return `Working on ${truncateSpeech(agent.currentTask, 48)}`
+  if (agent.status === 'spawning') return 'Booting up...'
+  if (agent.status === 'paused') return 'On break ☕'
+  if (agent.status === 'error') return 'Need help!'
+  // Idle agents cycle through social activities
+  const socialLines = ['Grabbing coffee ☕', 'Checking messages 📱', 'Stretching 🙆', 'Chatting with team 💬', 'Reading docs 📖', 'Getting water 💧']
+  if (agent.status === 'idle' || agent.status === 'ready') {
+    return socialLines[Math.floor(phase / 4) % socialLines.length]
+  }
+  return ''
+}
+
+function getStatusDotClass(status: AgentWorkingStatus): string {
   switch (status) {
-    case 'active':
-      return 'bg-emerald-500'
-    case 'idle':
-    case 'ready':
-      return 'bg-amber-400'
-    case 'spawning':
-    case 'paused':
-      return 'bg-yellow-500'
-    case 'error':
-      return 'bg-red-500'
-    default:
-      return 'bg-neutral-400'
+    case 'active': return 'bg-emerald-500'
+    case 'idle': case 'ready': return 'bg-amber-400'
+    case 'spawning': case 'paused': return 'bg-yellow-500'
+    case 'error': return 'bg-red-500'
+    default: return 'bg-neutral-400'
   }
 }
 
-function projectIsometric(col: number, row: number) {
-  const tileW = 132
-  const tileH = 68
-  const originX = 460
-  const originY = 132
+// ── SVG Office Furniture ──
 
-  return {
-    x: originX + (col - row) * (tileW / 2),
-    y: originY + (col + row) * (tileH / 2),
-  }
-}
-
-function DeskSprite({
-  x,
-  y,
-  accent,
-}: {
-  x: number
-  y: number
-  accent: string
-}) {
+function DeskSVG({ x, y, occupied, accent }: { x: number; y: number; occupied: boolean; accent?: string }) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <polygon points="0,0 52,26 0,52 -52,26" fill="#dbeafe" stroke="#bfdbfe" strokeWidth="1.5" />
-      <polygon points="0,6 44,28 0,50 -44,28" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1" />
-      <polygon points="-8,10 24,26 -8,42 -40,26" fill="#e2e8f0" />
-      <rect x="-20" y="-8" width="30" height="16" rx="2" fill="#334155" />
-      <rect x="-17" y="-5" width="24" height="10" rx="1" fill="#0ea5e9" opacity="0.8" />
-      <rect x="11" y="-4" width="4" height="10" fill="#64748b" />
-      <rect x="-41" y="20" width="6" height="22" fill="#94a3b8" />
-      <rect x="35" y="20" width="6" height="22" fill="#94a3b8" />
-      <rect x="-5" y="36" width="10" height="8" fill={accent} opacity="0.9" />
-      <rect x="-7" y="44" width="14" height="4" fill="#64748b" />
+      {/* Desk surface */}
+      <rect x="-40" y="-8" width="80" height="40" rx="4" fill={occupied ? '#f8fafc' : '#f1f5f9'} stroke={occupied ? '#cbd5e1' : '#e2e8f0'} strokeWidth="1.5" />
+      {/* Desk legs */}
+      <rect x="-36" y="32" width="4" height="16" rx="1" fill="#94a3b8" />
+      <rect x="32" y="32" width="4" height="16" rx="1" fill="#94a3b8" />
+      {/* Monitor */}
+      {occupied ? (
+        <>
+          <rect x="-18" y="-28" width="36" height="22" rx="3" fill="#1e293b" />
+          <rect x="-15" y="-25" width="30" height="16" rx="1.5" fill={accent || '#3b82f6'} opacity="0.8" />
+          <rect x="-3" y="-6" width="6" height="6" rx="1" fill="#64748b" />
+        </>
+      ) : (
+        <>
+          <rect x="-18" y="-28" width="36" height="22" rx="3" fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="1" />
+          <rect x="-3" y="-6" width="6" height="6" rx="1" fill="#cbd5e1" />
+        </>
+      )}
+      {/* Chair */}
+      <ellipse cx="0" cy="56" rx="14" ry="6" fill={occupied ? (accent ? `${accent}33` : '#dbeafe') : '#f1f5f9'} />
+      <rect x="-10" y="48" width="20" height="10" rx="4" fill={occupied ? '#475569' : '#cbd5e1'} />
     </g>
   )
 }
 
-function PlantSprite({ x, y }: { x: number; y: number }) {
+function CoffeeMachineSVG({ x, y }: { x: number; y: number }) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <circle cx="0" cy="0" r="14" fill="#16a34a" />
-      <circle cx="-10" cy="4" r="8" fill="#22c55e" />
-      <circle cx="10" cy="6" r="8" fill="#15803d" />
-      <rect x="-10" y="10" width="20" height="10" rx="2" fill="#b45309" />
+      <rect x="-20" y="-30" width="40" height="50" rx="5" fill="#78716c" />
+      <rect x="-14" y="-24" width="28" height="20" rx="3" fill="#292524" />
+      <circle cx="0" cy="-14" r="6" fill="#dc2626" opacity="0.8" />
+      <text x="0" y="-11" fontSize="6" fill="white" textAnchor="middle">☕</text>
+      <rect x="-16" y="20" width="32" height="6" rx="2" fill="#a8a29e" />
+      <text x="0" y="38" fontSize="8" fill="#78716c" textAnchor="middle">Coffee</text>
     </g>
   )
 }
 
-function WaterCoolerSprite({ x, y }: { x: number; y: number }) {
+function WaterCoolerSVG({ x, y }: { x: number; y: number }) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <rect x="-14" y="-2" width="28" height="44" rx="4" fill="#e2e8f0" stroke="#cbd5e1" />
-      <circle cx="0" cy="-8" r="10" fill="#bfdbfe" stroke="#93c5fd" />
-      <rect x="-8" y="44" width="16" height="6" rx="2" fill="#94a3b8" />
-      <circle cx="-6" cy="18" r="1.8" fill="#0ea5e9" />
-      <circle cx="6" cy="18" r="1.8" fill="#ef4444" />
+      <rect x="-14" y="-20" width="28" height="40" rx="4" fill="#e2e8f0" stroke="#cbd5e1" />
+      <circle cx="0" cy="-26" r="10" fill="#bfdbfe" stroke="#93c5fd" strokeWidth="1.5" />
+      <circle cx="-5" cy="0" r="2" fill="#0ea5e9" />
+      <circle cx="5" cy="0" r="2" fill="#ef4444" />
+      <text x="0" y="32" fontSize="8" fill="#64748b" textAnchor="middle">Water</text>
+    </g>
+  )
+}
+
+function SnackBarSVG({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <rect x="-24" y="-16" width="48" height="28" rx="4" fill="#fef3c7" stroke="#fbbf24" strokeWidth="1" />
+      <text x="0" y="2" fontSize="14" textAnchor="middle">🍪</text>
+      <text x="0" y="24" fontSize="8" fill="#92400e" textAnchor="middle">Snacks</text>
+    </g>
+  )
+}
+
+function PlantSVG({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <rect x="-10" y="6" width="20" height="14" rx="3" fill="#92400e" />
+      <circle cx="0" cy="-4" r="14" fill="#16a34a" opacity="0.9" />
+      <circle cx="-8" cy="0" r="8" fill="#22c55e" opacity="0.8" />
+      <circle cx="8" cy="2" r="7" fill="#15803d" opacity="0.8" />
     </g>
   )
 }
@@ -208,152 +186,155 @@ export function OfficeView({
   missionRunning,
   onViewOutput,
   selectedOutputAgentId,
-  activeTemplateName,
+  activeTemplateName: _activeTemplateName,
   processType,
 }: OfficeViewProps) {
-  const [now, setNow] = useState(() => new Date())
+  const [tick, setTick] = useState(0)
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000)
+    const timer = window.setInterval(() => setTick((t) => t + 1), 200)
     return () => window.clearInterval(timer)
   }, [])
 
   if (agentRows.length === 0) {
     return (
-      <div className="flex h-full min-h-[360px] items-center justify-center p-8">
+      <div className="flex min-h-[320px] items-center justify-center p-8">
         <div className="text-center">
           <p className="mb-3 text-4xl">🏢</p>
-          <p className="text-sm font-medium text-neutral-600">No agents in your team</p>
-          <p className="mt-1 text-xs text-neutral-500">Switch to the Team tab to add agents.</p>
+          <p className="text-sm font-medium text-neutral-600">Empty office</p>
+          <p className="mt-1 text-xs text-neutral-500">Add agents in Configure to fill the office.</p>
         </div>
       </div>
     )
   }
 
-  const sceneWidth = 900
-  const sceneHeight = 430
-  const footerHeight = 42
-  const sessionCount = agentRows.filter((row) => Boolean(row.sessionKey)).length
-  const activeCount = agentRows.filter((row) => row.status === 'active').length
-  const hour = now.getHours()
-  const minute = now.getMinutes()
-  const second = now.getSeconds()
-  const minuteAngle = minute * 6 + second * 0.1 - 90
-  const hourAngle = ((hour % 12) + minute / 60) * 30 - 90
-  const deskEntries = agentRows.map((agent, index) => {
-    const slot = OFFICE_DESK_SLOTS[index % OFFICE_DESK_SLOTS.length]
-    const loop = Math.floor(index / OFFICE_DESK_SLOTS.length)
-    const jitter = (loop % 3) * 12
-    const point = projectIsometric(slot.col + (loop > 0 ? (loop % 2 === 0 ? -1 : 1) : 0), slot.row + Math.floor(loop / 2))
-    return { agent, index, x: point.x + jitter, y: point.y + loop * 10 }
+  const sceneW = 960
+  const sceneH = 560
+  const activeCount = agentRows.filter((r) => r.status === 'active').length
+  const sessionCount = agentRows.filter((r) => Boolean(r.sessionKey)).length
+  const phase = tick * 0.2
+
+  // Assign agents to desks, idle agents wander to social spots
+  const agentPositions = agentRows.map((agent, index) => {
+    const desk = DESK_POSITIONS[index % DESK_POSITIONS.length]
+    const isIdle = agent.status === 'idle' || agent.status === 'ready'
+    const isPaused = agent.status === 'paused'
+
+    // Idle/paused agents wander between desk and social spots
+    if (isIdle || isPaused) {
+      const wanderCycle = Math.floor((tick + index * 17) / 25) % 4 // 0=desk, 1=walking, 2=social, 3=walking back
+      const socialSpot = SOCIAL_SPOTS[(index + Math.floor(tick / 60)) % SOCIAL_SPOTS.length]
+      const t = ((tick + index * 17) % 25) / 25
+
+      if (wanderCycle === 0) {
+        // At desk
+        return { x: desk.x, y: desk.y - 20, atDesk: true }
+      } else if (wanderCycle === 1) {
+        // Walking to social spot
+        return {
+          x: desk.x + (socialSpot.x - desk.x) * t,
+          y: desk.y - 20 + (socialSpot.y - desk.y + 10) * t,
+          atDesk: false,
+        }
+      } else if (wanderCycle === 2) {
+        // At social spot
+        const bob = Math.sin(phase + index) * 2
+        return { x: socialSpot.x + (index % 2 === 0 ? -20 : 20), y: socialSpot.y + bob, atDesk: false }
+      } else {
+        // Walking back
+        const socialSpotBack = SOCIAL_SPOTS[(index + Math.floor(tick / 60)) % SOCIAL_SPOTS.length]
+        return {
+          x: socialSpotBack.x + (desk.x - socialSpotBack.x) * t,
+          y: socialSpotBack.y + (desk.y - 20 - socialSpotBack.y) * t,
+          atDesk: false,
+        }
+      }
+    }
+
+    // Active/spawning agents stay at desk
+    return { x: desk.x, y: desk.y - 20, atDesk: true }
   })
 
   return (
-    <div className="h-full min-h-[400px] overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-neutral-50/80 px-3 py-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="text-xs font-semibold text-neutral-900">ClawSuite Office</span>
-          <span className="text-[11px] text-neutral-400">·</span>
-          <span className="text-[11px] text-neutral-600">{agentRows.length} agents</span>
-          <span className="text-[11px] text-neutral-400">·</span>
-          <span className="text-[11px] text-neutral-600">{activeCount} active</span>
-          {activeTemplateName ? (
-            <>
-              <span className="text-[11px] text-neutral-400">·</span>
-              <span className="truncate text-[11px] text-neutral-500">{activeTemplateName}</span>
-            </>
-          ) : null}
+    <div className="min-h-[480px] bg-gradient-to-b from-slate-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800">
+      {/* Header bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white/80 px-4 py-2.5 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-neutral-900 dark:text-white">ClawSuite Office</span>
+          <span className="text-[11px] text-neutral-500 dark:text-slate-400">{agentRows.length} agents · {activeCount} working · {sessionCount} sessions</span>
         </div>
         <div className="flex items-center gap-2">
           {missionRunning ? (
-            <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+            <span className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400">
               <span className="relative flex size-1.5">
                 <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
               </span>
-              Live
+              Mission Live
             </span>
           ) : null}
-          <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">
-            {processType}
-          </span>
+          <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[10px] font-semibold uppercase text-neutral-600 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">{processType}</span>
         </div>
       </div>
 
-      <div className="relative min-h-[400px]">
+      {/* Office canvas */}
+      <div className="relative" style={{ minHeight: '440px' }}>
+        {/* Floor pattern */}
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-[430px] opacity-85"
+          className="pointer-events-none absolute inset-0 opacity-40 dark:opacity-20"
           style={{
-            backgroundColor: '#f8fbff',
-            backgroundImage:
-              'linear-gradient(45deg, #e0efff 25%, transparent 25%), linear-gradient(-45deg, #e0efff 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d3e7ff 75%), linear-gradient(-45deg, transparent 75%, #d3e7ff 75%)',
-            backgroundSize: '44px 44px',
-            backgroundPosition: '0 0, 0 22px, 22px -22px, -22px 0',
+            backgroundImage: 'radial-gradient(circle at 1px 1px, #cbd5e1 1px, transparent 0)',
+            backgroundSize: '24px 24px',
           }}
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/70 via-transparent to-white/20" />
 
         <svg
-          viewBox={`0 0 ${sceneWidth} ${sceneHeight}`}
-          className="absolute inset-0 h-[430px] w-full"
+          viewBox={`0 0 ${sceneW} ${sceneH}`}
+          className="absolute inset-0 h-full w-full"
           preserveAspectRatio="xMidYMid meet"
           aria-hidden
         >
-          <defs>
-            <linearGradient id="wallFade" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
-              <stop offset="100%" stopColor="#eef6ff" stopOpacity="0.7" />
-            </linearGradient>
-          </defs>
+          {/* Floor zones */}
+          <rect x="80" y="140" width="680" height="420" rx="16" fill="#f8fafc" fillOpacity="0.5" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" className="dark:fill-slate-800/30 dark:stroke-slate-700" />
 
-          <rect x="0" y="0" width={sceneWidth} height="92" fill="url(#wallFade)" />
-          <rect x="0" y="92" width={sceneWidth} height="2" fill="#dbeafe" />
+          {/* Social zone labels */}
+          <text x="880" y="110" fontSize="9" fill="#94a3b8" textAnchor="middle" fontWeight="600" className="uppercase">Break Area</text>
 
-          <g opacity="0.7">
-            <line x1="185" y1="96" x2="95" y2="235" stroke="#dbeafe" strokeWidth="2" />
-            <line x1="715" y1="96" x2="805" y2="235" stroke="#dbeafe" strokeWidth="2" />
-          </g>
+          {/* Furniture */}
+          {SOCIAL_SPOTS.map((spot, i) => (
+            spot.type === 'coffee' ? <CoffeeMachineSVG key={i} x={spot.x} y={spot.y} /> :
+            spot.type === 'water' ? <WaterCoolerSVG key={i} x={spot.x} y={spot.y} /> :
+            spot.type === 'snack' ? <SnackBarSVG key={i} x={spot.x} y={spot.y} /> :
+            <PlantSVG key={i} x={spot.x} y={spot.y} />
+          ))}
 
-          <rect x="54" y="46" width="92" height="58" rx="10" fill="#ffffff" stroke="#dbeafe" />
-          <circle cx="100" cy="75" r="18" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="2" />
-          <line
-            x1="100"
-            y1="75"
-            x2={100 + Math.cos((hourAngle * Math.PI) / 180) * 9}
-            y2={75 + Math.sin((hourAngle * Math.PI) / 180) * 9}
-            stroke="#334155"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-          <line
-            x1="100"
-            y1="75"
-            x2={100 + Math.cos((minuteAngle * Math.PI) / 180) * 13}
-            y2={75 + Math.sin((minuteAngle * Math.PI) / 180) * 13}
-            stroke="#0ea5e9"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <circle cx="100" cy="75" r="2" fill="#334155" />
+          {/* Extra plants */}
+          <PlantSVG x={60} y={160} />
+          <PlantSVG x={60} y={560} />
 
-          <PlantSprite x={790} y={88} />
-          <PlantSprite x={835} y={105} />
-          <WaterCoolerSprite x={825} y={280} />
-
-          {deskEntries.map(({ index, x, y }) => {
-            const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
-            return <DeskSprite key={`desk-${index}`} x={x} y={y} accent={accent.hex} />
+          {/* All desks (empty ones too) */}
+          {DESK_POSITIONS.map((desk, i) => {
+            const occupied = i < agentRows.length
+            const accent = occupied ? AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length] : undefined
+            return <DeskSVG key={`desk-${i}`} x={desk.x} y={desk.y} occupied={occupied} accent={accent?.hex} />
           })}
         </svg>
 
-        {deskEntries.map(({ agent, index, x, y }) => {
+        {/* Agent avatars (HTML overlay for interactivity) */}
+        {agentRows.map((agent, index) => {
           const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+          const pos = agentPositions[index]
           const isSelected = agent.id === selectedOutputAgentId
           const isActive = agent.status === 'active'
+          const isIdle = agent.status === 'idle' || agent.status === 'ready'
           const statusMeta = getAgentStatusMeta(agent.status)
-          const avatarSize = 34
-          const left = `calc(${(x / sceneWidth) * 100}% - ${avatarSize / 2}px)`
-          const top = `calc(${(y / sceneHeight) * 100}% + 8px)`
+          const agentPhase = phase + index * 1.2
+          const bob = isActive ? Math.sin(agentPhase * 3) * 1.5 : Math.sin(agentPhase * 1.5) * 2
+          const speechLine = getSpeechLine(agent, tick + index * 7)
+          const showSpeech = Boolean(speechLine) && ((tick + index * 3) % 8 < 6)
+
+          const left = `${(pos.x / sceneW) * 100}%`
+          const top = `${((pos.y + bob) / sceneH) * 100}%`
 
           return (
             <button
@@ -361,61 +342,69 @@ export function OfficeView({
               type="button"
               onClick={() => onViewOutput(agent.id)}
               className={cn(
-                'group absolute z-10 flex w-28 flex-col items-center rounded-lg px-1.5 py-1 text-left transition-transform',
-                'hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400',
-                isSelected ? 'ring-2 ring-orange-300 bg-white/80 shadow-sm' : 'bg-white/55',
+                'group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-xl px-2 py-1.5 transition-all duration-300',
+                'hover:-translate-y-[calc(50%+2px)] hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400',
+                isSelected
+                  ? 'bg-white/95 shadow-lg ring-2 ring-orange-300 dark:bg-slate-800/95'
+                  : 'bg-white/70 hover:bg-white/90 hover:shadow-md dark:bg-slate-800/50 dark:hover:bg-slate-800/80',
               )}
               style={{ left, top }}
               title={`${agent.name} · ${statusMeta.label}`}
             >
-              <div className="relative flex items-center justify-center">
-                <div className={cn('rounded-md border border-white/90 p-1 shadow-sm backdrop-blur', accent.avatar)}>
-                  <AgentAvatar index={index} color={accent.hex} size={avatarSize} />
-                </div>
-                <span
-                  className={cn(
-                    'absolute -right-1 -top-1 size-2.5 rounded-full border border-white',
-                    getOfficeStatusDotClass(agent.status),
-                  )}
-                />
-              </div>
-
-              {isActive ? (
-                <span className="mt-1 inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
-                  <span className="size-1 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="size-1 rounded-full bg-emerald-500 animate-pulse [animation-delay:120ms]" />
-                  <span className="size-1 rounded-full bg-emerald-500 animate-pulse [animation-delay:240ms]" />
+              {/* Speech bubble */}
+              {showSpeech ? (
+                <span className="mb-1 max-w-[140px] rounded-lg border border-neutral-200 bg-white px-2 py-1 text-[9px] leading-snug text-neutral-700 shadow-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200">
+                  {speechLine}
                 </span>
               ) : null}
 
-              <span className="mt-1 max-w-full truncate text-[10px] font-semibold text-neutral-800">{agent.name}</span>
-              <span className="max-w-full truncate text-[9px] text-neutral-500">{getOfficeModelLabel(agent.modelId)}</span>
+              {/* Avatar */}
+              <div className="relative">
+                <div style={{ transform: `scale(${isActive ? 1.05 : 1})`, transition: 'transform 0.3s' }}>
+                  <AgentAvatar
+                    index={index % 10}
+                    color={accent.hex}
+                    size={isActive ? 44 : 38}
+                  />
+                </div>
+                {/* Status dot */}
+                <span className={cn(
+                  'absolute -right-0.5 -top-0.5 size-3 rounded-full border-2 border-white dark:border-slate-800',
+                  getStatusDotClass(agent.status),
+                  statusMeta.pulse && 'animate-pulse',
+                )} />
+              </div>
+
+              {/* Activity indicator */}
+              {isActive ? (
+                <span className="mt-1 flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                  <span className="size-1 animate-pulse rounded-full bg-emerald-500" />
+                  <span className="size-1 animate-pulse rounded-full bg-emerald-500 [animation-delay:120ms]" />
+                  <span className="size-1 animate-pulse rounded-full bg-emerald-500 [animation-delay:240ms]" />
+                  <span className="ml-0.5">Working</span>
+                </span>
+              ) : isIdle && !pos.atDesk ? (
+                <span className="mt-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">
+                  On break
+                </span>
+              ) : null}
+
+              {/* Name + model */}
+              <span className="mt-1 max-w-full truncate text-[10px] font-semibold text-neutral-800 dark:text-white">{agent.name}</span>
+              <span className="max-w-full truncate text-[9px] text-neutral-500 dark:text-slate-400">{getOfficeModelLabel(agent.modelId)}</span>
             </button>
           )
         })}
-
-        <div className="pointer-events-none absolute bottom-14 left-3 rounded-lg border border-white/70 bg-white/75 px-2 py-1 text-[10px] text-neutral-600 shadow-sm backdrop-blur">
-          <span className="font-medium text-neutral-800">{now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
-          <span className="mx-1 text-neutral-300">·</span>
-          <span>Office clock</span>
-        </div>
       </div>
 
-      <div className="flex h-[42px] items-center justify-between border-t border-neutral-200 bg-neutral-50 px-3 text-[11px] text-neutral-600">
-        <span>ClawSuite Office · {agentRows.length} agents · {sessionCount} sessions</span>
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <span className="size-2 rounded-full bg-emerald-500" />
-            Active
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="size-2 rounded-full bg-amber-400" />
-            Idle
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="size-2 rounded-full bg-neutral-400" />
-            No session
-          </span>
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t border-neutral-200 bg-white/80 px-4 py-2 text-[11px] text-neutral-500 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
+        <span>{agentRows.length}/{DESK_POSITIONS.length} desks occupied</span>
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> Working</span>
+          <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-amber-400" /> Idle</span>
+          <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-red-500" /> Error</span>
+          <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-neutral-400" /> Empty</span>
         </div>
       </div>
     </div>

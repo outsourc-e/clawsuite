@@ -206,6 +206,174 @@
   --color-primary-950: oklch(0.25 0.003 150);
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Enterprise Themes — semantic variables
+   Applied via data-theme attribute on <html>
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --theme-bg: #ffffff;
+  --theme-panel: #f8fafc;
+  --theme-card: #ffffff;
+  --theme-card2: #f1f5f9;
+  --theme-border: #e2e8f0;
+  --theme-text: #0f172a;
+  --theme-muted: #64748b;
+  --theme-shadow-1: 0 1px 2px rgba(0,0,0,0.05);
+  --theme-shadow-2: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --theme-shadow-3: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.05);
+  --theme-glass: rgba(255,255,255,0.8);
+  --theme-focus: #f97316;
+}
+
+/* ── Ops Dark: Cold blue-steel structural dark (Datadog/Grafana) ── */
+[data-theme="ops-dark"] {
+  --theme-bg: #080c14;
+  --theme-panel: #0e1420;
+  --theme-card: #121a2c;
+  --theme-card2: #182134;
+  --theme-border: #1e3a5f;
+  --theme-border-subtle: #1a2f4d;
+  --theme-text: #c8d8f0;
+  --theme-muted: #6a88b0;
+  --theme-shadow-1: 0 1px 2px rgba(0,0,0,0.45);
+  --theme-shadow-2: 0 4px 8px rgba(0,0,0,0.4), 0 0 0 1px rgba(30,58,95,0.3);
+  --theme-shadow-3: 0 10px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(30,58,95,0.2);
+  --theme-glass: rgba(8,12,20,0.88);
+  --theme-focus: #3b82f6;
+  --theme-accent: #3b82f6;
+  --theme-accent-subtle: rgba(59,130,246,0.08);
+  --theme-accent-border: rgba(59,130,246,0.25);
+  --theme-stripe: rgba(30,58,95,0.15);
+  --theme-header-bg: #0a1018;
+  --theme-header-border: #1e3a5f;
+}
+
+/* ── Premium Dark: Deep zinc, violet glow (Linear/Vercel) ── */
+[data-theme="premium-dark"] {
+  --theme-bg: #05050a;
+  --theme-panel: #0c0c12;
+  --theme-card: #131319;
+  --theme-card2: #1a1a22;
+  --theme-border: #2a1f4a;
+  --theme-border-subtle: #221840;
+  --theme-text: #f0eeff;
+  --theme-muted: #9087c0;
+  --theme-shadow-1: 0 1px 3px rgba(0,0,0,0.6);
+  --theme-shadow-2: 0 4px 16px rgba(0,0,0,0.6), inset 0 1px 0 rgba(148,130,255,0.06);
+  --theme-shadow-3: 0 12px 32px rgba(0,0,0,0.7), 0 0 40px rgba(100,80,200,0.08), inset 0 1px 0 rgba(148,130,255,0.08);
+  --theme-glass: rgba(5,5,10,0.92);
+  --theme-focus: #7c6fdd;
+  --theme-accent: #7c6fdd;
+  --theme-accent-subtle: rgba(124,111,221,0.1);
+  --theme-accent-border: rgba(124,111,221,0.3);
+  --theme-stripe: rgba(100,80,200,0.08);
+  --theme-header-bg: #08080f;
+  --theme-header-border: #2a1f4a;
+}
+
+/* ── Paper Light: Warm white, gentle shadows (iOS/Apple Notes) ── */
+[data-theme="paper-light"] {
+  --theme-bg: #fefdfb;
+  --theme-panel: #faf9f7;
+  --theme-card: #ffffff;
+  --theme-card2: #f5f4f1;
+  --theme-border: #e8e5df;
+  --theme-text: #1c1917;
+  --theme-muted: #78716c;
+  --theme-shadow-1: 0 1px 2px rgba(28,25,23,0.04);
+  --theme-shadow-2: 0 3px 8px rgba(28,25,23,0.06);
+  --theme-shadow-3: 0 8px 16px rgba(28,25,23,0.08);
+  --theme-glass: rgba(254,253,251,0.85);
+  --theme-focus: #ea580c;
+}
+
+/* ── Ops Dark: Apply blue-steel personality globally ── */
+[data-theme="ops-dark"] body,
+[data-theme="ops-dark"] #root,
+[data-theme="ops-dark"] .dark {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+[data-theme="ops-dark"] .border-neutral-200,
+[data-theme="ops-dark"] .border-slate-700 {
+  border-color: var(--theme-border) !important;
+}
+
+[data-theme="ops-dark"] .bg-neutral-50,
+[data-theme="ops-dark"] .bg-slate-800 {
+  background-color: var(--theme-panel) !important;
+}
+
+[data-theme="ops-dark"] .bg-white,
+[data-theme="ops-dark"] .bg-neutral-800 {
+  background-color: var(--theme-card) !important;
+}
+
+[data-theme="ops-dark"] .ring-orange-300,
+[data-theme="ops-dark"] .ring-accent-500\/20,
+[data-theme="ops-dark"] .border-accent-500 {
+  --tw-ring-color: var(--theme-accent) !important;
+  border-color: var(--theme-accent) !important;
+}
+
+/* Ops Dark: blue focus ring on active tabs and selection */
+[data-theme="ops-dark"] [aria-selected="true"],
+[data-theme="ops-dark"] [data-selected="true"],
+[data-theme="ops-dark"] .border-primary-500 {
+  border-color: var(--theme-accent) !important;
+}
+
+/* Ops Dark: subtle blue stripe on cards */
+[data-theme="ops-dark"] article::before,
+[data-theme="ops-dark"] .rounded-xl.border.bg-white::before {
+  background: linear-gradient(90deg, var(--theme-accent) 0%, transparent 100%) !important;
+}
+
+/* ── Premium Dark: Apply violet-glow personality globally ── */
+[data-theme="premium-dark"] body,
+[data-theme="premium-dark"] #root,
+[data-theme="premium-dark"] .dark {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+[data-theme="premium-dark"] .border-neutral-200,
+[data-theme="premium-dark"] .border-slate-700 {
+  border-color: var(--theme-border) !important;
+}
+
+[data-theme="premium-dark"] .bg-neutral-50,
+[data-theme="premium-dark"] .bg-slate-800 {
+  background-color: var(--theme-panel) !important;
+}
+
+[data-theme="premium-dark"] .bg-white,
+[data-theme="premium-dark"] .bg-neutral-800 {
+  background-color: var(--theme-card) !important;
+}
+
+/* Premium Dark: violet ring + border on focus/active */
+[data-theme="premium-dark"] .ring-orange-300,
+[data-theme="premium-dark"] .ring-accent-500\/20,
+[data-theme="premium-dark"] .border-accent-500 {
+  --tw-ring-color: var(--theme-accent) !important;
+  border-color: var(--theme-accent) !important;
+}
+
+[data-theme="premium-dark"] [aria-selected="true"],
+[data-theme="premium-dark"] [data-selected="true"],
+[data-theme="premium-dark"] .border-primary-500 {
+  border-color: var(--theme-accent) !important;
+}
+
+/* Premium Dark: violet glow on cards via box-shadow accent */
+[data-theme="premium-dark"] .shadow-sm,
+[data-theme="premium-dark"] .shadow-md {
+  box-shadow: var(--theme-shadow-2) !important;
+}
+
 .light {
   color-scheme: light;
 }

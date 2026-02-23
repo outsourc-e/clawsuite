@@ -7,6 +7,10 @@ export type ApprovalRequest = {
   requestedAt: number
   status: 'pending' | 'approved' | 'denied'
   resolvedAt?: number
+  /** Where this approval came from — 'agent' (parsed from SSE) or 'gateway' (polled from gateway API) */
+  source?: 'agent' | 'gateway'
+  /** Raw gateway approval ID for resolving via the gateway API */
+  gatewayApprovalId?: string
 }
 
 const APPROVALS_KEY = 'clawsuite:approvals'

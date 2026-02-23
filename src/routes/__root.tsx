@@ -70,6 +70,16 @@ const themeScript = `
     }
     const root = document.documentElement
     const media = window.matchMedia('(prefers-color-scheme: dark)')
+    // Enterprise theme (data-theme attribute)
+    const enterpriseTheme = localStorage.getItem('clawsuite-theme')
+    if (enterpriseTheme && (enterpriseTheme === 'ops-dark' || enterpriseTheme === 'premium-dark' || enterpriseTheme === 'paper-light')) {
+      root.setAttribute('data-theme', enterpriseTheme)
+      if (enterpriseTheme.includes('dark')) {
+        theme = 'dark'
+      } else {
+        theme = 'light'
+      }
+    }
     const apply = () => {
       root.classList.remove('light', 'dark', 'system')
       root.classList.add(theme)
