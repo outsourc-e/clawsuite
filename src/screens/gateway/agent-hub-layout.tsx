@@ -2181,6 +2181,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [agentActivity, setAgentActivity] = useState<Record<string, AgentActivityEntry>>({})
   const [artifacts, setArtifacts] = useState<MissionArtifact[]>([])
   const [missionReports, setMissionReports] = useState<StoredMissionReport[]>(() => loadStoredMissionReports())
+  const [missionHistory, setMissionHistory] = useState<MissionCheckpoint[]>(() => loadMissionHistory())
   const [artifactPreview, setArtifactPreview] = useState<MissionArtifact | null>(null)
   const [selectedReport, setSelectedReport] = useState<StoredMissionReport | null>(null)
   const [missionTokenCount, setMissionTokenCount] = useState(0)
@@ -3882,6 +3883,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         lastReportedMissionIdRef.current = snapshot.missionId
       }
       missionCompletionSnapshotRef.current = null
+      // Reload mission history to pick up any new checkpoints
+      setMissionHistory(loadMissionHistory())
     }
     prevMissionStateRef.current = missionState
   }, [missionState])
@@ -4110,12 +4113,49 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       ? formatDuration(Date.now() - missionStartedAtRef.current)
       : '0s'
 
-    // Active team data (Card 1)
-    const activeTeamName = activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : team.length > 0 ? 'Custom Team' : null
-    const activeTeamIcon = activeTeamName ? (TEAM_QUICK_TEMPLATES.find((t) => t.templateId === activeTemplateId)?.icon ?? '👥') : null
+    // Active team data (Card 1) — prefer saved team config over template state
+    const activeTeamConfig = teamConfigs.find((c) => c.id === selectedTeamConfigId)
+    const activeTeamName = activeTeamConfig?.name
+      ?? (activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : team.length > 0 ? 'Custom Team' : null)
+    const activeTeamIcon = activeTeamConfig?.icon
+      ?? (activeTeamName ? (TEAM_QUICK_TEMPLATES.find((t) => t.templateId === activeTemplateId)?.icon ?? '👥') : null)
+    const activeTeamDescription = activeTeamConfig?.description ?? ''
 
-    // Recent missions data (Card 2)
-    const recentMissions = missionReports.slice(0, 5)
+    // Recent missions data (Card 2) — merge stored reports + local checkpoints
+    const localHistoryItems = missionHistory.map((cp) => {
+      const completedTasks = cp.tasks.filter((t) => t.status === 'done' || t.status === 'completed').length
+      const totalTasks = cp.tasks.length
+      const duration = cp.completedAt ? cp.completedAt - cp.startedAt : Date.now() - cp.startedAt
+      const failed = cp.status === 'aborted' || cp.tasks.some((t) => t.status === 'blocked')
+      return {
+        id: cp.id,
+        name: cp.label,
+        goal: cp.label,
+        agentCount: cp.team.length,
+        duration,
+        completedAt: cp.completedAt || cp.updatedAt,
+        successRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+        failed,
+        taskStats: { total: totalTasks, completed: completedTasks, failed: failed ? 1 : 0 },
+      }
+    })
+    const storedReportItems = missionReports.map((report) => ({
+      id: report.id,
+      name: report.name || report.goal,
+      goal: report.goal,
+      agentCount: report.agents.length,
+      duration: report.duration,
+      completedAt: report.completedAt,
+      successRate: report.taskStats.total > 0
+        ? Math.round((report.taskStats.completed / report.taskStats.total) * 100)
+        : 0,
+      failed: report.taskStats.failed > 0,
+      taskStats: report.taskStats,
+    }))
+    const allMissions = [...localHistoryItems, ...storedReportItems]
+      .sort((a, b) => b.completedAt - a.completedAt)
+      .slice(0, 5)
+    const recentMissions = allMissions
 
     // Cost summary data (Card 3)
     // Aggregate tokens + cost from stored reports (today's sessions)
@@ -4200,7 +4240,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-neutral-900 dark:text-white">{activeTeamName ?? `Custom Team`}</p>
-                      <p className="text-[10px] text-neutral-400">{team.length} agent{team.length !== 1 ? 's' : ''}</p>
+                      <p className="text-[10px] text-neutral-400">
+                        {activeTeamDescription || `${team.length} agent${team.length !== 1 ? 's' : ''}`}
+                      </p>
                     </div>
                   </div>
 
@@ -4285,29 +4327,26 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </div>
               ) : (
                 <ul className="space-y-1.5">
-                  {recentMissions.slice(0, 4).map((report) => {
-                    const successRate = report.taskStats.total > 0
-                      ? Math.round((report.taskStats.completed / report.taskStats.total) * 100)
-                      : 0
-                    const durationStr = formatDuration(report.duration)
-                    const statusIcon = report.taskStats.failed > 0 ? '✗' : '✓'
-                    const statusCls = report.taskStats.failed > 0 ? 'text-red-500' : 'text-emerald-500'
+                  {recentMissions.slice(0, 4).map((mission) => {
+                    const durationStr = formatDuration(mission.duration)
+                    const statusIcon = mission.failed ? '✗' : '✓'
+                    const statusCls = mission.failed ? 'text-red-500' : 'text-emerald-500'
                     return (
-                      <li key={report.id} className={cn('flex items-center gap-2', insetCls)}>
+                      <li key={mission.id} className={cn('flex items-center gap-2', insetCls)}>
                         <span className={cn('shrink-0 text-[11px] font-bold', statusCls)}>{statusIcon}</span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">
-                            {truncateMissionGoal(report.name || report.goal, 44)}
+                            {truncateMissionGoal(mission.name || mission.goal, 44)}
                           </p>
                           <p className="text-[10px] text-neutral-400">
-                            {report.agents.length} agents · {durationStr} · {successRate}%
+                            {mission.agentCount} agents · {durationStr} · {mission.successRate}%
                           </p>
                         </div>
                         <span className={cn(
                           'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
-                          report.taskStats.failed > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700',
+                          mission.failed ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700',
                         )}>
-                          {report.taskStats.failed > 0 ? 'Failed' : 'Done'}
+                          {mission.failed ? 'Failed' : 'Done'}
                         </span>
                       </li>
                     )

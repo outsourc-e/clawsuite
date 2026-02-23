@@ -213,10 +213,12 @@
 
 :root {
   --theme-bg: #ffffff;
+  --theme-sidebar: #f8fafc;
   --theme-panel: #f8fafc;
   --theme-card: #ffffff;
   --theme-card2: #f1f5f9;
   --theme-border: #e2e8f0;
+  --theme-border-subtle: #f1f5f9;
   --theme-text: #0f172a;
   --theme-muted: #64748b;
   --theme-shadow-1: 0 1px 2px rgba(0,0,0,0.05);
@@ -224,11 +226,18 @@
   --theme-shadow-3: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.05);
   --theme-glass: rgba(255,255,255,0.8);
   --theme-focus: #f97316;
+  --theme-accent: #f97316;
+  --theme-accent-subtle: rgba(249,115,22,0.08);
+  --theme-accent-border: rgba(249,115,22,0.25);
+  --theme-stripe: rgba(241,245,249,0.5);
+  --theme-header-bg: #ffffff;
+  --theme-header-border: #e2e8f0;
 }
 
 /* ── Ops Dark: Cold blue-steel structural dark (Datadog/Grafana) ── */
 [data-theme="ops-dark"] {
   --theme-bg: #080c14;
+  --theme-sidebar: #0d1117;
   --theme-panel: #0e1420;
   --theme-card: #121a2c;
   --theme-card2: #182134;
@@ -252,6 +261,7 @@
 /* ── Premium Dark: Deep zinc, violet glow (Linear/Vercel) ── */
 [data-theme="premium-dark"] {
   --theme-bg: #05050a;
+  --theme-sidebar: #111113;
   --theme-panel: #0c0c12;
   --theme-card: #131319;
   --theme-card2: #1a1a22;
@@ -275,10 +285,12 @@
 /* ── Paper Light: Warm white, gentle shadows (iOS/Apple Notes) ── */
 [data-theme="paper-light"] {
   --theme-bg: #fefdfb;
+  --theme-sidebar: #f0ede8;
   --theme-panel: #faf9f7;
   --theme-card: #ffffff;
   --theme-card2: #f5f4f1;
   --theme-border: #e8e5df;
+  --theme-border-subtle: #f0ede8;
   --theme-text: #1c1917;
   --theme-muted: #78716c;
   --theme-shadow-1: 0 1px 2px rgba(28,25,23,0.04);
@@ -286,6 +298,43 @@
   --theme-shadow-3: 0 8px 16px rgba(28,25,23,0.08);
   --theme-glass: rgba(254,253,251,0.85);
   --theme-focus: #ea580c;
+  --theme-accent: #ea580c;
+  --theme-accent-subtle: rgba(234,88,12,0.08);
+  --theme-accent-border: rgba(234,88,12,0.25);
+  --theme-stripe: rgba(240,237,232,0.5);
+  --theme-header-bg: #fefdfb;
+  --theme-header-border: #e8e5df;
+}
+
+/* ── Paper Light: Apply warm personality globally ── */
+[data-theme="paper-light"] body,
+[data-theme="paper-light"] #root {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+[data-theme="paper-light"] .border-primary-200,
+[data-theme="paper-light"] .border-neutral-200 {
+  border-color: var(--theme-border) !important;
+}
+
+[data-theme="paper-light"] .bg-primary-50,
+[data-theme="paper-light"] .bg-neutral-50 {
+  background-color: var(--theme-panel) !important;
+}
+
+[data-theme="paper-light"] .bg-white,
+[data-theme="paper-light"] .bg-primary-100 {
+  background-color: var(--theme-card) !important;
+}
+
+[data-theme="paper-light"] .text-primary-900 {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="paper-light"] .text-primary-500,
+[data-theme="paper-light"] .text-primary-600 {
+  color: var(--theme-muted) !important;
 }
 
 /* ── Ops Dark: Apply blue-steel personality globally ── */
@@ -297,6 +346,8 @@
 }
 
 [data-theme="ops-dark"] .border-neutral-200,
+[data-theme="ops-dark"] .border-neutral-700,
+[data-theme="ops-dark"] .border-neutral-800,
 [data-theme="ops-dark"] .border-slate-700 {
   border-color: var(--theme-border) !important;
 }
@@ -307,8 +358,26 @@
 }
 
 [data-theme="ops-dark"] .bg-white,
-[data-theme="ops-dark"] .bg-neutral-800 {
+[data-theme="ops-dark"] .bg-neutral-800,
+[data-theme="ops-dark"] .bg-neutral-900 {
   background-color: var(--theme-card) !important;
+}
+
+[data-theme="ops-dark"] .bg-neutral-900\/60,
+[data-theme="ops-dark"] .bg-neutral-900\/40 {
+  background-color: var(--theme-card2) !important;
+  opacity: 1 !important;
+}
+
+[data-theme="ops-dark"] .text-neutral-100,
+[data-theme="ops-dark"] .text-neutral-200 {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="ops-dark"] .text-neutral-300,
+[data-theme="ops-dark"] .text-neutral-400,
+[data-theme="ops-dark"] .text-neutral-500 {
+  color: var(--theme-muted) !important;
 }
 
 [data-theme="ops-dark"] .ring-orange-300,
@@ -340,6 +409,8 @@
 }
 
 [data-theme="premium-dark"] .border-neutral-200,
+[data-theme="premium-dark"] .border-neutral-700,
+[data-theme="premium-dark"] .border-neutral-800,
 [data-theme="premium-dark"] .border-slate-700 {
   border-color: var(--theme-border) !important;
 }
@@ -350,8 +421,26 @@
 }
 
 [data-theme="premium-dark"] .bg-white,
-[data-theme="premium-dark"] .bg-neutral-800 {
+[data-theme="premium-dark"] .bg-neutral-800,
+[data-theme="premium-dark"] .bg-neutral-900 {
   background-color: var(--theme-card) !important;
+}
+
+[data-theme="premium-dark"] .bg-neutral-900\/60,
+[data-theme="premium-dark"] .bg-neutral-900\/40 {
+  background-color: var(--theme-card2) !important;
+  opacity: 1 !important;
+}
+
+[data-theme="premium-dark"] .text-neutral-100,
+[data-theme="premium-dark"] .text-neutral-200 {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="premium-dark"] .text-neutral-300,
+[data-theme="premium-dark"] .text-neutral-400,
+[data-theme="premium-dark"] .text-neutral-500 {
+  color: var(--theme-muted) !important;
 }
 
 /* Premium Dark: violet ring + border on focus/active */
@@ -373,6 +462,36 @@
 [data-theme="premium-dark"] .shadow-md {
   box-shadow: var(--theme-shadow-2) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Global theme utilities — use these in components
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Background utilities */
+.theme-bg { background-color: var(--theme-bg) !important; }
+.theme-sidebar { background-color: var(--theme-sidebar) !important; }
+.theme-panel { background-color: var(--theme-panel) !important; }
+.theme-card { background-color: var(--theme-card) !important; }
+.theme-card2 { background-color: var(--theme-card2) !important; }
+
+/* Border utilities */
+.theme-border { border-color: var(--theme-border) !important; }
+.theme-border-subtle { border-color: var(--theme-border-subtle) !important; }
+
+/* Text utilities */
+.theme-text { color: var(--theme-text) !important; }
+.theme-muted { color: var(--theme-muted) !important; }
+
+/* Accent utilities */
+.theme-accent-bg { background-color: var(--theme-accent) !important; }
+.theme-accent-text { color: var(--theme-accent) !important; }
+.theme-accent-border { border-color: var(--theme-accent) !important; }
+.theme-accent-subtle-bg { background-color: var(--theme-accent-subtle) !important; }
+
+/* Shadow utilities */
+.theme-shadow-1 { box-shadow: var(--theme-shadow-1) !important; }
+.theme-shadow-2 { box-shadow: var(--theme-shadow-2) !important; }
+.theme-shadow-3 { box-shadow: var(--theme-shadow-3) !important; }
 
 .light {
   color-scheme: light;

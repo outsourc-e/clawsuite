@@ -695,7 +695,7 @@ function ChatSidebarComponent({
 
   const asideProps = {
     className: cn(
-      'border-r border-primary-200 h-full overflow-hidden bg-primary-50 dark:bg-primary-100 flex flex-col',
+      'border-r h-full overflow-hidden flex flex-col theme-sidebar theme-border',
       isMobile && 'fixed inset-y-0 left-0 z-50 shadow-2xl',
       isMobile && isCollapsed && 'pointer-events-none',
     ),
@@ -1149,7 +1149,7 @@ function ChatSidebarComponent({
       {/* end scrollable body */}
 
       {/* ── Footer with User Menu ─────────────────────────────────── */}
-      <div className="px-2 py-2.5 border-t border-primary-200 bg-primary-100/80 dark:bg-neutral-900 shrink-0">
+      <div className="px-2 py-2.5 border-t shrink-0 theme-border theme-panel">
         {/* User card + actions */}
         <div className={cn(
           'flex items-center rounded-lg transition-colors',

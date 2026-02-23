@@ -251,6 +251,20 @@ function AppearanceContent() {
     const theme = value as SettingsThemeMode
     applyTheme(theme)
     updateSettings({ theme })
+    
+    // If user switches to light/dark via the standard toggle, update enterprise theme too
+    const currentEnterpriseTheme = localStorage.getItem('clawsuite-theme')
+    if (theme === 'light' && currentEnterpriseTheme && currentEnterpriseTheme.includes('dark')) {
+      // Switch to Paper Light when going light
+      const html = document.documentElement
+      html.setAttribute('data-theme', 'paper-light')
+      localStorage.setItem('clawsuite-theme', 'paper-light')
+    } else if (theme === 'dark' && (!currentEnterpriseTheme || !currentEnterpriseTheme.includes('dark'))) {
+      // Switch to Ops Dark when going dark (default)
+      const html = document.documentElement
+      html.setAttribute('data-theme', 'ops-dark')
+      localStorage.setItem('clawsuite-theme', 'ops-dark')
+    }
   }
 
   function badgeClass(color: AccentColor): string {
@@ -361,6 +375,7 @@ function ThemeSwatch({ colors }: { colors: typeof ENTERPRISE_THEMES[number]['pre
 }
 
 function EnterpriseThemePicker() {
+  const { updateSettings } = useSettings()
   const [current, setCurrent] = useState(() => {
     if (typeof window === 'undefined') return 'paper-light'
     return localStorage.getItem('clawsuite-theme') || 'paper-light'
@@ -372,9 +387,13 @@ function EnterpriseThemePicker() {
     if (id.includes('dark')) {
       html.classList.add('dark')
       html.classList.remove('light')
+      // Sync with settings store
+      updateSettings({ theme: 'dark' })
     } else {
       html.classList.add('light')
       html.classList.remove('dark')
+      // Sync with settings store
+      updateSettings({ theme: 'light' })
     }
     localStorage.setItem('clawsuite-theme', id)
     setCurrent(id)
