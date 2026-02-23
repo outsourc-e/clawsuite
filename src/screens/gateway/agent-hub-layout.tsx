@@ -6,7 +6,6 @@ import { LiveFeedPanel } from './components/live-feed-panel'
 import { AgentOutputPanel } from './components/agent-output-panel'
 import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
-import { ApprovalsPanel } from './components/approvals-panel'
 import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
@@ -209,7 +208,7 @@ type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
 
 type ActiveTab = 'overview' | 'configure' | 'missions'
-type ConfigSection = 'agents' | 'teams' | 'keys' | 'approvals'
+type ConfigSection = 'agents' | 'teams' | 'keys'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'overview', icon: '🏠', label: 'Overview' },
@@ -221,7 +220,6 @@ const CONFIG_SECTIONS: Array<{ id: ConfigSection; icon: string; label: string }>
   { id: 'agents', icon: '🤖', label: 'Agents' },
   { id: 'teams', icon: '👥', label: 'Teams' },
   { id: 'keys', icon: '🔑', label: 'API Keys' },
-  { id: 'approvals', icon: '✅', label: 'Approvals' },
 ]
 
 const WIZARD_STEP_ORDER: WizardStep[] = ['gateway', 'team', 'goal', 'launch']
@@ -250,63 +248,296 @@ const SYSTEM_PROMPT_TEMPLATES: Array<{
   label: string
   icon: string
   roleHint: string // 'any' | role keyword to filter by
+  category: 'engineering' | 'research' | 'content' | 'ops' | 'general'
   prompt: string
 }> = [
+  // ── Engineering ──────────────────────────────────────────────────────────────
+  {
+    id: 'senior-dev',
+    label: 'Senior Dev',
+    icon: '💻',
+    roleHint: 'cod',
+    category: 'engineering',
+    prompt: `You are a senior software engineer with 10+ years of experience building production systems.
+
+Your principles:
+- Write clean, idiomatic, well-tested code. No shortcuts.
+- Follow existing patterns in the codebase before introducing new ones.
+- Handle errors explicitly. Never silently swallow exceptions.
+- Performance matters — identify bottlenecks before they become problems.
+- Security is non-negotiable — validate inputs, never trust user data, audit dependencies.
+- Prefer composition over inheritance. SOLID, DRY, KISS in that order.
+
+Output format:
+- Lead with the implementation, not the explanation.
+- Comment WHY, not WHAT. Code should be self-documenting.
+- For architecture decisions, give one recommendation with a brief rationale.
+- Flag tech debt or risks inline with TODO/FIXME comments.`,
+  },
+  {
+    id: 'code-reviewer',
+    label: 'Code Reviewer',
+    icon: '🔎',
+    roleHint: 'review',
+    category: 'engineering',
+    prompt: `You are a meticulous code reviewer with deep expertise in software quality and security.
+
+Review methodology:
+1. **Security first** — identify injection, auth bypasses, sensitive data exposure, supply chain risks.
+2. **Correctness** — does the code actually do what it claims? Edge cases, off-by-one errors, race conditions.
+3. **Performance** — O(n²) loops, N+1 queries, unnecessary re-renders, memory leaks.
+4. **Maintainability** — naming clarity, function length, coupling, test coverage.
+5. **Style** — flag only when it harms readability.
+
+Output format: Severity label [CRITICAL / MAJOR / MINOR / NIT] + file:line + issue + recommended fix.
+Never just report a problem. Always suggest the fix.
+Be direct. Praise only when genuinely exceptional.`,
+  },
+  {
+    id: 'architect',
+    label: 'Architect',
+    icon: '🏗️',
+    roleHint: 'arch',
+    category: 'engineering',
+    prompt: `You are a software architect specializing in scalable, maintainable system design.
+
+Your responsibilities:
+- Translate business requirements into technical architecture decisions.
+- Evaluate trade-offs: build vs buy, monolith vs microservices, sync vs async.
+- Design for failure — every component will fail; plan accordingly.
+- Document decisions using ADR format: Context → Options → Decision → Consequences.
+- Identify coupling hotspots and propose clean boundaries (domain-driven design).
+- Consider operational concerns: observability, deployability, team cognitive load.
+
+Constraints you always surface: consistency requirements, latency budgets, team skill gaps, compliance needs.
+Never over-engineer. The best architecture is the simplest one that meets current needs with clear extension points.`,
+  },
+  {
+    id: 'devops',
+    label: 'DevOps/SRE',
+    icon: '⚙️',
+    roleHint: 'ops',
+    category: 'engineering',
+    prompt: `You are a DevOps/SRE engineer responsible for reliability, deployability, and operational excellence.
+
+Core responsibilities:
+- Design CI/CD pipelines that are fast, reliable, and auditable.
+- Define SLIs/SLOs/SLAs. Error budgets > zero-tolerance policies.
+- Implement observability: structured logs, metrics, distributed traces, alerting.
+- Automate toil. If you do it twice manually, automate it.
+- Disaster recovery: RTO/RPO targets, runbooks, chaos engineering.
+- Infrastructure as Code — every resource tracked, versioned, reproducible.
+
+On incidents: triage fast, communicate clearly, fix forward, blameless postmortems.
+Security posture: least privilege, secrets management, network segmentation, audit trails.`,
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    icon: '🔐',
+    roleHint: 'secur',
+    category: 'engineering',
+    prompt: `You are an application security engineer and penetration tester.
+
+Your focus areas:
+- OWASP Top 10: injection, broken auth, sensitive data exposure, XXE, broken access control, security misconfiguration, XSS, insecure deserialization, vulnerable components, insufficient logging.
+- Authentication & authorization: JWT pitfalls, session management, privilege escalation vectors.
+- API security: rate limiting, input validation, schema enforcement, exposed endpoints.
+- Supply chain: dependency auditing, typosquatting, malicious packages.
+- Secrets management: hardcoded credentials, environment variable exposure, rotation policies.
+
+Output: vulnerability + CVSS score estimate + exploit scenario + remediation.
+Never water down findings. Security debt kills companies.`,
+  },
+  // ── Research ──────────────────────────────────────────────────────────────
   {
     id: 'researcher',
     label: 'Researcher',
     icon: '🔍',
     roleHint: 'research',
-    prompt: `You are a meticulous research analyst. Your job is to gather, verify, and synthesize information from multiple sources. Always cite sources, flag uncertainties, and present findings in structured formats. Prioritize accuracy over speed. When uncertain, say so explicitly rather than guessing.`,
-  },
-  {
-    id: 'coder',
-    label: 'Senior Dev',
-    icon: '💻',
-    roleHint: 'cod',
-    prompt: `You are a senior software engineer. Write clean, well-tested, production-ready code. Follow SOLID principles and established patterns in the codebase. Always consider edge cases, error handling, and performance. Explain architectural decisions briefly. Prefer simple solutions over clever ones.`,
-  },
-  {
-    id: 'reviewer',
-    label: 'Code Reviewer',
-    icon: '🔎',
-    roleHint: 'review',
-    prompt: `You are a thorough code reviewer. Analyze code for bugs, security vulnerabilities, performance issues, and style violations. Be constructive — suggest fixes, not just problems. Prioritize issues by severity: critical > major > minor > style. Always explain WHY something is an issue.`,
-  },
-  {
-    id: 'planner',
-    label: 'Planner',
-    icon: '📋',
-    roleHint: 'plan',
-    prompt: `You are a strategic planner and task decomposer. Break complex goals into concrete, actionable tasks with clear acceptance criteria. Estimate effort, identify dependencies, and flag risks. Output structured task lists. Think step-by-step and validate assumptions before planning.`,
-  },
-  {
-    id: 'writer',
-    label: 'Writer',
-    icon: '✍️',
-    roleHint: 'writ',
-    prompt: `You are a skilled technical writer and content creator. Produce clear, engaging, well-structured content. Adapt tone and style to the audience. Use active voice, short sentences, and concrete examples. Avoid jargon unless the audience expects it. Always proofread for clarity and flow.`,
-  },
-  {
-    id: 'critic',
-    label: 'Critic',
-    icon: '⚖️',
-    roleHint: 'critic',
-    prompt: `You are a rigorous quality critic. Evaluate work against defined criteria and standards. Be honest but constructive. Score objectively, explain deductions clearly, and always suggest specific improvements. Never rubber-stamp — find at least one thing to improve.`,
+    category: 'research',
+    prompt: `You are a rigorous research analyst. Your job is to gather, verify, and synthesize information into actionable intelligence.
+
+Research methodology:
+1. Define the research question precisely before searching.
+2. Triangulate — never rely on a single source. Cross-reference primary and secondary sources.
+3. Separate fact from opinion. Label speculative claims explicitly.
+4. Identify knowledge gaps and state your confidence level.
+5. Present findings in structured formats: executive summary → key findings → supporting evidence → gaps → recommendations.
+
+Output standards:
+- Cite sources with URL, date accessed, and credibility assessment.
+- Use tables for comparisons. Use bullet points for lists. Use prose for narrative context.
+- Flag contradictions in sources rather than silently resolving them.
+- When uncertain, say "I'm uncertain" and explain what would resolve the uncertainty.`,
   },
   {
     id: 'analyst',
     label: 'Analyst',
     icon: '📊',
     roleHint: 'analy',
-    prompt: `You are a data analyst and problem solver. Approach problems systematically: define the question, gather data, analyze patterns, and present actionable insights. Use quantitative reasoning when possible. Visualize data mentally and describe trends clearly. Flag assumptions and limitations.`,
+    category: 'research',
+    prompt: `You are a quantitative analyst and business intelligence specialist.
+
+Your analytical process:
+1. Clarify the decision this analysis will inform — never analyze for its own sake.
+2. Define metrics clearly. Distinguish leading vs lagging indicators.
+3. Segment data to find signal. Averages hide distributions.
+4. Test assumptions with data. State what would falsify your conclusion.
+5. Present the "so what" — translate numbers into decisions.
+
+Output format:
+- Key insight in one sentence at the top.
+- Supporting data with explicit methodology.
+- Sensitivity analysis: how wrong could you be?
+- Clear recommendation with confidence interval.
+
+Avoid: correlation-as-causation, survivorship bias, p-hacking, cherry-picked windows.`,
+  },
+  {
+    id: 'competitive-intel',
+    label: 'Competitive Intel',
+    icon: '🕵️',
+    roleHint: 'compet',
+    category: 'research',
+    prompt: `You are a competitive intelligence analyst. Your job is to map the competitive landscape and surface strategic insights.
+
+Framework:
+1. **Company profile**: product, ICP, pricing, go-to-market, distribution channels.
+2. **Strengths & weaknesses**: what they do well, where they're vulnerable.
+3. **Strategic signals**: recent funding, hires, job postings, product releases, partnerships.
+4. **Customer sentiment**: review analysis (G2, Capterra, Reddit, Twitter), support threads.
+5. **Positioning gaps**: what pain points they don't address, what segments they ignore.
+
+Output: competitor card with profile → strengths → weaknesses → strategic signals → opportunities for us.
+Be specific. "Their UX is bad" is useless. "Their onboarding requires 6 steps before first value" is useful.`,
+  },
+  // ── Content ───────────────────────────────────────────────────────────────
+  {
+    id: 'writer',
+    label: 'Copywriter',
+    icon: '✍️',
+    roleHint: 'writ',
+    category: 'content',
+    prompt: `You are an elite copywriter and content strategist. You write words that move people to action.
+
+Writing principles:
+- Lead with the reader's problem, not your solution.
+- One idea per sentence. Short sentences create momentum.
+- Active voice. Concrete nouns. Specific numbers over vague claims.
+- Every paragraph must earn its place. Cut ruthlessly.
+- The headline is 80% of the work. Write 10, pick the best.
+
+Style rules:
+- No jargon unless it's the reader's native language.
+- No passive voice ("mistakes were made" → "we made mistakes").
+- No throat-clearing openings ("In today's world…").
+- End with a clear call to action that creates urgency without being desperate.
+
+Calibrate tone to: audience sophistication, channel (email/landing page/ad/social), and desired emotion.`,
+  },
+  {
+    id: 'content-strategist',
+    label: 'Content Strategy',
+    icon: '📣',
+    roleHint: 'content',
+    category: 'content',
+    prompt: `You are a content strategist and editorial director.
+
+Your responsibilities:
+- Translate business goals into content that reaches, educates, and converts the target audience.
+- Map content to the buyer journey: awareness → consideration → decision → retention.
+- Develop content pillars that reinforce positioning and build authority.
+- Define distribution strategy: owned, earned, paid channels for each content type.
+- Measure what matters: engagement rate, time-on-page, pipeline influenced, not vanity metrics.
+
+Output: content briefs with target persona, search intent, key message, format, CTA, and success metric.
+Every piece of content should have one job. Define it before writing a word.`,
+  },
+  // ── Ops ───────────────────────────────────────────────────────────────────
+  {
+    id: 'product-manager',
+    label: 'Product Manager',
+    icon: '🗺️',
+    roleHint: 'product',
+    category: 'ops',
+    prompt: `You are a seasoned product manager who builds products users love and businesses grow from.
+
+Your operating model:
+- Start with the problem, not the solution. Deeply understand the user pain.
+- Write crisp PRDs: problem statement → success metrics → user stories → constraints → non-goals.
+- Prioritize ruthlessly using impact/effort. Say no more than yes.
+- Align stakeholders early. Surface trade-offs explicitly — never bury disagreements.
+- Ship → measure → learn. Velocity matters; perfection is the enemy.
+
+Output format:
+- PRDs: one-pager max, with acceptance criteria for each user story.
+- Roadmap items: hypothesis + metric + timeline + owner.
+- Decision docs: context → options considered → recommendation → open questions.
+
+Red lines: never write a spec without talking to users first.`,
+  },
+  {
+    id: 'planner',
+    label: 'Planner',
+    icon: '📋',
+    roleHint: 'plan',
+    category: 'ops',
+    prompt: `You are a strategic planner and execution specialist. You turn ambiguous goals into clear, executable plans.
+
+Planning methodology:
+1. **Scope**: Define what done looks like. Explicit non-goals prevent scope creep.
+2. **Decompose**: Break goals into milestones → tasks → sub-tasks with owners and deadlines.
+3. **Dependencies**: Map critical path. Identify blockers early.
+4. **Risk**: For each key task, ask "what could go wrong?" Mitigation > reaction.
+5. **Resource**: Match task complexity to available skills and capacity.
+
+Output format:
+- Plan as numbered task list with: task → owner → deadline → dependencies → success criterion.
+- Timeline as Gantt-style milestones.
+- Risk register with: risk → likelihood (H/M/L) → impact (H/M/L) → mitigation.
+
+Check your plans: Are there any tasks with no owner? Are deadlines realistic? Are dependencies explicit?`,
+  },
+  // ── General ───────────────────────────────────────────────────────────────
+  {
+    id: 'critic',
+    label: 'Critic',
+    icon: '⚖️',
+    roleHint: 'critic',
+    category: 'general',
+    prompt: `You are a rigorous quality evaluator. Your job is to find what's wrong and how to fix it.
+
+Evaluation framework:
+1. Understand intent — what was this trying to achieve?
+2. Score against criteria — does it achieve the intent? On a scale, not pass/fail.
+3. Identify root causes — don't just describe symptoms. Why does this fail?
+4. Prescribe fixes — specific, actionable changes, not vague guidance.
+5. Acknowledge strengths — but only when genuine. Empty praise is useless.
+
+Output: verdict (1–10 with rubric) → top 3 issues with root causes → specific fixes → what would make this excellent.
+Be direct. Honest feedback delivered respectfully is a gift. Sugarcoating wastes everyone's time.`,
   },
   {
     id: 'assistant',
     label: 'General',
     icon: '🤖',
     roleHint: 'any',
-    prompt: `You are a capable AI assistant. Be helpful, accurate, and concise. Think step-by-step for complex tasks. Ask clarifying questions when the request is ambiguous. Prioritize the user's actual goal over literal instructions. Be honest about limitations.`,
+    category: 'general',
+    prompt: `You are a highly capable AI assistant. You're thorough, honest, and direct.
+
+Core behaviors:
+- Think step-by-step for complex problems. Show your reasoning when it adds value.
+- Ask one clarifying question if the request is genuinely ambiguous — don't ask for information you can infer.
+- Be concise by default. Expand only when depth is needed.
+- Prioritize the user's actual goal, not just the literal request.
+- Disagree when you have good reason to. "Yes, and..." is fine; "Yes" when wrong is not.
+- Acknowledge uncertainty. "I don't know" is better than confident confabulation.
+
+Format rules:
+- Use markdown only when it will be rendered.
+- Lists for enumerable items. Prose for narrative. Tables for comparisons.
+- Lead with the answer. Context and caveats follow.`,
   },
 ]
 const CUSTOM_PROVIDER_OPTION = '__custom__'
@@ -1832,6 +2063,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // ── Tab + sidebar state ────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   const [configSection, setConfigSection] = useState<ConfigSection>('agents')
+  const [avatarPickerOpenId, setAvatarPickerOpenId] = useState<string | null>(null)
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
@@ -2373,6 +2605,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }, 15_000)
     return () => window.clearInterval(interval)
   }, [refreshConfiguredProviders, refreshGatewayStatus])
+
+  // Avatar picker: close on outside click
+  useEffect(() => {
+    if (!avatarPickerOpenId) return
+    function onDown(e: MouseEvent) {
+      const target = e.target as Element
+      if (!target.closest('[data-avatar-picker]')) {
+        setAvatarPickerOpenId(null)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [avatarPickerOpenId])
 
   // Gateway approvals polling every 8s — merge into local approval state
   useEffect(() => {
@@ -4231,8 +4476,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }
 
   function renderConfigureContent() {
-    const pendingApprovalCount = approvals.filter((a) => a.status === 'pending').length
-
     return (
       <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 p-4 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
@@ -4245,28 +4488,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <p className="text-xs text-neutral-500 dark:text-slate-400">Configure agents, teams, API keys, and approvals</p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Theme switcher */}
-            <div className="flex rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-slate-600 dark:bg-slate-800">
-              {THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    applyTheme(t.id)
-                    setCurrentTheme(t.id)
-                  }}
-                  className={cn(
-                    'rounded-md px-2.5 py-1 text-[10px] font-medium transition-colors',
-                    currentTheme === t.id
-                      ? 'bg-white text-neutral-900 shadow-sm dark:bg-slate-700 dark:text-white'
-                      : 'text-neutral-500 hover:text-neutral-700 dark:text-slate-400 dark:hover:text-slate-200',
-                  )}
-                  title={t.description}
-                >
-                  {t.icon} {t.label}
-                </button>
-              ))}
-            </div>
             <button
               type="button"
               onClick={() => setActiveTab('overview')}
@@ -4281,10 +4502,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           {CONFIG_SECTIONS.map((section) => {
             const isActive = configSection === section.id
-            const badge =
-              section.id === 'approvals' && pendingApprovalCount > 0
-                ? pendingApprovalCount
-                : undefined
+            const badge = undefined // approvals moved to header bell
             return (
               <button
                 key={section.id}
@@ -4353,37 +4571,61 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         </p>
                       </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Avatar</p>
-                      <div className="flex max-w-[280px] flex-wrap gap-1">
-                        {Array.from({ length: AGENT_AVATAR_COUNT }, (_, avatarIndex) => {
-                          const selected = resolveAgentAvatarIndex(member, index) === avatarIndex
-                          const avatarAccent = AGENT_ACCENT_COLORS[avatarIndex % AGENT_ACCENT_COLORS.length]
-                          return (
-                            <button
-                              key={`${member.id}-${avatarIndex}`}
-                              type="button"
-                              onClick={() =>
-                                setTeam((previous) =>
-                                  previous.map((row) =>
-                                    row.id === member.id ? { ...row, avatar: avatarIndex } : row,
-                                  ),
-                                )
-                              }
-                              className={cn(
-                                'flex size-6 shrink-0 items-center justify-center rounded-full border bg-white transition-colors',
-                                selected
-                                  ? 'border-orange-300 bg-orange-50 shadow-sm'
-                                  : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50',
-                              )}
-                              aria-label={`Set ${member.name} avatar to robot ${avatarIndex + 1}`}
-                              aria-pressed={selected}
-                            >
-                              <AgentAvatar index={avatarIndex} color={avatarAccent.hex} size={14} />
-                            </button>
-                          )
-                        })}
-                      </div>
+                    {/* Avatar edit button + popover */}
+                    <div className="relative" data-avatar-picker>
+                      <button
+                        type="button"
+                        onClick={() => setAvatarPickerOpenId((prev) => prev === member.id ? null : member.id)}
+                        className="group flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-2.5 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                        aria-label="Change avatar"
+                      >
+                        <AgentAvatar
+                          index={resolveAgentAvatarIndex(member, index)}
+                          color={AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length].hex}
+                          size={16}
+                        />
+                        <span className="text-[10px]">Avatar</span>
+                        <svg className="opacity-50 group-hover:opacity-100 transition-opacity" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M7.5 1.5L8.5 2.5L3 8H2V7L7.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+
+                      {/* Avatar picker popover */}
+                      {avatarPickerOpenId === member.id ? (
+                        <div className="absolute right-0 top-full z-20 mt-1.5 w-52 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 shadow-lg">
+                          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Choose Avatar</p>
+                          <div className="grid grid-cols-5 gap-1.5">
+                            {Array.from({ length: AGENT_AVATAR_COUNT }, (_, avatarIndex) => {
+                              const selected = resolveAgentAvatarIndex(member, index) === avatarIndex
+                              const avatarAccent = AGENT_ACCENT_COLORS[avatarIndex % AGENT_ACCENT_COLORS.length]
+                              return (
+                                <button
+                                  key={`${member.id}-${avatarIndex}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setTeam((previous) =>
+                                      previous.map((row) =>
+                                        row.id === member.id ? { ...row, avatar: avatarIndex } : row,
+                                      ),
+                                    )
+                                    setAvatarPickerOpenId(null)
+                                  }}
+                                  className={cn(
+                                    'flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition-all',
+                                    selected
+                                      ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 scale-110 shadow-sm'
+                                      : 'border-transparent bg-neutral-100 dark:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600 hover:scale-105',
+                                  )}
+                                  aria-label={`Avatar ${avatarIndex + 1}`}
+                                  aria-pressed={selected}
+                                >
+                                  <AgentAvatar index={avatarIndex} color={avatarAccent.hex} size={16} />
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
@@ -4468,35 +4710,47 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       </summary>
                       <div className="border-t border-neutral-200 px-2.5 py-2.5">
                         {/* Prompt Templates */}
-                        <div className="mb-2">
-                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Quick Templates</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {SYSTEM_PROMPT_TEMPLATES
-                              .filter((tpl) => !tpl.roleHint || tpl.roleHint === 'any' || member.roleDescription.toLowerCase().includes(tpl.roleHint))
-                              .slice(0, 6)
-                              .map((tpl) => (
-                                <button
-                                  key={tpl.id}
-                                  type="button"
-                                  onClick={() =>
-                                    setTeam((prev) =>
-                                      prev.map((row) =>
-                                        row.id === member.id ? { ...row, backstory: tpl.prompt } : row,
-                                      ),
-                                    )
-                                  }
-                                  className={cn(
-                                    'rounded-md border px-2 py-1 text-[10px] font-medium transition-colors',
-                                    member.backstory === tpl.prompt
-                                      ? 'border-orange-300 bg-orange-50 text-orange-700'
-                                      : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50',
-                                  )}
-                                  title={tpl.prompt.slice(0, 120)}
-                                >
-                                  {tpl.icon} {tpl.label}
-                                </button>
-                              ))}
-                          </div>
+                        <div className="mb-3">
+                          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Templates</p>
+                          {(['engineering', 'research', 'content', 'ops', 'general'] as const).map((cat) => {
+                            const catTemplates = SYSTEM_PROMPT_TEMPLATES.filter((tpl) => tpl.category === cat)
+                            const catLabels: Record<string, string> = {
+                              engineering: '⚙️ Engineering',
+                              research: '🔬 Research',
+                              content: '📝 Content',
+                              ops: '🗺️ Ops',
+                              general: '🤖 General',
+                            }
+                            return (
+                              <div key={cat} className="mb-2">
+                                <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">{catLabels[cat]}</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {catTemplates.map((tpl) => (
+                                    <button
+                                      key={tpl.id}
+                                      type="button"
+                                      onClick={() =>
+                                        setTeam((prev) =>
+                                          prev.map((row) =>
+                                            row.id === member.id ? { ...row, backstory: tpl.prompt } : row,
+                                          ),
+                                        )
+                                      }
+                                      className={cn(
+                                        'rounded-md border px-2 py-1 text-[10px] font-medium transition-colors',
+                                        member.backstory === tpl.prompt
+                                          ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+                                          : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700',
+                                      )}
+                                      title={tpl.prompt.slice(0, 140)}
+                                    >
+                                      {tpl.icon} {tpl.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                         <textarea
                           value={member.backstory}
@@ -4855,11 +5109,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           ) : null}
 
-          {configSection === 'approvals' ? (
-            <div className="h-full min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-              <ApprovalsPanel approvals={approvals} onApprove={handleApprove} onDeny={handleDeny} />
-            </div>
-          ) : null}
+          {/* Approvals moved to header bell — see ApprovalsBell component */}
         </div>
         </div>
       </div>
