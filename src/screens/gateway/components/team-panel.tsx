@@ -8,6 +8,12 @@ export const MODEL_PRESETS = [
   { id: 'sonnet', label: 'Sonnet 4.6', desc: 'Fast & capable' },
   { id: 'codex', label: 'Codex', desc: 'Code specialist' },
   { id: 'flash', label: 'Gemini Flash', desc: 'Quick & cheap' },
+  { id: 'gpt5', label: 'GPT-5', desc: 'OpenAI flagship' },
+  { id: 'o3', label: 'o3', desc: 'OpenAI reasoning' },
+  { id: 'gemini-pro', label: 'Gemini Pro', desc: 'Google advanced' },
+  { id: 'deepseek', label: 'DeepSeek R1', desc: 'Open reasoning' },
+  { id: 'minimax', label: 'MiniMax', desc: 'Cost efficient' },
+  { id: 'grok', label: 'Grok 3', desc: 'xAI flagship' },
 ] as const
 
 export const TEAM_TEMPLATES = [
@@ -72,11 +78,17 @@ type TeamPanelProps = {
 }
 
 const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
-  auto: 'bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200',
-  opus: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  codex: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  flash: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+  auto: 'bg-neutral-200 text-neutral-700',
+  opus: 'bg-orange-100 text-orange-700',
+  sonnet: 'bg-blue-100 text-blue-700',
+  codex: 'bg-emerald-100 text-emerald-700',
+  flash: 'bg-violet-100 text-violet-700',
+  gpt5: 'bg-green-100 text-green-700',
+  o3: 'bg-pink-100 text-pink-700',
+  'gemini-pro': 'bg-indigo-100 text-indigo-700',
+  deepseek: 'bg-cyan-100 text-cyan-700',
+  minimax: 'bg-amber-100 text-amber-700',
+  grok: 'bg-red-100 text-red-700',
 }
 
 type SessionDotState = 'active' | 'idle' | 'stale' | 'dead' | 'spawning' | 'none'
