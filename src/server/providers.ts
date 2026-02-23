@@ -82,6 +82,14 @@ export function getConfiguredProviderNames(): Array<string> {
       }
     }
 
+    // Also include providers from models.providers keys — catches auth-free
+    // providers like ollama-pc1 that have no auth.profiles entry.
+    if (config.models?.providers) {
+      for (const providerName of Object.keys(config.models.providers)) {
+        if (providerName.trim()) providerNames.add(providerName.trim())
+      }
+    }
+
     cachedProviderNames = Array.from(providerNames).sort()
     cacheTimestamp = Date.now()
     return cachedProviderNames
