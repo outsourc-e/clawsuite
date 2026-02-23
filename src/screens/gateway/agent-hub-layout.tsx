@@ -13,6 +13,7 @@ import { THEMES, applyTheme, getStoredTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
+import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, PROVIDER_META } from './components/config-wizards'
 import {
   saveMissionCheckpoint,
   loadMissionCheckpoint,
@@ -1202,7 +1203,7 @@ function darkenHexColor(color: string, amount = 0.2): string {
   return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
 }
 
-function AgentAvatar({
+export function AgentAvatar({
   index,
   color,
   size = 40,
@@ -2064,7 +2065,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   const [configSection, setConfigSection] = useState<ConfigSection>('agents')
   const [avatarPickerOpenId, setAvatarPickerOpenId] = useState<string | null>(null)
-  const [agentEditOpenId, setAgentEditOpenId] = useState<string | null>(null)
+  const [agentWizardOpenId, setAgentWizardOpenId] = useState<string | null>(null)
+  const [teamWizardOpenId, setTeamWizardOpenId] = useState<string | null>(null)
+  const [showAddTeamModal, setShowAddTeamModal] = useState(false)
+  const [providerEditModalProvider, setProviderEditModalProvider] = useState<string | null>(null)
   const [providerWizardStep, setProviderWizardStep] = useState<'select' | 'key'>('select')
   const [providerWizardSelected, setProviderWizardSelected] = useState('')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
@@ -4547,329 +4551,52 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               {team.map((member, index) => {
                 const ac = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
-                const isEditing = agentEditOpenId === member.id
                 const hasPrompt = member.backstory.trim().length > 0
                 return (
                   <div
                     key={member.id}
-                    className={cn(
-                      'relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all duration-200',
-                      isEditing
-                        ? `${ac.border} shadow-md col-span-full`
-                        : `${ac.border} hover:shadow-md`,
-                    )}
+                    className={cn('relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md cursor-default', ac.border)}
                   >
-                    {/* Pencil edit button — top right */}
+                    {/* Pencil — top right, opens wizard modal */}
                     <button
                       type="button"
-                      onClick={() => setAgentEditOpenId((prev) => prev === member.id ? null : member.id)}
-                      className={cn(
-                        'absolute right-2.5 top-2.5 z-10 flex size-7 items-center justify-center rounded-full transition-all',
-                        isEditing
-                          ? 'bg-orange-500 text-white shadow-sm'
-                          : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 dark:hover:text-neutral-200',
-                      )}
-                      aria-label={isEditing ? 'Close editor' : 'Edit agent'}
-                      title={isEditing ? 'Done editing' : 'Edit agent'}
+                      onClick={() => setAgentWizardOpenId(member.id)}
+                      className="absolute right-2.5 top-2.5 z-10 flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 transition-all hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 dark:hover:text-neutral-200"
+                      aria-label="Edit agent"
+                      title="Edit agent"
                     >
-                      {isEditing ? (
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                          <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                        </svg>
-                      ) : (
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                          <path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      )}
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </button>
 
-                    {/* ── Identity section (always visible) ── */}
                     <div className="flex flex-col items-center px-4 pt-5 pb-4 text-center">
-                      {/* Avatar — large, centered */}
-                      <div
-                        className={cn(
-                          'relative mb-3 flex size-16 items-center justify-center rounded-full shadow-md',
-                          ac.avatar,
-                        )}
-                      >
-                        <AgentAvatar
-                          index={resolveAgentAvatarIndex(member, index)}
-                          color={ac.hex}
-                          size={32}
-                        />
-                        {/* Avatar swap button — only in edit mode */}
-                        {isEditing ? (
-                          <div className="absolute -bottom-1 -right-1" data-avatar-picker>
-                            <button
-                              type="button"
-                              onClick={() => setAvatarPickerOpenId((prev) => prev === member.id ? null : member.id)}
-                              className="flex size-5 items-center justify-center rounded-full bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 shadow-sm text-neutral-500 hover:text-neutral-700 transition-colors"
-                              title="Change avatar"
-                            >
-                              <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
-                                <path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </button>
-
-                            {/* Avatar picker popover */}
-                            {avatarPickerOpenId === member.id ? (
-                              <div className="absolute left-1/2 -translate-x-1/2 top-full z-20 mt-1.5 w-52 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 shadow-xl">
-                                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Choose Avatar</p>
-                                <div className="grid grid-cols-5 gap-1.5">
-                                  {Array.from({ length: AGENT_AVATAR_COUNT }, (_, avatarIndex) => {
-                                    const selected = resolveAgentAvatarIndex(member, index) === avatarIndex
-                                    const avatarAccent = AGENT_ACCENT_COLORS[avatarIndex % AGENT_ACCENT_COLORS.length]
-                                    return (
-                                      <button
-                                        key={`${member.id}-${avatarIndex}`}
-                                        type="button"
-                                        onClick={() => {
-                                          setTeam((previous) =>
-                                            previous.map((row) =>
-                                              row.id === member.id ? { ...row, avatar: avatarIndex } : row,
-                                            ),
-                                          )
-                                          setAvatarPickerOpenId(null)
-                                        }}
-                                        className={cn(
-                                          'flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition-all',
-                                          selected
-                                            ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 scale-110 shadow-sm'
-                                            : 'border-transparent bg-neutral-100 dark:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600 hover:scale-105',
-                                        )}
-                                        aria-label={`Avatar ${avatarIndex + 1}`}
-                                        aria-pressed={selected}
-                                      >
-                                        <AgentAvatar index={avatarIndex} color={avatarAccent.hex} size={16} />
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        ) : null}
+                      <div className={cn('mb-3 flex size-16 items-center justify-center rounded-full shadow-md', ac.avatar)}>
+                        <AgentAvatar index={resolveAgentAvatarIndex(member, index)} color={ac.hex} size={32} />
                       </div>
-
-                      {/* Name */}
-                      <p className="text-sm font-bold text-neutral-900 dark:text-white leading-tight">
-                        {member.name || `Agent ${index + 1}`}
-                      </p>
-                      {/* Model chip */}
+                      <p className="text-sm font-bold text-neutral-900 dark:text-white leading-tight">{member.name || `Agent ${index + 1}`}</p>
                       <span className="mt-1 rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
                         {getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}
                       </span>
-                      {/* Role */}
                       {member.roleDescription ? (
-                        <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-1">
-                          {member.roleDescription}
-                        </p>
+                        <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-1">{member.roleDescription}</p>
                       ) : null}
-
-                      {/* System prompt status (collapsed view) */}
-                      {!isEditing ? (
-                        <div className="mt-3 w-full rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-2.5 py-2 text-left">
-                          {hasPrompt ? (
-                            <p className="line-clamp-2 text-[10px] leading-relaxed text-neutral-500 dark:text-neutral-400">
-                              {member.backstory.trim().replace(/\s+/g, ' ').slice(0, 120)}…
-                            </p>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setAgentEditOpenId(member.id)}
-                              className="flex w-full items-center justify-center gap-1 text-[10px] font-medium text-neutral-400 dark:text-neutral-500 hover:text-orange-500 dark:hover:text-orange-400 transition-colors"
-                            >
-                              <span>+</span> Set system prompt
-                            </button>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    {/* ── Inline edit form (expands full width) ── */}
-                    {isEditing ? (
-                      <div className="border-t border-neutral-100 dark:border-neutral-800 px-6 pb-5 pt-4">
-                        {/* Top row: identity fields side by side */}
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4">
-                          {/* Name */}
-                          <label className="block">
-                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Name</span>
-                            <input
-                              value={member.name}
-                              onChange={(event) =>
-                                setTeam((previous) =>
-                                  previous.map((row) =>
-                                    row.id === member.id ? { ...row, name: event.target.value } : row,
-                                  ),
-                                )
-                              }
-                              className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
-                            />
-                          </label>
-
-                          {/* Model */}
-                          <label className="block">
-                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Model</span>
-                            <select
-                              value={member.modelId}
-                              onChange={(event) =>
-                                setTeam((previous) =>
-                                  previous.map((row) =>
-                                    row.id === member.id
-                                      ? { ...row, modelId: event.target.value }
-                                      : row,
-                                  ),
-                                )
-                              }
-                              className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
-                            >
-                              <optgroup label="Presets">
-                                {MODEL_PRESETS.map((preset) => (
-                                  <option key={preset.id} value={preset.id}>
-                                    {preset.label}
-                                  </option>
-                                ))}
-                              </optgroup>
-                              {gatewayModels.length > 0 ? (
-                                <optgroup label="Available Models">
-                                  {gatewayModels.map((model) => (
-                                    <option key={model.value} value={model.value}>
-                                      {model.label} ({model.provider})
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              ) : null}
-                            </select>
-                          </label>
-
-                          {/* Role */}
-                          <label className="block">
-                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Role</span>
-                            <input
-                              value={member.roleDescription}
-                              onChange={(event) =>
-                                setTeam((previous) =>
-                                  previous.map((row) =>
-                                    row.id === member.id
-                                      ? { ...row, roleDescription: event.target.value }
-                                      : row,
-                                  ),
-                                )
-                              }
-                              className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
-                            />
-                          </label>
-                        </div>
-
-                        {/* System Prompt — full width below */}
-                        <div>
-                          <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">System Prompt</span>
-                          {/* Template categories */}
-                          {(() => {
-                            const isCustom = member.backstory.trim() !== '' && !SYSTEM_PROMPT_TEMPLATES.some((t) => t.prompt === member.backstory)
-                            return (
-                              <div className="mb-2 space-y-1.5">
-                                {/* Custom button */}
-                                <div className="flex flex-wrap items-center gap-1 pb-0.5 border-b border-neutral-100 dark:border-neutral-800 mb-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (isCustom) {
-                                        setTeam((prev) => prev.map((row) => row.id === member.id ? { ...row, backstory: '' } : row))
-                                      }
-                                      // else: already empty, just let them type in textarea
-                                    }}
-                                    className={cn(
-                                      'rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors',
-                                      isCustom
-                                        ? 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
-                                        : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 hover:border-neutral-300',
-                                    )}
-                                    title="Write your own custom prompt"
-                                  >
-                                    ✏️ Custom
-                                  </button>
-                                  {member.backstory.trim() !== '' ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => setTeam((prev) => prev.map((row) => row.id === member.id ? { ...row, backstory: '' } : row))}
-                                      className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-400 hover:text-red-500 transition-colors"
-                                      title="Clear prompt"
-                                    >
-                                      ✕ Clear
-                                    </button>
-                                  ) : null}
-                                </div>
-                                {(['engineering', 'research', 'content', 'ops', 'general'] as const).map((cat) => {
-                                  const catTemplates = SYSTEM_PROMPT_TEMPLATES.filter((tpl) => tpl.category === cat)
-                                  const catLabels: Record<string, string> = {
-                                    engineering: '⚙️ Eng',
-                                    research: '🔬 Research',
-                                    content: '📝 Content',
-                                    ops: '🗺️ Ops',
-                                    general: '🤖 General',
-                                  }
-                                  return (
-                                    <div key={cat} className="flex flex-wrap items-center gap-1">
-                                      <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-neutral-300 dark:text-neutral-600 w-14">{catLabels[cat]}</span>
-                                      {catTemplates.map((tpl) => {
-                                        const isActive = member.backstory === tpl.prompt
-                                        return (
-                                          <button
-                                            key={tpl.id}
-                                            type="button"
-                                            onClick={() =>
-                                              setTeam((prev) =>
-                                                prev.map((row) =>
-                                                  row.id === member.id
-                                                    ? { ...row, backstory: isActive ? '' : tpl.prompt }
-                                                    : row,
-                                                ),
-                                              )
-                                            }
-                                            className={cn(
-                                              'rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors',
-                                              isActive
-                                                ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
-                                                : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700',
-                                            )}
-                                            title={tpl.prompt.slice(0, 140)}
-                                          >
-                                            {tpl.icon} {tpl.label}
-                                          </button>
-                                        )
-                                      })}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )
-                          })()}
-                          <textarea
-                            value={member.backstory}
-                            onChange={(event) =>
-                              setTeam((previous) =>
-                                previous.map((row) =>
-                                  row.id === member.id ? { ...row, backstory: event.target.value } : row,
-                                ),
-                              )
-                            }
-                            rows={5}
-                            className="min-h-[110px] w-full resize-y rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 py-2 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 font-mono leading-relaxed"
-                            placeholder="Persona, instructions, and context for this agent..."
-                          />
-                        </div>
-
-                        {/* Done button */}
-                        <button
-                          type="button"
-                          onClick={() => setAgentEditOpenId(null)}
-                          className="w-full rounded-lg bg-orange-500 py-2 text-xs font-semibold text-white hover:bg-orange-600 transition-colors"
-                        >
-                          ✓ Done
-                        </button>
+                      <div className="mt-3 w-full rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-2.5 py-2 text-left">
+                        {hasPrompt ? (
+                          <p className="line-clamp-2 text-[10px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+                            {member.backstory.trim().replace(/\s+/g, ' ').slice(0, 120)}…
+                          </p>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setAgentWizardOpenId(member.id)}
+                            className="flex w-full items-center justify-center gap-1 text-[10px] font-medium text-neutral-400 dark:text-neutral-500 hover:text-orange-500 dark:hover:text-orange-400 transition-colors"
+                          >
+                            <span>+</span> Set system prompt
+                          </button>
+                        )}
                       </div>
-                    ) : null}
+                    </div>
                   </div>
                 )
               })}
@@ -4880,11 +4607,64 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 onClick={handleAddAgent}
                 className="flex min-h-[160px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-center transition-all hover:border-orange-400 hover:bg-orange-50/30 dark:hover:border-orange-700 dark:hover:bg-orange-900/10"
               >
-                <span className="flex size-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl text-neutral-400 dark:text-neutral-500 transition-colors group-hover:bg-orange-100">+</span>
+                <span className="flex size-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl text-neutral-400">+</span>
                 <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">Add Agent</span>
               </button>
-
               </div>
+
+              {/* ── Agent Wizard Modals ── */}
+              {team.map((member, index) => {
+                if (agentWizardOpenId !== member.id) return null
+                const ac = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+                const avatarIdx = resolveAgentAvatarIndex(member, index)
+                const avatarNode = (
+                  <div className="relative" data-avatar-picker>
+                    <div className={cn('flex size-14 items-center justify-center rounded-full shadow-md', ac.avatar)}>
+                      <AgentAvatar index={avatarIdx} color={ac.hex} size={28} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAvatarPickerOpenId((prev) => prev === member.id ? null : member.id)}
+                      className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 shadow-sm text-neutral-500 hover:text-neutral-700 transition-colors"
+                      title="Change avatar"
+                    >
+                      <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    {avatarPickerOpenId === member.id ? (
+                      <div className="absolute left-0 top-full z-[60] mt-2 w-52 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 shadow-xl">
+                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Choose Avatar</p>
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {Array.from({ length: AGENT_AVATAR_COUNT }, (_, i) => {
+                            const aac = AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length]
+                            return (
+                              <button key={i} type="button"
+                                onClick={() => { setTeam((prev) => prev.map((r) => r.id === member.id ? { ...r, avatar: i } : r)); setAvatarPickerOpenId(null) }}
+                                className={cn('flex size-8 items-center justify-center rounded-full border-2 transition-all', avatarIdx === i ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 scale-110' : 'border-transparent bg-neutral-100 dark:bg-neutral-800 hover:scale-105')}>
+                                <AgentAvatar index={i} color={aac.hex} size={16} />
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+                return (
+                  <AgentWizardModal
+                    key={member.id}
+                    member={member}
+                    memberIndex={index}
+                    accentBorderClass={ac.border}
+                    avatarNode={avatarNode}
+                    gatewayModels={gatewayModels}
+                    modelPresets={MODEL_PRESETS}
+                    systemPromptTemplates={SYSTEM_PROMPT_TEMPLATES}
+                    onUpdate={(updates) => setTeam((prev) => prev.map((r) => r.id === member.id ? { ...r, ...updates } : r))}
+                    onDelete={() => { setTeam((prev) => prev.filter((r) => r.id !== member.id)); setAgentWizardOpenId(null) }}
+                    onClose={() => setAgentWizardOpenId(null)}
+                  />
+                )
+              })}
             </div>
           ) : null}
 
@@ -4895,106 +4675,78 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <div>
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
-                    <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Saved Teams</h2>
-                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">Your custom team configurations</p>
+                    <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">My Teams</h2>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{teamConfigs.length} saved · {team.length} agents active</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={teamConfigName}
-                      onChange={(event) => setTeamConfigName(event.target.value)}
-                      placeholder="Team name..."
-                      className="h-8 w-36 rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={saveCurrentTeamConfig}
-                      className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-                {teamConfigs.length === 0 ? (
                   <button
                     type="button"
-                    onClick={saveCurrentTeamConfig}
-                    className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 py-8 text-center transition-all hover:border-orange-400 hover:bg-orange-50/20"
+                    onClick={() => setShowAddTeamModal(true)}
+                    className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
                   >
-                    <span className="flex size-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl">💾</span>
-                    <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Save your first team</p>
-                    <p className="text-[10px] text-neutral-400 dark:text-neutral-500">Configure agents then save here</p>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                    New Team
+                  </button>
+                </div>
+                {teamConfigs.length === 0 ? (
+                  <button type="button" onClick={() => setShowAddTeamModal(true)}
+                    className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 py-8 text-center transition-all hover:border-orange-400 hover:bg-orange-50/20">
+                    <span className="flex size-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl">👥</span>
+                    <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Create your first team</p>
+                    <p className="text-[10px] text-neutral-400 dark:text-neutral-500">Save a config or start from a template</p>
                   </button>
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                     {teamConfigs.map((config, tIdx) => {
                       const isActive = selectedTeamConfigId === config.id
                       const teamColors = ['border-blue-300', 'border-emerald-300', 'border-violet-300', 'border-amber-300', 'border-pink-300', 'border-teal-300']
-                      const accentBorder = teamColors[tIdx % teamColors.length]
                       return (
-                        <div
-                          key={config.id}
-                          className={cn(
-                            'relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md',
-                            isActive ? 'border-orange-400 shadow-orange-100' : accentBorder,
-                          )}
-                        >
-                          {/* Active badge */}
-                          {isActive ? (
-                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-bold text-white shadow-sm">
-                              Active
-                            </span>
-                          ) : null}
+                        <div key={config.id} className={cn('relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md', isActive ? 'border-orange-400' : teamColors[tIdx % teamColors.length])}>
+                          {isActive ? <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-bold text-white shadow-sm">Active</span> : null}
+                          <button type="button" onClick={() => setTeamWizardOpenId(config.id)}
+                            className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 transition-all" title="Edit team">
+                            <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </button>
                           <div className="flex flex-col items-center px-3 pt-5 pb-3 text-center">
-                            {/* Team icon */}
-                            <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl shadow-sm">
-                              👥
-                            </div>
+                            <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl shadow-sm">👥</div>
                             <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">{config.name}</p>
                             <p className="mt-0.5 text-[10px] text-neutral-400">{config.team.length} agents</p>
                             <div className="mt-2 flex flex-wrap justify-center gap-1">
-                              {config.team.slice(0, 3).map((m) => (
-                                <span key={m.id} className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] font-medium text-neutral-500 dark:text-neutral-400">
-                                  {m.name}
-                                </span>
-                              ))}
-                              {config.team.length > 3 ? (
-                                <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-400">
-                                  +{config.team.length - 3}
-                                </span>
-                              ) : null}
+                              {config.team.slice(0, 3).map((m) => <span key={m.id} className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-500 dark:text-neutral-400">{m.name}</span>)}
+                              {config.team.length > 3 ? <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-400">+{config.team.length - 3}</span> : null}
                             </div>
                           </div>
                           <div className="border-t border-neutral-100 dark:border-neutral-800 flex">
-                            <button
-                              type="button"
-                              onClick={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id) }}
-                              className="flex-1 py-2 text-[10px] font-semibold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors rounded-bl-xl"
-                            >
-                              Load
-                            </button>
+                            <button type="button" onClick={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id) }}
+                              className="flex-1 py-2 text-[10px] font-semibold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors rounded-bl-xl">Load</button>
                             <div className="w-px bg-neutral-100 dark:bg-neutral-800" />
-                            <button
-                              type="button"
-                              onClick={() => deleteTeamConfig(config.id)}
-                              className="flex-1 py-2 text-[10px] font-medium text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors rounded-br-xl"
-                            >
-                              Delete
-                            </button>
+                            <button type="button" onClick={() => setTeamWizardOpenId(config.id)}
+                              className="flex-1 py-2 text-[10px] font-medium text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors rounded-br-xl">Edit</button>
                           </div>
                         </div>
                       )
                     })}
-                    {/* Save new team card */}
-                    <button
-                      type="button"
-                      onClick={saveCurrentTeamConfig}
-                      className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-center transition-all hover:border-orange-400 hover:bg-orange-50/20"
-                    >
+                    <button type="button" onClick={() => setShowAddTeamModal(true)}
+                      className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-center transition-all hover:border-orange-400 hover:bg-orange-50/20">
                       <span className="flex size-8 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-base text-neutral-400">+</span>
-                      <span className="text-[10px] font-medium text-neutral-400">Save current</span>
+                      <span className="text-[10px] font-medium text-neutral-400">New Team</span>
                     </button>
                   </div>
                 )}
+
+                {/* Team Wizard Modals */}
+                {teamConfigs.map((config) => teamWizardOpenId !== config.id ? null : (
+                  <TeamWizardModal key={config.id} teamId={config.id} teamName={config.name} teamMembers={config.team}
+                    isActive={selectedTeamConfigId === config.id}
+                    onRename={(name) => { setTeamConfigName(name) }}
+                    onLoad={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id) }}
+                    onDelete={() => { deleteTeamConfig(config.id); setTeamWizardOpenId(null) }}
+                    onClose={() => setTeamWizardOpenId(null)} />
+                ))}
+                {showAddTeamModal ? (
+                  <AddTeamModal currentTeam={team} quickStartTemplates={TEAM_QUICK_TEMPLATES}
+                    onSaveCurrentAs={(name) => { setTeamConfigName(name); saveCurrentTeamConfig() }}
+                    onApplyTemplate={applyTemplate} onClose={() => setShowAddTeamModal(false)} />
+                ) : null}
               </div>
 
               {/* Quick-Start Templates (secondary — collapsed by default) */}
@@ -5234,27 +4986,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {configuredProviders.map((provider, pIdx) => {
                       const providerModels = gatewayModels.filter((m) => m.provider === provider)
-                      const providerColors = [
-                        { border: 'border-blue-300', bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-blue-600 dark:text-blue-400' },
-                        { border: 'border-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-900/20', text: 'text-emerald-600 dark:text-emerald-400' },
-                        { border: 'border-violet-300', bg: 'bg-violet-50 dark:bg-violet-900/20', text: 'text-violet-600 dark:text-violet-400' },
-                        { border: 'border-amber-300', bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-amber-600 dark:text-amber-400' },
-                        { border: 'border-pink-300', bg: 'bg-pink-50 dark:bg-pink-900/20', text: 'text-pink-600 dark:text-pink-400' },
-                        { border: 'border-teal-300', bg: 'bg-teal-50 dark:bg-teal-900/20', text: 'text-teal-600 dark:text-teal-400' },
-                        { border: 'border-orange-300', bg: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-600 dark:text-orange-400' },
-                      ]
-                      const pc = providerColors[pIdx % providerColors.length]
+                      const pm = (PROVIDER_META as Record<string, { label: string; emoji: string; color: string; bg: string; border: string; description: string }>)[provider.toLowerCase()] ?? { label: provider, emoji: '🔑', color: 'text-neutral-600', bg: 'bg-neutral-100 dark:bg-neutral-800', border: 'border-neutral-300', description: '' }
                       return (
-                        <div
-                          key={provider}
-                          className={cn('rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md', pc.border)}
+                        <div key={provider}
+                          className={cn('relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md', pm.border)}
                         >
+                          {/* Edit pencil */}
+                          <button type="button" onClick={() => setProviderEditModalProvider(provider)}
+                            className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 transition-all" title="Edit provider">
+                            <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </button>
                           <div className="flex flex-col items-center px-3 pt-4 pb-3 text-center">
-                            {/* Provider icon */}
-                            <div className={cn('mb-2 flex size-12 items-center justify-center rounded-full text-lg font-black shadow-sm', pc.bg, pc.text)}>
-                              {provider.slice(0, 2).toUpperCase()}
+                            <div className={cn('mb-2 flex size-12 items-center justify-center rounded-full text-2xl shadow-sm', pm.bg)}>
+                              {pm.emoji}
                             </div>
-                            <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight capitalize">{provider}</p>
+                            <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">{pm.label}</p>
+                            <p className="text-[9px] text-neutral-400 mt-0.5">{pm.description}</p>
                             <div className="mt-1 flex items-center gap-1">
                               <span className="size-1.5 rounded-full bg-emerald-500" />
                               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Active</span>
@@ -5265,13 +5012,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             {providerModels.length > 0 ? (
                               <div className="mt-2 w-full space-y-0.5">
                                 {providerModels.slice(0, 3).map((m) => (
-                                  <span key={m.value} className="block truncate rounded bg-neutral-50 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-500 dark:text-neutral-400">
-                                    {m.label}
-                                  </span>
+                                  <span key={m.value} className="block truncate rounded bg-neutral-50 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-500 dark:text-neutral-400">{m.label}</span>
                                 ))}
-                                {providerModels.length > 3 ? (
-                                  <span className="block text-[9px] text-neutral-400 text-center">+{providerModels.length - 3} more</span>
-                                ) : null}
+                                {providerModels.length > 3 ? <span className="block text-[9px] text-neutral-400 text-center">+{providerModels.length - 3} more</span> : null}
                               </div>
                             ) : null}
                           </div>
@@ -5281,6 +5024,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </div>
                 )}
               </div>
+
+              {/* Provider Edit Modal */}
+              {providerEditModalProvider ? (
+                <ProviderEditModal
+                  provider={providerEditModalProvider}
+                  currentModels={gatewayModels.filter((m) => m.provider === providerEditModalProvider)}
+                  availableModels={gatewayModels.filter((m) => m.provider === providerEditModalProvider)}
+                  onSave={(_apiKey, _defaultModel) => {
+                    // Future: wire to gateway config update API
+                    void refreshGatewayStatus().then((connected) => {
+                      if (connected) return refreshConfiguredProviders()
+                      return Promise.resolve()
+                    })
+                  }}
+                  onClose={() => setProviderEditModalProvider(null)}
+                />
+              ) : null}
             </div>
           ) : null}
 
