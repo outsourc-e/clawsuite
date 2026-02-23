@@ -2064,6 +2064,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   const [configSection, setConfigSection] = useState<ConfigSection>('agents')
   const [avatarPickerOpenId, setAvatarPickerOpenId] = useState<string | null>(null)
+  const [agentEditOpenId, setAgentEditOpenId] = useState<string | null>(null)
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
@@ -4540,191 +4541,238 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
-              {team.map((member, index) => (
-                <div
-                  key={member.id}
-                  className={cn(
-                    'rounded-xl border border-neutral-200 border-l-4 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
-                    AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length].border,
-                  )}
-                >
-                  <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-2.5">
+              {team.map((member, index) => {
+                const ac = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+                const isEditing = agentEditOpenId === member.id
+                const hasPrompt = member.backstory.trim().length > 0
+                return (
+                  <div
+                    key={member.id}
+                    className={cn(
+                      'relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all duration-200',
+                      isEditing
+                        ? `${ac.border} shadow-md col-span-2`
+                        : `${ac.border} hover:shadow-md`,
+                    )}
+                  >
+                    {/* Pencil edit button — top right */}
+                    <button
+                      type="button"
+                      onClick={() => setAgentEditOpenId((prev) => prev === member.id ? null : member.id)}
+                      className={cn(
+                        'absolute right-2.5 top-2.5 z-10 flex size-7 items-center justify-center rounded-full transition-all',
+                        isEditing
+                          ? 'bg-orange-500 text-white shadow-sm'
+                          : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 dark:hover:text-neutral-200',
+                      )}
+                      aria-label={isEditing ? 'Close editor' : 'Edit agent'}
+                      title={isEditing ? 'Done editing' : 'Edit agent'}
+                    >
+                      {isEditing ? (
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                        </svg>
+                      ) : (
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </button>
+
+                    {/* ── Identity section (always visible) ── */}
+                    <div className="flex flex-col items-center px-4 pt-5 pb-4 text-center">
+                      {/* Avatar — large, centered */}
                       <div
                         className={cn(
-                          'flex size-8 items-center justify-center rounded-full shadow-sm',
-                          AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length].avatar,
+                          'relative mb-3 flex size-16 items-center justify-center rounded-full shadow-md',
+                          ac.avatar,
                         )}
                       >
                         <AgentAvatar
                           index={resolveAgentAvatarIndex(member, index)}
-                          color={AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length].hex}
-                          size={18}
+                          color={ac.hex}
+                          size={32}
                         />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold text-neutral-900 dark:text-white">{member.name || `Agent ${index + 1}`}</p>
-                        <p className="truncate text-[10px] text-neutral-500 dark:text-slate-400">
-                          Agent {index + 1} · {getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}
-                        </p>
-                      </div>
-                    </div>
-                    {/* Avatar edit button + popover */}
-                    <div className="relative" data-avatar-picker>
-                      <button
-                        type="button"
-                        onClick={() => setAvatarPickerOpenId((prev) => prev === member.id ? null : member.id)}
-                        className="group flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-2.5 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700"
-                        aria-label="Change avatar"
-                      >
-                        <AgentAvatar
-                          index={resolveAgentAvatarIndex(member, index)}
-                          color={AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length].hex}
-                          size={16}
-                        />
-                        <span className="text-[10px]">Avatar</span>
-                        <svg className="opacity-50 group-hover:opacity-100 transition-opacity" width="10" height="10" viewBox="0 0 10 10" fill="none">
-                          <path d="M7.5 1.5L8.5 2.5L3 8H2V7L7.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
+                        {/* Avatar swap button — only in edit mode */}
+                        {isEditing ? (
+                          <div className="absolute -bottom-1 -right-1" data-avatar-picker>
+                            <button
+                              type="button"
+                              onClick={() => setAvatarPickerOpenId((prev) => prev === member.id ? null : member.id)}
+                              className="flex size-5 items-center justify-center rounded-full bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 shadow-sm text-neutral-500 hover:text-neutral-700 transition-colors"
+                              title="Change avatar"
+                            >
+                              <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                                <path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
 
-                      {/* Avatar picker popover */}
-                      {avatarPickerOpenId === member.id ? (
-                        <div className="absolute right-0 top-full z-20 mt-1.5 w-52 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 shadow-lg">
-                          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Choose Avatar</p>
-                          <div className="grid grid-cols-5 gap-1.5">
-                            {Array.from({ length: AGENT_AVATAR_COUNT }, (_, avatarIndex) => {
-                              const selected = resolveAgentAvatarIndex(member, index) === avatarIndex
-                              const avatarAccent = AGENT_ACCENT_COLORS[avatarIndex % AGENT_ACCENT_COLORS.length]
-                              return (
-                                <button
-                                  key={`${member.id}-${avatarIndex}`}
-                                  type="button"
-                                  onClick={() => {
-                                    setTeam((previous) =>
-                                      previous.map((row) =>
-                                        row.id === member.id ? { ...row, avatar: avatarIndex } : row,
-                                      ),
+                            {/* Avatar picker popover */}
+                            {avatarPickerOpenId === member.id ? (
+                              <div className="absolute left-1/2 -translate-x-1/2 top-full z-20 mt-1.5 w-52 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 shadow-xl">
+                                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Choose Avatar</p>
+                                <div className="grid grid-cols-5 gap-1.5">
+                                  {Array.from({ length: AGENT_AVATAR_COUNT }, (_, avatarIndex) => {
+                                    const selected = resolveAgentAvatarIndex(member, index) === avatarIndex
+                                    const avatarAccent = AGENT_ACCENT_COLORS[avatarIndex % AGENT_ACCENT_COLORS.length]
+                                    return (
+                                      <button
+                                        key={`${member.id}-${avatarIndex}`}
+                                        type="button"
+                                        onClick={() => {
+                                          setTeam((previous) =>
+                                            previous.map((row) =>
+                                              row.id === member.id ? { ...row, avatar: avatarIndex } : row,
+                                            ),
+                                          )
+                                          setAvatarPickerOpenId(null)
+                                        }}
+                                        className={cn(
+                                          'flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition-all',
+                                          selected
+                                            ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 scale-110 shadow-sm'
+                                            : 'border-transparent bg-neutral-100 dark:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600 hover:scale-105',
+                                        )}
+                                        aria-label={`Avatar ${avatarIndex + 1}`}
+                                        aria-pressed={selected}
+                                      >
+                                        <AgentAvatar index={avatarIndex} color={avatarAccent.hex} size={16} />
+                                      </button>
                                     )
-                                    setAvatarPickerOpenId(null)
-                                  }}
-                                  className={cn(
-                                    'flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition-all',
-                                    selected
-                                      ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 scale-110 shadow-sm'
-                                      : 'border-transparent bg-neutral-100 dark:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600 hover:scale-105',
-                                  )}
-                                  aria-label={`Avatar ${avatarIndex + 1}`}
-                                  aria-pressed={selected}
-                                >
-                                  <AgentAvatar index={avatarIndex} color={avatarAccent.hex} size={16} />
-                                </button>
-                              )
-                            })}
+                                  })}
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
+                        ) : null}
+                      </div>
+
+                      {/* Name */}
+                      <p className="text-sm font-bold text-neutral-900 dark:text-white leading-tight">
+                        {member.name || `Agent ${index + 1}`}
+                      </p>
+                      {/* Model chip */}
+                      <span className="mt-1 rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+                        {getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}
+                      </span>
+                      {/* Role */}
+                      {member.roleDescription ? (
+                        <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-1">
+                          {member.roleDescription}
+                        </p>
+                      ) : null}
+
+                      {/* System prompt status (collapsed view) */}
+                      {!isEditing ? (
+                        <div className="mt-3 w-full rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-2.5 py-2 text-left">
+                          {hasPrompt ? (
+                            <p className="line-clamp-2 text-[10px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+                              {member.backstory.trim().replace(/\s+/g, ' ').slice(0, 120)}…
+                            </p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setAgentEditOpenId(member.id)}
+                              className="flex w-full items-center justify-center gap-1 text-[10px] font-medium text-neutral-400 dark:text-neutral-500 hover:text-orange-500 dark:hover:text-orange-400 transition-colors"
+                            >
+                              <span>+</span> Set system prompt
+                            </button>
+                          )}
                         </div>
                       ) : null}
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <label className="grid items-center gap-1.5 md:grid-cols-[112px_minmax(0,1fr)]">
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Name</span>
-                      <input
-                        value={member.name}
-                        onChange={(event) =>
-                          setTeam((previous) =>
-                            previous.map((row) =>
-                              row.id === member.id ? { ...row, name: event.target.value } : row,
-                            ),
-                          )
-                        }
-                        className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                      />
-                    </label>
-
-                    <label className="grid items-center gap-1.5 md:grid-cols-[112px_minmax(0,1fr)]">
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Model</span>
-                      <select
-                        value={member.modelId}
-                        onChange={(event) =>
-                          setTeam((previous) =>
-                            previous.map((row) =>
-                              row.id === member.id
-                                ? { ...row, modelId: event.target.value }
-                                : row,
-                            ),
-                          )
-                        }
-                        className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                      >
-                        <optgroup label="Presets">
-                          {MODEL_PRESETS.map((preset) => (
-                            <option key={preset.id} value={preset.id}>
-                              {preset.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                        {gatewayModels.length > 0 ? (
-                          <optgroup label="Available Models">
-                            {gatewayModels.map((model) => (
-                              <option key={model.value} value={model.value}>
-                                {model.label} ({model.provider})
-                              </option>
-                            ))}
-                          </optgroup>
-                        ) : null}
-                      </select>
-                    </label>
-
-                    <label className="grid items-start gap-1.5 md:grid-cols-[112px_minmax(0,1fr)]">
-                      <span className="pt-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Role</span>
-                      <input
-                        value={member.roleDescription}
-                        onChange={(event) =>
-                          setTeam((previous) =>
-                            previous.map((row) =>
-                              row.id === member.id
-                                ? { ...row, roleDescription: event.target.value }
-                                : row,
-                            ),
-                          )
-                        }
-                        className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                      />
-                    </label>
-
-                    <details className="rounded-lg border border-neutral-200 bg-neutral-50/70">
-                      <summary className="cursor-pointer list-none px-2.5 py-2 [&::-webkit-details-marker]:hidden">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">System Prompt</span>
-                          <span className="text-[10px] text-neutral-400">Expand</span>
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-[11px] text-neutral-600 dark:text-slate-400">
-                          {member.backstory.trim()
-                            ? member.backstory.trim().replace(/\s+/g, ' ')
-                            : 'No system prompt configured.'}
-                        </p>
-                      </summary>
-                      <div className="border-t border-neutral-200 px-2.5 py-2.5">
-                        {/* Prompt Templates */}
-                        <div className="mb-3">
-                          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Templates</p>
-                          {(['engineering', 'research', 'content', 'ops', 'general'] as const).map((cat) => {
-                            const catTemplates = SYSTEM_PROMPT_TEMPLATES.filter((tpl) => tpl.category === cat)
-                            const catLabels: Record<string, string> = {
-                              engineering: '⚙️ Engineering',
-                              research: '🔬 Research',
-                              content: '📝 Content',
-                              ops: '🗺️ Ops',
-                              general: '🤖 General',
+                    {/* ── Inline edit form (expands in place) ── */}
+                    {isEditing ? (
+                      <div className="border-t border-neutral-100 dark:border-neutral-800 px-4 pb-4 pt-3 space-y-3">
+                        {/* Name */}
+                        <label className="block">
+                          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Name</span>
+                          <input
+                            value={member.name}
+                            onChange={(event) =>
+                              setTeam((previous) =>
+                                previous.map((row) =>
+                                  row.id === member.id ? { ...row, name: event.target.value } : row,
+                                ),
+                              )
                             }
-                            return (
-                              <div key={cat} className="mb-2">
-                                <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">{catLabels[cat]}</p>
-                                <div className="flex flex-wrap gap-1">
+                            className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
+                          />
+                        </label>
+
+                        {/* Model */}
+                        <label className="block">
+                          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Model</span>
+                          <select
+                            value={member.modelId}
+                            onChange={(event) =>
+                              setTeam((previous) =>
+                                previous.map((row) =>
+                                  row.id === member.id
+                                    ? { ...row, modelId: event.target.value }
+                                    : row,
+                                ),
+                              )
+                            }
+                            className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
+                          >
+                            <optgroup label="Presets">
+                              {MODEL_PRESETS.map((preset) => (
+                                <option key={preset.id} value={preset.id}>
+                                  {preset.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                            {gatewayModels.length > 0 ? (
+                              <optgroup label="Available Models">
+                                {gatewayModels.map((model) => (
+                                  <option key={model.value} value={model.value}>
+                                    {model.label} ({model.provider})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ) : null}
+                          </select>
+                        </label>
+
+                        {/* Role */}
+                        <label className="block">
+                          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Role</span>
+                          <input
+                            value={member.roleDescription}
+                            onChange={(event) =>
+                              setTeam((previous) =>
+                                previous.map((row) =>
+                                  row.id === member.id
+                                    ? { ...row, roleDescription: event.target.value }
+                                    : row,
+                                ),
+                              )
+                            }
+                            className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
+                          />
+                        </label>
+
+                        {/* System Prompt */}
+                        <div>
+                          <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">System Prompt</span>
+                          {/* Template categories */}
+                          <div className="mb-2 space-y-1.5">
+                            {(['engineering', 'research', 'content', 'ops', 'general'] as const).map((cat) => {
+                              const catTemplates = SYSTEM_PROMPT_TEMPLATES.filter((tpl) => tpl.category === cat)
+                              const catLabels: Record<string, string> = {
+                                engineering: '⚙️ Eng',
+                                research: '🔬 Research',
+                                content: '📝 Content',
+                                ops: '🗺️ Ops',
+                                general: '🤖 General',
+                              }
+                              return (
+                                <div key={cat} className="flex flex-wrap items-center gap-1">
+                                  <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-neutral-300 dark:text-neutral-600 w-14">{catLabels[cat]}</span>
                                   {catTemplates.map((tpl) => (
                                     <button
                                       key={tpl.id}
@@ -4737,10 +4785,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                         )
                                       }
                                       className={cn(
-                                        'rounded-md border px-2 py-1 text-[10px] font-medium transition-colors',
+                                        'rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors',
                                         member.backstory === tpl.prompt
                                           ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
-                                          : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700',
+                                          : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700',
                                       )}
                                       title={tpl.prompt.slice(0, 140)}
                                     >
@@ -4748,37 +4796,46 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                     </button>
                                   ))}
                                 </div>
-                              </div>
-                            )
-                          })}
+                              )
+                            })}
+                          </div>
+                          <textarea
+                            value={member.backstory}
+                            onChange={(event) =>
+                              setTeam((previous) =>
+                                previous.map((row) =>
+                                  row.id === member.id ? { ...row, backstory: event.target.value } : row,
+                                ),
+                              )
+                            }
+                            rows={5}
+                            className="min-h-[110px] w-full resize-y rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 py-2 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 font-mono leading-relaxed"
+                            placeholder="Persona, instructions, and context for this agent..."
+                          />
                         </div>
-                        <textarea
-                          value={member.backstory}
-                          onChange={(event) =>
-                            setTeam((previous) =>
-                              previous.map((row) =>
-                                row.id === member.id ? { ...row, backstory: event.target.value } : row,
-                              ),
-                            )
-                          }
-                          rows={4}
-                          className="min-h-[96px] w-full resize-y rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 py-2 text-xs text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                          placeholder="Persona, instructions, and context for this agent..."
-                        />
+
+                        {/* Done button */}
+                        <button
+                          type="button"
+                          onClick={() => setAgentEditOpenId(null)}
+                          className="w-full rounded-lg bg-orange-500 py-2 text-xs font-semibold text-white hover:bg-orange-600 transition-colors"
+                        >
+                          ✓ Done
+                        </button>
                       </div>
-                    </details>
+                    ) : null}
                   </div>
-                </div>
-              ))}
+                )
+              })}
 
               {/* Add Agent card */}
               <button
                 type="button"
                 onClick={handleAddAgent}
-                className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-300 bg-white p-6 text-center transition-colors hover:border-orange-400 hover:bg-orange-50/30"
+                className="flex min-h-[160px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-center transition-all hover:border-orange-400 hover:bg-orange-50/30 dark:hover:border-orange-700 dark:hover:bg-orange-900/10"
               >
-                <span className="text-2xl text-neutral-400">+</span>
-                <span className="text-sm font-medium text-neutral-500 dark:text-slate-400">Add Agent</span>
+                <span className="flex size-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl text-neutral-400 dark:text-neutral-500 transition-colors group-hover:bg-orange-100">+</span>
+                <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">Add Agent</span>
               </button>
 
               </div>
