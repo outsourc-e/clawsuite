@@ -3133,6 +3133,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return row ? toTitleCase(row.status) : undefined
   }, [agentWorkingRows, selectedOutputAgentId])
 
+  // Safety net: auto-complete mission if all agents reach terminal state (handles missed SSE done events)
+  useEffect(() => {
+    if (!missionActive || missionState !== 'running') return
+    if (agentWorkingRows.length === 0) return
+    const allTerminal = agentWorkingRows.every((r) =>
+      r.status === 'idle' || r.status === 'none' || r.status === 'error'
+    )
+    if (!allTerminal) return
+    const timer = window.setTimeout(() => {
+      setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
+      emitFeedEvent({ type: 'mission_started', message: '✓ All agents reached terminal state — mission complete' })
+    }, 4000)
+    return () => window.clearTimeout(timer)
+  }, [agentWorkingRows, missionActive, missionState])
+
   // Global agent pool: active team + all agents from saved team configs (deduped by id)
   const allKnownAgents = useMemo(() => {
     const seen = new Set<string>()
@@ -5692,6 +5707,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[10px] font-medium text-neutral-600 hover:bg-neutral-50"
             >
               Re-run
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMissionReports((prev) => {
+                  const idx = prev.findIndex((r) => r.id === entry.id)
+                  if (idx < 0) return prev
+                  const next = [...prev]
+                  const [moved] = next.splice(idx, 1)
+                  return [...next, moved] // move to end (Done zone)
+                })
+              }}
+              className="rounded-md border border-neutral-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-2 py-1 text-[10px] font-medium text-neutral-500 hover:bg-neutral-50 dark:hover:bg-slate-700"
+            >
+              Archive ✓
             </button>
           </div>
         ),
