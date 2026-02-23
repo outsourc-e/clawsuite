@@ -11,6 +11,8 @@ export type OfficeViewProps = {
   selectedOutputAgentId?: string
   activeTemplateName?: string
   processType: 'sequential' | 'hierarchical' | 'parallel'
+  /** Fixed pixel height for the office container (compact mode) */
+  containerHeight?: number
 }
 
 export const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
@@ -188,7 +190,10 @@ export function OfficeView({
   selectedOutputAgentId,
   activeTemplateName: _activeTemplateName,
   processType,
+  containerHeight,
 }: OfficeViewProps) {
+  // When containerHeight is set, we use compact mode: header only (no footer), SVG fills remaining space
+  const compact = Boolean(containerHeight)
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
@@ -198,7 +203,7 @@ export function OfficeView({
 
   if (agentRows.length === 0) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center p-8">
+      <div className={cn('flex items-center justify-center p-8', compact ? 'h-full' : 'min-h-[320px]')}>
         <div className="text-center">
           <p className="mb-3 text-4xl">🏢</p>
           <p className="text-sm font-medium text-neutral-600">Empty office</p>
@@ -256,9 +261,9 @@ export function OfficeView({
   })
 
   return (
-    <div className="min-h-[480px] bg-gradient-to-b from-slate-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800">
+    <div className={cn('flex flex-col bg-gradient-to-b from-slate-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800', compact ? 'h-full' : 'min-h-[480px]')}>
       {/* Header bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white/80 px-4 py-2.5 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white/80 px-4 py-2 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-neutral-900 dark:text-white">ClawSuite Office</span>
           <span className="text-[11px] text-neutral-500 dark:text-slate-400">{agentRows.length} agents · {activeCount} working · {sessionCount} sessions</span>
@@ -278,7 +283,7 @@ export function OfficeView({
       </div>
 
       {/* Office canvas */}
-      <div className="relative" style={{ minHeight: '440px' }}>
+      <div className={cn('relative flex-1 overflow-hidden', !compact && 'min-h-[440px]')}>
         {/* Floor pattern */}
         <div
           className="pointer-events-none absolute inset-0 opacity-40 dark:opacity-20"
@@ -397,16 +402,18 @@ export function OfficeView({
         })}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-neutral-200 bg-white/80 px-4 py-2 text-[11px] text-neutral-500 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
-        <span>{agentRows.length}/{DESK_POSITIONS.length} desks occupied</span>
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> Working</span>
-          <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-amber-400" /> Idle</span>
-          <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-red-500" /> Error</span>
-          <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-neutral-400" /> Empty</span>
+      {/* Footer — hidden in compact mode */}
+      {!compact ? (
+        <div className="flex items-center justify-between border-t border-neutral-200 bg-white/80 px-4 py-2 text-[11px] text-neutral-500 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
+          <span>{agentRows.length}/{DESK_POSITIONS.length} desks occupied</span>
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> Working</span>
+            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-amber-400" /> Idle</span>
+            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-red-500" /> Error</span>
+            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-neutral-400" /> Empty</span>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

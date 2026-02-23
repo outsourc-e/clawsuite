@@ -4146,9 +4146,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="h-full min-h-0 overflow-y-auto bg-neutral-50 dark:bg-[var(--theme-bg,#0b0e14)]">
-        {/* ── Virtual Office Hero (full width, capped height) ── */}
-        <div className="max-h-[320px] overflow-hidden">
+      <div className="p-4 h-full min-h-0 overflow-y-auto bg-neutral-50 dark:bg-[var(--theme-bg,#0b0e14)]">
+        {/* ── Virtual Office Hero (full width, contained) ── */}
+        <div className="w-full overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm" style={{ height: 260 }}>
           <PixelOfficeView
             agentRows={agentWorkingRows}
             missionRunning={isMissionRunning}
@@ -4161,14 +4161,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined
             }
             processType={processType}
+            containerHeight={260}
           />
         </div>
 
-        <div className="p-5">
-        <div className="mx-auto max-w-[1400px] space-y-5">
-
           {/* ── 3-card responsive grid ── */}
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <section className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
@@ -4398,8 +4396,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </article>
 
           </section>
-        </div>
-        </div>
       </div>
     )
   }
