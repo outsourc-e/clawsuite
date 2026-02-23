@@ -6,6 +6,7 @@ import { AgentOutputPanel } from './components/agent-output-panel'
 import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
 import { ApprovalsPanel } from './components/approvals-panel'
+import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause } from '@/lib/gateway-api'
@@ -35,6 +36,9 @@ type AgentHubLayoutProps = {
 
 const TEAM_STORAGE_KEY = 'clawsuite:hub-team'
 const TEAM_CONFIGS_STORAGE_KEY = 'clawsuite:hub-team-configs'
+const MISSION_REPORTS_STORAGE_KEY = 'clawsuite-mission-reports'
+const MAX_MISSION_REPORTS = 10
+const ROUGH_COST_PER_1K_TOKENS_USD = 0.01
 
 type SavedTeamConfig = {
   id: string
@@ -65,6 +69,56 @@ type AgentActivityEntry = {
   lastLine?: string
   lastAt?: number
   lastEventType?: 'tool' | 'assistant' | 'system'
+}
+
+type MissionArtifact = {
+  id: string
+  agentId: string
+  agentName: string
+  type: 'html' | 'markdown' | 'code' | 'text'
+  title: string
+  content: string
+  timestamp: number
+}
+
+type MissionTaskStats = {
+  total: number
+  completed: number
+  failed: number
+}
+
+type MissionAgentSummary = {
+  agentId: string
+  agentName: string
+  modelId: string
+  lines: string[]
+}
+
+type MissionReportPayload = {
+  missionId: string
+  goal: string
+  teamName: string
+  startedAt: number
+  completedAt: number
+  team: TeamMember[]
+  tasks: HubTask[]
+  artifacts: MissionArtifact[]
+  tokenCount: number
+  agentSummaries: MissionAgentSummary[]
+}
+
+type StoredMissionReport = {
+  id: string
+  goal: string
+  teamName: string
+  agents: Array<{ id: string; name: string; modelId: string }>
+  taskStats: MissionTaskStats
+  duration: number
+  tokenCount: number
+  costEstimate: number
+  artifacts: MissionArtifact[]
+  report: string
+  completedAt: number
 }
 
 // Example mission chips: label → textarea fill text
@@ -465,6 +519,227 @@ function readSessionActivityMarker(session: SessionRecord): string {
   const lastMessage = readSessionLastMessage(session)
   const status = readString(session.status)
   return `${updatedAtRaw}|${status}|${lastMessage}`
+}
+
+function parseSsePayload(raw: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    return parsed as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+function readEventText(payload: Record<string, unknown>): string {
+  const direct = readString(payload.text) || readString(payload.content) || readString(payload.chunk)
+  if (direct) return direct
+  const message =
+    payload.message && typeof payload.message === 'object' && !Array.isArray(payload.message)
+      ? (payload.message as Record<string, unknown>)
+      : null
+  if (!message) return ''
+  const nested = readString(message.text) || readString(message.content)
+  if (nested) return nested
+  const contentBlocks = Array.isArray(message.content) ? message.content : []
+  return contentBlocks
+    .map((block) => {
+      if (!block || typeof block !== 'object' || Array.isArray(block)) return ''
+      const row = block as Record<string, unknown>
+      return readString(row.type) === 'text' ? readString(row.text) : ''
+    })
+    .filter(Boolean)
+    .join('')
+}
+
+function readEventRole(payload: Record<string, unknown>): 'assistant' | 'user' | '' {
+  const direct = readString(payload.role).toLowerCase()
+  if (direct === 'assistant' || direct === 'user') return direct
+  const message =
+    payload.message && typeof payload.message === 'object' && !Array.isArray(payload.message)
+      ? (payload.message as Record<string, unknown>)
+      : null
+  const nested = readString(message?.role).toLowerCase()
+  return nested === 'assistant' || nested === 'user' ? nested : ''
+}
+
+function normalizeArtifactType(lang: string): MissionArtifact['type'] {
+  const normalized = lang.toLowerCase()
+  if (normalized === 'html') return 'html'
+  if (normalized === 'md' || normalized === 'markdown') return 'markdown'
+  if (normalized === 'txt' || normalized === 'text') return 'text'
+  return 'code'
+}
+
+function extractArtifactsFromOutput(params: {
+  agentId: string
+  agentName: string
+  text: string
+  timestamp?: number
+}): MissionArtifact[] {
+  const { agentId, agentName, text } = params
+  const timestamp = params.timestamp ?? Date.now()
+  const artifacts: MissionArtifact[] = []
+  const codeBlockRegex = /```([a-zA-Z0-9_-]+)?([^\n]*)\n([\s\S]*?)```/g
+
+  for (const match of text.matchAll(codeBlockRegex)) {
+    const lang = (match[1] ?? '').trim()
+    const meta = match[2] ?? ''
+    const content = (match[3] ?? '').trim()
+    const filenameMatch = meta.match(/\bfilename=([^\s`]+)/i)
+    const filename = filenameMatch?.[1]?.trim()
+    if (!filename || !content) continue
+    artifacts.push({
+      id: createTaskId(),
+      agentId,
+      agentName,
+      type: normalizeArtifactType(lang),
+      title: filename,
+      content,
+      timestamp,
+    })
+  }
+
+  const reportPatterns = [
+    {
+      regex: /(^##\s+Report\b[\s\S]*?)(?=^\s*##\s+|\Z)/im,
+      title: 'Report',
+    },
+    {
+      regex: /(^#\s+Summary\b[\s\S]*?)(?=^\s*#\s+|\Z)/im,
+      title: 'Summary',
+    },
+  ] as const
+
+  reportPatterns.forEach(({ regex, title }) => {
+    const match = text.match(regex)
+    if (!match?.[1]) return
+    const content = match[1].trim()
+    if (!content) return
+    artifacts.push({
+      id: createTaskId(),
+      agentId,
+      agentName,
+      type: 'markdown',
+      title: `${agentName} ${title}`,
+      content,
+      timestamp,
+    })
+  })
+
+  return artifacts
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
+
+function computeMissionTaskStats(tasks: HubTask[]): MissionTaskStats {
+  const total = tasks.length
+  const completed = tasks.filter((task) => task.status === 'done' || (task.status as string) === 'completed').length
+  const failed = tasks.filter((task) => (task.status as string) === 'blocked').length
+  return { total, completed, failed }
+}
+
+function estimateMissionCost(tokenCount: number): number {
+  return Number(((tokenCount / 1000) * ROUGH_COST_PER_1K_TOKENS_USD).toFixed(4))
+}
+
+function generateMissionReport(payload: MissionReportPayload): string {
+  const durationMs = Math.max(0, payload.completedAt - payload.startedAt)
+  const taskStats = computeMissionTaskStats(payload.tasks)
+  const costEstimate = estimateMissionCost(payload.tokenCount)
+  const lines: string[] = []
+
+  lines.push('# Mission Report')
+  lines.push('')
+  lines.push(`## Mission`)
+  lines.push(`- Goal: ${payload.goal || 'Untitled mission'}`)
+  lines.push(`- Team: ${payload.teamName}`)
+  lines.push(`- Started: ${new Date(payload.startedAt).toLocaleString()}`)
+  lines.push(`- Completed: ${new Date(payload.completedAt).toLocaleString()}`)
+  lines.push(`- Duration: ${formatDuration(durationMs)}`)
+  lines.push('')
+  lines.push('## Team')
+  if (payload.team.length === 0) {
+    lines.push('- No agents')
+  } else {
+    payload.team.forEach((member) => {
+      lines.push(`- ${member.name} (${member.modelId})`)
+    })
+  }
+  lines.push('')
+  lines.push('## Tasks')
+  lines.push(`- Total: ${taskStats.total}`)
+  lines.push(`- Completed: ${taskStats.completed}`)
+  lines.push(`- Failed: ${taskStats.failed}`)
+  lines.push('')
+  lines.push('## Per-Agent Summary')
+  if (payload.agentSummaries.length === 0) {
+    lines.push('- No agent output captured')
+  } else {
+    payload.agentSummaries.forEach((summary) => {
+      lines.push(`### ${summary.agentName} (${summary.modelId || 'unknown'})`)
+      if (summary.lines.length === 0) {
+        lines.push('- No output captured')
+      } else {
+        summary.lines.forEach((line) => {
+          lines.push(`- ${line}`)
+        })
+      }
+      lines.push('')
+    })
+  }
+  lines.push('## Artifacts')
+  if (payload.artifacts.length === 0) {
+    lines.push('- None')
+  } else {
+    payload.artifacts.forEach((artifact) => {
+      lines.push(`- ${artifact.title} [${artifact.type}] by ${artifact.agentName}`)
+    })
+  }
+  lines.push('')
+  lines.push('## Cost Estimate')
+  lines.push(`- Tokens: ${payload.tokenCount.toLocaleString()}`)
+  lines.push(`- Estimated Cost: $${costEstimate.toFixed(4)} (rough)`)
+  lines.push('')
+
+  return lines.join('\n')
+}
+
+function loadStoredMissionReports(): StoredMissionReport[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(MISSION_REPORTS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((entry): entry is StoredMissionReport => Boolean(entry && typeof entry === 'object'))
+      .sort((a, b) => b.completedAt - a.completedAt)
+      .slice(0, MAX_MISSION_REPORTS)
+  } catch {
+    return []
+  }
+}
+
+function saveStoredMissionReport(entry: StoredMissionReport): StoredMissionReport[] {
+  if (typeof window === 'undefined') return [entry]
+  const next = [entry, ...loadStoredMissionReports().filter((row) => row.id !== entry.id)]
+    .sort((a, b) => b.completedAt - a.completedAt)
+    .slice(0, MAX_MISSION_REPORTS)
+  try {
+    window.localStorage.setItem(MISSION_REPORTS_STORAGE_KEY, JSON.stringify(next))
+  } catch {
+    // ignore quota/write errors
+  }
+  return next
 }
 
 const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
@@ -1452,6 +1727,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('connected')
   const [agentModelNotApplied, setAgentModelNotApplied] = useState<Record<string, boolean>>({})
   const [agentActivity, setAgentActivity] = useState<Record<string, AgentActivityEntry>>({})
+  const [artifacts, setArtifacts] = useState<MissionArtifact[]>([])
+  const [missionReports, setMissionReports] = useState<StoredMissionReport[]>(() => loadStoredMissionReports())
+  const [artifactPreview, setArtifactPreview] = useState<MissionArtifact | null>(null)
+  const [selectedReport, setSelectedReport] = useState<StoredMissionReport | null>(null)
+  const [missionTokenCount, setMissionTokenCount] = useState(0)
   const [pausedByAgentId, setPausedByAgentId] = useState<Record<string, boolean>>({})
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const stored = readStoredTeam()
@@ -1470,6 +1750,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const pendingTaskMovesRef = useRef<Array<{ taskIds: Array<string>; status: TaskStatus }>>([])
   const sessionActivityRef = useRef<Map<string, string>>(new Map())
   const dispatchingRef = useRef(false)
+  const artifactDedupRef = useRef<Set<string>>(new Set())
+  const agentOutputLinesRef = useRef<Record<string, string[]>>({})
+  const missionCompletionSnapshotRef = useRef<MissionReportPayload | null>(null)
+  const prevMissionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
+  const lastReportedMissionIdRef = useRef<string>('')
   // Mission ID for checkpointing
   const missionIdRef = useRef<string>('')
   const missionStartedAtRef = useRef<number>(0)
@@ -1489,6 +1774,127 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   missionGoalRef.current = missionGoal
   missionActiveRef.current = missionActive
   liveFeedVisibleRef.current = liveFeedVisible
+
+  const appendArtifacts = useCallback((nextArtifacts: MissionArtifact[]) => {
+    if (nextArtifacts.length === 0) return
+    setArtifacts((previous) => {
+      const additions: MissionArtifact[] = []
+      nextArtifacts.forEach((artifact) => {
+        const signature = [
+          artifact.agentId,
+          artifact.title.toLowerCase(),
+          artifact.type,
+          artifact.content.trim(),
+        ].join('|')
+        if (artifactDedupRef.current.has(signature)) return
+        artifactDedupRef.current.add(signature)
+        additions.push(artifact)
+      })
+      if (additions.length === 0) return previous
+      return [...previous, ...additions].sort((a, b) => b.timestamp - a.timestamp)
+    })
+  }, [])
+
+  const captureAgentOutput = useCallback((agentId: string, text: string) => {
+    const member = teamRef.current.find((entry) => entry.id === agentId)
+    if (!member) return
+    const cleaned = text.trim()
+    if (!cleaned) return
+
+    const nextLines = cleaned
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(-6)
+
+    if (nextLines.length > 0) {
+      const current = agentOutputLinesRef.current[agentId] ?? []
+      agentOutputLinesRef.current[agentId] = [...current, ...nextLines].slice(-8)
+    }
+
+    appendArtifacts(
+      extractArtifactsFromOutput({
+        agentId,
+        agentName: member.name,
+        text: cleaned,
+        timestamp: Date.now(),
+      }),
+    )
+  }, [appendArtifacts])
+
+  const buildMissionCompletionSnapshot = useCallback((): MissionReportPayload | null => {
+    const missionId = missionIdRef.current
+    if (!missionId) return null
+    const goal = activeMissionGoal || missionGoal || 'Untitled mission'
+    const startedAt = missionStartedAtRef.current || Date.now()
+    const completedAt = Date.now()
+    const teamSnapshot = teamRef.current.map((member) => ({ ...member }))
+    const tasksSnapshot = (missionTasks.length > 0 ? missionTasks : boardTasks).map((task) => ({ ...task }))
+    const artifactsSnapshot = artifacts.map((artifact) => ({ ...artifact }))
+    const agentSummaries: MissionAgentSummary[] = teamSnapshot.map((member) => ({
+      agentId: member.id,
+      agentName: member.name,
+      modelId: member.modelId,
+      lines: (agentOutputLinesRef.current[member.id] ?? []).slice(-4),
+    }))
+    const resolvedTemplate = resolveActiveTemplate(teamSnapshot)
+    const teamName = resolvedTemplate ? TEMPLATE_DISPLAY_NAMES[resolvedTemplate] : `Custom Team (${teamSnapshot.length})`
+
+    return {
+      missionId,
+      goal,
+      teamName,
+      startedAt,
+      completedAt,
+      team: teamSnapshot,
+      tasks: tasksSnapshot,
+      artifacts: artifactsSnapshot,
+      tokenCount: missionTokenCount,
+      agentSummaries,
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMissionGoal, artifacts, boardTasks, missionGoal, missionTasks, missionTokenCount])
+
+  const stopMissionAndCleanup = useCallback((reason: 'aborted' | 'completed' = 'aborted') => {
+    missionCompletionSnapshotRef.current = buildMissionCompletionSnapshot()
+
+    const currentCp = loadMissionCheckpoint()
+    if (currentCp) {
+      archiveMissionToHistory({ ...currentCp, status: reason })
+      clearMissionCheckpoint()
+    }
+
+    Object.values(agentSessionMap).forEach((sessionKey) => {
+      fetch('/api/chat-abort', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionKey }),
+      }).catch(() => {})
+      fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
+        method: 'DELETE',
+      }).catch(() => {})
+    })
+
+    setAgentSessionMap({})
+    setSpawnState({})
+    setAgentSessionStatus({})
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('clawsuite:hub-agent-sessions')
+    }
+    setMissionState('stopped')
+    setMissionActive(false)
+    setActiveMissionGoal('')
+    setMissionTasks([])
+    setDispatchedTaskIdsByAgent({})
+    setPausedByAgentId({})
+    setSelectedOutputAgentId(undefined)
+    setActiveTab('missions')
+    dispatchingRef.current = false
+    pendingTaskMovesRef.current = []
+    sessionActivityRef.current = new Map()
+    taskBoardRef.current = null
+    missionIdRef.current = ''
+  }, [agentSessionMap, buildMissionCompletionSnapshot])
 
   // Derived: which agents have spawn errors
   const spawnErrorNames = useMemo(
@@ -1797,6 +2203,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         try {
           const data = JSON.parse(event.data as string) as Record<string, unknown>
           const text = String(data.text ?? data.content ?? data.chunk ?? '').trim()
+          if (text && data.fullReplace !== true) {
+            setMissionTokenCount((current) => current + Math.ceil(text.length / 4))
+          }
           handleUpdate(text, 'assistant')
           if (text.includes('APPROVAL_REQUIRED:')) {
             const member = currentTeam.find((m) => m.id === agentId)
@@ -1828,6 +2237,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       source.addEventListener('message', () => {
         markStreamAlive()
       })
+
+      source.addEventListener('message', (event) => {
+        if (!(event instanceof MessageEvent)) return
+        markStreamAlive()
+        const payload = parseSsePayload(event.data as string)
+        if (!payload) return
+        const role = readEventRole(payload)
+        if (role !== 'assistant') return
+        const text = readEventText(payload)
+        if (!text) return
+        captureAgentOutput(agentId, text)
+      })
       source.addEventListener('done', () => {
         markStreamAlive()
       })
@@ -1839,7 +2260,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentSessionStatus, agentSessionMap]) // intentionally omit teamRef (stable ref)
+  }, [agentSessionStatus, agentSessionMap, captureAgentOutput]) // intentionally omit teamRef (stable ref)
 
   // Stale SSE stream pruner (60s inactivity → close) + unmount cleanup
   useEffect(() => {
@@ -2748,6 +3169,40 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
   }, [agentSessionMap, missionActive, missionState])
 
+  useEffect(() => {
+    const previous = prevMissionStateRef.current
+    if (previous === 'running' && missionState === 'stopped') {
+      const snapshot = missionCompletionSnapshotRef.current
+      if (snapshot && lastReportedMissionIdRef.current !== snapshot.missionId) {
+        const reportText = generateMissionReport(snapshot)
+        const taskStats = computeMissionTaskStats(snapshot.tasks)
+        const duration = Math.max(0, snapshot.completedAt - snapshot.startedAt)
+        const costEstimate = estimateMissionCost(snapshot.tokenCount)
+        const record: StoredMissionReport = {
+          id: snapshot.missionId,
+          goal: snapshot.goal,
+          teamName: snapshot.teamName,
+          agents: snapshot.team.map((member) => ({
+            id: member.id,
+            name: member.name,
+            modelId: member.modelId,
+          })),
+          taskStats,
+          duration,
+          tokenCount: snapshot.tokenCount,
+          costEstimate,
+          artifacts: snapshot.artifacts,
+          report: reportText,
+          completedAt: snapshot.completedAt,
+        }
+        setMissionReports(saveStoredMissionReport(record))
+        lastReportedMissionIdRef.current = snapshot.missionId
+      }
+      missionCompletionSnapshotRef.current = null
+    }
+    prevMissionStateRef.current = missionState
+  }, [missionState])
+
   function applyTemplate(templateId: TeamTemplateId) {
     setTeam(buildTeamFromTemplate(templateId))
     setSelectedAgentId(undefined)
@@ -2907,6 +3362,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setActiveMissionGoal(trimmedGoal)
     setMissionTasks(createdTasks)
     setDispatchedTaskIdsByAgent({})
+    setArtifacts([])
+    artifactDedupRef.current = new Set()
+    agentOutputLinesRef.current = {}
+    missionCompletionSnapshotRef.current = null
+    setMissionTokenCount(0)
     const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
     setSelectedOutputAgentId(firstAssignedAgentId)
     setPausedByAgentId({})
@@ -2953,7 +3413,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // ── Mission tab content ────────────────────────────────────────────────────
   function renderMissionContent() {
     const showRestoreBanner = restoreCheckpoint && !restoreDismissed && !missionActive
-    const recentReports = loadMissionHistory().slice(0, 5)
+    const recentReports = missionReports.slice(0, 5)
 
     return (
       <div className="flex min-h-0 flex-1 flex-col">
@@ -3104,7 +3564,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                 key={entry.id}
                                 className="truncate text-[11px] text-neutral-700"
                               >
-                                {entry.label}
+                                {entry.goal}
                               </li>
                             ))}
                           </ul>
@@ -3222,19 +3682,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             ) : null}
           </div>
         </div>
+        {(missionActive || artifacts.length > 0) ? renderDeliverablesSection() : null}
       </div>
     )
   }
 
   function renderMissionHistorySection() {
-    const recentReports = loadMissionHistory().slice(0, 8)
+    const recentReports = missionReports.slice(0, 8)
 
     return (
       <section className="border-t border-neutral-200 bg-neutral-50 px-4 py-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-neutral-900">Mission History</h3>
-            <p className="text-[11px] text-neutral-500">Recent mission checkpoints and reports.</p>
+            <p className="text-[11px] text-neutral-500">Recent mission reports from local storage.</p>
           </div>
         </div>
         {recentReports.length === 0 ? (
@@ -3244,34 +3705,112 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         ) : (
           <div className="space-y-2">
             {recentReports.map((entry) => {
-              const completedCount = entry.tasks.filter(
-                (task) => task.status === 'done' || task.status === 'completed',
-              ).length
-              const totalCount = entry.tasks.length
               return (
                 <div
                   key={entry.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-neutral-900">{entry.label}</p>
+                    <p className="truncate text-xs font-medium text-neutral-900">{truncateMissionGoal(entry.goal)}</p>
                     <p className="text-[11px] text-neutral-500">
-                      {timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}
+                      {timeAgoFromMs(entry.completedAt)} · {entry.teamName}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-[11px]">
                     <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-neutral-600">
-                      {entry.processType}
+                      {entry.taskStats.total > 0 ? `${entry.taskStats.completed}/${entry.taskStats.total} tasks` : 'No tasks'}
                     </span>
                     <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-neutral-600">
-                      {totalCount > 0 ? `${completedCount}/${totalCount} tasks` : 'No tasks'}
+                      ${entry.costEstimate.toFixed(4)}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedReport(entry)}
+                      className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[10px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                    >
+                      View Report
+                    </button>
                   </div>
                 </div>
               )
             })}
           </div>
         )}
+      </section>
+    )
+  }
+
+  function openHtmlArtifactPreview(artifact: MissionArtifact) {
+    const blob = new Blob([artifact.content], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank', 'noopener,noreferrer')
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
+
+  function renderDeliverablesSection() {
+    if (artifacts.length === 0) return null
+
+    return (
+      <section className="border-t border-neutral-200 bg-neutral-50 px-4 py-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-900">Deliverables</h3>
+            <p className="text-[11px] text-neutral-500">Artifacts and reports extracted from agent outputs.</p>
+          </div>
+          <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-600">
+            {artifacts.length} item{artifacts.length === 1 ? '' : 's'}
+          </span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {artifacts.slice(0, 12).map((artifact, index) => {
+            const member = teamById.get(artifact.agentId)
+            const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+            const avatarIndex = resolveAgentAvatarIndex(member, index)
+            const previewText = artifact.content.replace(/\s+/g, ' ').trim()
+            return (
+              <article
+                key={artifact.id}
+                className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex items-start gap-2">
+                    <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full border border-white shadow-sm', accent.avatar)}>
+                      <AgentAvatar index={avatarIndex} color={accent.hex} size={18} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-neutral-900">{artifact.title}</p>
+                      <p className="truncate text-[11px] text-neutral-500">{artifact.agentName}</p>
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[9px] font-semibold uppercase text-neutral-600">
+                    {artifact.type}
+                  </span>
+                </div>
+                <p className="mt-2 line-clamp-2 text-[11px] text-neutral-600">
+                  {previewText || '(empty artifact)'}
+                </p>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <span className="font-mono text-[10px] text-neutral-400">
+                    {new Date(artifact.timestamp).toLocaleTimeString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (artifact.type === 'html') {
+                        openHtmlArtifactPreview(artifact)
+                        return
+                      }
+                      setArtifactPreview(artifact)
+                    }}
+                    className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[10px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                  >
+                    Preview
+                  </button>
+                </div>
+              </article>
+            )
+          })}
+        </div>
       </section>
     )
   }
@@ -3284,7 +3823,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const taskSource = missionActive ? activeTaskSource : boardTasks
     const doneTasks = taskSource.filter((task) => task.status === 'done').length
     const totalTasks = taskSource.length
-    const recentReports = loadMissionHistory().slice(0, 5)
+    const recentReports = missionReports.slice(0, 5)
     const recentActivityItems = [
       ...(missionActive
         ? [
@@ -3296,7 +3835,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         .sort((a, b) => (b.lastAt ?? 0) - (a.lastAt ?? 0))
         .slice(0, 4)
         .map((row) => `${row.name}: ${truncateMissionGoal(row.lastLine ?? '', 72)}`),
-      ...recentReports.slice(0, 2).map((report) => `Report archived: ${truncateMissionGoal(report.label, 60)}`),
+      ...recentReports.slice(0, 2).map((report) => `Report archived: ${truncateMissionGoal(report.goal, 60)}`),
     ].slice(0, 6)
     return (
       <div className="h-full overflow-y-auto bg-neutral-50 p-4">
@@ -3938,7 +4477,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const showRestoreBanner = restoreCheckpoint && !restoreDismissed && !missionActive
 
     if (!missionActive) {
-      const recentReports = loadMissionHistory().slice(0, 8)
+      const recentReports = missionReports.slice(0, 8)
       return (
         <div className="flex h-full min-h-0 flex-col bg-neutral-50">
           {showRestoreBanner ? (
@@ -4080,19 +4619,33 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 transition-all hover:-translate-y-0.5 hover:shadow-md"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-neutral-900">{entry.label}</p>
+                          <p className="truncate text-xs font-medium text-neutral-900">{truncateMissionGoal(entry.goal)}</p>
                           <p className="text-[11px] text-neutral-500">
-                            {timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}
+                            {timeAgoFromMs(entry.completedAt)} · {entry.teamName}
                           </p>
                         </div>
-                        <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[10px] text-neutral-600">
-                          {entry.processType}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[10px] text-neutral-600">
+                            {entry.taskStats.completed}/{entry.taskStats.total} tasks
+                          </span>
+                          <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[10px] text-neutral-600">
+                            ${entry.costEstimate.toFixed(4)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedReport(entry)}
+                            className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[10px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                          >
+                            View Report
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </section>
+
+              {artifacts.length > 0 ? renderDeliverablesSection() : null}
             </div>
           </div>
         </div>
@@ -4265,44 +4818,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        // Archive mission checkpoint before stopping
-                        const currentCp = loadMissionCheckpoint()
-                        if (currentCp) {
-                          archiveMissionToHistory({ ...currentCp, status: 'aborted' })
-                          clearMissionCheckpoint()
-                        }
-                        // Best-effort cleanup of per-agent sessions
-                        Object.values(agentSessionMap).forEach((sessionKey) => {
-                          fetch('/api/chat-abort', {
-                            method: 'POST',
-                            headers: { 'content-type': 'application/json' },
-                            body: JSON.stringify({ sessionKey }),
-                          }).catch(() => {})
-                          fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
-                            method: 'DELETE',
-                          }).catch(() => {})
-                        })
-                        setAgentSessionMap({})
-                        setSpawnState({})
-                        setAgentSessionStatus({})
-                        if (typeof window !== 'undefined') {
-                          window.localStorage.removeItem('clawsuite:hub-agent-sessions')
-                        }
-                        setMissionState('stopped')
-                        setMissionActive(false)
-                        setActiveMissionGoal('')
-                        setMissionTasks([])
-                        setDispatchedTaskIdsByAgent({})
-                        setPausedByAgentId({})
-                        setSelectedOutputAgentId(undefined)
-                        setActiveTab('missions')
-                        dispatchingRef.current = false
-                        pendingTaskMovesRef.current = []
-                        sessionActivityRef.current = new Map()
-                        taskBoardRef.current = null
-                        missionIdRef.current = ''
-                      }}
+                      onClick={() => stopMissionAndCleanup('aborted')}
                       className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
                     >
                       Stop
@@ -4681,6 +5197,109 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   Launch Mission
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {artifactPreview ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/45"
+            onClick={() => setArtifactPreview(null)}
+            aria-hidden
+          />
+          <div className="relative flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-neutral-900">{artifactPreview.title}</p>
+                <p className="text-[11px] text-neutral-500">
+                  {artifactPreview.agentName} · {artifactPreview.type} · {new Date(artifactPreview.timestamp).toLocaleString()}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setArtifactPreview(null)}
+                className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[11px] font-medium text-neutral-700"
+              >
+                Close
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {artifactPreview.type === 'code' ? (
+                <pre className="overflow-x-auto rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-800">
+                  <code>{artifactPreview.content}</code>
+                </pre>
+              ) : (
+                <Markdown className="prose prose-sm max-w-none text-neutral-900 [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-neutral-200 [&_pre]:bg-neutral-50">
+                  {artifactPreview.content}
+                </Markdown>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedReport ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setSelectedReport(null)}
+            aria-hidden
+          />
+          <div className="relative flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-neutral-300 bg-white shadow-2xl">
+            <div className="border-b border-neutral-200 bg-white px-5 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="truncate text-base font-semibold tracking-tight text-neutral-900">Mission Report</h2>
+                  <p className="mt-1 truncate text-sm text-neutral-700">{truncateMissionGoal(selectedReport.goal, 140)}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-neutral-500">
+                    <span>{new Date(selectedReport.completedAt).toLocaleString()}</span>
+                    <span>•</span>
+                    <span>{selectedReport.teamName}</span>
+                    <span>•</span>
+                    <span>{selectedReport.taskStats.completed}/{selectedReport.taskStats.total} tasks</span>
+                    <span>•</span>
+                    <span>{selectedReport.tokenCount.toLocaleString()} tok</span>
+                    <span>•</span>
+                    <span>${selectedReport.costEstimate.toFixed(4)} est.</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedReport(null)}
+                  className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-[11px] font-medium text-neutral-700 transition-colors hover:bg-white"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto bg-neutral-50 p-5">
+              <div className="mx-auto max-w-4xl rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+                <div className="mb-4 grid gap-3 sm:grid-cols-4">
+                  <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Duration</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-900">{formatDuration(selectedReport.duration)}</p>
+                  </div>
+                  <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Tasks</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-900">
+                      {selectedReport.taskStats.completed}/{selectedReport.taskStats.total}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Artifacts</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-900">{selectedReport.artifacts.length}</p>
+                  </div>
+                  <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Cost Est.</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-900">${selectedReport.costEstimate.toFixed(4)}</p>
+                  </div>
+                </div>
+                <Markdown className="prose prose-sm max-w-none text-neutral-900 [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-neutral-200 [&_pre]:bg-neutral-50">
+                  {selectedReport.report}
+                </Markdown>
+              </div>
             </div>
           </div>
         </div>
