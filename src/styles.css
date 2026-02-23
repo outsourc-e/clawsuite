@@ -337,6 +337,14 @@
   color: var(--theme-muted) !important;
 }
 
+[data-theme="paper-light"] .bg-surface {
+  background-color: var(--theme-bg) !important;
+}
+
+[data-theme="paper-light"] .text-ink {
+  color: var(--theme-text) !important;
+}
+
 /* ── Ops Dark: Apply blue-steel personality globally ── */
 [data-theme="ops-dark"] body,
 [data-theme="ops-dark"] #root,
@@ -400,6 +408,14 @@
   background: linear-gradient(90deg, var(--theme-accent) 0%, transparent 100%) !important;
 }
 
+[data-theme="ops-dark"] .bg-surface {
+  background-color: var(--theme-bg) !important;
+}
+
+[data-theme="ops-dark"] .text-ink {
+  color: var(--theme-text) !important;
+}
+
 /* ── Premium Dark: Apply violet-glow personality globally ── */
 [data-theme="premium-dark"] body,
 [data-theme="premium-dark"] #root,
@@ -461,6 +477,14 @@
 [data-theme="premium-dark"] .shadow-sm,
 [data-theme="premium-dark"] .shadow-md {
   box-shadow: var(--theme-shadow-2) !important;
+}
+
+[data-theme="premium-dark"] .bg-surface {
+  background-color: var(--theme-bg) !important;
+}
+
+[data-theme="premium-dark"] .text-ink {
+  color: var(--theme-text) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
