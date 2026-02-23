@@ -87,16 +87,34 @@ function getModelDisplayLabel(modelId: string): string {
   if (!modelId) return 'Unknown'
   const preset = MODEL_PRESETS.find((entry) => entry.id === modelId)
   if (preset) return preset.label
-  return modelId
+  const parts = modelId.split('/')
+  return parts[parts.length - 1] || modelId
 }
 
-function getModelShortLabel(modelId: string): string {
+function getModelDisplayLabelFromLookup(
+  modelId: string,
+  gatewayModelLabelById?: Map<string, { label: string; provider: string }>,
+): string {
+  if (!modelId) return 'Unknown'
+  const preset = MODEL_PRESETS.find((entry) => entry.id === modelId)
+  if (preset) return preset.label
+  const gatewayModel = gatewayModelLabelById?.get(modelId)
+  if (gatewayModel?.label) return gatewayModel.label
+  return getModelDisplayLabel(modelId)
+}
+
+function getModelShortLabel(
+  modelId: string,
+  gatewayModelLabelById?: Map<string, { label: string; provider: string }>,
+): string {
   if (!modelId) return 'Unknown'
   const preset = MODEL_PRESETS.find((entry) => entry.id === modelId)
   if (preset) return OFFICE_MODEL_LABEL[preset.id]
+  const gatewayModel = gatewayModelLabelById?.get(modelId)
+  if (gatewayModel?.label) return gatewayModel.label
 
-  const [, scopedModelId] = modelId.split('/', 2)
-  return scopedModelId || modelId
+  const parts = modelId.split('/')
+  return parts[parts.length - 1] || modelId
 }
 
 type AgentActivityEntry = {
@@ -2021,6 +2039,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .filter((entry): entry is { value: string; provider: string; label: string } => Boolean(entry))
   }, [modelsQuery.data?.models])
 
+  const gatewayModelLabelById = useMemo(
+    () =>
+      new Map(
+        gatewayModels.map((model) => [model.value, { label: model.label, provider: model.provider }] as const),
+      ),
+    [gatewayModels],
+  )
+
   const addProviderAvailableModels = useMemo(() => {
     const provider = addProviderName.trim().toLowerCase()
     if (!provider) return []
@@ -2781,7 +2807,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         ...prev,
         [member.id]: { status: 'idle', lastSeen: Date.now() },
       }))
-      const modelLabel = getModelDisplayLabel(member.modelId)
+      const modelLabel = getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)
       const modelSuffix = member.modelId !== 'auto' ? ` (${modelLabel})` : ''
       emitFeedEvent({
         type: 'agent_spawned',
@@ -2796,7 +2822,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         agentName: member.name,
       })
     }
-  }, [spawnAgentSession])
+  }, [gatewayModelLabelById, spawnAgentSession])
 
   // Kill session for an agent
   const handleKillSession = useCallback(async (member: TeamMember) => {
@@ -2992,7 +3018,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             if (modelString) {
               setAgentSessionModelMap((prev) => ({ ...prev, [member.id]: modelString }))
             }
-            const modelLabel = getModelDisplayLabel(member.modelId)
+            const modelLabel = getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)
             const modelSuffix = member.modelId !== 'auto' ? ` (${modelLabel})` : ''
             emitFeedEvent({
               type: 'agent_spawned',
@@ -3016,7 +3042,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (isStaleLaunch()) return currentMap
     setAgentSessionMap(currentMap)
     return currentMap
-  }, [agentSessionMap, spawnAgentSession])
+  }, [agentSessionMap, gatewayModelLabelById, spawnAgentSession])
 
   const executeMission = useCallback(async (
     tasks: Array<HubTask>,
@@ -4198,7 +4224,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           isBusy ? 'bg-orange-100 text-orange-700' : 'bg-neutral-200 text-neutral-700',
                         )}
                       >
-                        {getModelShortLabel(agent.modelId)}
+                        {getModelShortLabel(agent.modelId, gatewayModelLabelById)}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center gap-2 text-[11px]">
@@ -4450,7 +4476,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           <optgroup label="Available Models">
                             {gatewayModels.map((model) => (
                               <option key={model.value} value={model.value}>
-                                {model.provider} / {model.label}
+                                {model.label} ({model.provider})
                               </option>
                             ))}
                           </optgroup>
@@ -4554,6 +4580,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               >
                 <TeamPanel
                   team={teamWithRuntimeStatus}
+                  gatewayModels={gatewayModels}
                   activeTemplateId={activeTemplateId}
                   agentTaskCounts={agentTaskCounts}
                   spawnState={spawnState}

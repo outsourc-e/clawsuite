@@ -54,8 +54,15 @@ export type AgentSessionStatusEntry = {
   lastMessage?: string
 }
 
+type GatewayModelOption = {
+  value: string
+  label: string
+  provider: string
+}
+
 type TeamPanelProps = {
   team: TeamMember[]
+  gatewayModels?: GatewayModelOption[]
   activeTemplateId?: TeamTemplateId
   agentTaskCounts?: Record<string, number>
   spawnState?: Record<string, 'idle' | 'spawning' | 'ready' | 'error'>
@@ -117,6 +124,7 @@ function resolveSessionDotState(
 
 export function TeamPanel({
   team,
+  gatewayModels,
   activeTemplateId,
   agentTaskCounts,
   spawnState,
@@ -143,9 +151,20 @@ export function TeamPanel({
 
   const modelLabelById = useMemo(
     () =>
-      new Map<string, string>(MODEL_PRESETS.map((preset) => [preset.id, preset.label])),
-    [],
+      new Map<string, string>([
+        ...MODEL_PRESETS.map((preset) => [preset.id, preset.label] as const),
+        ...(gatewayModels ?? []).map((model) => [model.value, model.label] as const),
+      ]),
+    [gatewayModels],
   )
+
+  function getModelLabel(modelId: string): string {
+    const preset = modelLabelById.get(modelId)
+    if (preset) return preset
+    if (!modelId) return 'Unknown'
+    const parts = modelId.split('/')
+    return parts[parts.length - 1] || modelId
+  }
 
   function getModelBadgeColor(modelId: string): string {
     return MODEL_BADGE_COLOR[modelId as ModelPresetId] ?? DEFAULT_MODEL_BADGE_COLOR
@@ -218,7 +237,7 @@ export function TeamPanel({
           const showPulse = dotState === 'active' || dotState === 'spawning'
           const showRetry = dotState === 'dead' && Boolean(onRetrySpawn)
           const expanded = expandedAgentId === agent.id
-          const modelLabel = modelLabelById.get(agent.modelId) ?? 'Auto'
+          const modelLabel = getModelLabel(agent.modelId)
           const taskCount = agentTaskCounts?.[agent.id] ?? 0
           const cardTitle = agentSessionKey ? `Session: ${agentSessionKey}` : undefined
 
@@ -348,16 +367,27 @@ export function TeamPanel({
                       value={agent.modelId}
                       onChange={(event) => {
                         onUpdateAgent(agent.id, {
-                          modelId: event.target.value as ModelPresetId,
+                          modelId: event.target.value,
                         })
                       }}
                       className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                     >
-                      {MODEL_PRESETS.map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {preset.label} - {preset.desc}
-                        </option>
-                      ))}
+                      <optgroup label="Presets">
+                        {MODEL_PRESETS.map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {preset.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      {(gatewayModels?.length ?? 0) > 0 ? (
+                        <optgroup label="Available Models">
+                          {gatewayModels?.map((model) => (
+                            <option key={model.value} value={model.value}>
+                              {model.label} ({model.provider})
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : null}
                     </select>
                   </label>
 
