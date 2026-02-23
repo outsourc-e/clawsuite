@@ -104,6 +104,7 @@ import { Route as ApiCronDeleteRouteImport } from './routes/api/cron/delete'
 import { Route as ApiBrowserTabsRouteImport } from './routes/api/browser/tabs'
 import { Route as ApiBrowserStatusRouteImport } from './routes/api/browser/status'
 import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
+import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/navigate'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
 
@@ -582,6 +583,11 @@ const ApiBrowserScreenshotRoute = ApiBrowserScreenshotRouteImport.update({
   path: '/screenshot',
   getParentRoute: () => ApiBrowserRoute,
 } as any)
+const ApiBrowserNavigateRoute = ApiBrowserNavigateRouteImport.update({
+  id: '/navigate',
+  path: '/navigate',
+  getParentRoute: () => ApiBrowserRoute,
+} as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -667,6 +673,7 @@ export interface FileRoutesByFullPath {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
@@ -765,6 +772,7 @@ export interface FileRoutesByTo {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
@@ -865,6 +873,7 @@ export interface FileRoutesById {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
@@ -966,6 +975,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/browser/navigate'
     | '/api/browser/screenshot'
     | '/api/browser/status'
     | '/api/browser/tabs'
@@ -1064,6 +1074,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat'
     | '/settings'
+    | '/api/browser/navigate'
     | '/api/browser/screenshot'
     | '/api/browser/status'
     | '/api/browser/tabs'
@@ -1163,6 +1174,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/browser/navigate'
     | '/api/browser/screenshot'
     | '/api/browser/status'
     | '/api/browser/tabs'
@@ -1943,6 +1955,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBrowserScreenshotRouteImport
       parentRoute: typeof ApiBrowserRoute
     }
+    '/api/browser/navigate': {
+      id: '/api/browser/navigate'
+      path: '/navigate'
+      fullPath: '/api/browser/navigate'
+      preLoaderRoute: typeof ApiBrowserNavigateRouteImport
+      parentRoute: typeof ApiBrowserRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -1975,12 +1994,14 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 )
 
 interface ApiBrowserRouteChildren {
+  ApiBrowserNavigateRoute: typeof ApiBrowserNavigateRoute
   ApiBrowserScreenshotRoute: typeof ApiBrowserScreenshotRoute
   ApiBrowserStatusRoute: typeof ApiBrowserStatusRoute
   ApiBrowserTabsRoute: typeof ApiBrowserTabsRoute
 }
 
 const ApiBrowserRouteChildren: ApiBrowserRouteChildren = {
+  ApiBrowserNavigateRoute: ApiBrowserNavigateRoute,
   ApiBrowserScreenshotRoute: ApiBrowserScreenshotRoute,
   ApiBrowserStatusRoute: ApiBrowserStatusRoute,
   ApiBrowserTabsRoute: ApiBrowserTabsRoute,

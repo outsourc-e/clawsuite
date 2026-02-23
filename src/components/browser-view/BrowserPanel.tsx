@@ -1,18 +1,25 @@
 import { HugeiconsIcon } from '@hugeicons/react'
-import { GlobeIcon, Loading03Icon } from '@hugeicons/core-free-icons'
-import { useQuery } from '@tanstack/react-query'
+import { GlobeIcon, Loading03Icon, RefreshIcon } from '@hugeicons/core-free-icons'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import { useMemo, useState } from 'react'
-import { BrowserControls } from './BrowserControls'
+import type { FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BrowserScreenshot } from './BrowserScreenshot'
 import { BrowserTabs } from './BrowserTabs'
-import { LocalBrowser } from './LocalBrowser'
 
 type BrowserTab = {
   id: string
   title: string
   url: string
   isActive: boolean
+}
+
+type BrowserStatusResponse = {
+  active: boolean
+  url?: string
+  screenshotUrl?: string
+  message?: string
+  gatewaySupportRequired?: boolean
 }
 
 type BrowserTabsResponse = {
@@ -36,6 +43,12 @@ type BrowserScreenshotResponse = {
   gatewaySupportRequired?: boolean
 }
 
+type NavigateResponse = {
+  ok: boolean
+  url?: string
+  error?: string
+}
+
 const GATEWAY_SUPPORT_PATTERNS = [
   'missing gateway auth',
   'gateway connection closed',
@@ -48,11 +61,14 @@ const GATEWAY_SUPPORT_PATTERNS = [
   'browser tool request failed',
 ]
 
+const BROWSER_CDP_URL = 'ws://127.0.0.1:18792'
+
 function readError(response: Response): Promise<string> {
   return response
     .json()
     .then(function onJson(payload) {
       if (payload && typeof payload.error === 'string') return payload.error
+      if (payload && typeof payload.message === 'string') return payload.message
       return response.statusText || 'Request failed'
     })
     .catch(function onError() {
@@ -75,57 +91,13 @@ function isGatewaySupportError(message: string): boolean {
   })
 }
 
-function createLocalFallbackTabs(error: unknown): BrowserTabsResponse {
-  const reason = readErrorMessage(error, 'Browser tabs unavailable')
-
-  return {
-    ok: true,
-    tabs: [
-      {
-        id: 'local-demo-tab',
-        title: 'ClawSuite Demo',
-        url: 'https://openclaw.local/studio',
-        isActive: true,
-      },
-    ],
-    activeTabId: 'local-demo-tab',
-    updatedAt: new Date().toISOString(),
-    demoMode: true,
-    error: reason,
-    gatewaySupportRequired: true,
+async function fetchBrowserStatus(): Promise<BrowserStatusResponse> {
+  const response = await fetch('/api/browser/status')
+  if (!response.ok) {
+    throw new Error(await readError(response))
   }
-}
 
-function createLocalFallbackScreenshot(
-  tabId?: string | null,
-  error?: unknown,
-): BrowserScreenshotResponse {
-  const timestamp = new Date().toISOString()
-  const reason = readErrorMessage(error, 'Browser screenshot unavailable')
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#1e293b"/>
-    </linearGradient>
-  </defs>
-  <rect width="1200" height="720" fill="url(#g)"/>
-  <rect x="80" y="80" width="1040" height="560" rx="22" fill="#0b1220" stroke="#334155"/>
-  <text x="120" y="180" fill="#f8fafc" font-family="ui-sans-serif, system-ui, sans-serif" font-size="38">Demo Browser Mode</text>
-  <text x="120" y="226" fill="#94a3b8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="21">Using fallback screenshot stream.</text>
-  <text x="120" y="268" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17">tabId=${tabId || 'active'}</text>
-</svg>`
-
-  return {
-    ok: true,
-    imageDataUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-    currentUrl: 'https://openclaw.local/demo/browser',
-    activeTabId: tabId || 'local-demo-tab',
-    capturedAt: timestamp,
-    demoMode: true,
-    error: reason,
-    gatewaySupportRequired: true,
-  }
+  return (await response.json()) as BrowserStatusResponse
 }
 
 async function fetchBrowserTabs(): Promise<BrowserTabsResponse> {
@@ -137,7 +109,17 @@ async function fetchBrowserTabs(): Promise<BrowserTabsResponse> {
 
     return (await response.json()) as BrowserTabsResponse
   } catch (error) {
-    return createLocalFallbackTabs(error)
+    return {
+      ok: false,
+      tabs: [],
+      activeTabId: null,
+      updatedAt: new Date().toISOString(),
+      demoMode: false,
+      error: readErrorMessage(error, 'Browser tabs unavailable'),
+      gatewaySupportRequired: isGatewaySupportError(
+        readErrorMessage(error, 'Browser tabs unavailable'),
+      ),
+    }
   }
 }
 
@@ -157,17 +139,54 @@ async function fetchBrowserScreenshot(
 
     return (await response.json()) as BrowserScreenshotResponse
   } catch (error) {
-    return createLocalFallbackScreenshot(activeTabId, error)
+    return {
+      ok: false,
+      imageDataUrl: '',
+      currentUrl: '',
+      activeTabId: activeTabId || null,
+      capturedAt: new Date().toISOString(),
+      demoMode: false,
+      error: readErrorMessage(error, 'Browser screenshot unavailable'),
+      gatewaySupportRequired: isGatewaySupportError(
+        readErrorMessage(error, 'Browser screenshot unavailable'),
+      ),
+    }
   }
+}
+
+async function navigateBrowser(url: string): Promise<NavigateResponse> {
+  const response = await fetch('/api/browser/navigate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  })
+
+  const payload = (await response.json().catch(() => ({}))) as NavigateResponse
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || response.statusText || 'Navigation failed')
+  }
+
+  return payload
 }
 
 function BrowserPanel() {
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null)
+  const [draftUrl, setDraftUrl] = useState('')
+  const [isEditingUrl, setIsEditingUrl] = useState(false)
+  const [actionError, setActionError] = useState('')
+
+  const statusQuery = useQuery({
+    queryKey: ['browser', 'status'],
+    queryFn: fetchBrowserStatus,
+    refetchInterval: 3_000,
+    refetchIntervalInBackground: true,
+    retry: false,
+  })
 
   const tabsQuery = useQuery({
     queryKey: ['browser', 'tabs'],
     queryFn: fetchBrowserTabs,
-    refetchInterval: 2_000,
+    refetchInterval: 3_000,
     refetchIntervalInBackground: true,
     retry: false,
   })
@@ -187,55 +206,132 @@ function BrowserPanel() {
         tabs.find((tab) => tab.isActive)?.id ??
         null)
 
+  const statusMessage = statusQuery.data?.message || ''
+  const tabsError = tabsQuery.data?.error || ''
+  const preConnectionError = tabsError || statusMessage
+  const demoMode = Boolean(tabsQuery.data?.demoMode)
+  const gatewaySupportRequired =
+    Boolean(statusQuery.data?.gatewaySupportRequired) ||
+    Boolean(tabsQuery.data?.gatewaySupportRequired) ||
+    isGatewaySupportError(preConnectionError)
+
+  const isConnected =
+    !demoMode &&
+    !gatewaySupportRequired &&
+    (Boolean(statusQuery.data?.active) || tabs.length > 0)
+
   const screenshotQuery = useQuery({
     queryKey: ['browser', 'screenshot', effectiveTabId ?? 'active'],
     queryFn: function queryScreenshot() {
       return fetchBrowserScreenshot(effectiveTabId)
     },
-    refetchInterval: 2_000,
+    enabled: isConnected,
+    refetchInterval: 3_000,
     refetchIntervalInBackground: true,
     retry: false,
   })
 
+  const navigateMutation = useMutation({
+    mutationFn: navigateBrowser,
+    onSuccess: async () => {
+      setActionError('')
+      await Promise.all([
+        statusQuery.refetch(),
+        tabsQuery.refetch(),
+        screenshotQuery.refetch(),
+      ])
+    },
+    onError: (error) => {
+      setActionError(readErrorMessage(error, 'Navigation failed'))
+    },
+  })
+
   const activeTab = tabs.find((tab) => tab.id === effectiveTabId)
   const currentUrl =
-    screenshotQuery.data?.currentUrl || activeTab?.url || 'about:blank'
-  const demoMode =
-    Boolean(tabsQuery.data?.demoMode) || Boolean(screenshotQuery.data?.demoMode)
-  const screenshotUrl = screenshotQuery.data?.imageDataUrl || ''
-  const errorText = tabsQuery.data?.error || screenshotQuery.data?.error || ''
-  const gatewaySupportRequired =
-    Boolean(tabsQuery.data?.gatewaySupportRequired) ||
-    Boolean(screenshotQuery.data?.gatewaySupportRequired) ||
-    isGatewaySupportError(errorText)
-  const showGatewaySupportPlaceholder = demoMode && gatewaySupportRequired
+    screenshotQuery.data?.currentUrl ||
+    activeTab?.url ||
+    statusQuery.data?.url ||
+    'about:blank'
+  const screenshotUrl =
+    screenshotQuery.data?.imageDataUrl || statusQuery.data?.screenshotUrl || ''
+  const errorText =
+    actionError ||
+    screenshotQuery.data?.error ||
+    tabsError ||
+    (isConnected ? '' : statusMessage)
 
-  // Default to local browser — gateway RPC browser is an advanced/optional mode
-  // Show local browser immediately, no waiting for gateway probe
-  const gatewayBrowserAvailable =
-    tabsQuery.isSuccess &&
-    !showGatewaySupportPlaceholder &&
-    (tabsQuery.data?.tabs?.length ?? 0) > 0
+  useEffect(() => {
+    if (!isEditingUrl) {
+      setDraftUrl(currentUrl || '')
+    }
+  }, [currentUrl, isEditingUrl])
 
-  if (!gatewayBrowserAvailable) {
+  function handleSelectTab(tabId: string) {
+    setSelectedTabId(tabId)
+    setActionError('')
+  }
+
+  function handleRefresh() {
+    void Promise.all([
+      statusQuery.refetch(),
+      tabsQuery.refetch(),
+      screenshotQuery.refetch(),
+    ])
+  }
+
+  async function handleNavigate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!draftUrl.trim()) return
+    setActionError('')
+    await navigateMutation.mutateAsync(draftUrl)
+  }
+
+  if (!isConnected) {
     return (
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.22 }}
-        className="h-screen bg-surface text-primary-900"
+        className="h-screen bg-surface px-3 py-3 text-primary-900 sm:px-4 sm:py-4"
       >
-        <LocalBrowser />
+        <div className="mx-auto flex h-full w-full max-w-[1700px] items-center justify-center">
+          <div className="w-full max-w-2xl rounded-2xl border border-primary-200 bg-primary-50/85 p-8 text-center shadow-sm backdrop-blur-xl">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-full border border-primary-300 bg-primary-100 text-primary-700">
+              <HugeiconsIcon icon={GlobeIcon} size={24} strokeWidth={1.5} />
+            </div>
+            <h1 className="mt-4 text-2xl font-medium text-primary-900">
+              Browser not connected
+            </h1>
+            <p className="mt-2 text-sm text-primary-600">
+              Click the OpenClaw Chrome extension icon on any Chrome tab to
+              attach it.
+            </p>
+            <div className="mt-4 rounded-xl border border-primary-200 bg-surface px-4 py-3 text-left">
+              <p className="text-xs uppercase tracking-wide text-primary-500">
+                Gateway CDP URL
+              </p>
+              <code className="mt-1 block rounded bg-primary-100 px-2 py-1 font-mono text-sm text-primary-800">
+                {BROWSER_CDP_URL}
+              </code>
+            </div>
+            {errorText ? (
+              <p className="mt-4 text-sm text-amber-700">{errorText}</p>
+            ) : null}
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={statusQuery.isRefetching || tabsQuery.isRefetching}
+                className="inline-flex items-center gap-2 rounded-lg border border-primary-300 bg-primary-100 px-4 py-2 text-sm font-medium text-primary-800 transition-colors hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <HugeiconsIcon icon={RefreshIcon} size={18} strokeWidth={1.5} />
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
       </motion.main>
     )
-  }
-
-  function handleSelectTab(tabId: string) {
-    setSelectedTabId(tabId)
-  }
-
-  function handleRefresh() {
-    void Promise.all([tabsQuery.refetch(), screenshotQuery.refetch()])
   }
 
   return (
@@ -247,53 +343,65 @@ function BrowserPanel() {
     >
       <div className="mx-auto flex h-full w-full max-w-[1700px] min-w-0 flex-col gap-3">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-100/70 px-3 py-1 text-xs text-primary-600 tabular-nums">
-            <HugeiconsIcon icon={GlobeIcon} size={20} strokeWidth={1.5} />
-            <span>Live Browser Monitor</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-100/70 px-3 py-1 text-xs text-primary-600 tabular-nums">
+              <HugeiconsIcon icon={GlobeIcon} size={20} strokeWidth={1.5} />
+              <span>Browser View</span>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700">
+              <span className="size-2 rounded-full bg-emerald-500" />
+              Connected
+            </span>
           </div>
-          <h1 className="mt-2 text-xl font-medium text-balance sm:text-2xl">
-            Browser View
-          </h1>
-          <p className="mt-1 text-sm text-primary-600 text-pretty">
-            Track agent browser tabs and live screenshots every 2 seconds.
+          <p className="mt-2 text-sm text-primary-600 text-pretty">
+            Live tabs and screenshot refresh every 3 seconds.
           </p>
         </header>
 
-        <BrowserControls
-          url={currentUrl}
-          loading={tabsQuery.isPending || screenshotQuery.isPending}
-          refreshing={tabsQuery.isRefetching || screenshotQuery.isRefetching}
-          demoMode={demoMode}
-          onRefresh={handleRefresh}
-        />
-
-        {demoMode ? (
-          <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15">
-              <HugeiconsIcon
-                icon={GlobeIcon}
-                size={20}
-                strokeWidth={1.5}
-                className="text-amber-600"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
-                  Demo Mode
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs text-amber-700 text-pretty">
-                {showGatewaySupportPlaceholder
-                  ? 'Browser control requires gateway support. Enable browser RPC in your Gateway configuration.'
-                  : 'Connect a browser to use live features. Configure the browser plugin in your Gateway settings.'}
-                {errorText ? (
-                  <span className="text-amber-600/80"> ({errorText})</span>
-                ) : null}
-              </p>
-            </div>
+        <form
+          onSubmit={handleNavigate}
+          className="rounded-2xl border border-primary-200 bg-primary-100/40 p-3 shadow-sm backdrop-blur-xl"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={
+                statusQuery.isPending ||
+                tabsQuery.isPending ||
+                screenshotQuery.isPending ||
+                statusQuery.isRefetching ||
+                tabsQuery.isRefetching ||
+                screenshotQuery.isRefetching
+              }
+              className="inline-flex items-center gap-2 rounded-lg border border-primary-300 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-800 transition-colors hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <HugeiconsIcon icon={RefreshIcon} size={18} strokeWidth={1.5} />
+              {statusQuery.isRefetching || tabsQuery.isRefetching || screenshotQuery.isRefetching
+                ? 'Refreshing'
+                : 'Refresh'}
+            </button>
+            <input
+              type="url"
+              value={draftUrl}
+              onChange={(event) => setDraftUrl(event.target.value)}
+              onFocus={() => setIsEditingUrl(true)}
+              onBlur={() => setIsEditingUrl(false)}
+              placeholder="Enter URL"
+              className="min-w-[260px] flex-1 rounded-xl border border-primary-200 bg-primary-50/75 px-3 py-2 text-sm text-primary-800 outline-none ring-0 placeholder:text-primary-400 focus:border-accent-500/50"
+            />
+            <button
+              type="submit"
+              disabled={navigateMutation.isPending || !draftUrl.trim()}
+              className="inline-flex items-center rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {navigateMutation.isPending ? 'Navigating...' : 'Go'}
+            </button>
           </div>
-        ) : null}
+          {errorText ? (
+            <p className="mt-2 text-xs text-amber-700">{errorText}</p>
+          ) : null}
+        </form>
 
         <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[320px_1fr]">
           <BrowserTabs
@@ -303,81 +411,7 @@ function BrowserPanel() {
             onSelect={handleSelectTab}
           />
 
-          {showGatewaySupportPlaceholder ? (
-            <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-2xl border border-primary-200 bg-primary-100/35 p-6 text-center lg:min-h-[560px]">
-              <div className="flex size-10 items-center justify-center rounded-full border border-primary-300 bg-primary-50 text-primary-700">
-                <HugeiconsIcon icon={GlobeIcon} size={20} strokeWidth={1.5} />
-              </div>
-              <h3 className="text-base font-medium text-primary-900 text-balance">
-                Browser Control Setup
-              </h3>
-              <p className="max-w-md text-sm text-primary-600 text-pretty">
-                Connect a browser so your AI agent can browse the web, fill
-                forms, and extract data.
-              </p>
-              <div className="mt-2 w-full max-w-md rounded-xl border border-primary-200 bg-surface p-4 text-left space-y-3">
-                <div className="flex items-start gap-3">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-500/15 text-xs font-bold text-accent-600">
-                    1
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-ink">
-                      Install the Chrome Extension
-                    </p>
-                    <p className="text-xs text-primary-500 mt-0.5">
-                      Install the{' '}
-                      <a
-                        href="https://docs.openclaw.ai/browser"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-accent-500 hover:underline"
-                      >
-                        OpenClaw Browser Relay
-                      </a>{' '}
-                      extension from the Chrome Web Store.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-500/15 text-xs font-bold text-accent-600">
-                    2
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-ink">
-                      Enable Browser RPC
-                    </p>
-                    <p className="text-xs text-primary-500 mt-0.5">
-                      Add{' '}
-                      <code className="rounded bg-primary-100 px-1 py-0.5 font-mono text-[11px]">
-                        browser: true
-                      </code>{' '}
-                      to your OpenClaw gateway config.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-500/15 text-xs font-bold text-accent-600">
-                    3
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-ink">Attach a Tab</p>
-                    <p className="text-xs text-primary-500 mt-0.5">
-                      Click the OpenClaw toolbar icon on any Chrome tab to
-                      connect it. The badge turns ON when attached.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <a
-                href="https://docs.openclaw.ai/browser"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-4 py-2 text-sm font-medium text-accent-600 hover:bg-accent-500/20 transition-colors"
-              >
-                View Full Setup Guide →
-              </a>
-            </div>
-          ) : screenshotUrl ? (
+          {screenshotUrl ? (
             <BrowserScreenshot
               imageDataUrl={screenshotUrl}
               loading={screenshotQuery.isPending}
