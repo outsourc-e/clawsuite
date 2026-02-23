@@ -1109,6 +1109,20 @@ const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
 
 const LEGACY_AGENT_AVATARS = ['🔍', '✍️', '📝', '🧪', '🎨', '📊', '🛡️', '⚡', '🔬', '🎯'] as const
 const AGENT_AVATAR_COUNT = 10
+
+const AGENT_NAME_POOL = [
+  'Atlas', 'Forge', 'Nova', 'Scout', 'Nexus', 'Echo', 'Apex', 'Vega',
+  'Orbit', 'Zen', 'Flux', 'Cipher', 'Sage', 'Wren', 'Coda', 'Drift',
+  'Hex', 'Iris', 'Jett', 'Lux', 'Mira', 'Pix', 'Quest', 'Sol',
+  'Terra', 'Unity', 'Blaze', 'Rune', 'Arlo', 'Cruz',
+]
+
+function pickUniqueAgentName(existingNames: string[]): string {
+  const usedSet = new Set(existingNames.map((n) => n.toLowerCase()))
+  const available = AGENT_NAME_POOL.filter((n) => !usedSet.has(n.toLowerCase()))
+  const pool = available.length > 0 ? available : AGENT_NAME_POOL
+  return pool[Math.floor(Math.random() * pool.length)]
+}
 const LEGACY_AGENT_AVATAR_INDEX = new Map<string, number>(
   LEGACY_AGENT_AVATARS.map((avatar, index) => [avatar, index]),
 )
@@ -1711,7 +1725,7 @@ function OfficeView({
                   </div>
                 ) : null}
 
-                {/* View Output button — full-width */}
+                {/* Edit agent button — full-width */}
                 <button
                   type="button"
                   onClick={() => onViewOutput(agent.id)}
@@ -1722,7 +1736,7 @@ function OfficeView({
                       : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50',
                   )}
                 >
-                  {isSelected ? '✓ Viewing Output' : 'View Output'}
+                  Edit agent
                 </button>
               </div>
             </div>
@@ -3680,7 +3694,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const nextIndex = team.length
     setNewAgentDraft({
       id: createMemberId(),
-      name: '',
+      name: pickUniqueAgentName(team.map((m) => m.name)),
       avatar: getAgentAvatarForSlot(nextIndex),
       modelId: 'auto',
       roleDescription: '',
@@ -3925,8 +3939,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             agentRows={agentWorkingRows}
             missionRunning={isMissionRunning}
             onViewOutput={(agentId) => {
-              setSelectedOutputAgentId(agentId)
-              setActiveTab('missions')
+              setActiveTab('configure')
+              setConfigSection('agents')
+              setAgentWizardOpenId(agentId)
             }}
             selectedOutputAgentId={selectedOutputAgentId}
             activeTemplateName={

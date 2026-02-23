@@ -765,22 +765,29 @@ function pickUniqueTeamIcon(existing: string[]): string {
 }
 
 export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons = [], onSaveCurrentAs, onApplyTemplate, onClose }: AddTeamModalProps) {
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(
     () => new Set(currentTeam.map((m) => m.id))
   )
   const [teamName, setTeamName] = useState('')
   const [teamIcon, setTeamIcon] = useState(() => pickUniqueTeamIcon(existingIcons))
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
-  // When a template is picked and "Next" is clicked, pre-fill name and agents
-  function applyTemplateToStep2(tpl: AddTeamModalProps['quickStartTemplates'][number] | null) {
+  // Auto-focus name input when step 1 mounts
+  useEffect(() => {
+    if (step === 1) {
+      const t = setTimeout(() => nameInputRef.current?.focus(), 50)
+      return () => clearTimeout(t)
+    }
+  }, [step])
+
+  // Apply a template — pre-fill agents (and name only if blank or was template name)
+  function applyTemplate(tpl: AddTeamModalProps['quickStartTemplates'][number] | null) {
     if (!tpl) {
-      // Skip / build from scratch — all agents selected, blank name
       setSelectedAgents(new Set(currentTeam.map((m) => m.id)))
       return
     }
-    setTeamName(tpl.label)
     const matched = new Set(
       currentTeam
         .filter((m) => tpl.agents.some((a) => a.toLowerCase() === m.name.toLowerCase()))
@@ -816,23 +823,27 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
 
   const canCreate = selectedAgents.size > 0
 
+  const stepLabel =
+    step === 1 ? 'Step 1 of 3' :
+    step === 2 ? 'Step 2 of 3' :
+                 'Step 3 of 3'
+
   return (
     <WizardModal open onClose={onClose} width="max-w-lg">
-      {/* Header — step indicator */}
+      {/* Header */}
       <div className="flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4 border-l-orange-400">
         <div className="flex size-12 items-center justify-center rounded-full bg-orange-50 dark:bg-orange-900/20 text-2xl shadow-sm">
           {teamIcon}
         </div>
         <div className="flex-1">
           <p className="text-base font-bold text-neutral-900 dark:text-white">New Team</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            {step === 1 ? 'Step 1 — Choose a Template' : 'Step 2 — Configure Team'}
-          </p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">{stepLabel}</p>
         </div>
         {/* Step dots */}
         <div className="flex items-center gap-1.5 mr-2">
           <span className={cn('size-2 rounded-full transition-colors', step === 1 ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
           <span className={cn('size-2 rounded-full transition-colors', step === 2 ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+          <span className={cn('size-2 rounded-full transition-colors', step === 3 ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
         </div>
         <button type="button" onClick={onClose}
           className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
@@ -840,31 +851,53 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
         </button>
       </div>
 
-      {/* ── Step 1: Choose a Template ── */}
+      {/* ── Step 1: Name your team ── */}
       {step === 1 ? (
         <>
-          <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">
-            <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">Pick a template to pre-configure your team, or start from scratch.</p>
-            <div className="grid grid-cols-2 gap-2">
-              {quickStartTemplates.map((tpl) => (
+          <div className="px-6 py-8">
+            <p className="mb-5 text-xl font-bold text-neutral-900 dark:text-white">Name your team</p>
+            <input
+              ref={nameInputRef}
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && teamName.trim()) setStep(2) }}
+              placeholder="e.g. Research Squad, Dev Team..."
+              className="h-11 w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 text-sm text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-2 transition-colors"
+            />
+            <p className="mt-2 text-xs text-neutral-400 dark:text-neutral-500">You can change this later</p>
+          </div>
+          <div className="flex justify-end border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              disabled={!teamName.trim()}
+              className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-40 transition-colors"
+            >
+              Next →
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {/* ── Step 2: Choose a picture ── */}
+      {step === 2 ? (
+        <>
+          <div className="px-6 py-6">
+            <p className="mb-4 text-xl font-bold text-neutral-900 dark:text-white">Choose a picture</p>
+            <div className="grid grid-cols-6 gap-2">
+              {INLINE_TEAM_ICONS.map((ic) => (
                 <button
-                  key={tpl.id}
+                  key={ic}
                   type="button"
-                  onClick={() => setSelectedTemplate(tpl.id === selectedTemplate ? null : tpl.id)}
-                  className={cn('flex items-center gap-2 rounded-xl border-2 px-3 py-3 text-left transition-all',
-                    selectedTemplate === tpl.id
-                      ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/15 shadow-sm'
-                      : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600')}
+                  onClick={() => setTeamIcon(ic)}
+                  className={cn(
+                    'flex size-11 items-center justify-center rounded-xl text-2xl transition-all hover:scale-110',
+                    teamIcon === ic
+                      ? 'bg-orange-100 dark:bg-orange-900/40 ring-2 ring-orange-400'
+                      : 'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                  )}
                 >
-                  <span className="shrink-0 text-xl">{tpl.icon}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-100 truncate">{tpl.label}</p>
-                    <p className="text-[9px] text-neutral-400 truncate mt-0.5">{tpl.description}</p>
-                  </div>
-                  <span className={cn('ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold',
-                    tpl.tier === 'budget' ? 'bg-green-100 text-green-700' : tpl.tier === 'balanced' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700')}>
-                    {tpl.tier === 'budget' ? '💰' : tpl.tier === 'balanced' ? '⚖️' : '🚀'}
-                  </span>
+                  {ic}
                 </button>
               ))}
             </div>
@@ -872,18 +905,14 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
           <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
             <button
               type="button"
-              onClick={() => { applyTemplateToStep2(null); setSelectedTemplate(null); setStep(2) }}
-              className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors underline underline-offset-2"
+              onClick={() => setStep(1)}
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
             >
-              Skip — build from scratch
+              ← Back
             </button>
             <button
               type="button"
-              onClick={() => {
-                const tpl = quickStartTemplates.find((t) => t.id === selectedTemplate) ?? null
-                applyTemplateToStep2(tpl)
-                setStep(2)
-              }}
+              onClick={() => setStep(3)}
               className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
             >
               Next →
@@ -892,10 +921,49 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
         </>
       ) : null}
 
-      {/* ── Step 2: Configure Team ── */}
-      {step === 2 ? (
+      {/* ── Step 3: Build your team ── */}
+      {step === 3 ? (
         <>
-          <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="px-6 py-5 max-h-[65vh] overflow-y-auto space-y-4">
+            {/* Templates section */}
+            <div>
+              <p className="mb-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Start from a template</p>
+              <div className="grid grid-cols-2 gap-2">
+                {quickStartTemplates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => {
+                      const next = tpl.id === selectedTemplate ? null : tpl.id
+                      setSelectedTemplate(next)
+                      applyTemplate(next ? tpl : null)
+                    }}
+                    className={cn('flex items-center gap-2 rounded-xl border-2 px-3 py-3 text-left transition-all',
+                      selectedTemplate === tpl.id
+                        ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/15 shadow-sm'
+                        : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600')}
+                  >
+                    <span className="shrink-0 text-xl">{tpl.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-100 truncate">{tpl.label}</p>
+                      <p className="text-[9px] text-neutral-400 truncate mt-0.5">{tpl.description}</p>
+                    </div>
+                    <span className={cn('ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold',
+                      tpl.tier === 'budget' ? 'bg-green-100 text-green-700' : tpl.tier === 'balanced' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700')}>
+                      {tpl.tier === 'budget' ? '💰' : tpl.tier === 'balanced' ? '⚖️' : '🚀'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 border-t border-neutral-200 dark:border-neutral-700" />
+              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 whitespace-nowrap">— or configure from scratch —</span>
+              <div className="flex-1 border-t border-neutral-200 dark:border-neutral-700" />
+            </div>
+
             {/* Agent checklist */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -909,7 +977,6 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
                   <p className="text-center text-xs text-neutral-400 py-3">No agents configured yet</p>
                 ) : currentTeam.map((m) => {
                   const checked = selectedAgents.has(m.id)
-                  // Get short model label
                   const modelParts = m.modelId.split('/')
                   const modelShort = modelParts[modelParts.length - 1] || m.modelId
                   return (
@@ -945,43 +1012,12 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
                 ) : null}
               </div>
             </div>
-
-            {/* Team Name + Icon side by side */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <FieldLabel>Team Name</FieldLabel>
-                <input
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                  placeholder="e.g. Research Squad, Dev Team…"
-                  className={INPUT_CLS}
-                />
-              </div>
-              <div>
-                <FieldLabel>Team Icon</FieldLabel>
-                <div className="flex flex-wrap gap-1 max-h-[72px] overflow-y-auto">
-                  {INLINE_TEAM_ICONS.slice(0, 20).map((ic) => (
-                    <button
-                      key={ic}
-                      type="button"
-                      onClick={() => setTeamIcon(ic)}
-                      className={cn(
-                        'flex size-8 items-center justify-center rounded-md text-lg transition-all hover:scale-110',
-                        teamIcon === ic ? 'bg-orange-100 dark:bg-orange-900/30 ring-1 ring-orange-400' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800',
-                      )}
-                    >
-                      {ic}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="flex items-center justify-between gap-3 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => setStep(2)}
               className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
             >
               ← Back
