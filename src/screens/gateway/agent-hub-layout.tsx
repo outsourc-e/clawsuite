@@ -11,7 +11,7 @@ import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval } from '@/lib/gateway-api'
+import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval, killAgentSession } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
 import {
@@ -3298,6 +3298,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     )
   }, [team, agentSessionMap, _handleSetAgentPaused])
 
+  const handleKillAgent = useCallback(async (agentId: string) => {
+    const sessionKey = agentSessionMap[agentId]
+    if (!sessionKey) return
+    const member = team.find((m) => m.id === agentId)
+    const agentName = member?.name ?? agentId
+    try {
+      await killAgentSession(sessionKey)
+      setAgentSessionMap((prev) => { const n = { ...prev }; delete n[agentId]; return n })
+      setSpawnState((prev) => ({ ...prev, [agentId]: 'idle' }))
+      setAgentSessionStatus((prev) => { const n = { ...prev }; delete n[agentId]; return n })
+      emitFeedEvent({ type: 'agent_killed', message: `${agentName} session killed`, agentName })
+      toast(`${agentName} killed`, { type: 'success' })
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Kill failed', { type: 'error' })
+    }
+  }, [agentSessionMap, team])
+
   const handleSteerAgent = useCallback(
     async (agentId: string, message: string) => {
       const sessionKey = agentSessionMap[agentId]
@@ -5452,8 +5469,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       setProcessType(restoreCheckpoint.processType)
                       setRestoreCheckpoint(null)
                       setRestoreDismissed(true)
-                      // Open mission wizard so user can review + launch
-                      setWizardOpen(true)
+                      // Open new mission modal pre-filled at step 3 (Review & Launch)
+                      setNewMissionName('')
+                      setNewMissionGoal(restoreCheckpoint.label)
+                      setNewMissionProcessType(restoreCheckpoint.processType)
+                      setMissionBoardModalOpen(true)
+                      setMissionWizardStep(3)
                     }}
                     className="rounded-md bg-orange-500 px-2 py-1 text-[10px] font-semibold text-white hover:bg-orange-600"
                   >
