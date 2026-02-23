@@ -529,12 +529,13 @@ type TeamWizardProps = {
   teamName: string
   teamIcon: string
   teamMembers: Array<{ id: string; name: string; modelId: string }>
+  availableAgents: Array<{ id: string; name: string; role: string }>
   isActive: boolean
   modelPresets: ReadonlyArray<{ readonly id: string; readonly label: string; readonly desc?: string }>
   gatewayModels: ReadonlyArray<{ value: string; label: string; provider: string }>
   onRename: (name: string) => void
   onUpdateIcon: (icon: string) => void
-  onUpdateMembers: (updates: Array<{ id: string; modelId: string }>) => void
+  onUpdateMembers: (members: Array<{ id: string; name: string; modelId: string }>) => void
   onLoad: () => void
   onDelete: () => void
   onClose: () => void
@@ -545,6 +546,7 @@ export function TeamWizardModal({
   teamName,
   teamIcon,
   teamMembers,
+  availableAgents,
   isActive,
   modelPresets,
   gatewayModels,
@@ -565,12 +567,24 @@ export function TeamWizardModal({
   function handleSave() {
     onRename(name)
     onUpdateIcon(icon)
-    onUpdateMembers(localMembers.map((m) => ({ id: m.id, modelId: m.modelId })))
+    onUpdateMembers(localMembers)
     onClose()
   }
 
   function setMemberModel(id: string, modelId: string) {
     setLocalMembers((prev) => prev.map((m) => m.id === id ? { ...m, modelId } : m))
+  }
+
+  function toggleAgent(agentId: string) {
+    const isSelected = localMembers.some((m) => m.id === agentId)
+    if (isSelected) {
+      setLocalMembers((prev) => prev.filter((m) => m.id !== agentId))
+    } else {
+      const agent = availableAgents.find((a) => a.id === agentId)
+      if (agent) {
+        setLocalMembers((prev) => [...prev, { id: agent.id, name: agent.name, modelId: 'auto' }])
+      }
+    }
   }
 
   return (
@@ -633,36 +647,53 @@ export function TeamWizardModal({
           <input value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLS} />
         </div>
 
-        {/* Agents list with model selectors */}
+        {/* Agents list with checkboxes and model selectors */}
         <div>
-          <FieldLabel>Agents &amp; Models ({localMembers.length})</FieldLabel>
-          <div className="space-y-1.5">
-            {localMembers.map((m, idx) => (
-              <div key={m.id} className="flex items-center gap-2 rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700 text-[10px] font-bold text-neutral-600 dark:text-neutral-300">
-                  {idx + 1}
-                </span>
-                <p className="min-w-0 flex-1 text-xs font-semibold text-neutral-800 dark:text-neutral-100 truncate">{m.name}</p>
-                <select
-                  value={m.modelId}
-                  onChange={(e) => setMemberModel(m.id, e.target.value)}
-                  className="h-7 w-40 shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 text-[10px] text-neutral-700 dark:text-neutral-300 outline-none focus:ring-1 ring-orange-400 cursor-pointer"
-                >
-                  <optgroup label="Presets">
-                    {modelPresets.map((p) => (
-                      <option key={p.id} value={p.id}>{p.label}</option>
-                    ))}
-                  </optgroup>
-                  {gatewayModels.length > 0 ? (
-                    <optgroup label="Available Models">
-                      {gatewayModels.map((gm) => (
-                        <option key={gm.value} value={gm.value}>{gm.label} ({gm.provider})</option>
-                      ))}
-                    </optgroup>
+          <FieldLabel>Team Members ({localMembers.length} / {availableAgents.length})</FieldLabel>
+          <div className="max-h-[400px] overflow-y-auto space-y-1.5">
+            {availableAgents.map((agent) => {
+              const member = localMembers.find((m) => m.id === agent.id)
+              const isSelected = !!member
+              return (
+                <div key={agent.id} className={cn(
+                  "flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors",
+                  isSelected 
+                    ? "border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20"
+                    : "border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50"
+                )}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleAgent(agent.id)}
+                    className="size-4 shrink-0 rounded border-neutral-300 text-orange-500 focus:ring-orange-500 cursor-pointer"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-100 truncate">{agent.name}</p>
+                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400">{agent.role}</p>
+                  </div>
+                  {isSelected && member ? (
+                    <select
+                      value={member.modelId}
+                      onChange={(e) => setMemberModel(member.id, e.target.value)}
+                      className="h-7 w-40 shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 text-[10px] text-neutral-700 dark:text-neutral-300 outline-none focus:ring-1 ring-orange-400 cursor-pointer"
+                    >
+                      <optgroup label="Presets">
+                        {modelPresets.map((p) => (
+                          <option key={p.id} value={p.id}>{p.label}</option>
+                        ))}
+                      </optgroup>
+                      {gatewayModels.length > 0 ? (
+                        <optgroup label="Available Models">
+                          {gatewayModels.map((gm) => (
+                            <option key={gm.value} value={gm.value}>{gm.label} ({gm.provider})</option>
+                          ))}
+                        </optgroup>
+                      ) : null}
+                    </select>
                   ) : null}
-                </select>
-              </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>

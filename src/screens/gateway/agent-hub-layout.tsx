@@ -4724,6 +4724,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     teamName={config.name}
                     teamIcon={config.icon ?? '👥'}
                     teamMembers={config.team}
+                    availableAgents={agents}
                     isActive={selectedTeamConfigId === config.id}
                     modelPresets={MODEL_PRESETS}
                     gatewayModels={gatewayModels}
@@ -4733,15 +4734,32 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     onUpdateIcon={(icon) => {
                       setTeamConfigs((prev) => prev.map((c) => c.id === config.id ? { ...c, icon, updatedAt: Date.now() } : c))
                     }}
-                    onUpdateMembers={(updates) => {
+                    onUpdateMembers={(members) => {
                       setTeamConfigs((prev) => prev.map((c) => {
                         if (c.id !== config.id) return c
+                        // Preserve existing TeamMember properties for existing members, use defaults for new ones
+                        const updatedTeam = members.map((m) => {
+                          const existing = c.team.find((t) => t.id === m.id)
+                          if (existing) {
+                            // Update model but keep other properties
+                            return { ...existing, modelId: m.modelId }
+                          } else {
+                            // New member - add with default properties
+                            const agent = agents.find((a) => a.id === m.id)
+                            return {
+                              id: m.id,
+                              name: m.name,
+                              modelId: m.modelId,
+                              roleDescription: agent?.role ?? '',
+                              goal: '',
+                              backstory: '',
+                              status: agent?.status ?? 'idle',
+                            }
+                          }
+                        })
                         return {
                           ...c,
-                          team: c.team.map((m) => {
-                            const upd = updates.find((u) => u.id === m.id)
-                            return upd ? { ...m, modelId: upd.modelId } : m
-                          }),
+                          team: updatedTeam,
                           updatedAt: Date.now(),
                         }
                       }))
@@ -5505,16 +5523,26 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       {agentWorkingRows.slice(0, 5).map((row) => (
                         <div key={row.id} className="flex items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-1 text-[10px]">
                           <span className="truncate font-medium text-neutral-800">{row.name}</span>
-                          <span className={cn(
-                            'ml-2 rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
-                            row.status === 'active' && 'bg-emerald-100 text-emerald-700',
-                            row.status === 'idle' && 'bg-amber-100 text-amber-700',
-                            row.status === 'paused' && 'bg-amber-100 text-amber-700',
-                            row.status === 'error' && 'bg-red-100 text-red-700',
-                            row.status !== 'active' && row.status !== 'idle' && row.status !== 'paused' && row.status !== 'error' && 'bg-neutral-200 text-neutral-700',
-                          )}>
-                            {row.status}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => _handleSetAgentPaused(row.id, row.status !== 'paused')}
+                              className="text-neutral-500 hover:text-neutral-700 transition-colors"
+                              title={row.status === 'paused' ? 'Resume agent' : 'Pause agent'}
+                            >
+                              {row.status === 'paused' ? '▶' : '⏸'}
+                            </button>
+                            <span className={cn(
+                              'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                              row.status === 'active' && 'bg-emerald-100 text-emerald-700',
+                              row.status === 'idle' && 'bg-amber-100 text-amber-700',
+                              row.status === 'paused' && 'bg-amber-100 text-amber-700',
+                              row.status === 'error' && 'bg-red-100 text-red-700',
+                              row.status !== 'active' && row.status !== 'idle' && row.status !== 'paused' && row.status !== 'error' && 'bg-neutral-200 text-neutral-700',
+                            )}>
+                              {row.status}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
