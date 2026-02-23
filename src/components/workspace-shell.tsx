@@ -18,7 +18,7 @@ import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
-import { useSettings } from '@/hooks/use-settings'
+// import { useSettings } from '@/hooks/use-settings'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
@@ -26,7 +26,7 @@ import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { SystemMetricsFooter } from '@/components/system-metrics-footer'
+// import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { DesktopAgentRosterSidebar } from '@/components/desktop-agent-roster-sidebar'
 import { DesktopLiveFeedPanel } from '@/components/desktop-live-feed-panel'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
@@ -56,8 +56,8 @@ export function WorkspaceShell() {
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
-  const { settings } = useSettings()
-  const showSystemMetrics = settings.showSystemMetrics ?? true
+  // const { settings } = useSettings()
+  // const showSystemMetrics = settings.showSystemMetrics ?? true
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
 
   // ChatGPT-style: track visual viewport height for keyboard-aware layout
@@ -96,7 +96,7 @@ export function WorkspaceShell() {
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
-  const isOnDashboardRoute = pathname === '/' || pathname === '/dashboard'
+  const isOnAgentHubRoute = pathname === '/agent-swarm' || pathname === '/agents' || pathname === '/sessions' || pathname === '/instances'
   // Desktop nav now uses hover expansion rail, so no backdrop click-target is needed.
   const showDesktopSidebarBackdrop = false
 
@@ -214,7 +214,7 @@ export function WorkspaceShell() {
             </div>
           )}
 
-          {!isMobile && isOnDashboardRoute ? <DesktopAgentRosterSidebar /> : null}
+          {!isMobile && isOnAgentHubRoute ? <DesktopAgentRosterSidebar /> : null}
 
           {/* Main content area — renders the matched route */}
           <main
@@ -243,7 +243,7 @@ export function WorkspaceShell() {
             </div>
           </main>
 
-          {!isMobile && isOnDashboardRoute ? <DesktopLiveFeedPanel /> : null}
+          {!isMobile && isOnAgentHubRoute ? <DesktopLiveFeedPanel /> : null}
 
           {/* Chat panel — visible on non-chat routes */}
           {!isOnChatRoute && !isMobile && <ChatPanel />}
@@ -262,7 +262,7 @@ export function WorkspaceShell() {
         ) : null}
       </div>
 
-      {showSystemMetrics ? <SystemMetricsFooter /> : null}
+      {/* System metrics footer removed from dashboard — re-enable in settings if needed */}
       {isMobile ? <MobileTabBar /> : null}
     </>
   )
