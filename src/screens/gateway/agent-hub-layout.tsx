@@ -5349,10 +5349,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     type="button"
                     onClick={() => {
                       if (!restoreCheckpoint) return
+                      // Restore full mission state: team + goal + process type
+                      setTeam(restoreCheckpoint.team.map((m, i) => ({
+                        ...m,
+                        avatar: m.avatar ?? getAgentAvatarForSlot(i),
+                      })))
                       setMissionGoal(restoreCheckpoint.label)
                       setProcessType(restoreCheckpoint.processType)
-                      setRestoreDismissed(true)
                       setRestoreCheckpoint(null)
+                      setRestoreDismissed(true)
+                      // Open mission wizard so user can review + launch
+                      setWizardOpen(true)
                     }}
                     className="rounded-md bg-orange-500 px-2 py-1 text-[10px] font-semibold text-white hover:bg-orange-600"
                   >
