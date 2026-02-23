@@ -2993,7 +2993,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         if (isTypingTarget) return
         if (!missionActiveRef.current) return
         event.preventDefault()
-        setMissionState((prev) => (prev === 'paused' ? 'running' : 'paused'))
+        void handleMissionPause(missionState === 'running')
         return
       }
 
@@ -3288,6 +3288,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     },
     [agentSessionMap, pausedByAgentId, team],
   )
+
+  const handleMissionPause = useCallback(async (pause: boolean) => {
+    setMissionState(pause ? 'paused' : 'running')
+    await Promise.allSettled(
+      team
+        .filter((m) => agentSessionMap[m.id])
+        .map((m) => _handleSetAgentPaused(m.id, pause))
+    )
+  }, [team, agentSessionMap, _handleSetAgentPaused])
 
   const handleSteerAgent = useCallback(
     async (agentId: string, message: string) => {
@@ -5580,7 +5589,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setMissionState((prev) => (prev === 'paused' ? 'running' : 'paused'))}
+                    onClick={() => void handleMissionPause(missionState === 'running')}
                     className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-[10px] font-medium text-neutral-700 hover:bg-neutral-50"
                   >
                     {missionState === 'paused' ? 'Resume' : 'Pause'}
@@ -6424,7 +6433,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <div className="mt-2 grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setMissionState('running')}
+                      onClick={() => void handleMissionPause(false)}
                       className={cn(
                         'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
                         missionState === 'running'
@@ -6436,7 +6445,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setMissionState('paused')}
+                      onClick={() => void handleMissionPause(true)}
                       className={cn(
                         'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
                         missionState === 'paused'
