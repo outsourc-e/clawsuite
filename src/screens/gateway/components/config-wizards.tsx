@@ -656,7 +656,7 @@ export function TeamWizardModal({
 
         {/* Section A: current team members */}
         <div>
-          <FieldLabel>Team ({localMembers.length} agent{localMembers.length !== 1 ? 's' : ''})</FieldLabel>
+          <FieldLabel>TEAM ({localMembers.length} agent{localMembers.length !== 1 ? 's' : ''})</FieldLabel>
           <div className="space-y-1.5">
             {localMembers.length === 0 ? (
               <p className="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 py-3 text-center text-xs text-neutral-400">No agents yet — add some below</p>
@@ -678,7 +678,11 @@ export function TeamWizardModal({
         {/* Section B: agents not in team */}
         {notInTeam.length > 0 ? (
           <div>
-            <FieldLabel>Add Agents</FieldLabel>
+            <div className="mb-2 flex items-center">
+              <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-700" />
+              <span className="px-2 text-[10px] font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-600">ADD AGENTS</span>
+              <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-700" />
+            </div>
             <div className="space-y-1.5">
               {notInTeam.map((agent) => (
                 <div key={agent.id} className="flex items-center gap-2.5 rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
