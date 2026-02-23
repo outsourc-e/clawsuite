@@ -2081,6 +2081,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [newMissionProcessType, setNewMissionProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
   const [newMissionBudgetLimit, setNewMissionBudgetLimit] = useState('120000')
   const [expandedMissionCardId, setExpandedMissionCardId] = useState<string | null>(null)
+  const [maximizedMissionId, setMaximizedMissionId] = useState<string | null>(null)
   const [_view, setView] = useState<'board' | 'timeline'>('board')
   const [missionState, setMissionState] = useState<'running' | 'paused' | 'stopped'>(
     'stopped',
@@ -4005,9 +4006,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             agentRows={agentWorkingRows}
             missionRunning={isMissionRunning}
             onViewOutput={(agentId) => {
-              setActiveTab('configure')
-              setConfigSection('agents')
-              setAgentWizardOpenId(agentId)
+              if (isMissionRunning) {
+                setMaximizedMissionId('running')
+              } else {
+                setActiveTab('configure')
+                setConfigSection('agents')
+                setAgentWizardOpenId(agentId)
+              }
             }}
             selectedOutputAgentId={selectedOutputAgentId}
             activeTemplateName={
@@ -5140,6 +5145,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       extraMetrics,
       extraFooter,
       expandedContent,
+      onMaximize,
     }: {
       id: string
       statusLabel: string
@@ -5155,6 +5161,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       extraMetrics?: Array<{ label: string; value: string }>
       extraFooter?: ReactNode
       expandedContent?: ReactNode
+      onMaximize?: () => void
     }) {
       const expanded = expandedMissionCardId === id
       const metricItems = [
@@ -5201,7 +5208,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <p className="truncate text-[10px] font-medium text-neutral-500 dark:text-slate-400">{teamLabel}</p>
               <div className="mt-1">{renderAvatarStrip(avatars)}</div>
             </div>
-            <span className="text-[10px] font-medium text-neutral-400">{expanded ? 'Hide' : 'Expand'}</span>
+            <div className="flex items-center gap-1">
+              {onMaximize ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onMaximize() }}
+                  className="flex size-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 transition-colors"
+                  title="Maximize"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M1.5 4.5V1.5H4.5M7.5 1.5H10.5V4.5M10.5 7.5V10.5H7.5M4.5 10.5H1.5V7.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              ) : null}
+              <span className="text-[10px] font-medium text-neutral-400">{expanded ? 'Hide' : 'Expand'}</span>
+            </div>
           </div>
 
           <div className="mt-3.5 grid grid-cols-2 gap-2 text-[10px] text-neutral-600 dark:text-slate-400">
@@ -5457,6 +5478,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </div>
               </div>
             ),
+            onMaximize: () => setMaximizedMissionId('running'),
           }),
         ]
       : []
@@ -5494,6 +5516,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <p className="line-clamp-3">{truncateMissionGoal(entry.report, 220)}</p>
           </div>
         ),
+        onMaximize: () => setMaximizedMissionId(entry.id),
       }),
     )
 
@@ -5543,6 +5566,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
         ),
+        onMaximize: () => setMaximizedMissionId(entry.id),
       }),
     )
 
@@ -5902,6 +5926,181 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   Send Directive ⌘↵
                 </button>
               </div>
+            </div>
+          </div>
+        )
+      })() : null}
+
+      {/* ── Mission Detail Overlay ────────────────────────────────────────── */}
+      {maximizedMissionId ? (() => {
+        const isRunning = maximizedMissionId === 'running'
+        const reportEntry = missionReports.find((r) => r.id === maximizedMissionId) ?? null
+
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setMaximizedMissionId(null)}
+          >
+            <div
+              className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-6 py-4">
+                <div>
+                  <p className="text-base font-bold text-neutral-900 dark:text-white">
+                    {isRunning ? (activeMissionName || 'Active Mission') : (reportEntry?.name || 'Mission Details')}
+                  </p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-1">
+                    {isRunning ? activeMissionGoal : reportEntry?.goal}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMaximizedMissionId(null)}
+                  className="flex size-8 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body — scrollable */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+                {/* Stats row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Progress', value: isRunning ? `${runningTaskStats.completed} / ${runningTaskStats.total}` : `${reportEntry?.taskStats.completed ?? 0} / ${reportEntry?.taskStats.total ?? 0}` },
+                    { label: 'Est. Cost', value: isRunning ? `$${estimateMissionCost(missionTokenCount).toFixed(2)}` : `$${reportEntry?.costEstimate.toFixed(2) ?? '0.00'}` },
+                    { label: 'Elapsed', value: isRunning ? formatDuration(Date.now() - (missionStartedAtRef.current || Date.now())) : formatDuration(reportEntry?.duration ?? 0) },
+                    { label: 'Tokens', value: isRunning ? missionTokenCount.toLocaleString() : (reportEntry?.tokenCount.toLocaleString() ?? '0') },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{label}</p>
+                      <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-white">{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Live Agent Status (running only) */}
+                {isRunning && agentWorkingRows.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Live Agent Status</p>
+                    <div className="space-y-2">
+                      {agentWorkingRows.map((row) => (
+                        <div key={row.id} className="flex items-center justify-between rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-slate-800 px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <span className={cn(
+                              'size-2 rounded-full',
+                              row.status === 'active' && 'bg-emerald-500 animate-pulse',
+                              row.status === 'idle' && 'bg-amber-400',
+                              row.status === 'paused' && 'bg-blue-400',
+                              row.status === 'error' && 'bg-red-500',
+                              !['active','idle','paused','error'].includes(row.status) && 'bg-neutral-300',
+                            )} />
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white">{row.name}</span>
+                            <span className={cn(
+                              'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                              row.status === 'active' && 'bg-emerald-100 text-emerald-700',
+                              row.status === 'idle' && 'bg-amber-100 text-amber-700',
+                              row.status === 'paused' && 'bg-blue-100 text-blue-700',
+                              row.status === 'error' && 'bg-red-100 text-red-700',
+                              !['active','idle','paused','error'].includes(row.status) && 'bg-neutral-200 text-neutral-700',
+                            )}>{row.status}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {/* Output button */}
+                            <button
+                              type="button"
+                              onClick={() => { setSelectedOutputAgentId(row.id); setOutputPanelVisible(true); setMaximizedMissionId(null) }}
+                              className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                              View Output
+                            </button>
+                            {/* Pause/resume */}
+                            <button
+                              type="button"
+                              onClick={() => _handleSetAgentPaused(row.id, row.status !== 'paused')}
+                              className="flex size-7 items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors text-sm"
+                              title={row.status === 'paused' ? 'Resume' : 'Pause'}
+                            >
+                              {row.status === 'paused' ? '▶' : '⏸'}
+                            </button>
+                            {/* Steer */}
+                            <button
+                              type="button"
+                              onClick={() => { setSteerAgentId(row.id); setSteerInput(''); setMaximizedMissionId(null) }}
+                              className="flex size-7 items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-orange-500 hover:border-orange-300 dark:hover:bg-slate-800 transition-colors text-sm"
+                              title="Steer agent"
+                            >
+                              ✦
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Latest agent output lines (running only) */}
+                {isRunning && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Latest Output</p>
+                    <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-4 font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-slate-300 max-h-48 overflow-y-auto space-y-1">
+                      {agentWorkingRows.flatMap((row) =>
+                        (agentOutputLinesRef.current[row.id] ?? []).slice(-4).map((line, idx) => (
+                          <p key={`${row.id}-${idx}`}>
+                            <span className="text-orange-500 font-semibold">[{row.name}]</span> {line}
+                          </p>
+                        ))
+                      ).slice(-20)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Artifacts */}
+                {isRunning && artifacts.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Artifacts ({artifacts.length})</p>
+                    <div className="flex flex-wrap gap-2">
+                      {artifacts.slice(0, 10).map((a) => (
+                        <span key={a.id} className="rounded-full border border-neutral-200 bg-white dark:bg-slate-800 px-3 py-1 text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                          {a.title}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Report text (done/review missions) */}
+                {!isRunning && reportEntry?.report && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Mission Report</p>
+                    <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-4 text-sm text-neutral-700 dark:text-slate-300 max-h-60 overflow-y-auto whitespace-pre-wrap">
+                      {reportEntry.report}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Footer controls (running only) */}
+              {isRunning && (
+                <div className="border-t border-neutral-200 dark:border-neutral-700 px-6 py-4 flex items-center justify-between gap-3">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    Mission running · {agentWorkingRows.filter((r) => r.status === 'active').length} agents active
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMaximizedMissionId(null)}
+                      className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )
