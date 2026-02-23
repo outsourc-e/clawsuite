@@ -3214,16 +3214,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
 
   const spawnAgentSession = useCallback(async (member: TeamMember): Promise<string> => {
-    // Use pure random UUID for friendlyId to avoid gateway parsing agent name
-    const friendlyId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `hub-${Math.random().toString(36).slice(2, 15)}`
+    const suffix = Math.random().toString(36).slice(2, 8)
+    const baseName = member.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const friendlyId = `hub-${baseName}-${suffix}`
     const label = `Mission: ${member.name}`
 
     // Check if a session with this label already exists — reuse it instead of
     // trying to create a duplicate (gateway enforces unique labels).
-    // Only reuse sessions that look like proper isolated hub sessions — never
-    // reuse discord/channel sessions that might be linked to the main chat.
     try {
       const listResp = await fetch('/api/sessions')
       if (listResp.ok) {
@@ -3233,9 +3230,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         )
         if (existing) {
           const existingKey = readString(existing.key)
-          // Only reuse if it's an isolated subagent session (not a channel session)
-          const isIsolated = existingKey.startsWith('agent:') && !existingKey.includes(':discord:') && !existingKey.includes(':channel:')
-          if (existingKey && isIsolated) return existingKey
+          if (existingKey) return existingKey
         }
       }
     } catch {
@@ -3243,19 +3238,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     const modelString = resolveGatewayModelId(member.modelId)
-    
-    // Build system prompt with agent context
-    const systemPromptParts = [
-      `You are ${member.name}, an agent in a multi-agent mission.`,
-      member.roleDescription && `Role: ${member.roleDescription}`,
-      member.goal && `Your goal: ${member.goal}`,
-      member.backstory && `Background: ${member.backstory}`,
-    ].filter(Boolean)
-    const systemPrompt = systemPromptParts.length > 0 ? systemPromptParts.join('\n\n') : undefined
-    
     const requestBody: Record<string, string> = { friendlyId, label }
     if (modelString) requestBody.model = modelString
-    if (systemPrompt) requestBody.systemPrompt = systemPrompt
 
     const response = await fetch('/api/sessions', {
       method: 'POST',
