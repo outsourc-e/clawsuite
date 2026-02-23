@@ -3891,15 +3891,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 4)
       .map(([label, count]) => `${label}×${count}`)
-    const _gatewayHeaderPillClass =
-      effectiveGatewayStatus === 'connected'
-        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-        : effectiveGatewayStatus === 'spawning'
-          ? 'border-amber-200 bg-amber-50 text-amber-700'
-          : 'border-red-200 bg-red-50 text-red-700'
-
-    const _headerMetricCardClass =
-      'rounded-lg border border-neutral-200/80 bg-white/85 px-2.5 py-2 shadow-sm'
     const widgetCardBaseClass =
       'group relative overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-5 shadow-sm hover:shadow-md transition-shadow duration-200 dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]'
     const widgetInsetClass =
@@ -4876,10 +4867,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const selectedMissionTeamMembers = selectedMissionTeamOption?.team ?? []
     const selectedBudgetTokens = parseTokenBudget(newMissionBudgetLimit)
     const selectedTotalBudgetCost = selectedBudgetTokens ? estimateMissionCost(selectedBudgetTokens) : null
-    const _selectedAverageBudgetCost =
-      selectedBudgetTokens && selectedMissionTeamMembers.length > 0
-        ? Number((estimateMissionCost(selectedBudgetTokens) / selectedMissionTeamMembers.length).toFixed(2))
-        : null
+    // (budget cost per agent — reserved for future budget display)
 
     function getTeamBudgetSummary(members: TeamMember[]) {
       const totalCost = selectedBudgetTokens ? estimateMissionCost(selectedBudgetTokens) : null
