@@ -10,7 +10,7 @@ import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval } from '@/lib/gateway-api'
+import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
 import {
@@ -2091,6 +2091,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [, setTeamPanelFlash] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string>()
   const [selectedOutputAgentId, setSelectedOutputAgentId] = useState<string>()
+  const [outputPanelVisible, setOutputPanelVisible] = useState(false)
   const [boardTasks, _setBoardTasks] = useState<Array<HubTask>>([])
   const [missionTasks, setMissionTasks] = useState<Array<HubTask>>([])
   const [dispatchedTaskIdsByAgent, setDispatchedTaskIdsByAgent] = useState<Record<string, Array<string>>>({})
@@ -2144,6 +2145,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [selectedReport, setSelectedReport] = useState<StoredMissionReport | null>(null)
   const [missionTokenCount, setMissionTokenCount] = useState(0)
   const [pausedByAgentId, setPausedByAgentId] = useState<Record<string, boolean>>({})
+  const [steerAgentId, setSteerAgentId] = useState<string | null>(null)
+  const [steerInput, setSteerInput] = useState('')
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const stored = readStoredTeam()
     if (stored.length > 0) return stored
@@ -3202,6 +3205,68 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     [agentSessionMap, pausedByAgentId, team],
   )
 
+  const handleSteerAgent = useCallback(
+    async (agentId: string, message: string) => {
+      const sessionKey = agentSessionMap[agentId]
+      if (!sessionKey) {
+        toast('No active session to steer', { type: 'error' })
+        return
+      }
+      const directive = message.trim()
+      if (!directive) return
+      const member = team.find((entry) => entry.id === agentId)
+      const agentName = member?.name ?? agentId
+      try {
+        await steerAgent(sessionKey, directive)
+        emitFeedEvent({
+          type: 'system',
+          message: `Directive sent to ${agentName}: ${directive.slice(0, 80)}`,
+          agentName,
+        })
+        toast(`Directive sent to ${agentName}`, { type: 'success' })
+        setSteerAgentId(null)
+        setSteerInput('')
+      } catch (error) {
+        toast(
+          error instanceof Error ? error.message : `Failed to send directive to ${agentName}`,
+          { type: 'error' },
+        )
+      }
+    },
+    [agentSessionMap, team],
+  )
+
+  const handleRetrySpawn = useCallback(
+    async (member: TeamMember): Promise<void> => {
+      setSpawnState((prev) => ({ ...prev, [member.id]: 'spawning' }))
+      try {
+        const sessionKey = await spawnAgentSession(member)
+        setAgentSessionMap((prev) => ({ ...prev, [member.id]: sessionKey }))
+        setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
+        setAgentSessionStatus((prev) => ({
+          ...prev,
+          [member.id]: { status: 'idle', lastSeen: Date.now() },
+        }))
+        const modelLabel = getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)
+        const modelSuffix = member.modelId !== 'auto' ? ` (${modelLabel})` : ''
+        emitFeedEvent({
+          type: 'agent_spawned',
+          message: `${member.name} session re-created${modelSuffix}`,
+          agentName: member.name,
+        })
+        toast(`${member.name} spawned successfully`, { type: 'success' })
+      } catch (err) {
+        setSpawnState((prev) => ({ ...prev, [member.id]: 'error' }))
+        emitFeedEvent({
+          type: 'system',
+          message: `Failed to re-spawn ${member.name}: ${err instanceof Error ? err.message : String(err)}`,
+          agentName: member.name,
+        })
+      }
+    },
+    [gatewayModelLabelById, spawnAgentSession],
+  )
+
   // ── Approval handlers ──────────────────────────────────────────────────────
   const handleApprove = useCallback((id: string) => {
     const approval = approvals.find(a => a.id === id)
@@ -3814,6 +3879,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionTokenCount(0)
     const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
     setSelectedOutputAgentId(firstAssignedAgentId)
+    if (firstAssignedAgentId) setOutputPanelVisible(true)
     setPausedByAgentId({})
     sessionActivityRef.current = new Map()
     // ── Auto-switch to Mission tab and show live feed ──────────────────────
@@ -5326,6 +5392,29 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             >
                               {row.status === 'paused' ? '▶' : '⏸'}
                             </button>
+                            {/* Steer button */}
+                            <button
+                              type="button"
+                              onClick={() => { setSteerAgentId(row.id); setSteerInput('') }}
+                              className="text-neutral-500 hover:text-orange-500 transition-colors"
+                              title="Steer agent"
+                            >
+                              ✦
+                            </button>
+                            {/* Retry button — only show when in error state */}
+                            {row.status === 'error' ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const member = team.find((m) => m.id === row.id)
+                                  if (member) void handleRetrySpawn(member)
+                                }}
+                                className="text-red-500 hover:text-red-700 transition-colors"
+                                title="Retry spawn"
+                              >
+                                ↺
+                              </button>
+                            ) : null}
                             <span className={cn(
                               'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
                               row.status === 'active' && 'bg-emerald-100 text-emerald-700',
@@ -5775,6 +5864,48 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
         ) : null}
+
+      {/* ── Steer Agent Modal ────────────────────────────────────────────── */}
+      {steerAgentId ? (() => {
+        const steerMember = team.find((m) => m.id === steerAgentId)
+        return (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={() => setSteerAgentId(null)}>
+            <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-neutral-900 dark:text-white">Steer Agent</p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">{steerMember?.name ?? steerAgentId}</p>
+                </div>
+                <button type="button" onClick={() => setSteerAgentId(null)} className="flex size-7 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">✕</button>
+              </div>
+              <textarea
+                value={steerInput}
+                onChange={(e) => setSteerInput(e.target.value)}
+                placeholder="Send a directive to this agent, e.g. 'Focus on X' or 'Stop doing Y and start Z'"
+                className="w-full resize-none rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm text-neutral-900 dark:text-white outline-none focus:ring-1 focus:ring-orange-400"
+                rows={3}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    void handleSteerAgent(steerAgentId, steerInput)
+                  }
+                }}
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                <button type="button" onClick={() => setSteerAgentId(null)} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Cancel</button>
+                <button
+                  type="button"
+                  disabled={!steerInput.trim()}
+                  onClick={() => void handleSteerAgent(steerAgentId, steerInput)}
+                  className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+                >
+                  Send Directive ⌘↵
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })() : null}
       </div>
     )
   }
@@ -6461,11 +6592,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       {/* ── Mobile: Agent Output Bottom Sheet ──────────────────────────────── */}
       {isMobileHub && missionActive && selectedOutputAgentId ? (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden" style={{ display: outputPanelVisible ? undefined : 'none' }}>
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50"
-            onClick={() => setSelectedOutputAgentId(undefined)}
+            onClick={() => setOutputPanelVisible(false)}
             aria-hidden
           />
           {/* Sheet */}
@@ -6476,7 +6607,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               </h3>
               <button
                 type="button"
-                onClick={() => setSelectedOutputAgentId(undefined)}
+                onClick={() => setOutputPanelVisible(false)}
                 className="flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
                 aria-label="Close agent output"
               >
@@ -6488,7 +6619,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 agentName={selectedOutputAgentName}
                 sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
                 tasks={selectedOutputTasks}
-                onClose={() => setSelectedOutputAgentId(undefined)}
+                onClose={() => setOutputPanelVisible(false)}
                 modelId={selectedOutputModelId}
                 statusLabel={selectedOutputStatusLabel}
               />
