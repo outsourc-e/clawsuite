@@ -2065,6 +2065,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [configSection, setConfigSection] = useState<ConfigSection>('agents')
   const [avatarPickerOpenId, setAvatarPickerOpenId] = useState<string | null>(null)
   const [agentEditOpenId, setAgentEditOpenId] = useState<string | null>(null)
+  const [providerWizardStep, setProviderWizardStep] = useState<'select' | 'key'>('select')
+  const [providerWizardSelected, setProviderWizardSelected] = useState('')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
@@ -4887,54 +4889,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           ) : null}
 
           {configSection === 'teams' ? (
-            <div className="space-y-5">
-              {/* Quick-start team templates */}
-              <div>
-                <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Quick-Start Templates</h2>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">Pre-built teams by use case. Click to apply.</p>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {TEAM_QUICK_TEMPLATES.map((tpl) => (
-                    <button
-                      key={tpl.id}
-                      type="button"
-                      onClick={() => {
-                        const templateId = tpl.templateId as TeamTemplateId
-                        if (templateId && templateId in TEAM_TEMPLATES) {
-                          applyTemplate(templateId)
-                        }
-                      }}
-                      className={cn(
-                        'rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md',
-                        activeTemplateId === tpl.templateId
-                          ? 'border-orange-300 bg-orange-50/60 shadow-sm'
-                          : 'border-neutral-200 bg-white shadow-sm',
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{tpl.icon}</span>
-                        <div>
-                          <p className="text-xs font-semibold text-neutral-900 dark:text-white">{tpl.label}</p>
-                          <p className="text-[10px] text-neutral-500 dark:text-slate-400">{tpl.description}</p>
-                        </div>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {tpl.agents.map((a) => (
-                          <span key={a} className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] text-neutral-600 dark:text-slate-400">{a}</span>
-                        ))}
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className={cn(
-                          'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                          tpl.tier === 'budget' ? 'bg-green-50 text-green-700' : tpl.tier === 'balanced' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700',
-                        )}>
-                          {tpl.tier === 'budget' ? '💰 Budget' : tpl.tier === 'balanced' ? '⚖️ Balanced' : '🚀 Max Output'}
-                        </span>
-                        <span className="text-[10px] text-neutral-400">{tpl.agents.length} agents</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="space-y-6">
 
               {/* Saved team configs */}
               <div>
@@ -5042,160 +4997,233 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 )}
               </div>
 
-              {/* Active team editor */}
-              <div>
-                <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Current Team</h2>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">Edit agents in the active team configuration</p>
-                <div className={cn('mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden', teamPanelFlash && 'bg-orange-50')}>
-                  <TeamPanel
-                    team={teamWithRuntimeStatus}
-                    gatewayModels={gatewayModels}
-                    activeTemplateId={activeTemplateId}
-                    agentTaskCounts={agentTaskCounts}
-                    spawnState={spawnState}
-                    agentSessionStatus={agentSessionStatus}
-                    agentSessionMap={agentSessionMap}
-                    agentModelNotApplied={agentModelNotApplied}
-                    tasks={boardTasks}
-                    onRetrySpawn={handleRetrySpawn}
-                    onKillSession={handleKillSession}
-                    onApplyTemplate={applyTemplate}
-                    onAddAgent={handleAddAgent}
-                    onUpdateAgent={(agentId, updates) => {
-                      setTeam((previous) =>
-                        previous.map((row) => (row.id === agentId ? { ...row, ...updates } : row)),
-                      )
-                    }}
-                    onSelectAgent={handleAgentSelection}
-                  />
+              {/* Quick-Start Templates (secondary — collapsed by default) */}
+              <details className="group">
+                <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                  <div className="flex items-center justify-between gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3 shadow-sm transition-all hover:border-neutral-300 dark:hover:border-neutral-600">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">🚀</span>
+                      <div>
+                        <p className="text-xs font-semibold text-neutral-900 dark:text-white">Quick-Start Templates</p>
+                        <p className="text-[10px] text-neutral-500 dark:text-neutral-400">Pre-built teams by use case</p>
+                      </div>
+                    </div>
+                    <svg className="size-4 text-neutral-400 transition-transform group-open:rotate-180" viewBox="0 0 16 16" fill="none">
+                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </summary>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {TEAM_QUICK_TEMPLATES.map((tpl) => {
+                    const isActive = activeTemplateId === tpl.templateId
+                    return (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => {
+                          const templateId = tpl.templateId as TeamTemplateId
+                          if (templateId && templateId in TEAM_TEMPLATES) {
+                            applyTemplate(templateId)
+                          }
+                        }}
+                        className={cn(
+                          'relative rounded-xl border-2 bg-white dark:bg-neutral-900 p-4 text-left transition-all hover:shadow-md',
+                          isActive ? 'border-orange-400' : 'border-neutral-200 dark:border-neutral-700',
+                        )}
+                      >
+                        {isActive ? (
+                          <span className="absolute -top-2 right-3 rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-bold text-white">Active</span>
+                        ) : null}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">{tpl.icon}</span>
+                          <div>
+                            <p className="text-xs font-semibold text-neutral-900 dark:text-white">{tpl.label}</p>
+                            <p className="text-[10px] text-neutral-500 dark:text-neutral-400">{tpl.description}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {tpl.agents.map((a) => (
+                            <span key={a} className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-600 dark:text-neutral-400">{a}</span>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', tpl.tier === 'budget' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : tpl.tier === 'balanced' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400')}>
+                            {tpl.tier === 'budget' ? '💰 Budget' : tpl.tier === 'balanced' ? '⚖️ Balanced' : '🚀 Max Output'}
+                          </span>
+                          <span className="text-[10px] text-neutral-400">{tpl.agents.length} agents</span>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
-              </div>
+              </details>
             </div>
           ) : null}
 
           {configSection === 'keys' ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="space-y-5">
+              {/* ── Add Provider Wizard ── */}
+              <div className="rounded-xl border-2 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden shadow-sm">
+                {/* Wizard header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100 dark:border-neutral-800">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Add Provider</h2>
+                    <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                      {providerWizardStep === 'select' ? 'Step 1 — Choose a provider' : `Step 2 — Enter your ${providerWizardSelected || addProviderName} API key`}
+                    </p>
+                  </div>
+                  {/* Step indicator */}
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn('size-2 rounded-full', providerWizardStep === 'select' ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+                    <span className={cn('size-2 rounded-full', providerWizardStep === 'key' ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+                  </div>
+                </div>
+
+                {/* Step 1: Provider grid */}
+                {providerWizardStep === 'select' ? (
+                  <div className="p-4">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                      {([...KNOWN_GATEWAY_PROVIDERS, CUSTOM_PROVIDER_OPTION] as const).map((provider, pIdx) => {
+                        const isCustom = provider === CUSTOM_PROVIDER_OPTION
+                        const isAlreadyAdded = configuredProviders.includes(provider)
+                        const pColors = [
+                          { border: 'border-blue-200 hover:border-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-blue-600 dark:text-blue-400' },
+                          { border: 'border-emerald-200 hover:border-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', text: 'text-emerald-600 dark:text-emerald-400' },
+                          { border: 'border-violet-200 hover:border-violet-400', bg: 'bg-violet-50 dark:bg-violet-900/20', text: 'text-violet-600 dark:text-violet-400' },
+                          { border: 'border-amber-200 hover:border-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-amber-600 dark:text-amber-400' },
+                          { border: 'border-pink-200 hover:border-pink-400', bg: 'bg-pink-50 dark:bg-pink-900/20', text: 'text-pink-600 dark:text-pink-400' },
+                          { border: 'border-teal-200 hover:border-teal-400', bg: 'bg-teal-50 dark:bg-teal-900/20', text: 'text-teal-600 dark:text-teal-400' },
+                        ]
+                        const pc = isCustom
+                          ? { border: 'border-neutral-200 hover:border-neutral-400', bg: 'bg-neutral-50 dark:bg-neutral-800', text: 'text-neutral-500 dark:text-neutral-400' }
+                          : pColors[pIdx % pColors.length]
+                        return (
+                          <button
+                            key={provider}
+                            type="button"
+                            onClick={() => {
+                              setProviderWizardSelected(provider)
+                              setAddProviderSelection(provider)
+                              setSelectedModel('')
+                              if (provider !== CUSTOM_PROVIDER_OPTION) {
+                                setAddProviderName(provider)
+                              } else {
+                                setAddProviderName('')
+                              }
+                              setProviderWizardStep('key')
+                            }}
+                            className={cn('relative rounded-xl border-2 p-3 text-center transition-all hover:shadow-sm', pc.border)}
+                          >
+                            {isAlreadyAdded ? (
+                              <span className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-emerald-500 text-[8px] text-white font-bold">✓</span>
+                            ) : null}
+                            <div className={cn('mx-auto mb-1.5 flex size-8 items-center justify-center rounded-full text-[10px] font-black', pc.bg, pc.text)}>
+                              {isCustom ? '⚙️' : provider.slice(0, 2).toUpperCase()}
+                            </div>
+                            <p className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300 truncate capitalize leading-tight">
+                              {isCustom ? 'Custom' : provider}
+                            </p>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Step 2: Key entry */}
+                {providerWizardStep === 'key' ? (
+                  <div className="p-5 space-y-3">
+                    {/* Back */}
+                    <button
+                      type="button"
+                      onClick={() => { setProviderWizardStep('select'); setAddProviderApiKey('') }}
+                      className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7 2L3 6l4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Back
+                    </button>
+
+                    {/* Custom name input */}
+                    {addProviderSelection === CUSTOM_PROVIDER_OPTION ? (
+                      <div>
+                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Provider Name</label>
+                        <input
+                          value={addProviderName}
+                          onChange={(event) => { setAddProviderName(event.target.value); setSelectedModel('') }}
+                          placeholder="e.g. together, fireworks..."
+                          className="h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
+                        />
+                      </div>
+                    ) : null}
+
+                    {/* API Key */}
+                    <div>
+                      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400">API Key</label>
+                      <input
+                        type="password"
+                        value={addProviderApiKey}
+                        onChange={(event) => setAddProviderApiKey(event.target.value)}
+                        placeholder={`${addProviderName || 'Provider'} API key…`}
+                        autoFocus
+                        className="h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 font-mono"
+                      />
+                    </div>
+
+                    {/* Optional model select */}
+                    {addProviderName.trim() && addProviderAvailableModels.length > 0 ? (
+                      <div>
+                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Default Model <span className="font-normal normal-case text-neutral-300">(optional)</span></label>
+                        <select
+                          value={selectedModel}
+                          onChange={(event) => setSelectedModel(event.target.value)}
+                          className="h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
+                        >
+                          <option value="">Use gateway default</option>
+                          {addProviderAvailableModels.map((model) => (
+                            <option key={model.value} value={model.value}>{model.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleAddProvider().then(() => {
+                          setProviderWizardStep('select')
+                          setProviderWizardSelected('')
+                        })
+                      }}
+                      disabled={isAddingProvider || !addProviderApiKey.trim() || !addProviderName.trim()}
+                      className="w-full rounded-lg bg-orange-500 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isAddingProvider ? 'Adding…' : `Connect ${addProviderName || 'Provider'}`}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Connected providers section */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
                   <div>
                     <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Connected Providers</h2>
-                    <p className="text-[11px] text-neutral-500 dark:text-slate-400">
-                      API key and provider profiles detected by the gateway.
-                    </p>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{configuredProviders.length} active · {gatewayModels.length} models available</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
                       void refreshGatewayStatus().then((connected) => {
-                        if (connected) {
-                          return refreshConfiguredProviders()
-                        }
+                        if (connected) return refreshConfiguredProviders()
                         setConfiguredProviders([])
                         return Promise.resolve()
                       })
                     }}
-                    className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50"
+                    className="flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 shadow-sm transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
                   >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 6A4 4 0 1 1 6 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M10 2v4H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     Refresh
                   </button>
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="text-xs text-neutral-600 dark:text-slate-400">Gateway Status</span>
-                  <GatewayStatusPill
-                    status={effectiveGatewayStatus}
-                    spawnErrorNames={spawnErrorNames}
-                    onRetry={spawnErrorNames.length > 0 ? handleRetryAllSpawnErrors : undefined}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 shadow-sm">
-                <div className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                  <h3 className="text-xs font-semibold text-neutral-900 dark:text-white">Add Provider</h3>
-                  <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-400">
-                    Add a provider profile and API key to the gateway config.
-                  </p>
-                  <div className="mt-3 space-y-2">
-                    <div>
-                      <select
-                        value={addProviderSelection}
-                        onChange={(event) => {
-                          const nextValue = event.target.value
-                          setAddProviderSelection(nextValue)
-                          setSelectedModel('')
-                          if (nextValue !== CUSTOM_PROVIDER_OPTION) {
-                            setAddProviderName(nextValue)
-                          } else {
-                            setAddProviderName('')
-                          }
-                        }}
-                        className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                      >
-                        <option value="">Select provider…</option>
-                        {KNOWN_GATEWAY_PROVIDERS.map((provider) => (
-                          <option key={provider} value={provider}>
-                            {provider}
-                          </option>
-                        ))}
-                        <option value={CUSTOM_PROVIDER_OPTION}>Custom...</option>
-                      </select>
-                    </div>
-                    {addProviderSelection === CUSTOM_PROVIDER_OPTION ? (
-                      <input
-                        value={addProviderName}
-                        onChange={(event) => {
-                          setAddProviderName(event.target.value)
-                          setSelectedModel('')
-                        }}
-                        placeholder="Custom provider name"
-                        className="w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                      />
-                    ) : null}
-                    {addProviderName.trim() ? (
-                      <div className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2">
-                        <p className="text-[11px] font-medium text-neutral-700">
-                          Default model for <span className="font-mono">{addProviderName.trim()}</span>
-                        </p>
-                        {addProviderAvailableModels.length > 0 ? (
-                          <select
-                            value={selectedModel}
-                            onChange={(event) => setSelectedModel(event.target.value)}
-                            className="mt-1 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                          >
-                            <option value="">Use gateway default (optional)</option>
-                            {addProviderAvailableModels.map((model) => (
-                              <option key={model.value} value={model.value}>
-                                {model.label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-slate-400">
-                            {modelsQuery.isLoading
-                              ? 'Loading available models…'
-                              : 'No models found yet for this provider. Models will be available after adding the API key.'}
-                          </p>
-                        )}
-                      </div>
-                    ) : null}
-                    <input
-                      type="password"
-                      value={addProviderApiKey}
-                      onChange={(event) => setAddProviderApiKey(event.target.value)}
-                      placeholder="API key"
-                      className="w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                    />
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => void handleAddProvider()}
-                        disabled={isAddingProvider}
-                        className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isAddingProvider ? 'Adding…' : 'Add Provider'}
-                      </button>
-                    </div>
-                  </div>
                 </div>
                 {configuredProviders.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-6 text-center">
