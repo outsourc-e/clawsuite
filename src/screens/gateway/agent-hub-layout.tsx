@@ -3222,6 +3222,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     // Check if a session with this label already exists — reuse it instead of
     // trying to create a duplicate (gateway enforces unique labels).
+    // Only reuse sessions that look like proper isolated hub sessions — never
+    // reuse discord/channel sessions that might be linked to the main chat.
     try {
       const listResp = await fetch('/api/sessions')
       if (listResp.ok) {
@@ -3231,7 +3233,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         )
         if (existing) {
           const existingKey = readString(existing.key)
-          if (existingKey) return existingKey
+          // Only reuse if it's an isolated subagent session (not a channel session)
+          const isIsolated = existingKey.startsWith('agent:') && !existingKey.includes(':discord:') && !existingKey.includes(':channel:')
+          if (existingKey && isIsolated) return existingKey
         }
       }
     } catch {
@@ -3497,6 +3501,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             if (isStaleLaunch()) return
             currentMap[member.id] = sessionKey
             setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
+            // Set status to active immediately after spawn so SSE streams open right away.
+            // (The session poll will confirm/correct this within 5s; using 'active' ensures
+            // streams open before the agent starts processing messages.)
+            setAgentSessionStatus((prev) => ({
+              ...prev,
+              [member.id]: { status: 'active', lastSeen: Date.now() },
+            }))
             // Track model used at spawn time
             const modelString = resolveGatewayModelId(member.modelId)
             if (modelString) {
@@ -3613,10 +3624,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         })
       } catch (error) {
         if (isStaleLaunch()) return
+        const errorMessage = error instanceof Error ? error.message : String(error)
         emitFeedEvent({
           type: 'system',
-          message: `Failed to dispatch to ${member?.name || agentId}: ${error instanceof Error ? error.message : String(error)}`,
+          message: `Failed to dispatch to ${member?.name || agentId}: ${errorMessage}`,
         })
+        // Mark tasks as done so progress counts them (not stuck at 0%)
+        const taskIds = agentTasks.map((task) => task.id)
+        moveTasksToStatus(taskIds, 'done')
+        agentSessionsDoneRef.current.add(sessionKey)
+        setAgentSessionStatus((prev) => ({
+          ...prev,
+          [agentId]: { status: 'error', lastSeen: Date.now() },
+        }))
       }
     }
 

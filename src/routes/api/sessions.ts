@@ -101,7 +101,13 @@ export const Route = createFileRoute('/api/sessions')({
 
           const requestedFriendlyId =
             typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
+          // Build a proper isolated session key in the format the gateway expects.
+          // A bare UUID as key causes the gateway to resolve it against the current
+          // operator session context (e.g. discord:g-...), linking the spawned session
+          // to the Discord channel. Using 'agent:main:subagent:<uuid>' creates a
+          // genuinely isolated subagent session.
           const friendlyId = requestedFriendlyId || randomUUID()
+          const sessionKey = `agent:main:subagent:${friendlyId}`
 
           const requestedModel =
             typeof body.model === 'string' ? body.model.trim() : ''
@@ -111,53 +117,56 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.systemPrompt === 'string' ? body.systemPrompt.trim() : ''
           const systemPrompt = requestedSystemPrompt || undefined
 
-          const baseParams: Record<string, unknown> = { key: friendlyId }
+          // Step 1: Create the isolated session with the proper key format.
+          // We intentionally do NOT include the model here — a separate patch below
+          // handles model assignment (matches the openclaw sessions_spawn pattern).
+          const baseParams: Record<string, unknown> = { key: sessionKey }
           if (label) baseParams.label = label
           if (systemPrompt) baseParams.systemPrompt = systemPrompt
 
-          let payload: SessionsPatchResponse
-          let modelApplied = Boolean(model)
+          const payload = await gatewayRpc<SessionsPatchResponse>(
+            'sessions.patch',
+            baseParams,
+          )
 
-          if (model) {
-            // Try with model first; if gateway rejects it, retry without (backwards compat)
-            try {
-              payload = await gatewayRpc<SessionsPatchResponse>('sessions.patch', {
-                ...baseParams,
-                model,
-              })
-            } catch {
-              modelApplied = false
-              payload = await gatewayRpc<SessionsPatchResponse>(
-                'sessions.patch',
-                baseParams,
-              )
-            }
-          } else {
-            payload = await gatewayRpc<SessionsPatchResponse>(
-              'sessions.patch',
-              baseParams,
-            )
-          }
-
-          const sessionKeyRaw = payload.key
-          const sessionKey =
-            typeof sessionKeyRaw === 'string' && sessionKeyRaw.trim().length > 0
-              ? sessionKeyRaw.trim()
+          const returnedKeyRaw = payload.key
+          const returnedKey =
+            typeof returnedKeyRaw === 'string' && returnedKeyRaw.trim().length > 0
+              ? returnedKeyRaw.trim()
               : ''
-          if (sessionKey.length === 0) {
+          // Use the returned key if the gateway echoed one; otherwise fall back to
+          // the key we sent (some gateway versions omit it on success).
+          const resolvedSessionKey = returnedKey || sessionKey
+          if (!resolvedSessionKey) {
             throw new Error('gateway returned an invalid response')
           }
 
-          // Register the friendly id so subsequent lookups resolve quickly.
+          // Step 2: Apply model as a separate patch (matches openclaw spawn pattern).
+          // This ensures model is set even if Step 1 doesn't support a model param.
+          let modelApplied = false
+          if (model) {
+            try {
+              await gatewayRpc<SessionsPatchResponse>('sessions.patch', {
+                key: resolvedSessionKey,
+                model,
+              })
+              modelApplied = true
+            } catch {
+              // Model not supported or invalid — session still usable with gateway default
+              modelApplied = false
+            }
+          }
+
+          // Register the friendly id alias so subsequent lookups resolve quickly.
           await gatewayRpc<SessionsResolveResponse>('sessions.resolve', {
-            key: friendlyId,
+            key: resolvedSessionKey,
             includeUnknown: true,
             includeGlobal: true,
           }).catch(() => ({ ok: false }))
 
           return json({
             ok: true,
-            sessionKey,
+            sessionKey: resolvedSessionKey,
             friendlyId,
             entry: payload.entry,
             modelApplied,
