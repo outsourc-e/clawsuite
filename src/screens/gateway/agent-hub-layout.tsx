@@ -3875,7 +3875,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const selectedSessionRow = selectedOutputAgentId
       ? agentWorkingRows.find((row) => row.id === selectedOutputAgentId)
       : agentWorkingRows.find((row) => row.status === 'active') ?? agentWorkingRows[0]
-    const selectedSessionMember = selectedSessionRow
+    const _selectedSessionMember = selectedSessionRow
       ? team.find((member) => member.id === selectedSessionRow.id)
       : undefined
     const recentAgentOutput = agentWorkingRows
@@ -4052,79 +4052,137 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               )}
             </OverviewWidget>
 
+            {/* System Health widget */}
             <OverviewWidget
-              title="Current Session"
-              badge={<span className="text-[11px] text-neutral-500 dark:text-slate-400">{selectedSessionRow?.sessionKey ? 'Live' : 'No session'}</span>}
+              title="System Health"
+              badge={
+                <span className={cn(
+                  'rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+                  effectiveGatewayStatus === 'connected'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                    : effectiveGatewayStatus === 'spawning'
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                      : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+                )}>
+                  {effectiveGatewayStatus}
+                </span>
+              }
             >
               <div className="space-y-2 text-xs text-neutral-700">
+                {/* Gateway */}
                 <div className={cn('flex items-center justify-between gap-2', widgetInsetClass)}>
-                  <span>Focused Agent</span>
-                  <span className="truncate font-medium text-neutral-900 dark:text-white">
-                    {selectedSessionRow?.name ?? 'None selected'}
+                  <span className="text-neutral-500 dark:text-neutral-400">Gateway</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn(
+                      'size-2 rounded-full',
+                      effectiveGatewayStatus === 'connected' ? 'bg-emerald-500' :
+                      effectiveGatewayStatus === 'spawning' ? 'bg-amber-400 animate-pulse' : 'bg-red-500',
+                    )} />
+                    <span className="font-medium text-neutral-900 dark:text-white capitalize">{effectiveGatewayStatus}</span>
+                  </div>
+                </div>
+                {/* Active sessions */}
+                <div className={cn('flex items-center justify-between gap-2', widgetInsetClass)}>
+                  <span className="text-neutral-500 dark:text-neutral-400">Active Sessions</span>
+                  <span className="font-semibold text-neutral-900 dark:text-white">{sessionCount}</span>
+                </div>
+                {/* Models available */}
+                <div className={cn('flex items-center justify-between gap-2', widgetInsetClass)}>
+                  <span className="text-neutral-500 dark:text-neutral-400">Models Available</span>
+                  <span className="font-semibold text-neutral-900 dark:text-white">
+                    {gatewayModels.length > 0 ? `${gatewayModels.length}` : '—'}
                   </span>
                 </div>
+                {/* Providers */}
                 <div className={cn('flex items-center justify-between gap-2', widgetInsetClass)}>
-                  <span>Session Key</span>
-                  <span className="max-w-[11rem] truncate font-mono text-[10px] text-neutral-600 dark:text-slate-400">
-                    {selectedSessionRow?.sessionKey ?? 'Not started'}
+                  <span className="text-neutral-500 dark:text-neutral-400">Providers</span>
+                  <span className="font-semibold text-neutral-900 dark:text-white">
+                    {configuredProviders.length > 0 ? configuredProviders.slice(0, 3).join(', ') : '—'}
                   </span>
                 </div>
-                <div className={cn('grid grid-cols-2 gap-2', widgetInsetClass)}>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-slate-400">Model</p>
-                    <p className="truncate font-semibold text-neutral-900 dark:text-white">
-                      {selectedSessionMember
-                        ? getModelDisplayLabelFromLookup(selectedSessionMember.modelId, gatewayModelLabelById)
-                        : 'Unknown'}
+                {/* Mission cost if running */}
+                {missionActive ? (
+                  <div className={cn('grid grid-cols-2 gap-2', widgetInsetClass)}>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-slate-400">Runtime</p>
+                      <p className="font-semibold text-neutral-900 dark:text-white">{missionElapsed}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-slate-400">Est. Cost</p>
+                      <p className="font-semibold text-neutral-900 dark:text-white">${runningCost.toFixed(2)}</p>
+                    </div>
+                  </div>
+                ) : null}
+                {/* Latest agent output */}
+                {recentAgentOutput?.lastLine ? (
+                  <div className={widgetInsetClass}>
+                    <p className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-slate-400 mb-1">Last Output</p>
+                    <p className="line-clamp-2 text-[11px] text-neutral-700 dark:text-neutral-300 font-mono">
+                      {recentAgentOutput.lastLine}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-slate-400">Status</p>
-                    <p className="font-semibold text-neutral-900 dark:text-white">
-                      {selectedSessionRow ? capitalizeFirst(selectedSessionRow.status) : 'Idle'}
-                    </p>
-                  </div>
-                </div>
-                <div className={cn('grid grid-cols-2 gap-2', widgetInsetClass)}>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-slate-400">Runtime</p>
-                    <p className="font-semibold text-neutral-900 dark:text-white">{missionElapsed}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-slate-400">Cost Est.</p>
-                    <p className="font-semibold text-neutral-900 dark:text-white">${runningCost.toFixed(2)}</p>
-                  </div>
-                </div>
-                <div className={widgetInsetClass}>
-                  <p className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-slate-400">Latest Output</p>
-                  <p className="mt-1 line-clamp-3 text-[11px] text-neutral-700">
-                    {selectedSessionRow?.lastLine ?? recentAgentOutput?.lastLine ?? 'Waiting for agent output...'}
-                  </p>
-                </div>
+                ) : null}
               </div>
             </OverviewWidget>
 
+            {/* Recent Missions widget */}
             <OverviewWidget
-              title="Reports"
-              badge={<span className="text-[11px] text-neutral-500 dark:text-slate-400">{recentReports.length}</span>}
+              title="Recent Missions"
+              badge={<span className="text-[11px] text-neutral-500 dark:text-slate-400">{recentReports.length} completed</span>}
             >
               {recentReports.length === 0 ? (
                 <div className="flex flex-col items-center gap-1 py-4 text-center">
-                  <span className="text-lg">📄</span>
-                  <p className="text-xs text-neutral-400">Reports generate after missions complete</p>
+                  <span className="text-2xl opacity-30">🚀</span>
+                  <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mt-1">No missions yet</p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('missions')}
+                    className="mt-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                  >
+                    Launch first mission →
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {recentReports.slice(0, 3).map((report) => (
-                    <div key={report.id} className={widgetInsetClass}>
-                      <p className="line-clamp-2 text-xs font-medium text-neutral-800">
-                        {truncateMissionGoal(report.name || report.goal, 72)}
-                      </p>
-                      <p className="mt-1 text-[10px] text-neutral-500 dark:text-slate-400">
-                        {report.taskStats.completed}/{report.taskStats.total} tasks · {Math.max(1, Math.round(report.duration / 60000))}m
-                      </p>
-                    </div>
-                  ))}
+                  {recentReports.slice(0, 3).map((report) => {
+                    const successRate = report.taskStats.total > 0
+                      ? Math.round((report.taskStats.completed / report.taskStats.total) * 100)
+                      : 0
+                    const durationMin = Math.max(1, Math.round(report.duration / 60000))
+                    return (
+                      <div key={report.id} className={cn(widgetInsetClass, 'space-y-1.5')}>
+                        <p className="line-clamp-1 text-xs font-semibold text-neutral-800 dark:text-neutral-100">
+                          {truncateMissionGoal(report.name || report.goal, 60)}
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] text-neutral-500 dark:text-neutral-400">
+                          <span className="flex items-center gap-1">
+                            <span className={cn(
+                              'size-1.5 rounded-full',
+                              successRate === 100 ? 'bg-emerald-500' :
+                              successRate >= 50 ? 'bg-amber-400' : 'bg-red-400',
+                            )} />
+                            {report.taskStats.completed}/{report.taskStats.total} tasks
+                          </span>
+                          <span>·</span>
+                          <span>{durationMin}m</span>
+                          <span>·</span>
+                          <span>${report.costEstimate.toFixed(2)}</span>
+                          <span className="ml-auto">{report.agents.length} agents</span>
+                        </div>
+                        {/* Mini progress bar */}
+                        <div className="h-1 w-full rounded-full bg-neutral-200 dark:bg-neutral-700">
+                          <div
+                            className={cn(
+                              'h-full rounded-full transition-all',
+                              successRate === 100 ? 'bg-emerald-500' :
+                              successRate >= 50 ? 'bg-amber-400' : 'bg-red-400',
+                            )}
+                            style={{ width: `${successRate}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </OverviewWidget>
@@ -4166,24 +4224,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </OverviewWidget>
           </section>
 
-          {/* ── Quick Links ── */}
-          <section className="flex flex-wrap gap-2">
-            {[
-              { label: '📊 Cost Analytics', href: '/costs' },
-              { label: '🧠 Memory Browser', href: '/memory' },
-              { label: '⏰ Cron Jobs', href: '/cron' },
-              { label: '📈 Usage', href: '/agent-swarm/usage' },
-              { label: '🔌 Sessions', href: '/agent-swarm/sessions' },
-            ].map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs font-medium text-neutral-700 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              >
-                {link.label}
-              </a>
-            ))}
-          </section>
+          {/* Quick links removed per design review */}
         </div>
       </div>
     )
