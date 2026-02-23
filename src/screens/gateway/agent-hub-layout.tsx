@@ -3090,6 +3090,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return row ? toTitleCase(row.status) : undefined
   }, [agentWorkingRows, selectedOutputAgentId])
 
+  // Global agent pool: active team + all agents from saved team configs (deduped by id)
+  const allKnownAgents = useMemo(() => {
+    const seen = new Set<string>()
+    const pool: typeof team = []
+    for (const m of team) {
+      if (!seen.has(m.id)) { seen.add(m.id); pool.push(m) }
+    }
+    for (const config of teamConfigs) {
+      for (const m of config.team) {
+        if (!seen.has(m.id)) {
+          seen.add(m.id)
+          pool.push({ ...m, status: m.status ?? 'available' })
+        }
+      }
+    }
+    return pool
+  }, [team, teamConfigs])
+
   const moveTasksToStatus = useCallback((taskIds: Array<string>, status: TaskStatus) => {
     if (taskIds.length === 0) return
     const uniqueTaskIds = Array.from(new Set(taskIds))
@@ -4357,26 +4375,39 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
-              {team.map((member, index) => {
+              {allKnownAgents.map((member, index) => {
+                const isInActiveTeam = team.some((m) => m.id === member.id)
                 const ac = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
                 const hasPrompt = member.backstory.trim().length > 0
                 return (
                   <div
                     key={member.id}
-                    className={cn('relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md cursor-default', ac.border)}
+                    className={cn('relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md cursor-default', ac.border, !isInActiveTeam && 'opacity-60')}
                   >
-                    {/* Pencil — top right, opens wizard modal */}
-                    <button
-                      type="button"
-                      onClick={() => setAgentWizardOpenId(member.id)}
-                      className="absolute right-2.5 top-2.5 z-10 flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 transition-all hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 dark:hover:text-neutral-200"
-                      aria-label="Edit agent"
-                      title="Edit agent"
-                    >
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
+                    {/* Top-right action: edit if in team, add-to-team if not */}
+                    {isInActiveTeam ? (
+                      <button
+                        type="button"
+                        onClick={() => setAgentWizardOpenId(member.id)}
+                        className="absolute right-2.5 top-2.5 z-10 flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 transition-all hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 dark:hover:text-neutral-200"
+                        aria-label="Edit agent"
+                        title="Edit agent"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setTeam((prev) => [...prev, { ...member, status: 'available' }])}
+                        className="absolute right-2.5 top-2.5 z-10 flex size-7 items-center justify-center rounded-full bg-orange-50 dark:bg-orange-900/20 text-orange-500 transition-all hover:bg-orange-100 dark:hover:bg-orange-900/40"
+                        aria-label="Add to active team"
+                        title="Add to active team"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                      </button>
+                    )}
 
                     <div className="flex flex-col items-center px-4 pt-5 pb-4 text-center">
                       <div className={cn('mb-3 flex size-16 items-center justify-center rounded-full shadow-md', ac.avatar)}>
@@ -5352,7 +5383,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       // Restore full mission state: team + goal + process type
                       setTeam(restoreCheckpoint.team.map((m, i) => ({
                         ...m,
-                        avatar: m.avatar ?? getAgentAvatarForSlot(i),
+                        avatar: getAgentAvatarForSlot(i),
+                        status: 'available',
                       })))
                       setMissionGoal(restoreCheckpoint.label)
                       setProcessType(restoreCheckpoint.processType)
