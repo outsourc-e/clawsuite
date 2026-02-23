@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { TeamMember, TeamTemplateId } from './team-panel'
 import { TEAM_TEMPLATES } from './team-panel'
@@ -348,9 +348,16 @@ export function AgentWizardModal({
   onClose,
 }: AgentWizardProps) {
   const isCustomPrompt = member.backstory.trim() !== '' && !systemPromptTemplates.some((t) => t.prompt === member.backstory)
-
-  // Header subtitle: show role if set, otherwise "Configure your agent"
   const headerSubtitle = member.roleDescription?.trim() || 'Configure your agent'
+  const systemPromptRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-resize textarea whenever backstory changes (e.g. template selected)
+  useEffect(() => {
+    const el = systemPromptRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 420)}px`
+  }, [member.backstory])
 
   return (
     <WizardModal open onClose={onClose} width="max-w-2xl">
@@ -422,35 +429,38 @@ export function AgentWizardModal({
           </div>
 
           {/* Template chips by category — compact */}
-          {(['engineering', 'research', 'content', 'ops', 'general'] as const).map((cat) => {
-            const catTemplates = systemPromptTemplates.filter((t) => t.category === cat)
-            const catLabels: Record<string, string> = { engineering: '⚙️ Eng', research: '🔬', content: '📝', ops: '🗺️', general: '🤖' }
-            return (
-              <div key={cat} className="flex flex-wrap items-center gap-1 mb-0.5">
-                <span className="shrink-0 w-8 text-[8px] font-bold uppercase tracking-widest text-neutral-300 dark:text-neutral-600">{catLabels[cat]}</span>
-                {catTemplates.map((tpl) => {
-                  const active = member.backstory === tpl.prompt
-                  return (
-                    <button key={tpl.id} type="button"
-                      onClick={() => onUpdate({ backstory: active ? '' : tpl.prompt })}
-                      className={cn('rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors',
-                        active ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
-                          : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-500 hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700')}
-                      title={tpl.prompt.slice(0, 120)}
-                    >
-                      {tpl.icon} {tpl.label}
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
+          <div className="space-y-1.5">
+            {(['engineering', 'research', 'content', 'ops', 'general'] as const).map((cat) => {
+              const catTemplates = systemPromptTemplates.filter((t) => t.category === cat)
+              const catLabels: Record<string, string> = { engineering: '⚙️', research: '🔬', content: '📝', ops: '🗺️', general: '🤖' }
+              return (
+                <div key={cat} className="flex flex-wrap items-center gap-1">
+                  <span className="shrink-0 w-6 text-center text-[9px]">{catLabels[cat]}</span>
+                  {catTemplates.map((tpl) => {
+                    const active = member.backstory === tpl.prompt
+                    return (
+                      <button key={tpl.id} type="button"
+                        onClick={() => { onUpdate({ backstory: active ? '' : tpl.prompt }) }}
+                        className={cn('rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors gap-1',
+                          active ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+                            : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-500 hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700')}
+                        title={tpl.prompt.slice(0, 120)}
+                      >
+                        {tpl.icon} {tpl.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
 
           <textarea
+            ref={systemPromptRef}
             value={member.backstory}
-            onChange={(e) => onUpdate({ backstory: e.target.value })}
-            rows={4}
-            className="mt-2 min-h-[100px] w-full resize-y rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 py-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 font-mono leading-relaxed"
+            onChange={(e) => { onUpdate({ backstory: e.target.value }) }}
+            className="mt-2 w-full resize-none rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 py-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 font-mono leading-relaxed overflow-auto"
+            style={{ minHeight: 100, maxHeight: 400 }}
             placeholder="Persona, instructions, and context for this agent..."
           />
         </div>
@@ -673,28 +683,31 @@ export function TeamWizardModal({
               </div>
             ))}
           </div>
+          {notInTeam.length > 0 && localMembers.length > 0 ? (
+            <p className="mt-1 text-center text-[9px] text-neutral-400">↓ scroll to add more agents</p>
+          ) : null}
         </div>
 
         {/* Section B: agents not in team */}
         {notInTeam.length > 0 ? (
           <div>
-            <div className="mb-2 flex items-center">
-              <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-700" />
-              <span className="px-2 text-[10px] font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-600">ADD AGENTS</span>
-              <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-700" />
+            <div className="flex items-center gap-2 my-1">
+              <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">Add Agents</span>
+              <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
             </div>
             <div className="space-y-1.5">
               {notInTeam.map((agent) => (
-                <div key={agent.id} className="flex items-center gap-2.5 rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
-                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-[11px] font-bold text-neutral-500">
+                <div key={agent.id} className="flex items-center gap-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/30 dark:bg-emerald-900/10 px-3 py-2.5 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                     {agent.name[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-neutral-600 dark:text-neutral-300 font-medium">{agent.name}</p>
+                    <p className="text-xs text-neutral-700 dark:text-neutral-200 font-medium">{agent.name}</p>
                     {agent.role ? <p className="text-[10px] text-neutral-400 truncate">{agent.role}</p> : null}
                   </div>
                   <button type="button" onClick={() => addAgent(agent.id)}
-                    className="flex size-6 items-center justify-center rounded-full text-neutral-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-500 transition-colors" title="Add to team">
+                    className="flex size-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors" title="Add to team">
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
                   </button>
                 </div>
