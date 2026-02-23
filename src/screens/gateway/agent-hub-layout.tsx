@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
+import { TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
 import { TaskBoard as _TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
 import { AgentOutputPanel } from './components/agent-output-panel'
@@ -9,9 +9,8 @@ import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type A
 import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
-import { THEMES, applyTheme, getStoredTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
-import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval } from '@/lib/gateway-api'
+import { toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
 import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META, WizardModal, PROVIDER_COMMON_MODELS } from './components/config-wizards'
 import {
@@ -563,60 +562,6 @@ const KNOWN_GATEWAY_PROVIDERS = [
   'cohere',
 ] as const
 
-function GatewayStatusPill({
-  status,
-  spawnErrorNames,
-  onRetry,
-}: {
-  status: GatewayStatus
-  spawnErrorNames: string[]
-  onRetry?: () => void
-}) {
-  if (spawnErrorNames.length > 0) {
-    return (
-      <div className="flex items-center gap-1.5">
-        <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600">
-          <span className="size-1.5 rounded-full bg-red-500" />
-          Spawn Error
-        </span>
-        {onRetry ? (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 transition-colors hover:bg-red-100"
-          >
-            Retry
-          </button>
-        ) : null}
-      </div>
-    )
-  }
-
-  if (status === 'disconnected') {
-    return (
-      <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600">
-        <span className="size-1.5 rounded-full bg-red-500" />
-        Offline
-      </span>
-    )
-  }
-
-  if (status === 'spawning') {
-    return (
-      <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber-700">
-        <span className="size-1.5 animate-pulse rounded-full bg-amber-400" />
-        Spawning
-      </span>
-    )
-  }
-
-  return (
-    <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-700">
-      <span className="size-1.5 rounded-full bg-emerald-500" />
-      Connected
-    </span>
-  )
-}
 
 function toTitleCase(value: string): string {
   return value
@@ -2116,7 +2061,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [missionBoardDrafts, setMissionBoardDrafts] = useState<MissionBoardDraft[]>([])
   const [missionBoardModalOpen, setMissionBoardModalOpen] = useState(false)
   const [missionWizardStep, setMissionWizardStep] = useState(0)
-  const [currentTheme, setCurrentTheme] = useState<ThemeId>(() => getStoredTheme())
   const [newMissionName, setNewMissionName] = useState('')
   const [newMissionGoal, setNewMissionGoal] = useState('')
   const [newMissionTeamConfigId, setNewMissionTeamConfigId] = useState('__current__')
@@ -2130,7 +2074,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [budgetLimit, setBudgetLimit] = useState('120000')
   const [activeMissionBudgetLimit, setActiveMissionBudgetLimit] = useState('')
   const [autoAssign, setAutoAssign] = useState(true)
-  const [teamPanelFlash, setTeamPanelFlash] = useState(false)
+  const [, setTeamPanelFlash] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string>()
   const [selectedOutputAgentId, setSelectedOutputAgentId] = useState<string>()
   const [boardTasks, _setBoardTasks] = useState<Array<HubTask>>([])
@@ -2177,7 +2121,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [spawnState, setSpawnState] = useState<Record<string, 'idle' | 'spawning' | 'ready' | 'error'>>({})
   const [agentSessionStatus, setAgentSessionStatus] = useState<Record<string, AgentSessionStatusEntry>>({})
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('connected')
-  const [agentModelNotApplied, setAgentModelNotApplied] = useState<Record<string, boolean>>({})
+  const [, setAgentModelNotApplied] = useState<Record<string, boolean>>({})
   const [agentActivity, setAgentActivity] = useState<Record<string, AgentActivityEntry>>({})
   const [artifacts, setArtifacts] = useState<MissionArtifact[]>([])
   const [missionReports, setMissionReports] = useState<StoredMissionReport[]>(() => loadStoredMissionReports())
@@ -2196,7 +2140,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [teamConfigs, setTeamConfigs] = useState<SavedTeamConfig[]>(() =>
     readStoredTeamConfigs(),
   )
-  const [teamConfigName, setTeamConfigName] = useState('')
   const [selectedTeamConfigId, setSelectedTeamConfigId] = useState('')
   const taskBoardRef = useRef<TaskBoardRef | null>(null)
   const teamPanelFlashTimerRef = useRef<number | undefined>(undefined)
@@ -2354,21 +2297,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     missionIdRef.current = ''
   }, [agentSessionMap, buildMissionCompletionSnapshot])
 
-  // Derived: which agents have spawn errors
-  const spawnErrorNames = useMemo(
-    () =>
-      team
-        .filter((m) => spawnState[m.id] === 'error')
-        .map((m) => m.name),
-    [team, spawnState],
-  )
 
-  // Derived gateway banner status (spawning takes precedence if any agent is spawning)
-  const isAnySpawning = useMemo(
-    () => Object.values(spawnState).some((s) => s === 'spawning'),
-    [spawnState],
-  )
-  const effectiveGatewayStatus: GatewayStatus = isAnySpawning ? 'spawning' : gatewayStatus
 
   // Live template suggestion based on current mission goal input
   const suggestedTemplateName = useMemo(() => {
@@ -3018,10 +2947,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     [runtimeById, team],
   )
 
-  const _boardAgents = useMemo(
-    () => teamWithRuntimeStatus.map((member) => ({ id: member.id, name: member.name })),
-    [teamWithRuntimeStatus],
-  )
   const activeTaskSource = useMemo(
     () => (missionActive && missionTasks.length > 0 ? missionTasks : boardTasks),
     [boardTasks, missionActive, missionTasks],
@@ -3035,24 +2960,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return counts
   }, [activeTaskSource])
   const activeTemplateId = useMemo(() => resolveActiveTemplate(team), [team])
-  const _missionBadge = useMemo(() => {
-    if (missionState === 'paused') {
-      return {
-        label: 'Paused',
-        className: 'bg-amber-500 text-white',
-      }
-    }
-    if (missionState === 'stopped') {
-      return {
-        label: 'Stopped',
-        className: 'bg-red-500 text-white',
-      }
-    }
-    return {
-      label: 'Running',
-      className: 'bg-emerald-500 text-white',
-    }
-  }, [missionState])
   const teamById = useMemo(
     () => new Map(teamWithRuntimeStatus.map((member) => [member.id, member])),
     [teamWithRuntimeStatus],
@@ -3179,19 +3086,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     pendingTaskMovesRef.current.push({ taskIds: uniqueTaskIds, status })
   }, [])
 
-  const _handleTaskBoardRef = useCallback((api: TaskBoardRef) => {
-    taskBoardRef.current = api
-    if (pendingTaskMovesRef.current.length === 0) return
-    pendingTaskMovesRef.current.forEach((entry) => {
-      api.moveTasks(entry.taskIds, entry.status)
-    })
-    pendingTaskMovesRef.current = []
-  }, [])
 
-  const handleAgentSelection = useCallback((agentId?: string) => {
-    setSelectedAgentId(agentId)
-    setSelectedOutputAgentId(agentId)
-  }, [])
 
   const spawnAgentSession = useCallback(async (member: TeamMember): Promise<string> => {
     const suffix = Math.random().toString(36).slice(2, 8)
@@ -3254,97 +3149,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return sessionKey
   }, [])
 
-  const handleRetrySpawn = useCallback(async (member: TeamMember): Promise<void> => {
-    setSpawnState((prev) => ({ ...prev, [member.id]: 'spawning' }))
-    try {
-      const sessionKey = await spawnAgentSession(member)
-      setAgentSessionMap((prev) => ({ ...prev, [member.id]: sessionKey }))
-      setPausedByAgentId((prev) => {
-        if (!prev[member.id]) return prev
-        const next = { ...prev }
-        delete next[member.id]
-        return next
-      })
-      // Track model used at spawn time
-      const modelString = resolveGatewayModelId(member.modelId)
-      if (modelString) {
-        setAgentSessionModelMap((prev) => ({ ...prev, [member.id]: modelString }))
-      }
-      setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
-      setAgentSessionStatus((prev) => ({
-        ...prev,
-        [member.id]: { status: 'idle', lastSeen: Date.now() },
-      }))
-      const modelLabel = getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)
-      const modelSuffix = member.modelId !== 'auto' ? ` (${modelLabel})` : ''
-      emitFeedEvent({
-        type: 'agent_spawned',
-        message: `${member.name} session re-created${modelSuffix}`,
-        agentName: member.name,
-      })
-    } catch (err) {
-      setSpawnState((prev) => ({ ...prev, [member.id]: 'error' }))
-      emitFeedEvent({
-        type: 'system',
-        message: `Failed to re-spawn ${member.name}: ${err instanceof Error ? err.message : String(err)}`,
-        agentName: member.name,
-      })
-    }
-  }, [gatewayModelLabelById, spawnAgentSession])
 
-  // Kill session for an agent
-  const handleKillSession = useCallback(async (member: TeamMember) => {
-    const sessionKey = agentSessionMap[member.id]
-    if (sessionKey) {
-      try {
-        await fetch(`/api/sessions?sessionKey=${encodeURIComponent(sessionKey)}`, {
-          method: 'DELETE',
-        })
-      } catch {
-        // best-effort
-      }
-    }
-    setAgentSessionMap((prev) => {
-      const next = { ...prev }
-      delete next[member.id]
-      return next
-    })
-    setSpawnState((prev) => ({ ...prev, [member.id]: 'idle' }))
-    setAgentSessionStatus((prev) => {
-      const next = { ...prev }
-      delete next[member.id]
-      return next
-    })
-    setAgentModelNotApplied((prev) => {
-      if (!prev[member.id]) return prev
-      const next = { ...prev }
-      delete next[member.id]
-      return next
-    })
-    setAgentSessionModelMap((prev) => {
-      if (!prev[member.id]) return prev
-      const next = { ...prev }
-      delete next[member.id]
-      return next
-    })
-    setAgentActivity((prev) => {
-      if (!prev[member.id]) return prev
-      const next = { ...prev }
-      delete next[member.id]
-      return next
-    })
-    setPausedByAgentId((prev) => {
-      if (!prev[member.id]) return prev
-      const next = { ...prev }
-      delete next[member.id]
-      return next
-    })
-    emitFeedEvent({
-      type: 'agent_killed',
-      message: `${member.name} session killed`,
-      agentName: member.name,
-    })
-  }, [agentSessionMap])
 
   const _handleSetAgentPaused = useCallback(
     async (agentId: string, pause: boolean) => {
@@ -3381,40 +3186,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       }
     },
     [agentSessionMap, pausedByAgentId, team],
-  )
-
-  const _handleSteerAgent = useCallback(
-    async (agentId: string, message: string) => {
-      const sessionKey = agentSessionMap[agentId]
-      if (!sessionKey) {
-        toast('No active session to steer', { type: 'error' })
-        return
-      }
-
-      const directive = message.trim()
-      if (!directive) return
-
-      const member = team.find((entry) => entry.id === agentId)
-      const agentName = member?.name ?? agentId
-
-      try {
-        await steerAgent(sessionKey, directive)
-        emitFeedEvent({
-          type: 'system',
-          message: `Directive sent to ${agentName}: ${truncateMissionGoal(directive, 80)}`,
-          agentName,
-        })
-        toast(`Directive sent to ${agentName}`, { type: 'success' })
-      } catch (error) {
-        toast(
-          error instanceof Error
-            ? error.message
-            : `Failed to send directive to ${agentName}`,
-          { type: 'error' },
-        )
-      }
-    },
-    [agentSessionMap, team],
   )
 
   // ── Approval handlers ──────────────────────────────────────────────────────
@@ -3936,31 +3707,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (index >= 0) setWizardStepIndex(index)
   }
 
-  function saveCurrentTeamConfig() {
-    const trimmedName = teamConfigName.trim()
-    const name =
-      trimmedName.length > 0
-        ? trimmedName
-        : `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} ${new Date().toLocaleDateString()}`
-    const timestamp = Date.now()
-    const id =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${timestamp}-${Math.random().toString(36).slice(2, 8)}`
-
-    const nextEntry: SavedTeamConfig = {
-      id,
-      name,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      team: team.map((member) => ({ ...member })),
-    }
-
-    setTeamConfigs((previous) => [nextEntry, ...previous].slice(0, 30))
-    setSelectedTeamConfigId(id)
-    setTeamConfigName('')
-    toast(`Saved team config: ${name}`, { type: 'success' })
-  }
 
   function loadTeamConfig(configId: string) {
     const config = teamConfigs.find((entry) => entry.id === configId)
@@ -4087,23 +3833,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // Keep the ref in sync so keyboard shortcut always calls the latest version
   handleCreateMissionRef.current = handleCreateMission
 
-  // Retry all spawn errors
-  function handleRetryAllSpawnErrors() {
-    const errorMembers = team.filter((m) => spawnState[m.id] === 'error')
-    errorMembers.forEach((m) => void handleRetrySpawn(m))
-  }
 
   const isMissionRunning = missionActive && missionState === 'running'
 
   // ── Mission tab content ────────────────────────────────────────────────────
 
 
-  function openHtmlArtifactPreview(artifact: MissionArtifact) {
-    const blob = new Blob([artifact.content], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank', 'noopener,noreferrer')
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  }
 
 
   function renderOverviewContent() {
