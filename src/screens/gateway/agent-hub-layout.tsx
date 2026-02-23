@@ -4724,7 +4724,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     teamName={config.name}
                     teamIcon={config.icon ?? '👥'}
                     teamMembers={config.team}
-                    availableAgents={agents}
+                    availableAgents={team.map((m) => ({ id: m.id, name: m.name, role: m.roleDescription }))}
                     isActive={selectedTeamConfigId === config.id}
                     modelPresets={MODEL_PRESETS}
                     gatewayModels={gatewayModels}
@@ -4744,15 +4744,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             // Update model but keep other properties
                             return { ...existing, modelId: m.modelId }
                           } else {
-                            // New member - add with default properties
-                            const agent = agents.find((a) => a.id === m.id)
+                            // New member - pull full data from team state
+                            const agent = team.find((a) => a.id === m.id)
                             return {
                               id: m.id,
                               name: m.name,
                               modelId: m.modelId,
-                              roleDescription: agent?.role ?? '',
-                              goal: '',
-                              backstory: '',
+                              roleDescription: agent?.roleDescription ?? '',
+                              goal: agent?.goal ?? '',
+                              backstory: agent?.backstory ?? '',
                               status: agent?.status ?? 'idle',
                             }
                           }
