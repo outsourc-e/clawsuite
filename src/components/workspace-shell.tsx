@@ -20,6 +20,7 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 // import { useSettings } from '@/hooks/use-settings'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
+import { cn } from '@/lib/utils'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
@@ -192,7 +193,12 @@ export function WorkspaceShell() {
         className="theme-bg theme-text relative overflow-hidden bg-surface text-primary-900"
         style={{ height: 'calc(var(--vvh, 100dvh) + var(--kb-inset, 0px))' }}
       >
-        <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr] lg:grid-cols-[auto_auto_1fr] xl:grid-cols-[auto_auto_1fr_auto]">
+        <div className={cn(
+          "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]",
+          isOnAgentHubRoute
+            ? "lg:grid-cols-[auto_auto_1fr] xl:grid-cols-[auto_auto_1fr_auto]"
+            : "lg:grid-cols-[auto_1fr]"
+        )}>
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
           {!isMobile && (
