@@ -1943,7 +1943,8 @@ function HistoryView() {
                   ? Date.parse(updatedAtRaw)
                   : 0
             const isExpanded = expandedId === sessionId
-            const tokenCount = typeof session.tokenCount === 'number' ? session.tokenCount : undefined
+            // Clamp token count to 0 minimum (gateway may return negative for cache accounting)
+            const tokenCount = typeof session.tokenCount === 'number' ? Math.max(0, session.tokenCount) : undefined
 
             const statusBadge =
               status === 'active'
@@ -2185,6 +2186,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const pendingMissionBudgetLimitRef = useRef('')
   const missionActiveRef = useRef(missionActive)
   const handleCreateMissionRef = useRef<() => void>(() => {})
+  // Stable ref for buildMissionCompletionSnapshot — kept in sync each render so
+  // SSE closures (which can't list missionTasks etc. in their own deps) can call it.
+  const buildMissionCompletionSnapshotRef = useRef<() => MissionReportPayload | null>(() => null)
   // Stable ref for live feed visibility (used in feed-count effect)
   const liveFeedVisibleRef = useRef(liveFeedVisible)
   // Tracks whether the live feed sidebar has ever been opened (keeps it mounted once shown)
@@ -2920,6 +2924,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         // Auto-complete: if all expected agents have finished, stop the mission
         if (expected > 0 && doneCount >= expected) {
           window.setTimeout(() => {
+            // Capture snapshot BEFORE changing state (uses fresh ref to avoid stale closure)
+            missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
             setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
             emitFeedEvent({
               type: 'mission_started',
@@ -3142,6 +3148,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     )
     if (!allTerminal) return
     const timer = window.setTimeout(() => {
+      // Capture snapshot BEFORE changing state (uses fresh ref to avoid stale closure)
+      missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
       setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
       emitFeedEvent({ type: 'mission_started', message: '✓ All agents reached terminal state — mission complete' })
     }, 4000)
@@ -3206,9 +3214,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
 
   const spawnAgentSession = useCallback(async (member: TeamMember): Promise<string> => {
-    const suffix = Math.random().toString(36).slice(2, 8)
-    const baseName = member.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    const friendlyId = `hub-${baseName}-${suffix}`
+    // Use pure random UUID for friendlyId to avoid gateway parsing agent name
+    const friendlyId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `hub-${Math.random().toString(36).slice(2, 15)}`
     const label = `Mission: ${member.name}`
 
     // Check if a session with this label already exists — reuse it instead of
@@ -3230,8 +3239,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     const modelString = resolveGatewayModelId(member.modelId)
+    
+    // Build system prompt with agent context
+    const systemPromptParts = [
+      `You are ${member.name}, an agent in a multi-agent mission.`,
+      member.roleDescription && `Role: ${member.roleDescription}`,
+      member.goal && `Your goal: ${member.goal}`,
+      member.backstory && `Background: ${member.backstory}`,
+    ].filter(Boolean)
+    const systemPrompt = systemPromptParts.length > 0 ? systemPromptParts.join('\n\n') : undefined
+    
     const requestBody: Record<string, string> = { friendlyId, label }
     if (modelString) requestBody.model = modelString
+    if (systemPrompt) requestBody.systemPrompt = systemPrompt
 
     const response = await fetch('/api/sessions', {
       method: 'POST',
@@ -3861,6 +3881,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       missionCompletionSnapshotRef.current = null
       // Reload mission history to pick up any new checkpoints
       setMissionHistory(loadMissionHistory())
+      // Mark mission as inactive so the card moves from Running to Review column
+      setMissionActive(false)
     }
     prevMissionStateRef.current = missionState
   }, [missionState])
@@ -4040,6 +4062,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   // Keep the ref in sync so keyboard shortcut always calls the latest version
   handleCreateMissionRef.current = handleCreateMission
+  buildMissionCompletionSnapshotRef.current = buildMissionCompletionSnapshot
 
 
   const isMissionRunning = missionActive && missionState === 'running'

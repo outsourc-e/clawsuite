@@ -107,8 +107,13 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.model === 'string' ? body.model.trim() : ''
           const model = requestedModel || undefined
 
+          const requestedSystemPrompt =
+            typeof body.systemPrompt === 'string' ? body.systemPrompt.trim() : ''
+          const systemPrompt = requestedSystemPrompt || undefined
+
           const baseParams: Record<string, unknown> = { key: friendlyId }
           if (label) baseParams.label = label
+          if (systemPrompt) baseParams.systemPrompt = systemPrompt
 
           let payload: SessionsPatchResponse
           let modelApplied = Boolean(model)
