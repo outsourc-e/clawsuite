@@ -2871,6 +2871,45 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         // Track this session as done
         agentSessionsDoneRef.current.add(sessionKey)
 
+        // Mark agent status as idle
+        setAgentSessionStatus((prev) => ({
+          ...prev,
+          [agentId]: { status: 'idle', lastSeen: Date.now() },
+        }))
+
+        // ── Mark this agent's tasks as done ──────────────────────────────
+        setMissionTasks((prev) => {
+          const updated = prev.map((task) =>
+            task.agentId === agentId && task.status !== 'done'
+              ? { ...task, status: 'done' as TaskStatus, updatedAt: Date.now() }
+              : task
+          )
+          const justCompleted = updated.filter(
+            (t, i) => t.status === 'done' && prev[i]?.status !== 'done',
+          )
+          if (justCompleted.length > 0) {
+            const agentName = teamRef.current.find((m) => m.id === agentId)?.name ?? agentId
+            justCompleted.forEach((task) => {
+              emitFeedEvent({
+                type: 'task_completed',
+                message: `${agentName} completed: ${task.title}`,
+                agentName,
+                taskTitle: task.title,
+              })
+            })
+            // Persist updated task statuses to checkpoint
+            const currentCp = loadMissionCheckpoint()
+            if (currentCp) {
+              saveMissionCheckpoint({
+                ...currentCp,
+                tasks: updated.map((t) => ({ id: t.id, title: t.title, status: t.status, assignedTo: t.agentId })),
+                updatedAt: Date.now(),
+              })
+            }
+          }
+          return updated
+        })
+
         const doneCount = agentSessionsDoneRef.current.size
         const expected = expectedAgentCountRef.current
 
