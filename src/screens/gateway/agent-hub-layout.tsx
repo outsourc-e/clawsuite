@@ -13,7 +13,7 @@ import { THEMES, applyTheme, getStoredTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval } from '@/lib/gateway-api'
 import { ApprovalsBell } from './components/approvals-bell'
-import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, PROVIDER_META } from './components/config-wizards'
+import { AgentWizardModal, TeamWizardModal, AddTeamModal, ProviderEditModal, ProviderLogo, PROVIDER_META } from './components/config-wizards'
 import {
   saveMissionCheckpoint,
   loadMissionCheckpoint,
@@ -47,6 +47,7 @@ const ROUGH_COST_PER_1K_TOKENS_USD = 0.01
 type SavedTeamConfig = {
   id: string
   name: string
+  icon?: string
   createdAt: number
   updatedAt: number
   team: TeamMember[]
@@ -816,9 +817,12 @@ function toSavedTeamConfig(value: unknown): SavedTeamConfig | null {
 
   if (!id || !name || team.length === 0) return null
 
+  const icon = typeof row.icon === 'string' ? row.icon : undefined
+
   return {
     id,
     name,
+    icon,
     createdAt,
     updatedAt,
     team,
@@ -4707,7 +4711,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                           </button>
                           <div className="flex flex-col items-center px-3 pt-5 pb-3 text-center">
-                            <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl shadow-sm">👥</div>
+                            <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl shadow-sm">{config.icon ?? '👥'}</div>
                             <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">{config.name}</p>
                             <p className="mt-0.5 text-[10px] text-neutral-400">{config.team.length} agents</p>
                             <div className="mt-2 flex flex-wrap justify-center gap-1">
@@ -4735,9 +4739,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
                 {/* Team Wizard Modals */}
                 {teamConfigs.map((config) => teamWizardOpenId !== config.id ? null : (
-                  <TeamWizardModal key={config.id} teamId={config.id} teamName={config.name} teamMembers={config.team}
+                  <TeamWizardModal key={config.id} teamId={config.id} teamName={config.name} teamIcon={config.icon ?? '👥'} teamMembers={config.team}
                     isActive={selectedTeamConfigId === config.id}
-                    onRename={(name) => { setTeamConfigName(name) }}
+                    onRename={(name) => {
+                      setTeamConfigs((prev) => prev.map((c) => c.id === config.id ? { ...c, name, updatedAt: Date.now() } : c))
+                    }}
+                    onUpdateIcon={(icon) => {
+                      setTeamConfigs((prev) => prev.map((c) => c.id === config.id ? { ...c, icon, updatedAt: Date.now() } : c))
+                    }}
                     onLoad={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id) }}
                     onDelete={() => { deleteTeamConfig(config.id); setTeamWizardOpenId(null) }}
                     onClose={() => setTeamWizardOpenId(null)} />
@@ -4749,66 +4758,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 ) : null}
               </div>
 
-              {/* Quick-Start Templates (secondary — collapsed by default) */}
-              <details className="group">
-                <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                  <div className="flex items-center justify-between gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3 shadow-sm transition-all hover:border-neutral-300 dark:hover:border-neutral-600">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">🚀</span>
-                      <div>
-                        <p className="text-xs font-semibold text-neutral-900 dark:text-white">Quick-Start Templates</p>
-                        <p className="text-[10px] text-neutral-500 dark:text-neutral-400">Pre-built teams by use case</p>
-                      </div>
-                    </div>
-                    <svg className="size-4 text-neutral-400 transition-transform group-open:rotate-180" viewBox="0 0 16 16" fill="none">
-                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </summary>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {TEAM_QUICK_TEMPLATES.map((tpl) => {
-                    const isActive = activeTemplateId === tpl.templateId
-                    return (
-                      <button
-                        key={tpl.id}
-                        type="button"
-                        onClick={() => {
-                          const templateId = tpl.templateId as TeamTemplateId
-                          if (templateId && templateId in TEAM_TEMPLATES) {
-                            applyTemplate(templateId)
-                          }
-                        }}
-                        className={cn(
-                          'relative rounded-xl border-2 bg-white dark:bg-neutral-900 p-4 text-left transition-all hover:shadow-md',
-                          isActive ? 'border-orange-400' : 'border-neutral-200 dark:border-neutral-700',
-                        )}
-                      >
-                        {isActive ? (
-                          <span className="absolute -top-2 right-3 rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-bold text-white">Active</span>
-                        ) : null}
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">{tpl.icon}</span>
-                          <div>
-                            <p className="text-xs font-semibold text-neutral-900 dark:text-white">{tpl.label}</p>
-                            <p className="text-[10px] text-neutral-500 dark:text-neutral-400">{tpl.description}</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {tpl.agents.map((a) => (
-                            <span key={a} className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-600 dark:text-neutral-400">{a}</span>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', tpl.tier === 'budget' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : tpl.tier === 'balanced' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400')}>
-                            {tpl.tier === 'budget' ? '💰 Budget' : tpl.tier === 'balanced' ? '⚖️ Balanced' : '🚀 Max Output'}
-                          </span>
-                          <span className="text-[10px] text-neutral-400">{tpl.agents.length} agents</span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </details>
             </div>
           ) : null}
 
@@ -4984,7 +4933,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                    {configuredProviders.map((provider, pIdx) => {
+                    {configuredProviders.map((provider) => {
                       const providerModels = gatewayModels.filter((m) => m.provider === provider)
                       const pm = (PROVIDER_META as Record<string, { label: string; emoji: string; color: string; bg: string; border: string; description: string }>)[provider.toLowerCase()] ?? { label: provider, emoji: '🔑', color: 'text-neutral-600', bg: 'bg-neutral-100 dark:bg-neutral-800', border: 'border-neutral-300', description: '' }
                       return (
@@ -4997,8 +4946,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                           </button>
                           <div className="flex flex-col items-center px-3 pt-4 pb-3 text-center">
-                            <div className={cn('mb-2 flex size-12 items-center justify-center rounded-full text-2xl shadow-sm', pm.bg)}>
-                              {pm.emoji}
+                            <div className={cn('mb-2 flex size-12 items-center justify-center rounded-full shadow-sm', pm.bg)}>
+                              <ProviderLogo provider={provider} size={28} />
                             </div>
                             <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">{pm.label}</p>
                             <p className="text-[9px] text-neutral-400 mt-0.5">{pm.description}</p>
