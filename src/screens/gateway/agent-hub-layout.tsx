@@ -6569,6 +6569,38 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
         ) : null}
+
+        {/* Desktop Agent Output Panel — slides in when an agent is selected */}
+        {outputPanelVisible && selectedOutputAgentId && (
+          <div className="flex w-80 shrink-0 flex-col border-l border-neutral-200 dark:border-slate-700 bg-white dark:bg-[var(--theme-panel,#111520)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
+                  {selectedOutputAgentName}
+                </p>
+                <p className="text-[10px] text-neutral-500 dark:text-neutral-400">Live Output</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setOutputPanelVisible(false) }}
+                className="flex size-7 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 transition-colors"
+                aria-label="Close output panel"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <AgentOutputPanel
+                agentName={selectedOutputAgentName}
+                sessionKey={agentSessionMap[selectedOutputAgentId] ?? null}
+                tasks={selectedOutputTasks}
+                onClose={() => setOutputPanelVisible(false)}
+                modelId={selectedOutputModelId}
+                statusLabel={selectedOutputStatusLabel}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Launch wizard ─────────────────────────────────────────────────── */}
