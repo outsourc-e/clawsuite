@@ -2185,6 +2185,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const handleCreateMissionRef = useRef<() => void>(() => {})
   // Stable ref for live feed visibility (used in feed-count effect)
   const liveFeedVisibleRef = useRef(liveFeedVisible)
+  // Tracks whether the live feed sidebar has ever been opened (keeps it mounted once shown)
+  const liveFeedEverOpenedRef = useRef(false)
+  // Tracks which agent session keys have sent their 'done' SSE event
+  const agentSessionsDoneRef = useRef<Set<string>>(new Set())
+  // Tracks the number of agents expected to complete for the current mission
+  const expectedAgentCountRef = useRef(0)
 
   teamRef.current = team
   missionGoalRef.current = missionGoal
@@ -2707,10 +2713,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return unsubscribe
   }, []) // uses liveFeedVisibleRef — stable
 
-  // Reset unread count when feed becomes visible
+  // Reset unread count when feed becomes visible; also track that it was ever opened
   useEffect(() => {
     if (liveFeedVisible) {
       setUnreadFeedCount(0)
+      liveFeedEverOpenedRef.current = true
     }
   }, [liveFeedVisible])
 
@@ -2861,6 +2868,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       })
       source.addEventListener('done', () => {
         markStreamAlive()
+        // Track this session as done
+        agentSessionsDoneRef.current.add(sessionKey)
+
+        const doneCount = agentSessionsDoneRef.current.size
+        const expected = expectedAgentCountRef.current
+
+        // Auto-complete: if all expected agents have finished, stop the mission
+        if (expected > 0 && doneCount >= expected) {
+          window.setTimeout(() => {
+            setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
+            emitFeedEvent({
+              type: 'mission_started',
+              message: `✓ All ${expected} agents completed — mission auto-finished`,
+            })
+          }, 2000)
+        }
       })
       source.addEventListener('open', () => {
         markStreamAlive()
@@ -3876,6 +3899,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setArtifacts([])
     artifactDedupRef.current = new Set()
     agentOutputLinesRef.current = {}
+    agentSessionsDoneRef.current = new Set()
+    expectedAgentCountRef.current = teamWithRuntimeStatus.length
     missionCompletionSnapshotRef.current = null
     setMissionTokenCount(0)
     const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
@@ -6226,8 +6251,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
 
         {/* ── Collapsible Live Feed + Approvals + Mission Controls sidebar ── */}
-        {liveFeedVisible ? (
-          <div className="flex w-72 shrink-0 flex-col border-l border-neutral-200 bg-neutral-50/30">
+        {/* Keep mounted once opened so LiveFeedPanel history is preserved on hide/show */}
+        {(liveFeedVisible || liveFeedEverOpenedRef.current) ? (
+          <div
+            className="flex w-72 shrink-0 flex-col border-l border-neutral-200 bg-neutral-50/30 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]"
+            style={{ display: liveFeedVisible ? undefined : 'none' }}
+          >
             {/* Approvals notification area */}
             {approvals.filter((a) => a.status === 'pending').length > 0 ? (
               <div className="border-b border-neutral-200 px-3 py-2.5">
