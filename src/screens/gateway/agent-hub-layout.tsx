@@ -4553,7 +4553,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     className={cn(
                       'relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all duration-200',
                       isEditing
-                        ? `${ac.border} shadow-md col-span-2`
+                        ? `${ac.border} shadow-md col-span-full`
                         : `${ac.border} hover:shadow-md`,
                     )}
                   >
@@ -4684,121 +4684,165 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       ) : null}
                     </div>
 
-                    {/* ── Inline edit form (expands in place) ── */}
+                    {/* ── Inline edit form (expands full width) ── */}
                     {isEditing ? (
-                      <div className="border-t border-neutral-100 dark:border-neutral-800 px-4 pb-4 pt-3 space-y-3">
-                        {/* Name */}
-                        <label className="block">
-                          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Name</span>
-                          <input
-                            value={member.name}
-                            onChange={(event) =>
-                              setTeam((previous) =>
-                                previous.map((row) =>
-                                  row.id === member.id ? { ...row, name: event.target.value } : row,
-                                ),
-                              )
-                            }
-                            className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
-                          />
-                        </label>
+                      <div className="border-t border-neutral-100 dark:border-neutral-800 px-6 pb-5 pt-4">
+                        {/* Top row: identity fields side by side */}
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4">
+                          {/* Name */}
+                          <label className="block">
+                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Name</span>
+                            <input
+                              value={member.name}
+                              onChange={(event) =>
+                                setTeam((previous) =>
+                                  previous.map((row) =>
+                                    row.id === member.id ? { ...row, name: event.target.value } : row,
+                                  ),
+                                )
+                              }
+                              className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
+                            />
+                          </label>
 
-                        {/* Model */}
-                        <label className="block">
-                          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Model</span>
-                          <select
-                            value={member.modelId}
-                            onChange={(event) =>
-                              setTeam((previous) =>
-                                previous.map((row) =>
-                                  row.id === member.id
-                                    ? { ...row, modelId: event.target.value }
-                                    : row,
-                                ),
-                              )
-                            }
-                            className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
-                          >
-                            <optgroup label="Presets">
-                              {MODEL_PRESETS.map((preset) => (
-                                <option key={preset.id} value={preset.id}>
-                                  {preset.label}
-                                </option>
-                              ))}
-                            </optgroup>
-                            {gatewayModels.length > 0 ? (
-                              <optgroup label="Available Models">
-                                {gatewayModels.map((model) => (
-                                  <option key={model.value} value={model.value}>
-                                    {model.label} ({model.provider})
+                          {/* Model */}
+                          <label className="block">
+                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Model</span>
+                            <select
+                              value={member.modelId}
+                              onChange={(event) =>
+                                setTeam((previous) =>
+                                  previous.map((row) =>
+                                    row.id === member.id
+                                      ? { ...row, modelId: event.target.value }
+                                      : row,
+                                  ),
+                                )
+                              }
+                              className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
+                            >
+                              <optgroup label="Presets">
+                                {MODEL_PRESETS.map((preset) => (
+                                  <option key={preset.id} value={preset.id}>
+                                    {preset.label}
                                   </option>
                                 ))}
                               </optgroup>
-                            ) : null}
-                          </select>
-                        </label>
+                              {gatewayModels.length > 0 ? (
+                                <optgroup label="Available Models">
+                                  {gatewayModels.map((model) => (
+                                    <option key={model.value} value={model.value}>
+                                      {model.label} ({model.provider})
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ) : null}
+                            </select>
+                          </label>
 
-                        {/* Role */}
-                        <label className="block">
-                          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Role</span>
-                          <input
-                            value={member.roleDescription}
-                            onChange={(event) =>
-                              setTeam((previous) =>
-                                previous.map((row) =>
-                                  row.id === member.id
-                                    ? { ...row, roleDescription: event.target.value }
-                                    : row,
-                                ),
-                              )
-                            }
-                            className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
-                          />
-                        </label>
+                          {/* Role */}
+                          <label className="block">
+                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Role</span>
+                            <input
+                              value={member.roleDescription}
+                              onChange={(event) =>
+                                setTeam((previous) =>
+                                  previous.map((row) =>
+                                    row.id === member.id
+                                      ? { ...row, roleDescription: event.target.value }
+                                      : row,
+                                  ),
+                                )
+                              }
+                              className="h-8 w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
+                            />
+                          </label>
+                        </div>
 
-                        {/* System Prompt */}
+                        {/* System Prompt — full width below */}
                         <div>
                           <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">System Prompt</span>
                           {/* Template categories */}
-                          <div className="mb-2 space-y-1.5">
-                            {(['engineering', 'research', 'content', 'ops', 'general'] as const).map((cat) => {
-                              const catTemplates = SYSTEM_PROMPT_TEMPLATES.filter((tpl) => tpl.category === cat)
-                              const catLabels: Record<string, string> = {
-                                engineering: '⚙️ Eng',
-                                research: '🔬 Research',
-                                content: '📝 Content',
-                                ops: '🗺️ Ops',
-                                general: '🤖 General',
-                              }
-                              return (
-                                <div key={cat} className="flex flex-wrap items-center gap-1">
-                                  <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-neutral-300 dark:text-neutral-600 w-14">{catLabels[cat]}</span>
-                                  {catTemplates.map((tpl) => (
-                                    <button
-                                      key={tpl.id}
-                                      type="button"
-                                      onClick={() =>
-                                        setTeam((prev) =>
-                                          prev.map((row) =>
-                                            row.id === member.id ? { ...row, backstory: tpl.prompt } : row,
-                                          ),
-                                        )
+                          {(() => {
+                            const isCustom = member.backstory.trim() !== '' && !SYSTEM_PROMPT_TEMPLATES.some((t) => t.prompt === member.backstory)
+                            return (
+                              <div className="mb-2 space-y-1.5">
+                                {/* Custom button */}
+                                <div className="flex flex-wrap items-center gap-1 pb-0.5 border-b border-neutral-100 dark:border-neutral-800 mb-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (isCustom) {
+                                        setTeam((prev) => prev.map((row) => row.id === member.id ? { ...row, backstory: '' } : row))
                                       }
-                                      className={cn(
-                                        'rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors',
-                                        member.backstory === tpl.prompt
-                                          ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
-                                          : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700',
-                                      )}
-                                      title={tpl.prompt.slice(0, 140)}
+                                      // else: already empty, just let them type in textarea
+                                    }}
+                                    className={cn(
+                                      'rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors',
+                                      isCustom
+                                        ? 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
+                                        : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 hover:border-neutral-300',
+                                    )}
+                                    title="Write your own custom prompt"
+                                  >
+                                    ✏️ Custom
+                                  </button>
+                                  {member.backstory.trim() !== '' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setTeam((prev) => prev.map((row) => row.id === member.id ? { ...row, backstory: '' } : row))}
+                                      className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-400 hover:text-red-500 transition-colors"
+                                      title="Clear prompt"
                                     >
-                                      {tpl.icon} {tpl.label}
+                                      ✕ Clear
                                     </button>
-                                  ))}
+                                  ) : null}
                                 </div>
-                              )
-                            })}
-                          </div>
+                                {(['engineering', 'research', 'content', 'ops', 'general'] as const).map((cat) => {
+                                  const catTemplates = SYSTEM_PROMPT_TEMPLATES.filter((tpl) => tpl.category === cat)
+                                  const catLabels: Record<string, string> = {
+                                    engineering: '⚙️ Eng',
+                                    research: '🔬 Research',
+                                    content: '📝 Content',
+                                    ops: '🗺️ Ops',
+                                    general: '🤖 General',
+                                  }
+                                  return (
+                                    <div key={cat} className="flex flex-wrap items-center gap-1">
+                                      <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-neutral-300 dark:text-neutral-600 w-14">{catLabels[cat]}</span>
+                                      {catTemplates.map((tpl) => {
+                                        const isActive = member.backstory === tpl.prompt
+                                        return (
+                                          <button
+                                            key={tpl.id}
+                                            type="button"
+                                            onClick={() =>
+                                              setTeam((prev) =>
+                                                prev.map((row) =>
+                                                  row.id === member.id
+                                                    ? { ...row, backstory: isActive ? '' : tpl.prompt }
+                                                    : row,
+                                                ),
+                                              )
+                                            }
+                                            className={cn(
+                                              'rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors',
+                                              isActive
+                                                ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+                                                : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700',
+                                            )}
+                                            title={tpl.prompt.slice(0, 140)}
+                                          >
+                                            {tpl.icon} {tpl.label}
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )
+                          })()}
                           <textarea
                             value={member.backstory}
                             onChange={(event) =>
@@ -4894,7 +4938,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               {/* Saved team configs */}
               <div>
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
                     <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Saved Teams</h2>
                     <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">Your custom team configurations</p>
@@ -4904,62 +4948,98 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       value={teamConfigName}
                       onChange={(event) => setTeamConfigName(event.target.value)}
                       placeholder="Team name..."
-                      className="h-8 w-40 rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                      className="h-8 w-36 rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1"
                     />
                     <button
                       type="button"
                       onClick={saveCurrentTeamConfig}
                       className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600"
                     >
-                      Save Current
+                      Save
                     </button>
                   </div>
                 </div>
-                <div className="mt-3 space-y-2">
-                  {teamConfigs.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-neutral-200 bg-white py-8 text-center">
-                      <span className="text-xl">📁</span>
-                      <p className="text-xs text-neutral-400">No saved teams yet. Configure agents and save your first team.</p>
-                    </div>
-                  ) : (
-                    teamConfigs.map((config) => (
-                      <div
-                        key={config.id}
-                        className={cn(
-                          'flex items-center justify-between gap-3 rounded-xl border bg-white p-3 shadow-sm transition-all hover:shadow-md',
-                          selectedTeamConfigId === config.id ? 'border-orange-300' : 'border-neutral-200',
-                        )}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-neutral-900 dark:text-white">{config.name}</p>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {config.team.map((m) => (
-                              <span key={m.id} className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] text-neutral-600 dark:text-slate-400">
-                                {m.name}
-                              </span>
-                            ))}
+                {teamConfigs.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={saveCurrentTeamConfig}
+                    className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 py-8 text-center transition-all hover:border-orange-400 hover:bg-orange-50/20"
+                  >
+                    <span className="flex size-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl">💾</span>
+                    <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Save your first team</p>
+                    <p className="text-[10px] text-neutral-400 dark:text-neutral-500">Configure agents then save here</p>
+                  </button>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {teamConfigs.map((config, tIdx) => {
+                      const isActive = selectedTeamConfigId === config.id
+                      const teamColors = ['border-blue-300', 'border-emerald-300', 'border-violet-300', 'border-amber-300', 'border-pink-300', 'border-teal-300']
+                      const accentBorder = teamColors[tIdx % teamColors.length]
+                      return (
+                        <div
+                          key={config.id}
+                          className={cn(
+                            'relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md',
+                            isActive ? 'border-orange-400 shadow-orange-100' : accentBorder,
+                          )}
+                        >
+                          {/* Active badge */}
+                          {isActive ? (
+                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-bold text-white shadow-sm">
+                              Active
+                            </span>
+                          ) : null}
+                          <div className="flex flex-col items-center px-3 pt-5 pb-3 text-center">
+                            {/* Team icon */}
+                            <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl shadow-sm">
+                              👥
+                            </div>
+                            <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">{config.name}</p>
+                            <p className="mt-0.5 text-[10px] text-neutral-400">{config.team.length} agents</p>
+                            <div className="mt-2 flex flex-wrap justify-center gap-1">
+                              {config.team.slice(0, 3).map((m) => (
+                                <span key={m.id} className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] font-medium text-neutral-500 dark:text-neutral-400">
+                                  {m.name}
+                                </span>
+                              ))}
+                              {config.team.length > 3 ? (
+                                <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-400">
+                                  +{config.team.length - 3}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="border-t border-neutral-100 dark:border-neutral-800 flex">
+                            <button
+                              type="button"
+                              onClick={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id) }}
+                              className="flex-1 py-2 text-[10px] font-semibold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors rounded-bl-xl"
+                            >
+                              Load
+                            </button>
+                            <div className="w-px bg-neutral-100 dark:bg-neutral-800" />
+                            <button
+                              type="button"
+                              onClick={() => deleteTeamConfig(config.id)}
+                              className="flex-1 py-2 text-[10px] font-medium text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors rounded-br-xl"
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
-                        <div className="flex shrink-0 gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id) }}
-                            className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2.5 py-1.5 text-[10px] font-medium text-neutral-700 hover:bg-neutral-50"
-                          >
-                            Load
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteTeamConfig(config.id)}
-                            className="rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-red-600 hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                      )
+                    })}
+                    {/* Save new team card */}
+                    <button
+                      type="button"
+                      onClick={saveCurrentTeamConfig}
+                      className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-center transition-all hover:border-orange-400 hover:bg-orange-50/20"
+                    >
+                      <span className="flex size-8 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-base text-neutral-400">+</span>
+                      <span className="text-[10px] font-medium text-neutral-400">Save current</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Active team editor */}
@@ -5123,40 +5203,50 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <p className="text-xs text-neutral-400">No configured providers detected. Add one above.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {configuredProviders.map((provider) => {
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {configuredProviders.map((provider, pIdx) => {
                       const providerModels = gatewayModels.filter((m) => m.provider === provider)
+                      const providerColors = [
+                        { border: 'border-blue-300', bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-blue-600 dark:text-blue-400' },
+                        { border: 'border-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-900/20', text: 'text-emerald-600 dark:text-emerald-400' },
+                        { border: 'border-violet-300', bg: 'bg-violet-50 dark:bg-violet-900/20', text: 'text-violet-600 dark:text-violet-400' },
+                        { border: 'border-amber-300', bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-amber-600 dark:text-amber-400' },
+                        { border: 'border-pink-300', bg: 'bg-pink-50 dark:bg-pink-900/20', text: 'text-pink-600 dark:text-pink-400' },
+                        { border: 'border-teal-300', bg: 'bg-teal-50 dark:bg-teal-900/20', text: 'text-teal-600 dark:text-teal-400' },
+                        { border: 'border-orange-300', bg: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-600 dark:text-orange-400' },
+                      ]
+                      const pc = providerColors[pIdx % providerColors.length]
                       return (
                         <div
                           key={provider}
-                          className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm"
+                          className={cn('rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md', pc.border)}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="flex size-8 items-center justify-center rounded-lg bg-neutral-100 text-sm font-bold text-neutral-600 dark:text-slate-400">
-                                {provider.slice(0, 2).toUpperCase()}
-                              </span>
-                              <div>
-                                <p className="text-xs font-semibold text-neutral-900 dark:text-white">{provider}</p>
-                                <p className="text-[10px] text-neutral-500 dark:text-slate-400">{providerModels.length} models available</p>
-                              </div>
+                          <div className="flex flex-col items-center px-3 pt-4 pb-3 text-center">
+                            {/* Provider icon */}
+                            <div className={cn('mb-2 flex size-12 items-center justify-center rounded-full text-lg font-black shadow-sm', pc.bg, pc.text)}>
+                              {provider.slice(0, 2).toUpperCase()}
                             </div>
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                              ● Active
+                            <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight capitalize">{provider}</p>
+                            <div className="mt-1 flex items-center gap-1">
+                              <span className="size-1.5 rounded-full bg-emerald-500" />
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Active</span>
+                            </div>
+                            <span className="mt-1 rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-500 dark:text-neutral-400">
+                              {providerModels.length} model{providerModels.length !== 1 ? 's' : ''}
                             </span>
+                            {providerModels.length > 0 ? (
+                              <div className="mt-2 w-full space-y-0.5">
+                                {providerModels.slice(0, 3).map((m) => (
+                                  <span key={m.value} className="block truncate rounded bg-neutral-50 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-500 dark:text-neutral-400">
+                                    {m.label}
+                                  </span>
+                                ))}
+                                {providerModels.length > 3 ? (
+                                  <span className="block text-[9px] text-neutral-400 text-center">+{providerModels.length - 3} more</span>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
-                          {providerModels.length > 0 ? (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {providerModels.slice(0, 6).map((m) => (
-                                <span key={m.value} className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] text-neutral-600 dark:text-slate-400">
-                                  {m.label}
-                                </span>
-                              ))}
-                              {providerModels.length > 6 ? (
-                                <span className="text-[10px] text-neutral-400">+{providerModels.length - 6} more</span>
-                              ) : null}
-                            </div>
-                          ) : null}
                         </div>
                       )
                     })}
