@@ -7,6 +7,7 @@ import { AgentOutputPanel } from './components/agent-output-panel'
 import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
 import { ApprovalsPanel } from './components/approvals-panel'
+import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -197,8 +198,8 @@ type ConfigSection = 'agents' | 'teams' | 'keys' | 'approvals'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'overview', icon: '🏠', label: 'Overview' },
-  { id: 'configure', icon: '⚙️', label: 'Configure' },
   { id: 'missions', icon: '🚀', label: 'Missions' },
+  { id: 'configure', icon: '⚙️', label: 'Configure' },
 ]
 
 const CONFIG_SECTIONS: Array<{ id: ConfigSection; icon: string; label: string }> = [
@@ -1724,7 +1725,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // ── Tab + sidebar state ────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   const [configSection, setConfigSection] = useState<ConfigSection>('agents')
-  const [overviewAgentsView, setOverviewAgentsView] = useState<'cards' | 'live'>('cards')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
@@ -4014,7 +4014,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const activeCount = agentWorkingRows.filter(
       (row) => row.status === 'active' || row.status === 'spawning',
     ).length
+    const sessionCount = agentWorkingRows.filter((row) => Boolean(row.sessionKey)).length
     const pendingApprovalCount = approvals.filter((a) => a.status === 'pending').length
+    const pendingApprovals = approvals
+      .filter((a) => a.status === 'pending')
+      .sort((a, b) => b.requestedAt - a.requestedAt)
+      .slice(0, 4)
     const taskSource = missionActive ? activeTaskSource : boardTasks
     const doneTasks = taskSource.filter((task) => task.status === 'done').length
     const totalTasks = taskSource.length
@@ -4022,156 +4027,92 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const recentActivityItems = [
       ...(missionActive
         ? [
-            `Mission "${truncateMissionGoal(activeMissionGoal || missionGoal || 'Active mission', 40)}" ${missionState === 'running' ? 'running' : missionState}`,
+            {
+              id: 'mission-active',
+              text: `Mission "${truncateMissionGoal(activeMissionGoal || missionGoal || 'Active mission', 44)}" ${missionState === 'running' ? 'running' : missionState}`,
+              at: Date.now(),
+            },
           ]
         : []),
       ...agentWorkingRows
         .filter((row) => row.lastLine)
         .sort((a, b) => (b.lastAt ?? 0) - (a.lastAt ?? 0))
-        .slice(0, 4)
-        .map((row) => `${row.name}: ${truncateMissionGoal(row.lastLine ?? '', 72)}`),
-      ...recentReports.slice(0, 2).map((report) => `Report archived: ${truncateMissionGoal(report.goal, 60)}`),
-    ].slice(0, 6)
+        .slice(0, 5)
+        .map((row) => ({
+          id: `agent-${row.id}`,
+          text: `${row.name}: ${truncateMissionGoal(row.lastLine ?? '', 72)}`,
+          at: row.lastAt ?? 0,
+        })),
+      ...recentReports.slice(0, 3).map((report) => ({
+        id: `report-${report.id}`,
+        text: `Report archived: ${truncateMissionGoal(report.goal, 60)}`,
+        at: report.completedAt,
+      })),
+    ]
+      .sort((a, b) => b.at - a.at)
+      .slice(0, 5)
     return (
-      <div className="h-full overflow-y-auto bg-neutral-50 p-4">
-        <div className="space-y-4">
-          <section className="rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-            {missionActive ? (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-neutral-900">
-                    Mission Status
-                  </p>
-                  <p className="mt-1 truncate text-sm text-neutral-700">
-                    {truncateMissionGoal(activeMissionGoal || missionGoal || 'Active mission')}
-                  </p>
-                  <p className="mt-1 text-[11px] text-neutral-500">
-                    {activeCount} active agent{activeCount === 1 ? '' : 's'}
-                    {' · '}
-                    {totalTasks > 0 ? `${doneTasks}/${totalTasks} tasks done` : 'No tasks yet'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView('board')
-                      setActiveTab('missions')
-                    }}
-                    className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50"
-                  >
-                    View Mission
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('missions')}
-                    className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
-                  >
-                    Stop
-                  </button>
-                </div>
+      <div className="h-full min-h-0 bg-neutral-50 p-4">
+        <div className="flex h-full min-h-0 flex-col gap-4">
+          <section className="rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0 flex-1 text-xs text-neutral-600">
+                <span className="font-semibold text-neutral-900">Mission Control Overview</span>
+                <span className="mx-2 text-neutral-300">·</span>
+                <span>{team.length} agents</span>
+                <span className="mx-2 text-neutral-300">·</span>
+                <span>{activeCount} active</span>
+                <span className="mx-2 text-neutral-300">·</span>
+                <span>{totalTasks > 0 ? `${doneTasks}/${totalTasks} tasks` : '0/0 tasks'}</span>
+                {missionActive ? (
+                  <>
+                    <span className="mx-2 text-neutral-300">·</span>
+                    <span className="truncate text-neutral-700">
+                      {truncateMissionGoal(activeMissionGoal || missionGoal || 'Active mission', 48)}
+                    </span>
+                  </>
+                ) : null}
               </div>
-            ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold text-neutral-900">No active mission</p>
-                  <p className="mt-1 text-[11px] text-neutral-500">
-                    Configure your team and launch a mission when ready.
-                  </p>
-                </div>
+              <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
-                  onClick={openLaunchWizard}
-                  className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+                  onClick={() => setActiveTab('missions')}
+                  className="rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                >
+                  Open Missions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('configure')
+                    setConfigSection('agents')
+                  }}
+                  className="rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                >
+                  Configure
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('missions')}
+                  className="rounded-lg bg-orange-500 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-orange-600"
                 >
                   Start Mission
                 </button>
               </div>
-            )}
-          </section>
-
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              { label: 'Agents', value: team.length.toString(), sub: `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom'} team` },
-              { label: 'Active', value: activeCount.toString(), sub: missionActive ? 'Currently working' : 'Idle' },
-              { label: 'Tasks', value: totalTasks.toString(), sub: totalTasks > 0 ? `${doneTasks} done` : 'No tasks yet' },
-              { label: 'Approvals', value: pendingApprovalCount.toString(), sub: pendingApprovalCount > 0 ? 'Needs review' : 'All clear' },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="flex min-h-[92px] h-full flex-col justify-between rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <p className="text-[11px] font-medium text-neutral-500">{stat.label}</p>
-                <p className="mt-1 text-lg font-semibold tracking-tight text-neutral-900">{stat.value}</p>
-                <p className="mt-1 text-[11px] text-neutral-500">{stat.sub}</p>
-              </div>
-            ))}
-          </section>
-
-          <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex min-w-0 flex-wrap items-center gap-3">
-                <h2 className="text-sm font-semibold text-neutral-900">Agents</h2>
-                {agentWorkingRows.length > 0 ? (
-                  <div className="flex -space-x-2">
-                    {agentWorkingRows.slice(0, 5).map((agent, index) => {
-                      const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
-                      return (
-                        <span
-                          key={`${agent.id}-header-avatar`}
-                          title={agent.name}
-                          className={cn(
-                            'flex size-6 items-center justify-center rounded-full border-2 border-white text-lg leading-none shadow-sm',
-                            accent.avatar,
-                          )}
-                        >
-                          <AgentAvatar index={resolveAgentAvatarIndex(teamById.get(agent.id), index)} color={accent.hex} size={14} />
-                        </span>
-                      )
-                    })}
-                  </div>
-                ) : null}
-                {agentWorkingRows.length > 0 ? (
-                  <div className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-100 p-0.5 align-middle">
-                    <div className="flex items-center gap-0.5">
-                      {(['cards', 'live'] as const).map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() => setOverviewAgentsView(mode)}
-                          className={cn(
-                            'rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors',
-                            overviewAgentsView === mode
-                              ? 'bg-white text-neutral-900 shadow-sm'
-                              : 'text-neutral-500 hover:text-neutral-700',
-                          )}
-                        >
-                          {mode === 'cards' ? 'Cards' : 'Live'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('configure')
-                  setConfigSection('agents')
-                }}
-                className="text-xs font-medium text-orange-600 hover:text-orange-700"
-              >
-                Configure
-              </button>
             </div>
+          </section>
+
+          <section className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
             {agentWorkingRows.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center">
-                <p className="text-2xl" aria-hidden>🤖</p>
-                <p className="mt-1 text-sm font-medium text-neutral-700">No agents configured yet</p>
-                <p className="mt-1 text-xs text-neutral-500">Open Configure to add your first agent.</p>
+              <div className="flex min-h-[400px] items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center">
+                <div>
+                  <p className="text-2xl" aria-hidden>🤖</p>
+                  <p className="mt-1 text-sm font-medium text-neutral-700">No agents configured yet</p>
+                  <p className="mt-1 text-xs text-neutral-500">Open Configure to add your first agent.</p>
+                </div>
               </div>
-            ) : overviewAgentsView === 'live' ? (
-              <OfficeView
+            ) : (
+              <PixelOfficeView
                 agentRows={agentWorkingRows}
                 missionRunning={isMissionRunning}
                 onViewOutput={(agentId) => {
@@ -4183,125 +4124,160 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 activeTemplateName={activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined}
                 processType={processType}
               />
-            ) : (
-              <div
-                className={cn(
-                  'grid auto-rows-fr gap-4',
-                  agentWorkingRows.length <= 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3',
-                )}
-              >
-                {agentWorkingRows.map((agent, index) => {
-                const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
-                const isBusy = agent.status === 'active' || agent.status === 'spawning'
-                const isRunning = agent.status === 'active'
-                const statusMeta = getAgentStatusMeta(agent.status)
-                return (
-                  <div
-                    key={agent.id}
-                    className="relative flex h-full min-h-[220px] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    <div className={cn('absolute inset-y-0 left-0 w-[3px]', accent.bar)} />
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 items-start gap-2">
-                        <div
-                          className={cn(
-                            'flex size-10 shrink-0 items-center justify-center rounded-full shadow-sm',
-                            accent.avatar,
-                          )}
-                        >
-                          <AgentAvatar index={resolveAgentAvatarIndex(teamById.get(agent.id), index)} color={accent.hex} size={24} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-neutral-900">{agent.name}</p>
-                          <p className="truncate text-[11px] text-neutral-500">
-                            {agent.roleDescription || 'No role description'}
-                          </p>
-                        </div>
-                      </div>
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                          isBusy ? 'bg-orange-100 text-orange-700' : 'bg-neutral-200 text-neutral-700',
-                        )}
-                      >
-                        {getModelShortLabel(agent.modelId, gatewayModelLabelById)}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2 text-[11px]">
-                      {statusMeta.pulse ? (
-                        <span className="relative flex size-2 shrink-0">
-                          <span className={cn('absolute inset-0 animate-ping rounded-full opacity-60', statusMeta.dotClassName)} />
-                          <span className={cn('relative inline-flex size-2 rounded-full', statusMeta.dotClassName)} />
-                        </span>
-                      ) : (
-                        <span className={cn('size-2 rounded-full', statusMeta.dotClassName)} />
-                      )}
-                      <span className={cn('font-medium', statusMeta.className)}>● {statusMeta.label}</span>
-                      {agent.taskCount > 0 ? <span>· {agent.taskCount} tasks</span> : null}
-                    </div>
-                    {agent.lastLine ? (
-                      <p className="mt-2 line-clamp-2 min-h-[2.2rem] font-mono text-[11px] text-neutral-500">
-                        {agent.lastLine}
-                      </p>
-                    ) : (
-                      <p className={cn('mt-2 min-h-[2.2rem] font-mono text-[11px]', statusMeta.className)}>
-                        {agent.status === 'none' ? '● Waiting for session' : `● ${statusMeta.label}`}
-                      </p>
-                    )}
-                    <div className="mt-auto flex gap-2 pt-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveTab('configure')
-                          setConfigSection('agents')
-                        }}
-                        className={cn(
-                          'flex-1 rounded-lg border bg-white px-2 py-1.5 text-[11px] font-medium transition-colors',
-                          isRunning
-                            ? 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-                            : 'border-orange-200 text-orange-600 hover:bg-orange-50',
-                        )}
-                      >
-                        Configure
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleAgentSelection(agent.id)
-                          setView('board')
-                          setActiveTab('missions')
-                        }}
-                        className={cn(
-                          'flex-1 rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition-colors',
-                          isRunning
-                            ? 'border-orange-500 bg-orange-500 text-white hover:bg-orange-600'
-                            : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50',
-                        )}
-                      >
-                        View Output
-                      </button>
-                    </div>
-                  </div>
-                )
-                })}
-              </div>
             )}
           </section>
 
-          <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-            <h2 className="text-sm font-semibold text-neutral-900">Recent Activity</h2>
-            {recentActivityItems.length === 0 ? (
-              <p className="mt-2 text-xs text-neutral-500">📝 No recent activity yet.</p>
-            ) : (
-              <ul className="mt-2 space-y-2">
-                {recentActivityItems.map((item, index) => (
-                  <li key={`${index}-${item}`} className="flex items-start gap-2 text-xs">
-                    <span className="mt-1 size-1.5 rounded-full bg-orange-500" />
-                    <span className="text-neutral-700">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <article className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-neutral-900">Team</h2>
+                <span className="text-[11px] text-neutral-500">{team.length} members</span>
+              </div>
+              {team.length === 0 ? (
+                <p className="text-xs text-neutral-500">No agents configured yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {team.slice(0, 5).map((member, index) => {
+                    const ac = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+                    const row = agentWorkingRows.find((item) => item.id === member.id)
+                    const statusMeta = row ? getAgentStatusMeta(row.status) : getAgentStatusMeta('none')
+                    return (
+                      <li key={member.id} className="flex items-center gap-2 rounded-lg border border-neutral-100 bg-neutral-50 px-2 py-1.5">
+                        <span className={cn('flex size-7 items-center justify-center rounded-md border border-white shadow-sm', ac.avatar)}>
+                          <AgentAvatar index={resolveAgentAvatarIndex(member, index)} color={ac.hex} size={16} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs font-medium text-neutral-800">{member.name}</div>
+                          <div className="truncate text-[10px] text-neutral-500">{member.role || 'Agent'}</div>
+                        </div>
+                        <span className={cn('rounded px-1.5 py-0.5 font-mono text-[9px] font-medium', getOfficeModelBadge(member.modelId))}>
+                          {getOfficeModelLabel(member.modelId)}
+                        </span>
+                        <span
+                          className={cn(
+                            'size-2 shrink-0 rounded-full',
+                            row ? (
+                              row.status === 'active' ? 'bg-emerald-500'
+                                : row.status === 'idle' || row.status === 'ready' ? 'bg-amber-400'
+                                  : row.status === 'error' ? 'bg-red-500'
+                                    : 'bg-neutral-400'
+                            ) : 'bg-neutral-300',
+                          )}
+                          title={statusMeta.label}
+                        />
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </article>
+
+            <article className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-neutral-900">Activity</h2>
+                <span className="text-[11px] text-neutral-500">Last 5</span>
+              </div>
+              {recentActivityItems.length === 0 ? (
+                <p className="text-xs text-neutral-500">No recent activity yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {recentActivityItems.map((item) => (
+                    <li key={item.id} className="flex items-start gap-2 text-xs">
+                      <span className="mt-1 size-1.5 rounded-full bg-orange-500" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-neutral-700">{item.text}</div>
+                        <div className="mt-0.5 text-[10px] text-neutral-400">
+                          {item.at > 0 ? new Date(item.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'just now'}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+
+            <article className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-neutral-900">Approvals</h2>
+                <span className={cn(
+                  'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                  pendingApprovalCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700',
+                )}>
+                  {pendingApprovalCount} pending
+                </span>
+              </div>
+              {pendingApprovals.length === 0 ? (
+                <p className="text-xs text-neutral-500">All clear.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {pendingApprovals.map((approval) => (
+                    <li key={approval.id} className="rounded-lg border border-neutral-100 bg-neutral-50 px-2 py-1.5">
+                      <p className="truncate text-xs font-medium text-neutral-800">{approval.agentName}</p>
+                      <p className="mt-0.5 line-clamp-2 text-[11px] text-neutral-600">{approval.action}</p>
+                      <p className="mt-1 text-[10px] text-neutral-400">
+                        {new Date(approval.requestedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+
+            <article className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-neutral-900">Reports</h2>
+                <span className="text-[11px] text-neutral-500">{recentReports.length}</span>
+              </div>
+              {recentReports.length === 0 ? (
+                <p className="text-xs text-neutral-500">No reports yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {recentReports.slice(0, 3).map((report) => (
+                    <div key={report.id} className="rounded-lg border border-neutral-100 bg-neutral-50 px-2 py-1.5">
+                      <p className="line-clamp-2 text-xs font-medium text-neutral-800">
+                        {truncateMissionGoal(report.goal, 72)}
+                      </p>
+                      <p className="mt-1 text-[10px] text-neutral-500">
+                        {report.taskStats.completed}/{report.taskStats.total} tasks · {Math.max(1, Math.round(report.duration / 60000))}m
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+
+            <article className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-neutral-900">Missions</h2>
+                <span className="text-[11px] text-neutral-500">{missionActive ? 'Running' : 'Idle'}</span>
+              </div>
+              <div className="space-y-2 text-xs text-neutral-700">
+                <div className="flex items-center justify-between rounded-lg border border-neutral-100 bg-neutral-50 px-2 py-1.5">
+                  <span>Status</span>
+                  <span className={cn(
+                    'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                    missionActive ? 'bg-emerald-100 text-emerald-700' : 'bg-neutral-100 text-neutral-600',
+                  )}>
+                    {missionActive ? (missionState === 'running' ? 'Running' : capitalizeFirst(missionState)) : 'No active mission'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-neutral-100 bg-neutral-50 px-2 py-1.5">
+                  <span>Tasks</span>
+                  <span>{doneTasks}/{totalTasks || 0}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-neutral-100 bg-neutral-50 px-2 py-1.5">
+                  <span>Sessions</span>
+                  <span>{sessionCount}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('missions')}
+                  className="w-full rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-center text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                >
+                  Open Mission Board
+                </button>
+              </div>
+            </article>
           </section>
         </div>
       </div>
