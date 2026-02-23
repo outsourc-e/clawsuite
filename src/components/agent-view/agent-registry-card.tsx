@@ -1,8 +1,6 @@
-import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { KillConfirmDialog } from './kill-confirm-dialog'
 import { SteerModal } from './steer-modal'
-import { cn } from '@/lib/utils'
 
 export type AgentRegistryStatus = 'active' | 'idle' | 'available' | 'paused'
 
@@ -21,7 +19,6 @@ export type AgentRegistryCardData = {
 type AgentRegistryCardProps = {
   agent: AgentRegistryCardData
   isSpawning?: boolean
-  mobileOptimized?: boolean
   onTap?: (agent: AgentRegistryCardData) => void
   onChat: (agent: AgentRegistryCardData) => void | Promise<void>
   onSpawn: (agent: AgentRegistryCardData) => void | Promise<void>
@@ -41,21 +38,10 @@ const STATUS_LABELS: Record<AgentRegistryStatus, string> = {
 }
 
 const STATUS_DOT_CLASS: Record<AgentRegistryStatus, string> = {
-  active: 'bg-accent-500 dark:bg-accent-400',
+  active: 'bg-emerald-500',
   idle: 'bg-yellow-500',
   available: 'bg-neutral-400',
   paused: 'bg-red-500',
-}
-
-const MOBILE_STATUS_STRIP_CLASS: Record<AgentRegistryStatus, string> = {
-  active:
-    'max-[767px]:before:from-orange-500 max-[767px]:before:via-orange-400/60 max-[767px]:before:to-transparent dark:max-[767px]:before:from-orange-400 dark:max-[767px]:before:via-orange-300/50',
-  idle:
-    'max-[767px]:before:from-primary-400 max-[767px]:before:via-primary-300/50 max-[767px]:before:to-transparent',
-  available:
-    'max-[767px]:before:from-primary-400 max-[767px]:before:via-primary-300/50 max-[767px]:before:to-transparent',
-  paused:
-    'max-[767px]:before:from-red-500 max-[767px]:before:via-red-400/60 max-[767px]:before:to-transparent',
 }
 
 const CARD_GRADIENT_CLASS: Record<AgentRegistryCardData['color'], string> = {
@@ -72,7 +58,6 @@ const CARD_GRADIENT_CLASS: Record<AgentRegistryCardData['color'], string> = {
 export function AgentRegistryCard({
   agent,
   isSpawning = false,
-  mobileOptimized = false,
   onTap,
   onChat,
   onSpawn,
@@ -140,7 +125,7 @@ export function AgentRegistryCard({
   }
 
   return (
-    <motion.article
+    <article
       onClick={(event) => {
         if (!onTap) return
         const target = event.target as HTMLElement | null
@@ -153,37 +138,14 @@ export function AgentRegistryCard({
         }
         onTap(agent)
       }}
-      whileTap={mobileOptimized ? { scale: 1, y: -2 } : undefined}
-      transition={mobileOptimized ? { duration: 0.15, ease: 'easeOut' } : undefined}
-      className={cn(
-        `always-dark-card relative overflow-hidden rounded-2xl p-4 shadow-sm border border-white/20 ${CARD_GRADIENT_CLASS[agent.color]}`,
-        mobileOptimized && [
-          'max-[767px]:border-primary-200 max-[767px]:bg-primary-100 max-[767px]:shadow-[0_6px_18px_rgba(0,0,0,0.12)] max-[767px]:dark:bg-primary-50',
-          'max-[767px]:before:absolute max-[767px]:before:inset-x-0 max-[767px]:before:top-0 max-[767px]:before:h-[2px] max-[767px]:before:content-[\"\"] max-[767px]:before:bg-gradient-to-r',
-          MOBILE_STATUS_STRIP_CLASS[agent.status],
-          agent.status === 'active' &&
-            'max-[767px]:shadow-[0_0_20px_rgba(249,115,22,0.2)]',
-        ],
-      )}
+      className={`relative overflow-hidden rounded-2xl p-4 shadow-sm border border-white/20 ${CARD_GRADIENT_CLASS[agent.color]}`}
     >
-      <div
-        className={cn(
-          'bg-white/40 dark:bg-neutral-900/20 backdrop-blur-md rounded-xl p-3',
-          mobileOptimized &&
-            'max-[767px]:rounded-xl max-[767px]:border max-[767px]:border-primary-200/70 max-[767px]:bg-primary-50/80 max-[767px]:p-3 max-[767px]:backdrop-blur-none max-[767px]:dark:bg-primary-100',
-        )}
-      >
+      <div className="bg-white/40 dark:bg-neutral-900/20 backdrop-blur-md rounded-xl p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span
-                className={cn(
-                  'h-2.5 w-2.5 rounded-full',
-                  STATUS_DOT_CLASS[agent.status],
-                  mobileOptimized &&
-                    agent.status === 'active' &&
-                    'max-[767px]:animate-[pulse_2s_infinite]',
-                )}
+                className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASS[agent.status]}`}
               />
               <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
                 {STATUS_LABELS[agent.status]}
@@ -201,11 +163,7 @@ export function AgentRegistryCard({
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className={cn(
-                'inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/60 text-neutral-700 shadow-sm border border-white/30 dark:bg-neutral-900/30 dark:text-neutral-100 dark:border-white/10',
-                mobileOptimized &&
-                  'max-[767px]:border-primary-200/80 max-[767px]:bg-primary-50 max-[767px]:shadow-none max-[767px]:dark:bg-primary-100',
-              )}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/60 text-neutral-700 shadow-sm border border-white/30 dark:bg-neutral-900/30 dark:text-neutral-100 dark:border-white/10"
               aria-label={`${agent.name} controls`}
               aria-expanded={menuOpen}
             >
@@ -275,33 +233,21 @@ export function AgentRegistryCard({
             onClick={() => {
               void onChat(agent)
             }}
-            className={cn(
-              'rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition',
-              mobileOptimized &&
-                'max-[767px]:bg-primary-50 max-[767px]:backdrop-blur-none max-[767px]:border-primary-200/80 max-[767px]:shadow-none max-[767px]:dark:bg-primary-100',
-            )}
+            className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
           >
             Chat
           </button>
           <button
             type="button"
             onClick={handleSteerIntent}
-            className={cn(
-              'rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition',
-              mobileOptimized &&
-                'max-[767px]:bg-primary-50 max-[767px]:backdrop-blur-none max-[767px]:border-primary-200/80 max-[767px]:shadow-none max-[767px]:dark:bg-primary-100',
-            )}
+            className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
           >
             Steer
           </button>
           <button
             type="button"
             onClick={() => onHistory(agent)}
-            className={cn(
-              'rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition',
-              mobileOptimized &&
-                'max-[767px]:bg-primary-50 max-[767px]:backdrop-blur-none max-[767px]:border-primary-200/80 max-[767px]:shadow-none max-[767px]:dark:bg-primary-100',
-            )}
+            className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
           >
             History
           </button>
@@ -311,11 +257,7 @@ export function AgentRegistryCard({
               void onSpawn(agent)
             }}
             disabled={isSpawning}
-            className={cn(
-              'rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition disabled:opacity-60',
-              mobileOptimized &&
-                'max-[767px]:bg-primary-50 max-[767px]:backdrop-blur-none max-[767px]:border-primary-200/80 max-[767px]:shadow-none max-[767px]:dark:bg-primary-100',
-            )}
+            className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition disabled:opacity-60"
           >
             {isSpawning ? '...' : 'Spawn'}
           </button>
@@ -336,6 +278,6 @@ export function AgentRegistryCard({
         sessionKey={agent.sessionKey}
         onKilled={() => onKilled?.(agent)}
       />
-    </motion.article>
+    </article>
   )
 }

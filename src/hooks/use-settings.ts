@@ -1,11 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { applyAccentColor } from '@/lib/accent-colors'
-import {
-  applyAppTheme,
-  saveTheme,
-  type AppTheme,
-} from '@/lib/theme-system'
 
 export type SettingsThemeMode = 'system' | 'light' | 'dark'
 export type AccentColor = 'orange' | 'purple' | 'blue' | 'green'
@@ -14,7 +9,6 @@ export type StudioSettings = {
   gatewayUrl: string
   gatewayToken: string
   theme: SettingsThemeMode
-  appTheme: AppTheme
   accentColor: AccentColor
   editorFontSize: number
   editorWordWrap: boolean
@@ -25,7 +19,6 @@ export type StudioSettings = {
   preferredBudgetModel: string
   preferredPremiumModel: string
   onlySuggestCheaper: boolean
-  showSystemMetrics: boolean
 }
 
 type SettingsState = {
@@ -37,7 +30,6 @@ export const defaultStudioSettings: StudioSettings = {
   gatewayUrl: '',
   gatewayToken: '',
   theme: 'system',
-  appTheme: 'ops-dark',
   accentColor: 'orange',
   editorFontSize: 13,
   editorWordWrap: true,
@@ -48,38 +40,22 @@ export const defaultStudioSettings: StudioSettings = {
   preferredBudgetModel: '',
   preferredPremiumModel: '',
   onlySuggestCheaper: false,
-  showSystemMetrics: true,
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
-    function createSettingsStore(set, get) {
+    function createSettingsStore(set) {
       return {
         settings: defaultStudioSettings,
         updateSettings: function updateSettings(updates) {
-          const previousSettings = get().settings
-          const nextSettings = {
-            ...previousSettings,
-            ...updates,
-          }
-
-          if (
-            updates.appTheme &&
-            nextSettings.appTheme !== previousSettings.appTheme
-          ) {
-            applyAppTheme(nextSettings.appTheme)
-            saveTheme(nextSettings.appTheme)
-            // Sync legacy theme mode so .dark class is always consistent
-            nextSettings.theme = nextSettings.appTheme === 'paper-light' ? 'light' : 'dark'
-            applyTheme(nextSettings.theme)
-          } else if (
-            updates.theme &&
-            nextSettings.theme !== previousSettings.theme
-          ) {
-            applyTheme(nextSettings.theme)
-          }
-
-          set({ settings: nextSettings })
+          set(function applyUpdates(state) {
+            return {
+              settings: {
+                ...state.settings,
+                ...updates,
+              },
+            }
+          })
         },
       }
     },
@@ -131,7 +107,6 @@ export function applyTheme(theme: SettingsThemeMode) {
 function applySettingsAppearance(settings: StudioSettings) {
   applyTheme(settings.theme)
   applyAccentColor(settings.accentColor)
-  applyAppTheme(settings.appTheme)
 }
 
 let didInitializeSettingsAppearance = false
@@ -159,13 +134,7 @@ export function initializeSettingsAppearance() {
       if (nextSettings.accentColor !== previousSettings.accentColor) {
         applyAccentColor(nextSettings.accentColor)
       }
-
-      if (
-        nextSettings.appTheme !== previousSettings.appTheme ||
-        nextSettings.theme !== previousSettings.theme
-      ) {
-        applyAppTheme(nextSettings.appTheme)
-      }
     },
   )
 }
+

@@ -935,7 +935,6 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                         key={agent.id}
                         agent={agent}
                         isSpawning={Boolean(spawningByAgentId[agent.id])}
-                        mobileOptimized
                         onTap={handleStreamTap}
                         onChat={handleChat}
                         onSpawn={handleSpawn}

@@ -9,7 +9,7 @@ import { WIDGET_REGISTRY } from '../constants/grid-config'
 const STORAGE_KEY = 'openclaw-dashboard-visible-widgets-v3'
 
 /** Widgets hidden by default — available via Widgets menu */
-const HIDDEN_BY_DEFAULT: WidgetId[] = ['notifications', 'usage-meter']
+const HIDDEN_BY_DEFAULT: WidgetId[] = ['notifications']
 
 function getDefaultVisibleIds(): WidgetId[] {
   return WIDGET_REGISTRY.map((w) => w.id).filter(

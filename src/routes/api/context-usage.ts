@@ -19,6 +19,25 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'gemini-2.5-pro': 1_000_000,
 }
 
+const REQUEST_TIMEOUT_MS = 5000 // 5 second timeout
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  timeoutMessage: string,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), ms)
+  })
+
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    clearTimeout(timeoutId!)
+  }
+}
+
 function getContextWindow(model: string): number {
   if (MODEL_CONTEXT_WINDOWS[model]) return MODEL_CONTEXT_WINDOWS[model]
   for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
@@ -35,11 +54,19 @@ export const Route = createFileRoute('/api/context-usage')({
       GET: async () => {
         try {
           const [sessionsResult, usageResult] = await Promise.allSettled([
-            gatewayRpc<any>('sessions.list', { limit: 50 }),
-            gatewayRpc<any>('sessions.usage', {
-              limit: 10,
-              includeContextWeight: true,
-            }),
+            withTimeout(
+              gatewayRpc<any>('sessions.list', { limit: 50 }),
+              REQUEST_TIMEOUT_MS,
+              'Sessions list request timed out',
+            ),
+            withTimeout(
+              gatewayRpc<any>('sessions.usage', {
+                limit: 10,
+                includeContextWeight: true,
+              }),
+              REQUEST_TIMEOUT_MS,
+              'Sessions usage request timed out',
+            ),
           ])
 
           const sessions =

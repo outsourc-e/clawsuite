@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import { TeamPanel, TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
 import { TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
@@ -87,13 +86,19 @@ const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
 
-type ActiveTab = 'office' | 'mission' | 'history' | 'team' | 'approvals'
+type ActiveTab = 'overview' | 'configure' | 'missions'
+type ConfigSection = 'agents' | 'teams' | 'keys' | 'approvals'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
-  { id: 'office', icon: '🏢', label: 'Office' },
-  { id: 'mission', icon: '🚀', label: 'Mission' },
-  { id: 'history', icon: '📋', label: 'Reports' },
-  { id: 'team', icon: '👥', label: 'Team' },
+  { id: 'overview', icon: '🏠', label: 'Overview' },
+  { id: 'configure', icon: '⚙️', label: 'Configure' },
+  { id: 'missions', icon: '🚀', label: 'Missions' },
+]
+
+const CONFIG_SECTIONS: Array<{ id: ConfigSection; icon: string; label: string }> = [
+  { id: 'agents', icon: '🤖', label: 'Agents' },
+  { id: 'teams', icon: '👥', label: 'Teams' },
+  { id: 'keys', icon: '🔑', label: 'API Keys' },
   { id: 'approvals', icon: '✅', label: 'Approvals' },
 ]
 
@@ -111,7 +116,7 @@ function GatewayStatusPill({
   if (spawnErrorNames.length > 0) {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-400">
+        <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600">
           <span className="size-1.5 rounded-full bg-red-500" />
           Spawn Error
         </span>
@@ -119,7 +124,7 @@ function GatewayStatusPill({
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 transition-colors hover:bg-red-100 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-900/40"
+            className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 transition-colors hover:bg-red-100"
           >
             Retry
           </button>
@@ -130,7 +135,7 @@ function GatewayStatusPill({
 
   if (status === 'disconnected') {
     return (
-      <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-400">
+      <span className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-red-600">
         <span className="size-1.5 rounded-full bg-red-500" />
         Offline
       </span>
@@ -139,7 +144,7 @@ function GatewayStatusPill({
 
   if (status === 'spawning') {
     return (
-      <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-400">
+      <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-amber-700">
         <span className="size-1.5 animate-pulse rounded-full bg-amber-400" />
         Spawning
       </span>
@@ -147,7 +152,7 @@ function GatewayStatusPill({
   }
 
   return (
-    <span className="flex items-center gap-1 rounded-full border border-emerald-800 bg-emerald-900/50 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-400">
+    <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-700">
       <span className="size-1.5 rounded-full bg-emerald-500" />
       Connected
     </span>
@@ -266,6 +271,7 @@ function buildTeamFromTemplate(templateId: TeamTemplateId): TeamMember[] {
   return template.agents.map((agentName, index) => ({
     id: `${template.id}-${agentName}`,
     name: toTitleCase(agentName),
+    avatar: getAgentAvatarForSlot(index),
     modelId: modelSuggestions[index] ?? 'auto',
     roleDescription: `${toTitleCase(agentName)} lead for this mission`,
     goal: '',
@@ -277,9 +283,10 @@ function buildTeamFromTemplate(templateId: TeamTemplateId): TeamMember[] {
 function buildTeamFromRuntime(
   agents: AgentHubLayoutProps['agents'],
 ): TeamMember[] {
-  return agents.slice(0, 5).map((agent) => ({
+  return agents.slice(0, 5).map((agent, index) => ({
     id: agent.id,
     name: agent.name,
+    avatar: getAgentAvatarForSlot(index),
     modelId: 'auto',
     roleDescription: agent.role,
     goal: '',
@@ -297,6 +304,10 @@ function toTeamMember(value: unknown): TeamMember | null {
   const status = typeof row.status === 'string' ? row.status.trim() : 'available'
   const roleDescription =
     typeof row.roleDescription === 'string' ? row.roleDescription : ''
+  const avatar =
+    row.avatar === undefined
+      ? undefined
+      : normalizeAgentAvatarIndex(row.avatar)
   const goal = typeof row.goal === 'string' ? row.goal : ''
   const backstory = typeof row.backstory === 'string' ? row.backstory : ''
   const modelIdRaw = typeof row.modelId === 'string' ? row.modelId : 'auto'
@@ -309,6 +320,7 @@ function toTeamMember(value: unknown): TeamMember | null {
   return {
     id,
     name,
+    avatar,
     modelId,
     roleDescription,
     goal,
@@ -461,23 +473,320 @@ const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
   content: 'Content Pipeline',
 }
 
+const LEGACY_AGENT_AVATARS = ['🔍', '✍️', '📝', '🧪', '🎨', '📊', '🛡️', '⚡', '🔬', '🎯'] as const
+const AGENT_AVATAR_COUNT = 10
+const LEGACY_AGENT_AVATAR_INDEX = new Map<string, number>(
+  LEGACY_AGENT_AVATARS.map((avatar, index) => [avatar, index]),
+)
+
+function normalizeAgentAvatarIndex(value: unknown, fallbackIndex = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const normalized = Math.trunc(value)
+    if (normalized >= 0) return normalized % AGENT_AVATAR_COUNT
+  }
+  if (typeof value === 'string') {
+    const legacy = LEGACY_AGENT_AVATAR_INDEX.get(value.trim())
+    if (legacy !== undefined) return legacy
+  }
+  const fallback = Math.trunc(fallbackIndex)
+  return ((fallback % AGENT_AVATAR_COUNT) + AGENT_AVATAR_COUNT) % AGENT_AVATAR_COUNT
+}
+
+function getAgentAvatarForSlot(index: number): number {
+  return normalizeAgentAvatarIndex(index, 0)
+}
+
+function resolveAgentAvatarIndex(member: unknown, index: number): number {
+  const row = member && typeof member === 'object' && !Array.isArray(member)
+    ? (member as Record<string, unknown>)
+    : null
+  return normalizeAgentAvatarIndex(row?.avatar, index)
+}
+
+function darkenHexColor(color: string, amount = 0.2): string {
+  const hex = color.trim()
+  const normalized = hex.startsWith('#') ? hex.slice(1) : hex
+  const expanded =
+    normalized.length === 3
+      ? normalized.split('').map((char) => `${char}${char}`).join('')
+      : normalized
+
+  if (!/^[0-9a-fA-F]{6}$/.test(expanded)) return color
+
+  const r = Math.round(parseInt(expanded.slice(0, 2), 16) * (1 - amount))
+  const g = Math.round(parseInt(expanded.slice(2, 4), 16) * (1 - amount))
+  const b = Math.round(parseInt(expanded.slice(4, 6), 16) * (1 - amount))
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+function AgentAvatar({
+  index,
+  color,
+  size = 40,
+  className,
+}: {
+  index: number
+  color: string
+  size?: number
+  className?: string
+}) {
+  const variant = normalizeAgentAvatarIndex(index, 0)
+  const shade = darkenHexColor(color, 0.2)
+  const outline = darkenHexColor(color, 0.35)
+  const eye = '#f8fafc'
+
+  const baseParts = (() => {
+    switch (variant) {
+      case 2:
+        return {
+          head: (
+            <>
+              <rect x="16" y="9" width="16" height="12" fill={color} />
+              <rect x="14" y="11" width="20" height="8" fill={color} />
+              <rect x="30" y="9" width="2" height="12" fill={shade} />
+              <rect x="14" y="17" width="20" height="2" fill={shade} />
+              <rect x="16" y="19" width="16" height="2" fill={shade} />
+            </>
+          ),
+          body: { x: 14, y: 22, w: 20, h: 14 },
+          arms: { leftX: 9, rightX: 35, y: 24, w: 4, h: 10 },
+          legs: { y: 36, w: 5, h: 6, leftX: 17, rightX: 26 },
+        }
+      case 3:
+        return {
+          head: (
+            <>
+              <rect x="15" y="10" width="18" height="11" fill={color} />
+              <rect x="31" y="10" width="2" height="11" fill={shade} />
+              <rect x="14" y="19" width="20" height="3" fill={shade} />
+            </>
+          ),
+          body: { x: 12, y: 22, w: 24, h: 15 },
+          arms: { leftX: 7, rightX: 37, y: 24, w: 5, h: 11 },
+          legs: { y: 37, w: 6, h: 5, leftX: 16, rightX: 26 },
+        }
+      case 4:
+        return {
+          head: (
+            <>
+              <rect x="18" y="9" width="12" height="14" fill={color} />
+              <rect x="28" y="9" width="2" height="14" fill={shade} />
+              <rect x="18" y="21" width="12" height="2" fill={shade} />
+            </>
+          ),
+          body: { x: 17, y: 23, w: 14, h: 15 },
+          arms: { leftX: 12, rightX: 32, y: 25, w: 4, h: 10 },
+          legs: { y: 38, w: 4, h: 5, leftX: 19, rightX: 25 },
+        }
+      case 8:
+        return {
+          head: (
+            <>
+              <rect x="17" y="12" width="14" height="11" fill={color} />
+              <rect x="29" y="12" width="2" height="11" fill={shade} />
+              <rect x="17" y="21" width="14" height="2" fill={shade} />
+            </>
+          ),
+          body: { x: 16, y: 23, w: 16, h: 12 },
+          arms: { leftX: 12, rightX: 32, y: 25, w: 3, h: 8 },
+          legs: { y: 35, w: 4, h: 6, leftX: 18, rightX: 25 },
+        }
+      default:
+        return {
+          head: (
+            <>
+              <rect x="16" y="10" width="16" height="12" fill={color} />
+              <rect x="30" y="10" width="2" height="12" fill={shade} />
+              <rect x="16" y="20" width="16" height="2" fill={shade} />
+            </>
+          ),
+          body: { x: 14, y: 22, w: 20, h: 14 },
+          arms: { leftX: 10, rightX: 34, y: 24, w: 4, h: 10 },
+          legs: { y: 36, w: 5, h: 6, leftX: 17, rightX: 26 },
+        }
+    }
+  })()
+
+  const bodyParts = (
+    <>
+      {baseParts.head}
+      <rect x={baseParts.body.x} y={baseParts.body.y} width={baseParts.body.w} height={baseParts.body.h} fill={color} />
+      <rect x={baseParts.body.x + baseParts.body.w - 2} y={baseParts.body.y} width="2" height={baseParts.body.h} fill={shade} />
+      <rect x={baseParts.body.x} y={baseParts.body.y + baseParts.body.h - 2} width={baseParts.body.w} height="2" fill={shade} />
+      <rect x={baseParts.arms.leftX} y={baseParts.arms.y} width={baseParts.arms.w} height={baseParts.arms.h} fill={color} />
+      <rect x={baseParts.arms.rightX} y={baseParts.arms.y} width={baseParts.arms.w} height={baseParts.arms.h} fill={color} />
+      <rect x={baseParts.arms.leftX + Math.max(0, baseParts.arms.w - 1)} y={baseParts.arms.y} width="1" height={baseParts.arms.h} fill={shade} />
+      <rect x={baseParts.arms.rightX + Math.max(0, baseParts.arms.w - 1)} y={baseParts.arms.y} width="1" height={baseParts.arms.h} fill={shade} />
+      <rect x={baseParts.legs.leftX} y={baseParts.legs.y} width={baseParts.legs.w} height={baseParts.legs.h} fill={color} />
+      <rect x={baseParts.legs.rightX} y={baseParts.legs.y} width={baseParts.legs.w} height={baseParts.legs.h} fill={color} />
+      <rect x={baseParts.legs.leftX + Math.max(0, baseParts.legs.w - 1)} y={baseParts.legs.y} width="1" height={baseParts.legs.h} fill={shade} />
+      <rect x={baseParts.legs.rightX + Math.max(0, baseParts.legs.w - 1)} y={baseParts.legs.y} width="1" height={baseParts.legs.h} fill={shade} />
+    </>
+  )
+
+  const details = (() => {
+    switch (variant) {
+      case 0:
+        return (
+          <>
+            <rect x="23" y="6" width="2" height="4" fill={color} />
+            <circle cx="24" cy="5" r="1.5" fill={eye} />
+            <circle cx="20" cy="16" r="1.6" fill={eye} />
+            <circle cx="28" cy="16" r="1.6" fill={eye} />
+            <rect x="19" y="20" width="10" height="2" fill={outline} />
+            <rect x="18" y="28" width="12" height="2" fill={shade} />
+          </>
+        )
+      case 1:
+        return (
+          <>
+            <rect x="17" y="14" width="14" height="5" fill={eye} opacity="0.95" />
+            <rect x="17" y="18" width="14" height="1" fill={shade} />
+            <rect x="19" y="28" width="10" height="2" fill={shade} />
+            <rect x="13" y="15" width="3" height="2" fill={shade} />
+            <rect x="32" y="15" width="3" height="2" fill={shade} />
+          </>
+        )
+      case 2:
+        return (
+          <>
+            <circle cx="19" cy="16" r="2.2" fill={eye} />
+            <circle cx="29" cy="16" r="2.2" fill={eye} />
+            <rect x="20" y="20" width="8" height="2" fill={shade} />
+            <rect x="20" y="29" width="8" height="2" fill={shade} />
+          </>
+        )
+      case 3:
+        return (
+          <>
+            <rect x="18" y="15" width="4" height="2" fill={eye} />
+            <rect x="26" y="15" width="4" height="2" fill={eye} />
+            <rect x="16" y="18" width="16" height="2" fill={outline} />
+            <rect x="18" y="28" width="12" height="2" fill={outline} />
+            <rect x="16" y="31" width="16" height="2" fill={shade} />
+          </>
+        )
+      case 4:
+        return (
+          <>
+            <circle cx="21" cy="16" r="1.7" fill={eye} />
+            <circle cx="27" cy="16" r="1.7" fill={eye} />
+            <rect x="22" y="20" width="4" height="1" fill={shade} />
+            <rect x="20" y="29" width="8" height="2" fill={shade} />
+            <rect x="21" y="32" width="6" height="1" fill={outline} />
+          </>
+        )
+      case 5:
+        return (
+          <>
+            <rect x="18" y="5" width="2" height="5" fill={color} />
+            <rect x="28" y="5" width="2" height="5" fill={color} />
+            <circle cx="19" cy="4" r="1.6" fill={eye} />
+            <circle cx="29" cy="4" r="1.6" fill={eye} />
+            <circle cx="20" cy="16" r="1.6" fill={eye} />
+            <circle cx="28" cy="16" r="1.6" fill={eye} />
+            <rect x="19" y="20" width="10" height="2" fill={shade} />
+            <rect x="18" y="28" width="12" height="2" fill={shade} />
+          </>
+        )
+      case 6:
+        return (
+          <>
+            <circle cx="24" cy="16" r="3.2" fill={eye} />
+            <circle cx="24" cy="16" r="1.3" fill={shade} />
+            <rect x="18" y="20" width="12" height="2" fill={outline} />
+            <rect x="17" y="28" width="2" height="2" fill={shade} />
+            <rect x="19" y="30" width="2" height="2" fill={shade} />
+            <rect x="21" y="28" width="2" height="2" fill={shade} />
+            <rect x="23" y="30" width="2" height="2" fill={shade} />
+            <rect x="25" y="28" width="2" height="2" fill={shade} />
+            <rect x="27" y="30" width="2" height="2" fill={shade} />
+            <rect x="29" y="28" width="2" height="2" fill={shade} />
+          </>
+        )
+      case 7:
+        return (
+          <>
+            <rect x="21" y="7" width="6" height="3" fill={color} />
+            <rect x="22" y="5" width="4" height="2" fill={color} />
+            <rect x="18" y="15" width="4" height="2" fill={eye} />
+            <rect x="26" y="15" width="4" height="2" fill={eye} />
+            <rect x="17" y="18" width="14" height="2" fill={outline} />
+            <rect x="19" y="28" width="10" height="2" fill={outline} />
+          </>
+        )
+      case 8:
+        return (
+          <>
+            <circle cx="20" cy="17" r="2.3" fill={eye} />
+            <circle cx="28" cy="17" r="2.3" fill={eye} />
+            <rect x="21" y="21" width="6" height="1" fill={shade} />
+            <rect x="20" y="27" width="8" height="2" fill={shade} />
+          </>
+        )
+      case 9:
+      default:
+        return (
+          <>
+            <circle cx="19" cy="16" r="2.4" fill={eye} />
+            <circle cx="29" cy="16" r="1.4" fill={eye} />
+            <rect x="17" y="20" width="4" height="1" fill={shade} />
+            <rect x="23" y="20" width="3" height="1" fill={shade} />
+            <rect x="28" y="20" width="2" height="1" fill={shade} />
+            <rect x="18" y="28" width="2" height="2" fill={outline} />
+            <rect x="20" y="30" width="2" height="2" fill={outline} />
+            <rect x="22" y="28" width="2" height="2" fill={outline} />
+            <rect x="24" y="30" width="2" height="2" fill={outline} />
+            <rect x="26" y="28" width="2" height="2" fill={outline} />
+            <rect x="28" y="30" width="2" height="2" fill={outline} />
+            <rect x="31" y="24" width="2" height="4" fill={shade} />
+          </>
+        )
+    }
+  })()
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      aria-hidden
+      className={className}
+      shapeRendering="crispEdges"
+    >
+      <rect x="5" y="5" width="38" height="38" fill={color} opacity="0.08" />
+      <rect x="7" y="7" width="34" height="34" fill="white" opacity="0.92" />
+      <rect x="7" y="7" width="34" height="34" fill="none" stroke={outline} strokeWidth="1" />
+      {bodyParts}
+      {details}
+    </svg>
+  )
+}
+
 // ── Agent accent colors (indexed per agent slot) ───────────────────────────────
 const AGENT_ACCENT_COLORS = [
-  { bar: 'bg-orange-500', avatar: 'bg-orange-500', text: 'text-orange-400', ring: 'ring-orange-500/30' },
-  { bar: 'bg-blue-500',   avatar: 'bg-blue-500',   text: 'text-blue-400',   ring: 'ring-blue-500/30' },
-  { bar: 'bg-violet-500', avatar: 'bg-violet-500', text: 'text-violet-400', ring: 'ring-violet-500/30' },
-  { bar: 'bg-emerald-500',avatar: 'bg-emerald-500',text: 'text-emerald-400',ring: 'ring-emerald-500/30' },
-  { bar: 'bg-rose-500',   avatar: 'bg-rose-500',   text: 'text-rose-400',   ring: 'ring-rose-500/30' },
-  { bar: 'bg-amber-500',  avatar: 'bg-amber-500',  text: 'text-amber-400',  ring: 'ring-amber-500/30' },
-]
+  { bar: 'bg-orange-500', border: 'border-orange-500', avatar: 'bg-orange-100', text: 'text-orange-600', ring: 'ring-orange-500/20' },
+  { bar: 'bg-blue-500', border: 'border-blue-500', avatar: 'bg-blue-100', text: 'text-blue-600', ring: 'ring-blue-500/20' },
+  { bar: 'bg-violet-500', border: 'border-violet-500', avatar: 'bg-violet-100', text: 'text-violet-600', ring: 'ring-violet-500/20' },
+  { bar: 'bg-emerald-500', border: 'border-emerald-500', avatar: 'bg-emerald-100', text: 'text-emerald-600', ring: 'ring-emerald-500/20' },
+  { bar: 'bg-rose-500', border: 'border-rose-500', avatar: 'bg-rose-100', text: 'text-rose-600', ring: 'ring-rose-500/20' },
+  { bar: 'bg-amber-500', border: 'border-amber-500', avatar: 'bg-amber-100', text: 'text-amber-700', ring: 'ring-amber-500/20' },
+  { bar: 'bg-cyan-500', border: 'border-cyan-500', avatar: 'bg-cyan-100', text: 'text-cyan-600', ring: 'ring-cyan-500/20' },
+  { bar: 'bg-fuchsia-500', border: 'border-fuchsia-500', avatar: 'bg-fuchsia-100', text: 'text-fuchsia-600', ring: 'ring-fuchsia-500/20' },
+  { bar: 'bg-lime-500', border: 'border-lime-500', avatar: 'bg-lime-100', text: 'text-lime-700', ring: 'ring-lime-500/20' },
+  { bar: 'bg-sky-500', border: 'border-sky-500', avatar: 'bg-sky-100', text: 'text-sky-600', ring: 'ring-sky-500/20' },
+].map((accent, index) => ({
+  ...accent,
+  hex: ['#f97316', '#3b82f6', '#8b5cf6', '#10b981', '#f43f5e', '#f59e0b', '#06b6d4', '#d946ef', '#84cc16', '#0ea5e9'][index] ?? '#f97316',
+}))
 
 // ── Model badge styling ────────────────────────────────────────────────────────
 const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
-  auto:   'rounded-full bg-neutral-800 text-neutral-400',
-  opus:   'bg-orange-950/60 text-orange-300',
-  sonnet: 'bg-blue-950/60 text-blue-300',
-  codex:  'bg-emerald-950/60 text-emerald-300',
-  flash:  'bg-violet-950/60 text-violet-300',
+  auto:   'rounded-full border border-neutral-200 bg-neutral-100 text-neutral-600',
+  opus:   'border border-orange-200 bg-orange-50 text-orange-700',
+  sonnet: 'border border-blue-200 bg-blue-50 text-blue-700',
+  codex:  'border border-emerald-200 bg-emerald-50 text-emerald-700',
+  flash:  'border border-violet-200 bg-violet-50 text-violet-700',
 }
 
 const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
@@ -486,6 +795,61 @@ const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
   sonnet: 'Sonnet',
   codex:  'Codex',
   flash:  'Flash',
+}
+
+function getAgentStatusMeta(status: AgentWorkingStatus): {
+  label: string
+  className: string
+  dotClassName: string
+  pulse?: boolean
+} {
+  switch (status) {
+    case 'active':
+      return {
+        label: 'Active',
+        className: 'text-blue-600',
+        dotClassName: 'bg-blue-500',
+        pulse: true,
+      }
+    case 'ready':
+    case 'idle':
+      return {
+        label: 'Ready',
+        className: 'text-emerald-600',
+        dotClassName: 'bg-emerald-500',
+      }
+    case 'error':
+      return {
+        label: 'Error',
+        className: 'text-red-600',
+        dotClassName: 'bg-red-500',
+      }
+    case 'none':
+      return {
+        label: 'No session',
+        className: 'text-neutral-400',
+        dotClassName: 'bg-neutral-400',
+      }
+    case 'spawning':
+      return {
+        label: 'Spawning',
+        className: 'text-amber-600',
+        dotClassName: 'bg-amber-400',
+        pulse: true,
+      }
+    case 'paused':
+      return {
+        label: 'Paused',
+        className: 'text-amber-700',
+        dotClassName: 'bg-amber-500',
+      }
+    default:
+      return {
+        label: toTitleCase(String(status)),
+        className: 'text-neutral-600',
+        dotClassName: 'bg-neutral-400',
+      }
+  }
 }
 
 // ── OfficeView ─────────────────────────────────────────────────────────────────
@@ -508,10 +872,10 @@ function OfficeView({
 }: OfficeViewProps) {
   if (agentRows.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
+      <div className="flex h-full min-h-[360px] items-center justify-center p-8">
         <div className="text-center">
           <p className="mb-3 text-4xl">🏢</p>
-          <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">No agents in your team</p>
+          <p className="text-sm font-medium text-neutral-600">No agents in your team</p>
           <p className="mt-1 text-xs text-neutral-500">Switch to the Team tab to add agents.</p>
         </div>
       </div>
@@ -519,14 +883,14 @@ function OfficeView({
   }
 
   const processTypeBadgeClass =
-    processType === 'hierarchical' ? 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-400' :
-    processType === 'sequential'   ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-400' :
-                                     'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-400'
+    processType === 'hierarchical' ? 'border-violet-300 bg-violet-50 text-violet-700' :
+    processType === 'sequential'   ? 'border-blue-300 bg-blue-50 text-blue-700' :
+                                     'border-emerald-300 bg-emerald-50 text-emerald-700'
 
   return (
-    <div className="h-full overflow-y-auto p-4">
+    <div className="h-full min-h-[420px] overflow-y-auto bg-neutral-50 p-4">
       {/* ── Crew strip ─────────────────────────────────────────────────── */}
-      <div className="mb-4 flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/60">
+      <div className="mb-4 flex items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
         {/* Overlapping agent avatars */}
         <div className="flex -space-x-2">
           {agentRows.slice(0, 5).map((agent, i) => {
@@ -536,16 +900,16 @@ function OfficeView({
                 key={agent.id}
                 title={agent.name}
                 className={cn(
-                  'flex size-8 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white dark:border-neutral-900',
+                  'flex size-8 items-center justify-center rounded-full border-2 border-white shadow-sm',
                   accent.avatar,
                 )}
               >
-                {agent.name.charAt(0).toUpperCase()}
+                <AgentAvatar index={i} color={accent.hex} size={22} />
               </div>
             )
           })}
           {agentRows.length > 5 ? (
-            <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-neutral-200 text-[10px] font-bold text-neutral-600 dark:border-neutral-900 dark:bg-neutral-800 dark:text-neutral-400">
+            <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-neutral-100 text-[10px] font-bold text-neutral-600">
               +{agentRows.length - 5}
             </div>
           ) : null}
@@ -553,12 +917,12 @@ function OfficeView({
 
         {/* Labels */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+          <span className="text-sm font-semibold text-neutral-800">
             {agentRows.length} agent{agentRows.length !== 1 ? 's' : ''}
           </span>
           {activeTemplateName ? (
             <>
-              <span className="text-neutral-400 dark:text-neutral-700">·</span>
+              <span className="text-neutral-300">·</span>
               <span className="truncate text-sm text-neutral-500">{activeTemplateName}</span>
             </>
           ) : null}
@@ -567,7 +931,7 @@ function OfficeView({
         {/* Process type badge */}
         <div className="flex items-center gap-2 shrink-0">
           {missionRunning && (
-            <span className="flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <span className="flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
               <span className="relative flex size-1.5">
                 <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
@@ -589,9 +953,9 @@ function OfficeView({
       {/* ── Agent desk grid ─────────────────────────────────────────────── */}
       <div
         className={cn(
-          'grid gap-3',
+          'grid auto-rows-fr gap-4',
           agentRows.length <= 3 ? 'grid-cols-1 sm:grid-cols-2' :
-          'grid-cols-2 md:grid-cols-3',
+          'grid-cols-1 sm:grid-cols-2 md:grid-cols-3',
         )}
       >
         {agentRows.map((agent, i) => {
@@ -628,41 +992,41 @@ function OfficeView({
             <div
               key={agent.id}
               className={cn(
-            'relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 transition-all hover:shadow-[0_0_15px_rgba(249,115,22,0.15)]',
+            'relative flex h-full min-h-[248px] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md',
             isSelected
-                  ? 'shadow-lg ring-1 ring-emerald-500/50 shadow-emerald-500/10'
+                  ? 'shadow-md ring-1 ring-orange-300'
                   : '',
-                isActive && missionRunning && !isSelected && 'ring-1 ring-neutral-700',
+                isActive && missionRunning && !isSelected && 'ring-1 ring-emerald-200',
               )}
             >
               {/* Top accent bar (3px) */}
               <div className={cn('h-[3px] w-full', accent.bar)} />
 
-              <div className="p-4">
+              <div className="flex h-full flex-col p-4">
                 {/* Header: avatar (left) + status dot (right) */}
                 <div className="flex items-start justify-between">
                   {/* Avatar */}
                   <div
                     className={cn(
-                      'flex size-12 items-center justify-center rounded-full border border-neutral-950/80 text-lg font-bold text-white',
+                      'flex size-12 items-center justify-center rounded-full border border-white/80 shadow-sm',
                       accent.avatar,
                     )}
                   >
-                    {agent.name.charAt(0).toUpperCase()}
+                    <AgentAvatar index={i} color={accent.hex} size={28} />
                   </div>
                   {/* Status dot */}
                   {statusDotEl}
                 </div>
 
                 {/* Agent name */}
-                <h3 className="mt-3 truncate text-sm font-semibold tracking-tight text-neutral-100">
+                <h3 className="mt-3 truncate text-sm font-semibold tracking-tight text-neutral-900">
                   {agent.name}
                 </h3>
 
                 {/* Role / model row */}
-                <div className="mt-1 flex items-start gap-1.5">
+                <div className="mt-1 flex flex-wrap items-start gap-1.5">
                   {agent.roleDescription ? (
-                    <span className="line-clamp-2 min-w-0 text-xs text-neutral-400">
+                    <span className="line-clamp-2 min-w-0 text-xs text-neutral-600">
                       {agent.roleDescription}
                     </span>
                   ) : null}
@@ -677,14 +1041,25 @@ function OfficeView({
                 </div>
 
                 {/* Activity line (monospace) */}
-                <p className="mt-2 line-clamp-2 min-h-[2.4em] font-mono text-xs leading-relaxed text-neutral-500">
-                  {agent.lastLine ?? (agent.status === 'none' ? '// no session' : '// waiting for mission…')}
-                </p>
+                {agent.lastLine ? (
+                  <p className="mt-2 line-clamp-2 min-h-[2.4em] font-mono text-xs leading-relaxed text-neutral-500">
+                    {agent.lastLine}
+                  </p>
+                ) : (
+                  <p
+                    className={cn(
+                      'mt-2 min-h-[2.4em] font-mono text-xs leading-relaxed',
+                      getAgentStatusMeta(agent.status).className,
+                    )}
+                  >
+                    ● {getAgentStatusMeta(agent.status).label}
+                  </p>
+                )}
 
                 {/* Footer: task count badge */}
                 {agent.taskCount > 0 ? (
                   <div className="mt-2">
-                    <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[9px] font-semibold text-neutral-400">
+                    <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[9px] font-semibold text-neutral-600">
                       {agent.taskCount} task{agent.taskCount !== 1 ? 's' : ''}
                     </span>
                   </div>
@@ -695,10 +1070,10 @@ function OfficeView({
                   type="button"
                   onClick={() => onViewOutput(agent.id)}
                   className={cn(
-                    'mt-3 w-full rounded-lg border px-2 py-2 text-[11px] font-medium transition-colors',
+                    'mt-auto w-full rounded-lg border px-2 py-2 text-[11px] font-medium transition-colors',
                     isSelected
-                      ? 'border-neutral-700 bg-neutral-800 text-neutral-100'
-                      : 'border-neutral-700 text-neutral-300 hover:bg-neutral-800',
+                      ? 'border-orange-200 bg-orange-50 text-orange-700'
+                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50',
                   )}
                 >
                   {isSelected ? '✓ Viewing Output' : 'View Output'}
@@ -710,17 +1085,17 @@ function OfficeView({
       </div>
 
       {/* Fix 2: Status dot legend */}
-      <div className="mt-3 flex items-center justify-end gap-3 px-1">
-        <span className="flex items-center gap-1 text-[10px] text-neutral-400">
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 rounded-xl border border-neutral-200 bg-white px-4 py-2 shadow-sm">
+        <span className="flex items-center gap-1 text-[10px] text-neutral-500">
           <span className="size-2 rounded-full bg-emerald-500" /> Active
         </span>
-        <span className="flex items-center gap-1 text-[10px] text-neutral-400">
+        <span className="flex items-center gap-1 text-[10px] text-neutral-500">
           <span className="size-2 rounded-full bg-yellow-500" /> Idle
         </span>
-        <span className="flex items-center gap-1 text-[10px] text-neutral-400">
+        <span className="flex items-center gap-1 text-[10px] text-neutral-500">
           <span className="size-2 rounded-full bg-neutral-400" /> No session
         </span>
-        <span className="flex items-center gap-1 text-[10px] text-neutral-400">
+        <span className="flex items-center gap-1 text-[10px] text-neutral-500">
           <span className="size-2 rounded-full bg-red-500" /> Error
         </span>
       </div>
@@ -787,8 +1162,8 @@ function HistoryView() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-2 size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-600 dark:border-neutral-600 dark:border-t-neutral-300" />
-          <p className="font-mono text-[10px] text-neutral-500 dark:text-neutral-600">// loading mission history…</p>
+          <div className="mx-auto mb-2 size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-600" />
+          <p className="font-mono text-[10px] text-neutral-500">// loading mission history…</p>
         </div>
       </div>
     )
@@ -799,24 +1174,24 @@ function HistoryView() {
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
           <p className="mb-3 text-4xl opacity-30">📋</p>
-          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">No mission history yet</p>
-          <p className="mt-1 font-mono text-[10px] text-neutral-500 dark:text-neutral-600">// start a mission to see it recorded here</p>
+          <p className="text-sm font-medium text-neutral-700">No mission history yet</p>
+          <p className="mt-1 font-mono text-[10px] text-neutral-500">// start a mission to see it recorded here</p>
         </div>
       </div>
     )
   }
 
   const PROCESS_TYPE_BADGE: Record<string, string> = {
-    sequential:   'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800/50',
-    hierarchical: 'bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/60 dark:text-violet-400 dark:border-violet-800/50',
-    parallel:     'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/50',
+    sequential:   'bg-blue-50 text-blue-700 border border-blue-200',
+    hierarchical: 'bg-violet-50 text-violet-700 border border-violet-200',
+    parallel:     'bg-emerald-50 text-emerald-700 border border-emerald-200',
   }
 
   const CHECKPOINT_STATUS_BADGE: Record<string, { label: string; icon: string; className: string }> = {
-    running:   { label: 'Running',   icon: '▶', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/50' },
-    paused:    { label: 'Paused',    icon: '⏸', className: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800/50' },
-    completed: { label: 'Completed', icon: '●', className: 'bg-neutral-100 text-neutral-600 border border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700' },
-    aborted:   { label: 'Aborted',   icon: '✕', className: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/60 dark:text-red-400 dark:border-red-800/50' },
+    running:   { label: 'Running',   icon: '▶', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+    paused:    { label: 'Paused',    icon: '⏸', className: 'bg-amber-50 text-amber-700 border border-amber-200' },
+    completed: { label: 'Completed', icon: '●', className: 'bg-neutral-100 text-neutral-600 border border-neutral-200' },
+    aborted:   { label: 'Aborted',   icon: '✕', className: 'bg-red-50 text-red-700 border border-red-200' },
   }
 
   return (
@@ -837,11 +1212,11 @@ function HistoryView() {
             return (
               <div
                 key={cp.id}
-                className="rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900/80 dark:hover:border-neutral-700"
+                className="rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300"
               >
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] text-neutral-500 dark:text-neutral-700" aria-hidden>{statusBadge!.icon}</span>
-                  <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                  <span className="text-[10px] text-neutral-500" aria-hidden>{statusBadge!.icon}</span>
+                  <h3 className="truncate text-sm font-semibold text-neutral-900">
                     {cp.label}
                   </h3>
                   <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold', statusBadge!.className)}>
@@ -861,14 +1236,14 @@ function HistoryView() {
                         <span
                           key={member.id}
                           title={member.name}
-                          className={cn('flex size-6 items-center justify-center rounded-full border border-white text-[9px] font-bold text-white dark:border-neutral-900', ac.avatar)}
+                          className={cn('flex size-6 items-center justify-center rounded-full border border-white text-sm leading-none', ac.avatar)}
                         >
-                          {member.name.charAt(0).toUpperCase()}
+                          <AgentAvatar index={resolveAgentAvatarIndex(member, idx)} color={ac.hex} size={16} />
                         </span>
                       )
                     })}
                     {cp.team.length > 5 ? (
-                      <span className="flex size-6 items-center justify-center rounded-full border border-white bg-neutral-200 text-[9px] font-bold text-neutral-600 dark:border-neutral-900 dark:bg-neutral-800 dark:text-neutral-500">
+                      <span className="flex size-6 items-center justify-center rounded-full border border-white bg-neutral-200 text-[9px] font-bold text-neutral-600">
                         +{cp.team.length - 5}
                       </span>
                     ) : null}
@@ -910,21 +1285,21 @@ function HistoryView() {
 
             const statusBadge =
               status === 'active'
-                ? { label: 'Active', icon: '▶', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/50' }
+                ? { label: 'Active', icon: '▶', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' }
                 : status === 'idle'
-                  ? { label: 'Idle', icon: '⏸', className: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800/50' }
-                  : { label: 'Ended', icon: '●', className: 'bg-neutral-100 text-neutral-600 border border-neutral-200 dark:bg-neutral-800 dark:text-neutral-500 dark:border-neutral-700' }
+                  ? { label: 'Idle', icon: '⏸', className: 'bg-amber-50 text-amber-700 border border-amber-200' }
+                  : { label: 'Ended', icon: '●', className: 'bg-neutral-100 text-neutral-600 border border-neutral-200' }
 
             return (
               <div
                 key={sessionId || label}
-                className="rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900/80 dark:hover:border-neutral-700"
+                className="rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] text-neutral-500 dark:text-neutral-700" aria-hidden>{statusBadge.icon}</span>
-                      <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                      <span className="text-[10px] text-neutral-500" aria-hidden>{statusBadge.icon}</span>
+                      <h3 className="truncate text-sm font-semibold text-neutral-900">
                         {label.replace(/^Mission:\s*/, '')}
                       </h3>
                       <span
@@ -951,21 +1326,21 @@ function HistoryView() {
                   <button
                     type="button"
                     onClick={() => setExpandedId(isExpanded ? null : sessionId)}
-                    className="shrink-0 rounded-lg border border-neutral-200 bg-neutral-100 px-2.5 py-1 text-[10px] font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:text-neutral-200"
+                    className="shrink-0 rounded-lg border border-neutral-200 bg-neutral-100 px-2.5 py-1 text-[10px] font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:text-neutral-900"
                   >
                     {isExpanded ? 'Hide' : 'View'}
                   </button>
                 </div>
 
                 {isExpanded ? (
-                  <div className="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950/60">
-                    <p className="mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-700">
+                  <div className="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                    <p className="mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-neutral-500">
                       Session Details
                     </p>
                     <dl className="space-y-1.5">
                       <div className="flex gap-2">
-                        <dt className="shrink-0 font-mono text-[9px] text-neutral-500 dark:text-neutral-700">ID</dt>
-                        <dd className="truncate font-mono text-[9px] text-neutral-600 dark:text-neutral-400">{sessionId}</dd>
+                        <dt className="shrink-0 font-mono text-[9px] text-neutral-500">ID</dt>
+                        <dd className="truncate font-mono text-[9px] text-neutral-600">{sessionId}</dd>
                       </div>
                       {lastMessage ? (
                         <div className="flex flex-col gap-0.5">
@@ -985,11 +1360,15 @@ function HistoryView() {
   )
 }
 
-export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
-  const navigate = useNavigate()
+// Retained temporarily while the new 3-tab layout rolls out.
+void OfficeView
+void HistoryView
 
+export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // ── Tab + sidebar state ────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<ActiveTab>('mission')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
+  const [configSection, setConfigSection] = useState<ConfigSection>('agents')
+  const [overviewAgentsView, setOverviewAgentsView] = useState<'cards' | 'live'>('cards')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
@@ -2376,6 +2755,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       {
         id: createMemberId(),
         name: `Agent ${previous.length + 1}`,
+        avatar: getAgentAvatarForSlot(previous.length),
         modelId: 'auto',
         roleDescription: '',
         goal: '',
@@ -2436,7 +2816,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   function loadTeamConfig(configId: string) {
     const config = teamConfigs.find((entry) => entry.id === configId)
     if (!config) return
-    setTeam(config.team.map((member) => ({ ...member })))
+    setTeam(config.team.map((member, index) => ({ ...member, avatar: member.avatar ?? getAgentAvatarForSlot(index) })))
     setSelectedTeamConfigId(config.id)
     setSelectedAgentId(undefined)
     setSelectedOutputAgentId(undefined)
@@ -2517,7 +2897,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setPausedByAgentId({})
     sessionActivityRef.current = new Map()
     // ── Auto-switch to Mission tab and show live feed ──────────────────────
-    setActiveTab('mission')
+    setActiveTab('missions')
     setLiveFeedVisible(true)
     setWizardOpen(false)
     emitFeedEvent({
@@ -2564,9 +2944,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Restore banner */}
         {showRestoreBanner ? (
-          <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs dark:border-amber-800/40 dark:bg-amber-950/20">
+          <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs">
             <span aria-hidden>⚡</span>
-            <span className="flex-1 truncate text-amber-800 dark:text-amber-200">
+            <span className="flex-1 truncate text-amber-900">
               Resume previous mission?{' '}
               <span className="font-semibold">
                 &ldquo;{truncateMissionGoal(restoreCheckpoint.label, 40)}&rdquo;
@@ -2585,7 +2965,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 setRestoreDismissed(true)
                 setRestoreCheckpoint(null)
               }}
-              className="shrink-0 rounded-md bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-amber-600"
+              className="shrink-0 rounded-md bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-amber-600"
             >
               Restore
             </button>
@@ -2596,7 +2976,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 setRestoreCheckpoint(null)
                 setRestoreDismissed(true)
               }}
-              className="shrink-0 rounded-md border border-amber-300 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/30"
+              className="shrink-0 rounded-md border border-amber-200 bg-white/80 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-100"
             >
               Discard
             </button>
@@ -2633,12 +3013,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             {!missionActive ? (
               <div className="flex min-h-0 h-full flex-1">
                 <div className="min-h-0 flex-1">
-                  <div className="flex items-center justify-between border-b border-neutral-800 bg-neutral-950 px-4 py-2.5">
+                  <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-2.5">
                     <div>
-                      <h2 className="text-sm font-semibold text-neutral-100">
+                      <h2 className="text-sm font-semibold text-neutral-900">
                         Task Board
                       </h2>
-                      <p className="text-[11px] text-neutral-400">
+                      <p className="text-[11px] text-neutral-500">
                         Capture notes and tasks before launching.
                       </p>
                     </div>
@@ -2660,20 +3040,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </div>
                 </div>
                 {!isMobileHub ? (
-                  <aside className="w-80 shrink-0 border-l border-neutral-800 bg-neutral-950 p-4">
+                  <aside className="w-80 shrink-0 border-l border-neutral-200 bg-neutral-50 p-4">
                     <div className="space-y-4">
-                      <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-3">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                      <section className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-600">
                           Team Ready
                         </h3>
-                        <p className="mt-1 text-xs text-neutral-400">
+                        <p className="mt-1 text-xs text-neutral-500">
                           {team.length} member{team.length === 1 ? '' : 's'} configured
                         </p>
                         <ul className="mt-2 space-y-1.5">
                           {team.slice(0, 5).map((member) => (
                             <li
                               key={member.id}
-                              className="truncate text-[11px] text-neutral-200"
+                              className="truncate text-[11px] text-neutral-700"
                             >
                               {member.name}
                             </li>
@@ -2681,8 +3061,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         </ul>
                       </section>
 
-                      <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-3">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                      <section className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-600">
                           Mission Notes
                         </h3>
                         <textarea
@@ -2690,16 +3070,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           onChange={(event) => setMissionGoal(event.target.value)}
                           rows={5}
                           placeholder="Draft goal notes here..."
-                          className="mt-2 w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                          className="mt-2 w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1"
                         />
                       </section>
 
-                      <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-3">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                      <section className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-600">
                           Recent Reports
                         </h3>
                         {recentReports.length === 0 ? (
-                          <p className="mt-1 text-[11px] text-neutral-400">
+                          <p className="mt-1 text-[11px] text-neutral-500">
                             No past missions yet.
                           </p>
                         ) : (
@@ -2707,7 +3087,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             {recentReports.map((entry) => (
                               <li
                                 key={entry.id}
-                                className="truncate text-[11px] text-neutral-200"
+                                className="truncate text-[11px] text-neutral-700"
                               >
                                 {entry.label}
                               </li>
@@ -2720,25 +3100,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 ) : null}
               </div>
             ) : view === 'timeline' ? (
-              <div className="flex min-h-0 h-full flex-1 items-center justify-center bg-neutral-950 px-6">
-                <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900 px-6 py-5 text-center">
-                  <h3 className="text-sm font-semibold text-neutral-100">
+              <div className="flex min-h-0 h-full flex-1 items-center justify-center bg-neutral-50 px-6">
+                <div className="rounded-xl border border-dashed border-neutral-300 bg-white px-6 py-5 text-center shadow-sm">
+                  <h3 className="text-sm font-semibold text-neutral-900">
                     Timeline view coming soon
                   </h3>
-                  <p className="mt-1 text-xs text-neutral-400">
+                  <p className="mt-1 text-xs text-neutral-500">
                     Switch back to Board for active mission orchestration.
                   </p>
                 </div>
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col h-full">
-                <div className="flex items-center justify-between border-b border-neutral-800 bg-neutral-950 px-4 py-2.5">
-                  <p className="truncate text-xs font-medium text-neutral-200">
+                <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-2.5">
+                  <p className="truncate text-xs font-medium text-neutral-800">
                     Mission: {truncateMissionGoal(activeMissionGoal || missionGoal.trim())}
                   </p>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
                     {/* Board/Timeline toggle — use string cast to avoid TS narrowing in else branch */}
-                    <div className="flex items-center rounded-lg border border-neutral-800 bg-neutral-900 p-0.5">
+                    <div className="flex items-center rounded-lg border border-neutral-200 bg-neutral-50 p-0.5">
                       {(['board', 'timeline'] as const).map((v) => (
                         <button
                           key={v}
@@ -2746,8 +3126,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           className={cn(
                             'rounded-md px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
                             (view as string) === v
-                              ? 'bg-neutral-800 text-neutral-100'
-                              : 'text-neutral-500 hover:text-neutral-300',
+                              ? 'bg-white text-neutral-900 shadow-sm'
+                              : 'text-neutral-500 hover:text-neutral-700',
                           )}
                           onClick={() => setView(v)}
                         >
@@ -2780,7 +3160,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* Inline agent output panel (desktop, right of task board) */}
           {!isMobileHub && missionActive && selectedOutputAgentId ? (
-            <div className="w-72 shrink-0 border-l border-neutral-800 bg-neutral-950">
+            <div className="w-72 shrink-0 border-l border-neutral-200 bg-white">
               <AgentOutputPanel
                 agentName={selectedOutputAgentName}
                 sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
@@ -2794,28 +3174,892 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     )
   }
 
+  function renderMissionHistorySection() {
+    const recentReports = loadMissionHistory().slice(0, 8)
+
+    return (
+      <section className="border-t border-neutral-200 bg-neutral-50 px-4 py-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-900">Mission History</h3>
+            <p className="text-[11px] text-neutral-500">Recent mission checkpoints and reports.</p>
+          </div>
+        </div>
+        {recentReports.length === 0 ? (
+          <div className="rounded-xl border border-neutral-200 bg-white px-4 py-5 text-sm text-neutral-500 shadow-sm">
+            No mission history yet.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {recentReports.map((entry) => {
+              const completedCount = entry.tasks.filter(
+                (task) => task.status === 'done' || task.status === 'completed',
+              ).length
+              const totalCount = entry.tasks.length
+              return (
+                <div
+                  key={entry.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-neutral-900">{entry.label}</p>
+                    <p className="text-[11px] text-neutral-500">
+                      {timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-neutral-600">
+                      {entry.processType}
+                    </span>
+                    <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-neutral-600">
+                      {totalCount > 0 ? `${completedCount}/${totalCount} tasks` : 'No tasks'}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  function renderOverviewContent() {
+    const activeCount = agentWorkingRows.filter((row) => row.status === 'active').length
+    const pendingApprovalCount = approvals.filter((a) => a.status === 'pending').length
+    const taskSource = missionActive ? missionTasks : boardTasks
+    const doneTasks = taskSource.filter((task) => task.status === 'done').length
+    const totalTasks = taskSource.length
+    const recentReports = loadMissionHistory().slice(0, 5)
+    const recentActivityItems = [
+      ...(missionActive
+        ? [
+            `Mission "${truncateMissionGoal(activeMissionGoal || missionGoal || 'Active mission', 40)}" ${missionState === 'running' ? 'running' : missionState}`,
+          ]
+        : []),
+      ...agentWorkingRows
+        .filter((row) => row.lastLine)
+        .sort((a, b) => (b.lastAt ?? 0) - (a.lastAt ?? 0))
+        .slice(0, 4)
+        .map((row) => `${row.name}: ${truncateMissionGoal(row.lastLine ?? '', 72)}`),
+      ...recentReports.slice(0, 2).map((report) => `Report archived: ${truncateMissionGoal(report.label, 60)}`),
+    ].slice(0, 6)
+    return (
+      <div className="h-full overflow-y-auto bg-neutral-50 p-4">
+        <div className="space-y-4">
+          <section className="rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+            {missionActive ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-neutral-900">
+                    Mission Status
+                  </p>
+                  <p className="mt-1 truncate text-sm text-neutral-700">
+                    {truncateMissionGoal(activeMissionGoal || missionGoal || 'Active mission')}
+                  </p>
+                  <p className="mt-1 text-[11px] text-neutral-500">
+                    {activeCount} active agent{activeCount === 1 ? '' : 's'}
+                    {' · '}
+                    {totalTasks > 0 ? `${doneTasks}/${totalTasks} tasks done` : 'No tasks yet'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('missions')}
+                    className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50"
+                  >
+                    View Mission
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('missions')}
+                    className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+                  >
+                    Stop
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-neutral-900">No active mission</p>
+                  <p className="mt-1 text-[11px] text-neutral-500">
+                    Configure your team and launch a mission when ready.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openLaunchWizard}
+                  className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+                >
+                  Start Mission
+                </button>
+              </div>
+            )}
+          </section>
+
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { label: 'Agents', value: team.length.toString(), sub: `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom'} team` },
+              { label: 'Active', value: activeCount.toString(), sub: missionActive ? 'Currently working' : 'Idle' },
+              { label: 'Tasks', value: totalTasks.toString(), sub: totalTasks > 0 ? `${doneTasks} done` : 'No tasks yet' },
+              { label: 'Approvals', value: pendingApprovalCount.toString(), sub: pendingApprovalCount > 0 ? 'Needs review' : 'All clear' },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="flex min-h-[92px] h-full flex-col justify-between rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <p className="text-[11px] font-medium text-neutral-500">{stat.label}</p>
+                <p className="mt-1 text-lg font-semibold tracking-tight text-neutral-900">{stat.value}</p>
+                <p className="mt-1 text-[11px] text-neutral-500">{stat.sub}</p>
+              </div>
+            ))}
+          </section>
+
+          <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <h2 className="text-sm font-semibold text-neutral-900">Agents</h2>
+                {agentWorkingRows.length > 0 ? (
+                  <div className="flex -space-x-2">
+                    {agentWorkingRows.slice(0, 5).map((agent, index) => {
+                      const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+                      return (
+                        <span
+                          key={`${agent.id}-header-avatar`}
+                          title={agent.name}
+                          className={cn(
+                            'flex size-6 items-center justify-center rounded-full border-2 border-white text-lg leading-none shadow-sm',
+                            accent.avatar,
+                          )}
+                        >
+                          <AgentAvatar index={resolveAgentAvatarIndex(teamById.get(agent.id), index)} color={accent.hex} size={14} />
+                        </span>
+                      )
+                    })}
+                  </div>
+                ) : null}
+                {agentWorkingRows.length > 0 ? (
+                  <div className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-100 p-0.5 align-middle">
+                    <div className="flex items-center gap-0.5">
+                      {(['cards', 'live'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setOverviewAgentsView(mode)}
+                          className={cn(
+                            'rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors',
+                            overviewAgentsView === mode
+                              ? 'bg-white text-neutral-900 shadow-sm'
+                              : 'text-neutral-500 hover:text-neutral-700',
+                          )}
+                        >
+                          {mode === 'cards' ? 'Cards' : 'Live'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('configure')
+                  setConfigSection('agents')
+                }}
+                className="text-xs font-medium text-orange-600 hover:text-orange-700"
+              >
+                Configure
+              </button>
+            </div>
+            {agentWorkingRows.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center">
+                <p className="text-2xl" aria-hidden>🤖</p>
+                <p className="mt-1 text-sm font-medium text-neutral-700">No agents configured yet</p>
+                <p className="mt-1 text-xs text-neutral-500">Open Configure to add your first agent.</p>
+              </div>
+            ) : overviewAgentsView === 'live' ? (
+              <OfficeView
+                agentRows={agentWorkingRows}
+                missionRunning={missionActive}
+                onViewOutput={(agentId) => {
+                  handleAgentSelection(agentId)
+                  setActiveTab('missions')
+                }}
+                selectedOutputAgentId={selectedOutputAgentId}
+                activeTemplateName={activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined}
+                processType={processType}
+              />
+            ) : (
+              <div
+                className={cn(
+                  'grid auto-rows-fr gap-4',
+                  agentWorkingRows.length <= 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3',
+                )}
+              >
+                {agentWorkingRows.map((agent, index) => {
+                const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+                const isBusy = agent.status === 'active' || agent.status === 'spawning'
+                const isRunning = agent.status === 'active'
+                const statusMeta = getAgentStatusMeta(agent.status)
+                return (
+                  <div
+                    key={agent.id}
+                    className="relative flex h-full min-h-[220px] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    <div className={cn('absolute inset-y-0 left-0 w-[3px]', accent.bar)} />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-start gap-2">
+                        <div
+                          className={cn(
+                            'flex size-10 shrink-0 items-center justify-center rounded-full shadow-sm',
+                            accent.avatar,
+                          )}
+                        >
+                          <AgentAvatar index={resolveAgentAvatarIndex(teamById.get(agent.id), index)} color={accent.hex} size={24} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-neutral-900">{agent.name}</p>
+                          <p className="truncate text-[11px] text-neutral-500">
+                            {agent.roleDescription || 'No role description'}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          isBusy ? 'bg-orange-100 text-orange-700' : 'bg-neutral-200 text-neutral-700',
+                        )}
+                      >
+                        {OFFICE_MODEL_LABEL[agent.modelId]}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-[11px]">
+                      {statusMeta.pulse ? (
+                        <span className="relative flex size-2 shrink-0">
+                          <span className={cn('absolute inset-0 animate-ping rounded-full opacity-60', statusMeta.dotClassName)} />
+                          <span className={cn('relative inline-flex size-2 rounded-full', statusMeta.dotClassName)} />
+                        </span>
+                      ) : (
+                        <span className={cn('size-2 rounded-full', statusMeta.dotClassName)} />
+                      )}
+                      <span className={cn('font-medium', statusMeta.className)}>● {statusMeta.label}</span>
+                      {agent.taskCount > 0 ? <span>· {agent.taskCount} tasks</span> : null}
+                    </div>
+                    {agent.lastLine ? (
+                      <p className="mt-2 line-clamp-2 min-h-[2.2rem] font-mono text-[11px] text-neutral-500">
+                        {agent.lastLine}
+                      </p>
+                    ) : (
+                      <p className={cn('mt-2 min-h-[2.2rem] font-mono text-[11px]', statusMeta.className)}>
+                        {agent.status === 'none' ? '● Waiting for session' : `● ${statusMeta.label}`}
+                      </p>
+                    )}
+                    <div className="mt-auto flex gap-2 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('configure')
+                          setConfigSection('agents')
+                        }}
+                        className={cn(
+                          'flex-1 rounded-lg border bg-white px-2 py-1.5 text-[11px] font-medium transition-colors',
+                          isRunning
+                            ? 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                            : 'border-orange-200 text-orange-600 hover:bg-orange-50',
+                        )}
+                      >
+                        Configure
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleAgentSelection(agent.id)
+                          setActiveTab('missions')
+                        }}
+                        className={cn(
+                          'flex-1 rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition-colors',
+                          isRunning
+                            ? 'border-orange-500 bg-orange-500 text-white hover:bg-orange-600'
+                            : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50',
+                        )}
+                      >
+                        View Output
+                      </button>
+                    </div>
+                  </div>
+                )
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+            <h2 className="text-sm font-semibold text-neutral-900">Recent Activity</h2>
+            {recentActivityItems.length === 0 ? (
+              <p className="mt-2 text-xs text-neutral-500">📝 No recent activity yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {recentActivityItems.map((item, index) => (
+                  <li key={`${index}-${item}`} className="flex items-start gap-2 text-xs">
+                    <span className="mt-1 size-1.5 rounded-full bg-orange-500" />
+                    <span className="text-neutral-700">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
+    )
+  }
+
+  function renderConfigureContent() {
+    const pendingApprovalCount = approvals.filter((a) => a.status === 'pending').length
+
+    return (
+      <div className="flex h-full min-h-0 bg-neutral-50">
+        <aside className="w-56 shrink-0 border-r border-neutral-200 bg-white p-3">
+          <div className="space-y-1">
+            {CONFIG_SECTIONS.map((section) => {
+              const isActive = configSection === section.id
+              const badge =
+                section.id === 'approvals' && pendingApprovalCount > 0
+                  ? pendingApprovalCount
+                  : undefined
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => setConfigSection(section.id)}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-medium shadow-sm transition-colors',
+                    isActive
+                      ? 'border-orange-200 bg-orange-50 text-orange-700 shadow-sm'
+                      : 'border-transparent bg-white text-neutral-700 hover:border-neutral-200 hover:bg-neutral-50',
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <span aria-hidden>{section.icon}</span>
+                    <span>{section.label}</span>
+                  </span>
+                  {badge ? (
+                    <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      {badge}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
+        </aside>
+
+        <div className="min-w-0 flex-1 overflow-y-auto p-4">
+          {configSection === 'agents' ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:shadow-md">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-900">Configured Agents</h2>
+                    <p className="text-[11px] text-neutral-500">
+                      Edit agent identity, model, role description, and system prompt.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddAgent}
+                    className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+                  >
+                    Add Agent
+                  </button>
+                </div>
+              </div>
+
+              {team.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-neutral-200 bg-white px-4 py-8 text-center shadow-sm">
+                  <p className="text-2xl" aria-hidden>🧩</p>
+                  <p className="mt-2 text-sm font-medium text-neutral-700">No agents in this team</p>
+                  <p className="mt-1 text-xs text-neutral-500">Add an agent to start configuring roles and prompts.</p>
+                </div>
+              ) : null}
+
+              {team.map((member, index) => (
+                <div
+                  key={member.id}
+                  className={cn(
+                    'rounded-xl border border-neutral-200 border-l-4 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
+                    AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length].border,
+                  )}
+                >
+                  <div className="mb-3 flex items-center gap-3">
+                    <div
+                      className={cn(
+                        'flex size-10 items-center justify-center rounded-full shadow-sm',
+                        AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length].avatar,
+                      )}
+                    >
+                      <AgentAvatar
+                        index={resolveAgentAvatarIndex(member, index)}
+                        color={AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length].hex}
+                        size={24}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-neutral-900">{member.name}</p>
+                      <p className="text-[11px] text-neutral-500">Agent {index + 1}</p>
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <p className="text-[11px] font-medium text-neutral-600">Avatar</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {Array.from({ length: AGENT_AVATAR_COUNT }, (_, avatarIndex) => {
+                        const selected = resolveAgentAvatarIndex(member, index) === avatarIndex
+                        const avatarAccent = AGENT_ACCENT_COLORS[avatarIndex % AGENT_ACCENT_COLORS.length]
+                        return (
+                          <button
+                            key={`${member.id}-${avatarIndex}`}
+                            type="button"
+                            onClick={() =>
+                              setTeam((previous) =>
+                                previous.map((row) =>
+                                  row.id === member.id ? { ...row, avatar: avatarIndex } : row,
+                                ),
+                              )
+                            }
+                            className={cn(
+                              'flex size-8 shrink-0 items-center justify-center rounded-full border bg-white transition-colors',
+                              selected
+                                ? 'border-orange-300 bg-orange-50 shadow-sm'
+                                : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50',
+                            )}
+                            aria-label={`Set ${member.name} avatar to robot ${avatarIndex + 1}`}
+                            aria-pressed={selected}
+                          >
+                            <AgentAvatar index={avatarIndex} color={avatarAccent.hex} size={20} />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block">
+                      <span className="text-[11px] font-medium text-neutral-600">Name</span>
+                      <input
+                        value={member.name}
+                        onChange={(event) =>
+                          setTeam((previous) =>
+                            previous.map((row) =>
+                              row.id === member.id ? { ...row, name: event.target.value } : row,
+                            ),
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[11px] font-medium text-neutral-600">Model</span>
+                      <select
+                        value={member.modelId}
+                        onChange={(event) =>
+                          setTeam((previous) =>
+                            previous.map((row) =>
+                              row.id === member.id
+                                ? { ...row, modelId: event.target.value as ModelPresetId }
+                                : row,
+                            ),
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                      >
+                        {MODEL_PRESETS.map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {preset.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="text-[11px] font-medium text-neutral-600">Role Description</span>
+                    <input
+                      value={member.roleDescription}
+                      onChange={(event) =>
+                        setTeam((previous) =>
+                          previous.map((row) =>
+                            row.id === member.id
+                              ? { ...row, roleDescription: event.target.value }
+                              : row,
+                          ),
+                        )
+                      }
+                      className="mt-1 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                    />
+                  </label>
+                  <label className="mt-4 block">
+                    <span className="text-[11px] font-medium text-neutral-600">System Prompt</span>
+                    <textarea
+                      value={member.backstory}
+                      onChange={(event) =>
+                        setTeam((previous) =>
+                          previous.map((row) =>
+                            row.id === member.id ? { ...row, backstory: event.target.value } : row,
+                          ),
+                        )
+                      }
+                      rows={4}
+                      className="mt-1 min-h-[112px] w-full resize-y rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                      placeholder="Persona, instructions, and context for this agent..."
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {configSection === 'teams' ? (
+            <div className="h-full min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+              <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+                  Team Configurations
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    value={teamConfigName}
+                    onChange={(event) => setTeamConfigName(event.target.value)}
+                    placeholder="Config name (optional)"
+                    className="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-xs text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={saveCurrentTeamConfig}
+                    className="shrink-0 rounded-md bg-orange-500 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+                  >
+                    Save
+                  </button>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <select
+                    value={selectedTeamConfigId}
+                    onChange={(event) => {
+                      const nextId = event.target.value
+                      setSelectedTeamConfigId(nextId)
+                      if (nextId) loadTeamConfig(nextId)
+                    }}
+                    className="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-xs text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                  >
+                    <option value="">Load saved config…</option>
+                    {teamConfigs.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedTeamConfigId) return
+                      deleteTeamConfig(selectedTeamConfigId)
+                    }}
+                    disabled={!selectedTeamConfigId}
+                    className="shrink-0 rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              <div
+                className={cn(
+                  'h-[calc(100%-112px)] overflow-y-auto',
+                  teamPanelFlash && 'bg-orange-50',
+                )}
+              >
+                <TeamPanel
+                  team={teamWithRuntimeStatus}
+                  activeTemplateId={activeTemplateId}
+                  agentTaskCounts={agentTaskCounts}
+                  spawnState={spawnState}
+                  agentSessionStatus={agentSessionStatus}
+                  agentSessionMap={agentSessionMap}
+                  agentModelNotApplied={agentModelNotApplied}
+                  tasks={boardTasks}
+                  onRetrySpawn={handleRetrySpawn}
+                  onKillSession={handleKillSession}
+                  onApplyTemplate={applyTemplate}
+                  onAddAgent={handleAddAgent}
+                  onUpdateAgent={(agentId, updates) => {
+                    setTeam((previous) =>
+                      previous.map((row) => (row.id === agentId ? { ...row, ...updates } : row)),
+                    )
+                  }}
+                  onSelectAgent={handleAgentSelection}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {configSection === 'keys' ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-900">Connected Providers</h2>
+                    <p className="text-[11px] text-neutral-500">
+                      API key and provider profiles detected by the gateway.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void refreshGatewayStatus().then((connected) => {
+                        if (connected) {
+                          return refreshConfiguredProviders()
+                        }
+                        setConfiguredProviders([])
+                        return Promise.resolve()
+                      })
+                    }}
+                    className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs text-neutral-600">Gateway Status</span>
+                  <GatewayStatusPill
+                    status={effectiveGatewayStatus}
+                    spawnErrorNames={spawnErrorNames}
+                    onRetry={spawnErrorNames.length > 0 ? handleRetryAllSpawnErrors : undefined}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+                {configuredProviders.length === 0 ? (
+                  <p className="text-sm text-neutral-500">No configured providers detected.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {configuredProviders.map((provider) => (
+                      <div
+                        key={provider}
+                        className="flex items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-neutral-900">{provider}</p>
+                          <p className="text-[11px] text-neutral-500">Connected via gateway profile</p>
+                        </div>
+                        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+                          Connected
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <a
+                  href="/settings/providers"
+                  className="mt-3 inline-block text-xs font-medium text-orange-600 hover:text-orange-700"
+                >
+                  Manage API keys →
+                </a>
+              </div>
+            </div>
+          ) : null}
+
+          {configSection === 'approvals' ? (
+            <div className="h-full min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+              <ApprovalsPanel approvals={approvals} onApprove={handleApprove} onDeny={handleDeny} />
+            </div>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  function renderMissionsTabContent() {
+    const showRestoreBanner = restoreCheckpoint && !restoreDismissed && !missionActive
+
+    if (!missionActive) {
+      const recentReports = loadMissionHistory().slice(0, 8)
+      return (
+        <div className="flex h-full min-h-0 flex-col bg-neutral-50">
+          {showRestoreBanner ? (
+            <div className="mx-4 mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs">
+              <span aria-hidden>⚡</span>
+              <span className="flex-1 truncate text-amber-900">
+                Resume previous mission{' '}
+                <span className="font-semibold">
+                  &ldquo;{truncateMissionGoal(restoreCheckpoint.label, 40)}&rdquo;
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMissionGoal(restoreCheckpoint.label)
+                  setProcessType(restoreCheckpoint.processType)
+                  setRestoreDismissed(true)
+                  setRestoreCheckpoint(null)
+                }}
+                className="rounded-md bg-orange-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+              >
+                Restore
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearMissionCheckpoint()
+                  setRestoreCheckpoint(null)
+                  setRestoreDismissed(true)
+                }}
+                className="rounded-md border border-amber-200 bg-white px-2.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-100"
+              >
+                Discard
+              </button>
+            </div>
+          ) : null}
+
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="space-y-4">
+              <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-900">Launch Mission</h2>
+                    <p className="text-[11px] text-neutral-500">
+                      Prepare a goal and launch the mission wizard.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openLaunchWizard}
+                    className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+                  >
+                    Launch Mission
+                  </button>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 md:items-start">
+                  <label className="block">
+                    <span className="text-[11px] font-medium text-neutral-600">Team</span>
+                    <div className="mt-1 flex min-h-[40px] items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('configure')
+                          setConfigSection('teams')
+                        }}
+                        className="flex-1 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:border-orange-200 hover:bg-white"
+                      >
+                        {activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · {team.length} agents
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('configure')
+                          setConfigSection('teams')
+                        }}
+                        className="shrink-0 text-xs font-medium text-orange-600 hover:text-orange-700"
+                      >
+                        Edit team →
+                      </button>
+                    </div>
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-medium text-neutral-600">Process</span>
+                    <div className="mt-1 flex min-h-[40px] flex-wrap items-center gap-2">
+                      {(['sequential', 'hierarchical', 'parallel'] as const).map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => setProcessType(option)}
+                          className={cn(
+                            'rounded-lg border px-3 py-2 text-xs font-medium capitalize transition-colors',
+                            processType === option
+                              ? 'border-orange-200 bg-orange-50 text-orange-700'
+                              : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50',
+                          )}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+                </div>
+
+                <label className="mt-3 block">
+                  <span className="text-[11px] font-medium text-neutral-600">Goal</span>
+                  <textarea
+                    value={missionGoal}
+                    onChange={(event) => setMissionGoal(event.target.value)}
+                    rows={4}
+                    placeholder="Enter mission objective..."
+                    className="mt-1 min-h-[112px] w-full resize-y rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                  />
+                </label>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {EXAMPLE_MISSIONS.map((example) => (
+                    <button
+                      key={example.label}
+                      type="button"
+                      onClick={() => setMissionGoal(example.text)}
+                      className="rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-[11px] text-neutral-600 transition-colors hover:border-orange-200 hover:text-orange-700"
+                    >
+                      {example.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                <h3 className="text-sm font-semibold text-neutral-900">Mission History</h3>
+                {recentReports.length === 0 ? (
+                  <p className="mt-2 text-xs text-neutral-500">🚀 No previous missions yet.</p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {recentReports.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-neutral-900">{entry.label}</p>
+                          <p className="text-[11px] text-neutral-500">
+                            {timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[10px] text-neutral-600">
+                          {entry.processType}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {renderMissionContent()}
+        </div>
+        {renderMissionHistorySection()}
+      </div>
+    )
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white dark:bg-neutral-950">
+    <div className="flex h-full min-h-0 flex-col bg-white">
       {/* ── Brand top accent border ──────────────────────────────────────── */}
       <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 bg-neutral-900 px-5 py-3">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate({ to: '/' })}
-            className="flex items-center justify-center size-7 rounded-md text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-100"
-            aria-label="Go back to dashboard"
-          >
-            ←
-          </button>
-          <div>
-            <h1 className="text-base font-semibold tracking-tight text-neutral-100">
-              Agent Hub
-            </h1>
-            <p className="font-mono text-[10px] text-neutral-500">// Mission Control</p>
-          </div>
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 bg-white px-5 py-3">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-900">Agent Hub</h1>
+          <p className="truncate font-mono text-[10px] text-neutral-500">// Mission Control</p>
         </div>
         {/* Status pill lives in the header */}
         <GatewayStatusPill
@@ -2826,9 +4070,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       </div>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center overflow-x-auto border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-        {TAB_DEFS.map((tab) => {
-          const pendingApprovals = tab.id === 'approvals'
+      <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-neutral-50/80 px-2">
+        <div className="min-w-0 flex-1 overflow-x-auto">
+          <div className="flex min-w-max items-center">
+            {TAB_DEFS.map((tab) => {
+          const pendingApprovals = tab.id === 'configure'
             ? approvals.filter(a => a.status === 'pending').length
             : 0
           const isActive = activeTab === tab.id
@@ -2838,10 +4084,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'relative flex items-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-all sm:px-4',
+                'relative flex min-w-[108px] flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-all sm:min-w-[120px] sm:px-4',
                 isActive
-                  ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
-                  : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-200',
+                  ? 'bg-white text-neutral-900 shadow-sm'
+                  : 'text-neutral-500 hover:bg-white hover:text-neutral-800',
               )}
             >
               {/* Active tab: orange bottom highlight */}
@@ -2851,24 +4097,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <span aria-hidden className="text-base leading-none">{tab.icon}</span>
               <span className="shrink-0 whitespace-nowrap">{tab.label}</span>
               {/* Mission tab: animated running indicator */}
-              {tab.id === 'mission' && isMissionRunning ? (
+              {tab.id === 'missions' && isMissionRunning ? (
                 <span className="relative ml-0.5 flex size-1.5">
                   <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
                   <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
                 </span>
               ) : null}
-              {/* Approvals tab: pending count badge */}
-              {tab.id === 'approvals' && pendingApprovals > 0 ? (
-                <span className="ml-0.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+              {tab.id === 'configure' && pendingApprovals > 0 ? (
+                <span className="ml-0.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
                   {pendingApprovals > 99 ? '99+' : pendingApprovals}
                 </span>
               ) : null}
             </button>
           )
-        })}
+            })}
+          </div>
+        </div>
 
         {/* Spacer + Live Feed toggle */}
-        <div className="ml-auto flex items-center gap-3 pr-3">
+        <div className="hidden shrink-0 items-center gap-3 py-1 md:flex">
           <button
             type="button"
             onClick={() => {
@@ -2877,8 +4124,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
               liveFeedVisible
-                ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100'
-                : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-200',
+                ? 'bg-neutral-200 text-neutral-900'
+                : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800',
             )}
           >
             <span aria-hidden>📡</span>
@@ -2896,142 +4143,31 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* ── Tab content area ── */}
         <div className="min-w-0 flex-1 overflow-hidden">
-          {/* Office tab */}
           <div
-            className="h-full min-h-0 bg-white dark:bg-neutral-950"
-            style={{ display: activeTab === 'office' ? 'block' : 'none' }}
+            className="h-full min-h-0 bg-white"
+            style={{ display: activeTab === 'overview' ? 'block' : 'none' }}
           >
-            <OfficeView
-              agentRows={agentWorkingRows}
-              missionRunning={isMissionRunning}
-              selectedOutputAgentId={selectedOutputAgentId}
-              activeTemplateName={activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined}
-              processType={processType}
-              onViewOutput={(agentId) => {
-                handleAgentSelection(agentId)
-                // Switch to mission tab to see output
-                setActiveTab('mission')
-              }}
-            />
+            {renderOverviewContent()}
           </div>
 
-          {/* Mission tab */}
           <div
-            className="h-full min-h-0 bg-white dark:bg-neutral-950"
-            style={{ display: activeTab === 'mission' ? 'block' : 'none' }}
+            className="h-full min-h-0 bg-white"
+            style={{ display: activeTab === 'configure' ? 'block' : 'none' }}
           >
-            {renderMissionContent()}
+            {renderConfigureContent()}
           </div>
 
-          {/* History tab */}
           <div
-            className="h-full min-h-0 bg-white dark:bg-neutral-950"
-            style={{ display: activeTab === 'history' ? 'block' : 'none' }}
+            className="h-full min-h-0 bg-white"
+            style={{ display: activeTab === 'missions' ? 'block' : 'none' }}
           >
-            <HistoryView />
-          </div>
-
-          {/* Approvals tab */}
-          <div
-            className="h-full min-h-0 bg-white dark:bg-neutral-950"
-            style={{ display: activeTab === 'approvals' ? 'block' : 'none' }}
-          >
-            <ApprovalsPanel
-              approvals={approvals}
-              onApprove={handleApprove}
-              onDeny={handleDeny}
-            />
-          </div>
-
-          {/* Team tab */}
-          <div
-            className="h-full min-h-0 bg-white dark:bg-neutral-950"
-            style={{ display: activeTab === 'team' ? 'block' : 'none' }}
-          >
-            <div
-              className={cn(
-                'h-full overflow-y-auto',
-                teamPanelFlash && 'bg-emerald-50/70 dark:bg-emerald-900/10',
-              )}
-            >
-              <div className="border-b border-primary-200 bg-primary-50/60 px-3 py-3 dark:border-neutral-700 dark:bg-neutral-900/30">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                  Team Configurations
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    value={teamConfigName}
-                    onChange={(event) => setTeamConfigName(event.target.value)}
-                    placeholder="Config name (optional)"
-                    className="min-w-0 flex-1 rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={saveCurrentTeamConfig}
-                    className="shrink-0 rounded-md bg-accent-500 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-accent-600"
-                  >
-                    Save
-                  </button>
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <select
-                    value={selectedTeamConfigId}
-                    onChange={(event) => {
-                      const nextId = event.target.value
-                      setSelectedTeamConfigId(nextId)
-                      if (nextId) loadTeamConfig(nextId)
-                    }}
-                    className="min-w-0 flex-1 rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-                  >
-                    <option value="">Load saved config…</option>
-                    {teamConfigs.map((entry) => (
-                      <option key={entry.id} value={entry.id}>
-                        {entry.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!selectedTeamConfigId) return
-                      deleteTeamConfig(selectedTeamConfigId)
-                    }}
-                    disabled={!selectedTeamConfigId}
-                    className="shrink-0 rounded-md border border-red-300 px-2.5 py-1.5 text-[11px] font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/20"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-              <TeamPanel
-                team={teamWithRuntimeStatus}
-                activeTemplateId={activeTemplateId}
-                agentTaskCounts={agentTaskCounts}
-                spawnState={spawnState}
-                agentSessionStatus={agentSessionStatus}
-                agentSessionMap={agentSessionMap}
-                agentModelNotApplied={agentModelNotApplied}
-                tasks={boardTasks}
-                onRetrySpawn={handleRetrySpawn}
-                onKillSession={handleKillSession}
-                onApplyTemplate={applyTemplate}
-                onAddAgent={handleAddAgent}
-                onUpdateAgent={(agentId, updates) => {
-                  setTeam((previous) =>
-                    previous.map((member) =>
-                      member.id === agentId ? { ...member, ...updates } : member,
-                    ),
-                  )
-                }}
-                onSelectAgent={handleAgentSelection}
-              />
-            </div>
+            {renderMissionsTabContent()}
           </div>
         </div>
 
         {/* ── Collapsible Live Feed + Mission Controls sidebar ── */}
         {liveFeedVisible ? (
-          <div className="flex w-72 shrink-0 flex-col border-l border-primary-200 bg-primary-50/30 dark:border-neutral-700 dark:bg-neutral-900/20">
+          <div className="flex w-72 shrink-0 flex-col border-l border-primary-200 bg-primary-50/30">
             <div className="min-h-0 flex-1 overflow-hidden">
               <LiveFeedPanel />
             </div>
@@ -3101,7 +4237,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         setDispatchedTaskIdsByAgent({})
                         setPausedByAgentId({})
                         setSelectedOutputAgentId(undefined)
-                        setActiveTab('mission')
+                        setActiveTab('missions')
                         dispatchingRef.current = false
                         pendingTaskMovesRef.current = []
                         sessionActivityRef.current = new Map()
@@ -3123,22 +4259,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       min={0}
                       value={budgetLimit}
                       onChange={(event) => setBudgetLimit(event.target.value)}
-                      className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                      className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1"
                     />
                   </label>
 
                   <button
                     type="button"
                     onClick={() => setAutoAssign((current) => !current)}
-                    className="mt-2 flex w-full items-center justify-between rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                    className="mt-2 flex w-full items-center justify-between rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-50"
                   >
                     <span>Auto-assign tasks</span>
                     <span
                       className={cn(
                         'rounded-full px-2 py-0.5 text-[10px] font-semibold',
                         autoAssign
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                          : 'bg-primary-100 text-primary-600 dark:bg-neutral-700 dark:text-neutral-300',
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-primary-100 text-primary-600',
                       )}
                     >
                       {autoAssign ? 'On' : 'Off'}
@@ -3161,10 +4297,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             onClick={closeLaunchWizard}
             aria-hidden
           />
-          <div className="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-primary-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
-            <div className="flex items-center justify-between border-b border-primary-200 px-5 py-3 dark:border-neutral-700">
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-primary-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-primary-200 px-5 py-3">
               <div>
-                <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                <h2 className="text-sm font-semibold text-primary-900">
                   Launch Mission
                 </h2>
                 <p className="text-[11px] text-primary-500">
@@ -3174,13 +4310,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <button
                 type="button"
                 onClick={closeLaunchWizard}
-                className="rounded-md border border-primary-200 px-2 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                className="rounded-md border border-primary-200 px-2 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50"
               >
                 Cancel
               </button>
             </div>
 
-            <div className="border-b border-primary-200 px-5 py-2.5 dark:border-neutral-700">
+            <div className="border-b border-primary-200 px-5 py-2.5">
               <div className="flex flex-wrap items-center gap-2 text-[11px]">
                 {WIZARD_STEP_ORDER.map((step, index) => {
                   const label =
@@ -3201,10 +4337,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       className={cn(
                         'rounded-full border px-2.5 py-1 font-medium transition-colors',
                         active
-                          ? 'border-accent-400 bg-accent-50 text-accent-700 dark:border-accent-700 dark:bg-accent-950/30 dark:text-accent-300'
+                          ? 'border-accent-400 bg-accent-50 text-accent-700'
                           : completed
-                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'
-                            : 'border-primary-200 bg-white text-primary-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400',
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                            : 'border-primary-200 bg-white text-primary-500',
                       )}
                     >
                       {index + 1}. {label}
@@ -3217,8 +4353,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <div className="max-h-[65vh] overflow-y-auto px-5 py-4">
               {wizardStep === 'gateway' ? (
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-primary-200 bg-primary-50/50 p-4 dark:border-neutral-700 dark:bg-neutral-900/40">
-                    <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+                  <div className="rounded-xl border border-primary-200 bg-primary-50/50 p-4">
+                    <p className="text-xs font-semibold text-primary-900">
                       Gateway Connection
                     </p>
                     <p className="mt-1 text-xs text-primary-500">
@@ -3233,8 +4369,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         className={cn(
                           'rounded-full px-2 py-0.5 text-[10px] font-semibold',
                           gatewayStatus === 'disconnected'
-                            ? 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400'
-                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400',
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-emerald-100 text-emerald-700',
                         )}
                       >
                         {gatewayStatus === 'disconnected'
@@ -3255,15 +4391,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             })
                             .finally(() => setWizardCheckingGateway(false))
                         }}
-                        className="rounded-md border border-primary-200 px-2 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                        className="rounded-md border border-primary-200 px-2 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50"
                       >
                         Refresh
                       </button>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-primary-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-                    <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+                  <div className="rounded-xl border border-primary-200 bg-white p-4">
+                    <p className="text-xs font-semibold text-primary-900">
                       Provider Profiles
                     </p>
                     {configuredProviders.length === 0 ? (
@@ -3275,7 +4411,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         {configuredProviders.map((provider) => (
                           <span
                             key={provider}
-                            className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary-700 dark:bg-neutral-800 dark:text-neutral-300"
+                            className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary-700"
                           >
                             {provider}
                           </span>
@@ -3284,7 +4420,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     )}
                     <a
                       href="/settings/providers"
-                      className="mt-3 inline-block text-[11px] font-medium text-accent-600 hover:text-accent-700 dark:text-accent-400"
+                      className="mt-3 inline-block text-[11px] font-medium text-accent-600 hover:text-accent-700"
                     >
                       Manage API keys →
                     </a>
@@ -3295,7 +4431,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {wizardStep === 'team' ? (
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+                    <p className="text-xs font-semibold text-primary-900">
                       Choose Team Template
                     </p>
                     <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -3307,8 +4443,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           className={cn(
                             'rounded-xl border px-3 py-2 text-left text-xs transition-colors',
                             activeTemplateId === template.id
-                              ? 'border-accent-400 bg-accent-50 text-accent-700 dark:border-accent-700 dark:bg-accent-950/20 dark:text-accent-300'
-                              : 'border-primary-200 bg-white text-primary-700 hover:border-primary-300 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200',
+                              ? 'border-accent-400 bg-accent-50 text-accent-700'
+                              : 'border-primary-200 bg-white text-primary-700 hover:border-primary-300',
                           )}
                         >
                           <p className="font-semibold">
@@ -3323,17 +4459,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+                    <p className="text-xs font-semibold text-primary-900">
                       Current Team
                     </p>
-                    <ul className="mt-2 space-y-1.5 rounded-xl border border-primary-200 bg-primary-50/40 p-3 dark:border-neutral-700 dark:bg-neutral-900/30">
+                    <ul className="mt-2 space-y-1.5 rounded-xl border border-primary-200 bg-primary-50/40 p-3">
                       {team.length === 0 ? (
                         <li className="text-xs text-primary-500">No agents configured.</li>
                       ) : (
                         team.map((member) => (
                           <li
                             key={member.id}
-                            className="truncate text-xs text-primary-700 dark:text-neutral-200"
+                            className="truncate text-xs text-primary-700"
                           >
                             {member.name} · {member.roleDescription || 'No role set'}
                           </li>
@@ -3347,7 +4483,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {wizardStep === 'goal' ? (
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+                    <p className="text-xs font-semibold text-primary-900">
                       Mission Goal
                     </p>
                     <textarea
@@ -3355,7 +4491,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       onChange={(event) => setMissionGoal(event.target.value)}
                       rows={5}
                       placeholder="Describe the mission outcome and constraints"
-                      className="mt-2 w-full resize-none rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                      className="mt-2 w-full resize-none rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-900 outline-none ring-accent-400 focus:ring-1"
                     />
                     <div className="mt-2 flex flex-wrap gap-2">
                       {EXAMPLE_MISSIONS.map((example) => (
@@ -3363,7 +4499,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           key={example.label}
                           type="button"
                           onClick={() => setMissionGoal(example.text)}
-                          className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-accent-400 hover:text-accent-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                          className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-accent-400 hover:text-accent-700"
                         >
                           {example.label}
                         </button>
@@ -3390,8 +4526,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           className={cn(
                             'rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors',
                             processType === option.id
-                              ? 'border-accent-400 bg-accent-50 text-accent-700 dark:border-accent-600 dark:bg-accent-950/30 dark:text-accent-300'
-                              : 'border-primary-200 bg-white text-primary-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300',
+                              ? 'border-accent-400 bg-accent-50 text-accent-700'
+                              : 'border-primary-200 bg-white text-primary-600',
                           )}
                         >
                           {option.label}
@@ -3407,7 +4543,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       type="button"
                       onClick={handleAutoConfigure}
                       disabled={missionGoal.trim().length === 0}
-                      className="mt-2 rounded-md border border-accent-400 px-2.5 py-1 text-[11px] font-medium text-accent-600 transition-colors hover:bg-accent-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-accent-700 dark:text-accent-400 dark:hover:bg-accent-950/20"
+                      className="mt-2 rounded-md border border-accent-400 px-2.5 py-1 text-[11px] font-medium text-accent-600 transition-colors hover:bg-accent-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Auto-configure team from goal
                     </button>
@@ -3417,28 +4553,28 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               {wizardStep === 'launch' ? (
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-primary-200 bg-primary-50/40 p-4 dark:border-neutral-700 dark:bg-neutral-900/30">
-                    <h3 className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+                  <div className="rounded-xl border border-primary-200 bg-primary-50/40 p-4">
+                    <h3 className="text-xs font-semibold text-primary-900">
                       Review
                     </h3>
                     <dl className="mt-2 space-y-1.5 text-xs">
                       <div className="flex gap-2">
                         <dt className="w-24 text-primary-500">Gateway</dt>
-                        <dd className="text-primary-800 dark:text-neutral-200">
+                        <dd className="text-primary-800">
                           {gatewayStatus === 'disconnected' ? 'Disconnected' : 'Connected'}
                         </dd>
                       </div>
                       <div className="flex gap-2">
                         <dt className="w-24 text-primary-500">Team size</dt>
-                        <dd className="text-primary-800 dark:text-neutral-200">{team.length}</dd>
+                        <dd className="text-primary-800">{team.length}</dd>
                       </div>
                       <div className="flex gap-2">
                         <dt className="w-24 text-primary-500">Process</dt>
-                        <dd className="capitalize text-primary-800 dark:text-neutral-200">{processType}</dd>
+                        <dd className="capitalize text-primary-800">{processType}</dd>
                       </div>
                       <div className="flex gap-2">
                         <dt className="w-24 text-primary-500">Goal</dt>
-                        <dd className="line-clamp-3 text-primary-800 dark:text-neutral-200">
+                        <dd className="line-clamp-3 text-primary-800">
                           {missionGoal.trim() || 'No mission goal provided'}
                         </dd>
                       </div>
@@ -3448,14 +4584,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               ) : null}
             </div>
 
-            <div className="flex items-center justify-between border-t border-primary-200 px-5 py-3 dark:border-neutral-700">
+            <div className="flex items-center justify-between border-t border-primary-200 px-5 py-3">
               <button
                 type="button"
                 onClick={() =>
                   setWizardStepIndex((prev) => Math.max(0, prev - 1))
                 }
                 disabled={wizardStepIndex === 0}
-                className="rounded-md border border-primary-200 px-3 py-1.5 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                className="rounded-md border border-primary-200 px-3 py-1.5 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Back
               </button>
@@ -3501,15 +4637,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             aria-hidden
           />
           {/* Sheet */}
-          <div className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl dark:bg-neutral-900">
-            <div className="flex shrink-0 items-center justify-between border-b border-primary-200 p-3 dark:border-neutral-700">
-              <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+          <div className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-primary-200 p-3">
+              <h3 className="text-sm font-semibold text-primary-900">
                 {selectedOutputAgentName} Output
               </h3>
               <button
                 type="button"
                 onClick={() => setSelectedOutputAgentId(undefined)}
-                className="flex size-7 items-center justify-center rounded-full text-primary-400 transition-colors hover:bg-primary-100 hover:text-primary-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                className="flex size-7 items-center justify-center rounded-full text-primary-400 transition-colors hover:bg-primary-100 hover:text-primary-700"
                 aria-label="Close agent output"
               >
                 ✕
@@ -3529,12 +4665,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       {/* ── Mobile: Bottom Tab Nav ─────────────────────────────────────────── */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary-200 bg-white/95 backdrop-blur-sm dark:border-neutral-700 dark:bg-neutral-900/95 md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary-200 bg-white/95 backdrop-blur-sm md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex">
           {TAB_DEFS.map((tab) => {
-            const pendingApprovals = tab.id === 'approvals'
+            const pendingApprovals = tab.id === 'configure'
               ? approvals.filter(a => a.status === 'pending').length
               : 0
             return (
@@ -3545,20 +4681,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 className={cn(
                   'relative flex flex-1 flex-col items-center justify-center py-2.5 text-[10px] font-medium transition-colors',
                   activeTab === tab.id
-                    ? 'text-accent-600 dark:text-accent-400'
-                    : 'text-primary-500 hover:text-primary-700 dark:text-neutral-400 dark:hover:text-neutral-200',
+                    ? 'text-orange-600'
+                    : 'text-neutral-500 hover:text-neutral-800',
                 )}
               >
                 <span className="text-base leading-none" aria-hidden>{tab.icon}</span>
                 <span className="mt-0.5">{tab.label}</span>
-                {tab.id === 'mission' && isMissionRunning ? (
+                {tab.id === 'missions' && isMissionRunning ? (
                   <span className="absolute right-3 top-1.5 flex size-1.5">
                     <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
                     <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
                   </span>
                 ) : null}
-                {tab.id === 'approvals' && pendingApprovals > 0 ? (
-                  <span className="absolute right-2 top-1 rounded-full bg-red-500 px-1 text-[8px] font-bold text-white leading-tight">
+                {tab.id === 'configure' && pendingApprovals > 0 ? (
+                  <span className="absolute right-2 top-1 rounded-full bg-orange-500 px-1 text-[8px] font-bold text-white leading-tight">
                     {pendingApprovals > 9 ? '9+' : pendingApprovals}
                   </span>
                 ) : null}

@@ -357,7 +357,7 @@ class GatewayClient {
   }
 
   private attachSocket(ws: WebSocket) {
-    ws.on('message', (data: RawData) => {
+    ws.on('message', (data) => {
       this.handleMessage(data)
     })
 
@@ -368,12 +368,12 @@ class GatewayClient {
       }
     })
 
-    ws.on('close', (code: number, reason: Buffer) => {
+    ws.on('close', (code, reason) => {
       console.log(`[gateway] WebSocket closed: code=${code} reason=${reason?.toString() || 'n/a'}`)
       this.handleDisconnect(new Error(`Gateway connection closed (code=${code})`))
     })
 
-    ws.on('error', (error: unknown) => {
+    ws.on('error', (error) => {
       const err = error instanceof Error ? error : new Error(String(error))
       this.handleDisconnect(err)
     })
@@ -540,7 +540,7 @@ class GatewayClient {
     }
 
     await new Promise<void>((resolve, reject) => {
-      this.ws?.send(JSON.stringify(frame), (err: unknown) => {
+      this.ws?.send(JSON.stringify(frame), (err) => {
         if (err) {
           reject(err)
           return

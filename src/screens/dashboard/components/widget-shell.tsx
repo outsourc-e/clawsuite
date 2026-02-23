@@ -46,9 +46,9 @@ export const WIDGET_SIZE_SPAN: Record<WidgetSize, string> = {
 
 /** Maps size → padding + min-height */
 const SIZE_STYLES: Record<WidgetSize, string> = {
-  small: 'p-4 md:p-3 lg:p-2.5 min-h-[120px]',
-  medium: 'p-4 lg:p-3 min-h-[160px]',
-  large: 'p-4 lg:p-3 min-h-[260px]',
+  small: 'p-4 md:p-3 min-h-[120px]',
+  medium: 'p-4 min-h-[160px]',
+  large: 'p-4 min-h-[260px]',
 }
 
 /** Maps size → title text size */

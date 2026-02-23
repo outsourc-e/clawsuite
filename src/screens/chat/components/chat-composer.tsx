@@ -33,6 +33,7 @@ import {
   type SlashCommandDefinition,
   type SlashCommandMenuHandle,
 } from '@/components/slash-command-menu'
+import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
 import { fetchModels, switchModel } from '@/lib/gateway-api'
@@ -493,6 +494,8 @@ function ChatComposerComponent({
   composerRef,
   focusKey,
 }: ChatComposerProps) {
+  const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
+  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const setMobileKeyboardOpen = useWorkspaceStore((s) => s.setMobileKeyboardOpen)
   const setMobileKeyboardInset = useWorkspaceStore(
     (s) => s.setMobileKeyboardInset,
@@ -1246,16 +1249,21 @@ function ChatComposerComponent({
     [wrapperRef],
   )
 
+  const keyboardOrFocusActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const composerWrapperStyle = useMemo(
     () => {
+      const tabBarOffset = keyboardOrFocusActive
+        ? '0px'
+        : 'max(0px, calc(var(--mobile-tab-bar-offset) - 0.375rem))'
+      const mobileTranslate = `translateY(calc(-1 * (${tabBarOffset} + var(--kb-inset, 0px))))`
       return {
         maxWidth: 'min(768px, 100%)',
-        bottom: isMobileViewport
-          ? 'calc(var(--kb-inset, 0px) + env(safe-area-inset-bottom) + 84px)'
-          : undefined,
+        '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
+        transform: isMobileViewport ? mobileTranslate : undefined,
+        WebkitTransform: isMobileViewport ? mobileTranslate : undefined,
       } as CSSProperties
     },
-    [isMobileViewport],
+    [isMobileViewport, keyboardOrFocusActive],
   )
 
   return (
@@ -1263,11 +1271,10 @@ function ChatComposerComponent({
       className={cn(
         'no-swipe pointer-events-auto mx-auto w-full bg-surface px-3 pt-2 sm:px-5 touch-manipulation',
         isMobileViewport
-          ? 'fixed z-[70] left-3 right-3 w-auto max-w-none bg-transparent px-0 pt-0 pb-0 transition-[bottom] duration-200'
+          ? 'fixed inset-x-0 bottom-0 z-[70] transition-transform duration-200'
           : 'relative z-40 shrink-0',
         'pb-[max(var(--safe-b),0px)] md:pb-[calc(var(--safe-b)+0.75rem)]',
         'md:bg-surface/95 md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
-        'max-[767px]:pb-0 max-[767px]:min-h-[56px] max-[767px]:max-h-[140px]',
       )}
       style={composerWrapperStyle}
       ref={setWrapperRefs}
@@ -1288,7 +1295,6 @@ function ChatComposerComponent({
         disabled={disabled}
         className={cn(
           'relative z-50 transition-all duration-300',
-          'max-[767px]:rounded-[28px] max-[767px]:border max-[767px]:border-white/10 max-[767px]:bg-black/60 max-[767px]:py-2 max-[767px]:outline-white/10 max-[767px]:shadow-[0_10px_40px_rgba(0,0,0,0.5)] max-[767px]:backdrop-blur-xl',
           isDraggingOver &&
             'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
           isLoading &&
@@ -1378,7 +1384,7 @@ function ChatComposerComponent({
               setMobileKeyboardInset(0)
             }
           }}
-          className="min-h-[44px] max-[767px]:text-white max-[767px]:placeholder:text-white/60 max-[767px]:caret-white max-[767px]:max-h-[96px] max-[767px]:overflow-y-auto"
+          className="min-h-[44px]"
         />
         <PromptInputActions className="justify-between px-1.5 md:px-3 gap-0.5 md:gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-0 md:gap-1">
@@ -1423,7 +1429,7 @@ function ChatComposerComponent({
                   setIsModelMenuOpen((prev) => !prev)
                 }}
                 className={cn(
-                  'inline-flex h-7 max-w-[8rem] items-center gap-0.5 rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 md:gap-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 hover:text-primary-800 max-[767px]:bg-white/10 max-[767px]:text-white/80 max-[767px]:hover:bg-white/20 max-[767px]:hover:text-white',
+                  'inline-flex h-7 max-w-[8rem] items-center gap-0.5 rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 md:gap-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 hover:text-primary-800',
                   isModelSwitcherDisabled &&
                     'cursor-not-allowed opacity-50',
                 )}

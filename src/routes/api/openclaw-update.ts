@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 type VersionCheckResult = {
   currentVersion: string
@@ -124,7 +125,11 @@ export const Route = createFileRoute('/api/openclaw-update')({
         }
       },
 
-      POST: async () => {
+      POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
         try {
           // Re-check install type before attempting update
           const check = await checkOpenClawVersion()

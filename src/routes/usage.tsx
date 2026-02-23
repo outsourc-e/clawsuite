@@ -19,7 +19,9 @@ export const Route = createFileRoute('/usage')({
             : 'An unexpected error occurred'}
         </p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            if (typeof window !== 'undefined') window.location.reload()
+          }}
           className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
         >
           Reload Page

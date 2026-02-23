@@ -32,16 +32,16 @@ import { ServicesHealthWidget } from './components/services-health-widget'
 import { ScheduledJobsWidget } from './components/scheduled-jobs-widget'
 import { SkillsWidget } from './components/skills-widget'
 import { TasksWidget } from './components/tasks-widget'
+import { UsageMeterWidget } from './components/usage-meter-widget'
 import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
 import { QuickActionsRow } from './components/quick-actions-row'
 import { TokenUsageHero } from './components/token-usage-hero'
-import { CockpitMetricsGrid } from './components/cockpit-metrics-grid'
 import { WidgetGrid, type WidgetGridItem } from './components/widget-grid'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
 import { useVisibleWidgets } from './hooks/use-visible-widgets'
-import { useDashboardData } from './hooks/use-dashboard-data'
+import { useDashboardData, buildUsageSummaryText } from './hooks/use-dashboard-data'
 import { formatMoney, formatRelativeTime } from './lib/formatters'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -229,6 +229,9 @@ export function DashboardScreen() {
     return dashboardData.connection.connected ? 'Active' : '—'
   }, [dashboardData.uptime.formatted, dashboardData.connection.connected, dashboardData.updatedAt])
 
+  const usageSummaryText = buildUsageSummaryText(dashboardData)
+  const usageSummaryIsError = dashboardData.usageStatus === 'error' || dashboardData.usageStatus === 'timeout'
+
   const visibleAlerts = dashboardData.alerts.filter((c) => !dismissedChips.has(c.id))
 
   // Timeseries data for micro charts
@@ -344,6 +347,7 @@ export function DashboardScreen() {
       return {
         showServices: visibleWidgetSet.has('services-health'),
         showScheduledJobs: visibleWidgetSet.has('scheduled-jobs'),
+        showUsage: visibleWidgetSet.has('usage-meter'),
         showSquad: visibleWidgetSet.has('agent-status'),
         showSessions: visibleWidgetSet.has('recent-sessions'),
         showTasks: visibleWidgetSet.has('tasks'),
@@ -360,7 +364,7 @@ export function DashboardScreen() {
     function buildMobileDeepSections() {
       const sections: Array<MobileWidgetSection> = []
       const deepTierOrder = widgetOrder.filter((id) =>
-        ['services', 'scheduled-jobs', 'activity', 'agents', 'sessions', 'tasks', 'skills'].includes(id),
+        ['services', 'scheduled-jobs', 'activity', 'agents', 'sessions', 'tasks', 'skills', 'usage'].includes(id),
       )
 
       for (const widgetId of deepTierOrder) {
@@ -422,10 +426,7 @@ export function DashboardScreen() {
             label: 'Agents',
             content: (
               <div className="w-full">
-                <SquadStatusWidget
-                  agents={dashboardData.agents.roster}
-                  loading={dashboardData.status === 'loading'}
-                />
+                <SquadStatusWidget />
               </div>
             ),
           })
@@ -440,9 +441,6 @@ export function DashboardScreen() {
             content: (
               <div className="w-full">
                 <RecentSessionsWidget
-                  sessions={dashboardData.sessions.list}
-                  activeCount={dashboardData.sessions.active || dashboardData.agents.active || 0}
-                  loading={dashboardData.status === 'loading'}
                   onOpenSession={(sessionKey) =>
                     navigate({
                       to: '/chat/$sessionKey',
@@ -497,6 +495,48 @@ export function DashboardScreen() {
           continue
         }
 
+        if (widgetId === 'usage') {
+          if (!visibleWidgetSet.has('usage-meter')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Usage',
+            content: (
+              <div className="w-full">
+                <CollapsibleWidget
+                  title="Usage Meter"
+                  summary={usageSummaryText}
+                  defaultOpen={false}
+                  action={
+                    usageSummaryIsError ? (
+                      <button
+                        type="button"
+                        onClick={refetch}
+                        className="rounded-md border border-red-200 bg-red-50/80 px-1.5 py-0.5 text-[10px] font-medium text-red-700 transition-colors hover:bg-red-100"
+                      >
+                        Retry
+                      </button>
+                    ) : null
+                  }
+                >
+                  {usageSummaryIsError ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-700">
+                      <p className="font-medium">Usage unavailable</p>
+                      <button
+                        type="button"
+                        onClick={refetch}
+                        className="mt-2 rounded-md border border-red-200 bg-red-100/80 px-2 py-1 text-xs font-medium transition-colors hover:bg-red-100"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : (
+                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
+                  )}
+                </CollapsibleWidget>
+              </div>
+            ),
+          })
+        }
       }
 
       return sections
@@ -509,6 +549,8 @@ export function DashboardScreen() {
       navigate,
       refetch,
       removeWidget,
+      usageSummaryIsError,
+      usageSummaryText,
       visibleWidgetSet,
       widgetOrder,
     ],
@@ -538,7 +580,7 @@ export function DashboardScreen() {
     <>
       <main
         ref={mainScrollRef as RefObject<HTMLElement>}
-        className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-4 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8 lg:px-5 lg:pt-6 lg:pb-6"
+        className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-4 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8"
       >
         {/* Pull-to-refresh indicator (mobile) */}
         {isMobile && isPulling ? (
@@ -788,13 +830,17 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
-              {/* 2x2 cockpit grid — above the fold, always visible on mobile */}
-              <CockpitMetricsGrid
-                data={dashboardData}
-                uptimeDisplay={uptimeDisplay}
-              />
-
               <QuickActionsRow />
+
+              <CollapsibleWidget
+                title="Token Usage"
+                summary={`${costTodayDisplay} today • ${dashboardData.sessions.active || dashboardData.agents.active || 0} active sessions`}
+                defaultOpen={false}
+                className="bg-primary-50/70"
+                contentClassName="pt-2"
+              >
+                <TokenUsageHero data={dashboardData} />
+              </CollapsibleWidget>
 
               {/* MetricCards intentionally omitted on mobile — SystemGlance above is the canonical hero */}
 
@@ -838,7 +884,7 @@ export function DashboardScreen() {
             </div>
           ) : (
             /* ── Desktop enterprise layout (C2) ─────────────────────────────── */
-            <div className="flex flex-col gap-4 lg:gap-3">
+            <div className="flex flex-col gap-4">
               {/* 1. SystemGlance */}
               <SystemGlance
                 sessions={dashboardData.sessions.total}
@@ -898,7 +944,7 @@ export function DashboardScreen() {
 
               {/* 3. Metric cards row — Sessions · Active Agents · Cost Today · Uptime */}
               {/* These complement SystemGlance: they add micro charts, trend pills & time-range selectors */}
-              <WidgetGrid items={metricItems} className="gap-4 lg:gap-3" />
+              <WidgetGrid items={metricItems} className="gap-4" />
 
               {desktopLayout.showServices ? (
                 <ServicesHealthWidget
@@ -926,21 +972,23 @@ export function DashboardScreen() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-3 xl:grid-cols-4">
-                {desktopLayout.showSquad && (
-                  <div className="min-w-0">
-                    <SquadStatusWidget
-                      agents={dashboardData.agents.roster}
-                      loading={dashboardData.status === 'loading'}
-                    />
-                  </div>
-                )}
-                {desktopLayout.showSessions && (
-                  <div className="min-w-0">
+              {/* 3. Two-up: Usage Today + Squad Status */}
+              {(desktopLayout.showUsage || desktopLayout.showSquad) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {desktopLayout.showUsage && (
+                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
+                  )}
+                  {desktopLayout.showSquad && (
+                    <SquadStatusWidget />
+                  )}
+                </div>
+              )}
+
+              {/* 4. Two-up: Recent Sessions + Tasks */}
+              {(desktopLayout.showSessions || desktopLayout.showTasks) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {desktopLayout.showSessions && (
                     <RecentSessionsWidget
-                      sessions={dashboardData.sessions.list}
-                      activeCount={dashboardData.sessions.active || dashboardData.agents.active || 0}
-                      loading={dashboardData.status === 'loading'}
                       onOpenSession={(sessionKey) =>
                         navigate({
                           to: '/chat/$sessionKey',
@@ -949,29 +997,29 @@ export function DashboardScreen() {
                       }
                       onRemove={() => removeWidget('recent-sessions')}
                     />
-                  </div>
-                )}
-                {desktopLayout.showTasks && (
-                  <div className="min-w-0">
+                  )}
+                  {desktopLayout.showTasks && (
                     <TasksWidget onRemove={() => removeWidget('tasks')} />
-                  </div>
-                )}
-                {desktopLayout.showActivity && (
-                  <div className="min-w-0 lg:col-span-2 xl:col-span-2">
-                    <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
-                  </div>
-                )}
-                {desktopLayout.showSkills && (
-                  <div className="min-w-0">
+                  )}
+                </div>
+              )}
+
+              {/* 5. Full-width: Activity Log */}
+              {desktopLayout.showActivity && (
+                <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+              )}
+
+              {/* 6. Skills + Notifications */}
+              {(desktopLayout.showSkills || desktopLayout.showNotifications) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {desktopLayout.showSkills && (
                     <SkillsWidget onRemove={() => removeWidget('skills')} />
-                  </div>
-                )}
-                {desktopLayout.showNotifications && (
-                  <div className="min-w-0">
+                  )}
+                  {desktopLayout.showNotifications && (
                     <NotificationsWidget onRemove={() => removeWidget('notifications')} />
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </section>

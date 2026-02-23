@@ -14,19 +14,19 @@ export const TEAM_TEMPLATES = [
   {
     id: 'research',
     name: 'Research Team',
-    agents: ['analyst', 'writer', 'reviewer'],
+    agents: ['Atlas', 'Lens', 'Cipher'],
     icon: '🔍',
   },
   {
     id: 'coding',
     name: 'Coding Sprint',
-    agents: ['architect', 'developer', 'tester'],
+    agents: ['Forge', 'Sentinel', 'Spark'],
     icon: '💻',
   },
   {
     id: 'content',
     name: 'Content Pipeline',
-    agents: ['researcher', 'writer', 'editor'],
+    agents: ['Scout', 'Quill', 'Polish'],
     icon: '📝',
   },
 ] as const
@@ -37,6 +37,7 @@ export type TeamTemplateId = (typeof TEAM_TEMPLATES)[number]['id']
 export type TeamMember = {
   id: string
   name: string
+  avatar?: number
   modelId: ModelPresetId
   roleDescription: string
   goal: string        // What this agent is trying to achieve

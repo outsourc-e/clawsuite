@@ -5,20 +5,23 @@ import {
   Cancel01Icon,
   CheckmarkCircle02Icon,
   CloudIcon,
+  ComputerIcon,
+  Moon01Icon,
   Notification03Icon,
   PaintBoardIcon,
   Settings02Icon,
   SourceCodeSquareIcon,
+  Sun01Icon,
   UserIcon,
   MessageMultiple01Icon,
 } from '@hugeicons/core-free-icons'
 import { useState, useEffect, Component } from 'react'
 import type * as React from 'react'
-import type { AccentColor } from '@/hooks/use-settings'
+import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { useSettings } from '@/hooks/use-settings'
-import { THEMES, type AppTheme } from '@/lib/theme-system'
+import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
+import { applyTheme, useSettings } from '@/hooks/use-settings'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -243,7 +246,12 @@ function ProfileContent() {
 
 function AppearanceContent() {
   const { settings, updateSettings } = useSettings()
-  const { appTheme } = settings
+
+  function handleThemeChange(value: string) {
+    const theme = value as SettingsThemeMode
+    applyTheme(theme)
+    updateSettings({ theme })
+  }
 
   function badgeClass(color: AccentColor): string {
     if (color === 'orange') return 'bg-orange-500'
@@ -259,37 +267,23 @@ function AppearanceContent() {
         description="Theme, accent color, and loading animation."
       />
       <Row label="Theme">
-        <div className="flex min-w-[18rem] flex-col gap-2">
-          <div className="grid grid-cols-1 gap-1 rounded-xl border border-primary-200 bg-primary-100/70 p-1 sm:grid-cols-3">
-            {THEMES.map((themeOption) => {
-              const active = appTheme === themeOption.value
-              return (
-                <button
-                  key={themeOption.value}
-                  type="button"
-                  onClick={() =>
-                    updateSettings({ appTheme: themeOption.value as AppTheme })
-                  }
-                  aria-pressed={active}
-                  className={cn(
-                    'rounded-lg px-3 py-2 text-xs font-medium transition-colors',
-                    active
-                      ? 'bg-accent-500 text-white'
-                      : 'text-primary-700 hover:bg-primary-200',
-                  )}
-                >
-                  {themeOption.label}
-                </button>
-              )
-            })}
-          </div>
-          <p className="text-xs text-primary-500 dark:text-neutral-400">
-            {THEMES.find((themeOption) => themeOption.value === appTheme)
-              ?.description ?? ''}
-          </p>
-        </div>
+        <Tabs value={settings.theme} onValueChange={handleThemeChange}>
+          <TabsList variant="default" className="gap-1">
+            <TabsTab value="system">
+              <HugeiconsIcon icon={ComputerIcon} size={16} strokeWidth={1.5} />
+              <span>System</span>
+            </TabsTab>
+            <TabsTab value="light">
+              <HugeiconsIcon icon={Sun01Icon} size={16} strokeWidth={1.5} />
+              <span>Light</span>
+            </TabsTab>
+            <TabsTab value="dark">
+              <HugeiconsIcon icon={Moon01Icon} size={16} strokeWidth={1.5} />
+              <span>Dark</span>
+            </TabsTab>
+          </TabsList>
+        </Tabs>
       </Row>
-
       <Row label="Accent color">
         <div className="flex gap-1.5">
           {(['orange', 'purple', 'blue', 'green'] as const).map((color) => (
@@ -310,29 +304,6 @@ function AppearanceContent() {
               <span className="capitalize">{color}</span>
             </Button>
           ))}
-        </div>
-      </Row>
-      <Row label="System metrics bar">
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-primary-500">
-            {settings.showSystemMetrics ? 'Visible' : 'Hidden'}
-          </span>
-          <button
-            type="button"
-            onClick={() => updateSettings({ showSystemMetrics: !settings.showSystemMetrics })}
-            className={cn(
-              'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-              settings.showSystemMetrics ? 'bg-accent-500' : 'bg-primary-200 dark:bg-neutral-700',
-            )}
-            aria-label="Toggle system metrics bar"
-          >
-            <span
-              className={cn(
-                'inline-block size-3.5 rounded-full bg-white shadow transition-transform',
-                settings.showSystemMetrics ? 'translate-x-4' : 'translate-x-0.5',
-              )}
-            />
-          </button>
         </div>
       </Row>
       <LoaderContent />

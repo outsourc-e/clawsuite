@@ -87,7 +87,6 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
   }, [data.cost.byModel])
 
   const totalCostToday = data.todayCostUsd ?? data.cost.today
-  const hasUsageWithoutModelBreakdown = topModels.length === 0 && (totalCostToday > 0 || data.usage.tokens > 0)
 
   return (
     <section
@@ -146,11 +145,7 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
         </div>
 
         {topModels.length === 0 ? (
-          <p className="mt-3 text-xs text-neutral-500">
-            {hasUsageWithoutModelBreakdown
-              ? 'Model breakdown unavailable for today.'
-              : 'No model usage yet today.'}
-          </p>
+          <p className="mt-3 text-xs text-neutral-500">No model usage yet today.</p>
         ) : (
           <div className="mt-3 space-y-2.5">
             {topModels.map((model) => (

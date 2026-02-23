@@ -62,19 +62,6 @@ function toSessionDisplayName(session: Record<string, unknown>): string {
   return friendlyId === 'main' ? 'Main Session' : (friendlyId || 'Session')
 }
 
-function toSessionPreview(session: Record<string, unknown>): string {
-  const preview =
-    readString(session.lastMessagePreview) ||
-    readString(session.task) ||
-    readString(session.initialMessage)
-  if (preview && !/^a new session was started/i.test(preview)) return preview
-
-  const label = readString(session.label)
-  if (label && !/^a new session was started/i.test(label)) return label
-
-  return 'New session'
-}
-
 /** Returns true if the session is a spawned subagent or Agent Hub mission session (exclude from hero counts). */
 function isSubagentSession(session: Record<string, unknown>): boolean {
   const key = readString(session.key ?? session.sessionKey ?? '')
@@ -191,7 +178,6 @@ export type SessionInfo = {
   key: string
   friendlyId: string
   label: string
-  preview: string
   model: string
   updatedAt: number
 }
@@ -202,8 +188,6 @@ export type AgentInfo = {
   status: 'active' | 'idle' | 'available'
   model: string
   modelFormatted: string
-  taskPreview: string
-  tokens: number
   updatedAt: number
 }
 
@@ -431,7 +415,6 @@ export function useDashboardData(): UseDashboardDataResult {
         key: readString(s.key ?? s.friendlyId),
         friendlyId: readString(s.friendlyId),
         label: toSessionDisplayName(s as unknown as Record<string, unknown>),
-        preview: toSessionPreview(s as unknown as Record<string, unknown>),
         model: readString((s as Record<string, unknown>).model),
         updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : 0,
       }))
@@ -476,8 +459,6 @@ export function useDashboardData(): UseDashboardDataResult {
           status: isActive ? 'active' : isIdle ? 'idle' : 'available',
           model: readString(s.model),
           modelFormatted: formatModelName(readString(s.model)),
-          taskPreview: toSessionPreview(s as unknown as Record<string, unknown>),
-          tokens: readNumber(s.usage?.totalTokens ?? 0),
           updatedAt: activityAtMs || updatedAtMs,
         }
       })
@@ -576,39 +557,9 @@ export function useDashboardData(): UseDashboardDataResult {
       }
     }
 
-    const ssModels = Array.isArray(ssPayload?.models)
-      ? (ssPayload.models as Array<Record<string, unknown>>)
-      : []
-    for (const entry of ssModels) {
-      const provider = readString(entry.provider)
-      const modelRaw =
-        readString(entry.model) ||
-        readString(entry.name) ||
-        readString(ssPayload?.model) ||
-        provider ||
-        'unknown'
-      const inputTokens = readNumber(entry.inputTokens)
-      const outputTokens = readNumber(entry.outputTokens)
-      const tokens =
-        readNumber(entry.tokens) ||
-        readNumber(entry.totalTokens) ||
-        (inputTokens + outputTokens)
-      const cost = readNumber(entry.costUsd) || readNumber(entry.cost)
-      const count = readNumber(entry.count) || 1
-
-      if (provider && !providerMap.has(provider)) {
-        providerMap.set(provider, { cost, tokens })
-      }
-      if (!modelMap.has(modelRaw)) {
-        modelMap.set(modelRaw, { cost, tokens, count })
-      }
-    }
-
     // Primary: top-level dailyCost from session-status (most accurate, always present)
     const ssDaily = readNumber(ssPayload?.dailyCost ?? ssPayload?.costUsd ?? 0)
     if (ssDaily > 0) todayCostTotal = ssDaily
-    const ssDailyTokens = readNumber(ssPayload?.totalTokens ?? 0)
-    if (todayTokensTotal === 0 && ssDailyTokens > 0) todayTokensTotal = ssDailyTokens
 
     // Also pull input/output/cacheRead from usage API for finer breakdown
     const usageData = usageSummaryQuery.data?.kind === 'ok' ? usageSummaryQuery.data.data : null
@@ -620,14 +571,6 @@ export function useDashboardData(): UseDashboardDataResult {
       // If we have better today's token count from session-status, use that
       if (todayTokensTotal === 0) todayTokensTotal = usageData.totalUsage
       if (todayCostTotal === 0) todayCostTotal = usageData.totalCost
-    }
-
-    if (modelMap.size === 0 && (todayCostTotal > 0 || todayTokensTotal > 0)) {
-      modelMap.set(rawModel || 'Unknown model', {
-        cost: todayCostTotal,
-        tokens: todayTokensTotal,
-        count: 1,
-      })
     }
 
     const byProvider = Array.from(providerMap.entries())

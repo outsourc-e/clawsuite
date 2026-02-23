@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../../server/auth-middleware'
 import { gatewayCronRpc } from '@/server/cron'
 
 export const Route = createFileRoute('/api/cron/run')({
@@ -7,6 +8,10 @@ export const Route = createFileRoute('/api/cron/run')({
     handlers: {
       POST: async ({ request }) => {
         try {
+          if (!isAuthenticated(request)) {
+            return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          }
+
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
             unknown

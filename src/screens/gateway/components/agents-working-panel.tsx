@@ -37,27 +37,27 @@ type AgentsWorkingPanelProps = {
 
 // Accent colors per agent index (cycled) — must match AGENT_ACCENT_COLORS in agent-hub-layout
 const ACCENT_COLORS = [
-  { bar: 'bg-orange-500', text: 'text-orange-400' },
-  { bar: 'bg-blue-500',   text: 'text-blue-400' },
-  { bar: 'bg-violet-500', text: 'text-violet-400' },
-  { bar: 'bg-emerald-500',text: 'text-emerald-400' },
-  { bar: 'bg-rose-500',   text: 'text-rose-400' },
-  { bar: 'bg-amber-500',  text: 'text-amber-400' },
+  { bar: 'bg-orange-500', text: 'text-orange-600' },
+  { bar: 'bg-blue-500',   text: 'text-blue-600' },
+  { bar: 'bg-violet-500', text: 'text-violet-600' },
+  { bar: 'bg-emerald-500',text: 'text-emerald-600' },
+  { bar: 'bg-rose-500',   text: 'text-rose-600' },
+  { bar: 'bg-amber-500',  text: 'text-amber-600' },
 ]
 
 const MODEL_BADGE: Record<string, string> = {
-  auto:          'bg-neutral-800 text-neutral-400',
-  opus:          'bg-orange-950/60 text-orange-300',
-  sonnet:        'bg-blue-950/60 text-blue-300',
-  codex:         'bg-emerald-950/60 text-emerald-300',
-  flash:         'bg-violet-950/60 text-violet-300',
-  'pc1-planner': 'bg-teal-950/60 text-teal-300',
-  'pc1-coder':   'bg-purple-950/60 text-purple-300',
-  'pc1-critic':  'bg-indigo-950/60 text-indigo-300',
-  'pc1-fast':    'bg-slate-800 text-slate-300',
-  'pc1-heavy':   'bg-cyan-950/60 text-cyan-300',
-  'pc1-fmt':      'bg-zinc-800 text-zinc-300',
-  'pc1-devstral': 'bg-rose-950/60 text-rose-300',
+  auto:          'border border-neutral-200 bg-neutral-100 text-neutral-600',
+  opus:          'border border-orange-200 bg-orange-50 text-orange-700',
+  sonnet:        'border border-blue-200 bg-blue-50 text-blue-700',
+  codex:         'border border-emerald-200 bg-emerald-50 text-emerald-700',
+  flash:         'border border-violet-200 bg-violet-50 text-violet-700',
+  'pc1-planner': 'border border-teal-200 bg-teal-50 text-teal-700',
+  'pc1-coder':   'border border-purple-200 bg-purple-50 text-purple-700',
+  'pc1-critic':  'border border-indigo-200 bg-indigo-50 text-indigo-700',
+  'pc1-fast':    'border border-slate-200 bg-slate-50 text-slate-700',
+  'pc1-heavy':   'border border-cyan-200 bg-cyan-50 text-cyan-700',
+  'pc1-fmt':      'border border-zinc-200 bg-zinc-50 text-zinc-700',
+  'pc1-devstral': 'border border-rose-200 bg-rose-50 text-rose-700',
 }
 
 const MODEL_LABEL: Record<string, string> = {
@@ -139,8 +139,8 @@ function AgentRow({
       onClick={onSelect}
       className={cn(
         'group relative flex cursor-pointer items-stretch overflow-hidden rounded-lg border transition-all',
-        'border-neutral-200 bg-neutral-100 hover:bg-neutral-200 dark:border-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-800/80',
-        isSelected && 'border-neutral-700 bg-neutral-800 ring-1 ring-neutral-600/40',
+        'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50',
+        isSelected && 'border-orange-200 bg-orange-50/40 ring-1 ring-orange-200',
       )}
     >
       {/* Left accent bar */}
@@ -164,16 +164,16 @@ function AgentRow({
                 className={cn(
                   'inline-flex size-2 rounded-full',
                   agent.status === 'idle'  ? 'bg-amber-500' :
-                  agent.status === 'ready' ? 'bg-neutral-500' :
+                  agent.status === 'ready' ? 'bg-blue-400' :
                   agent.status === 'error' ? 'bg-red-500' :
-                  'bg-neutral-700',
+                  'bg-neutral-400',
                 )}
               />
             )}
           </span>
 
           {/* Name */}
-          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100">
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-neutral-900">
             {agent.name}
           </span>
 
@@ -192,7 +192,7 @@ function AgentRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onRespawn() }}
-              className="shrink-0 text-xs text-neutral-500 transition-colors hover:text-neutral-200"
+              className="shrink-0 text-xs text-neutral-500 transition-colors hover:text-neutral-700"
               title="Respawn agent"
             >
               ↻
@@ -205,7 +205,7 @@ function AgentRow({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setMenuOpen((p) => !p) }}
-                className="shrink-0 text-sm text-neutral-500 transition-colors group-hover:text-neutral-300 hover:text-neutral-200"
+                className="shrink-0 text-sm text-neutral-500 transition-colors group-hover:text-neutral-700 hover:text-neutral-900"
               >
                 ⋯
               </button>
@@ -216,7 +216,7 @@ function AgentRow({
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }}
                     aria-hidden
                   />
-                  <div className="absolute bottom-full right-0 z-20 mb-1 min-w-[110px] rounded-lg border border-neutral-800 bg-neutral-900 shadow-xl">
+                  <div className="absolute bottom-full right-0 z-20 mb-1 min-w-[110px] rounded-lg border border-neutral-200 bg-white shadow-xl">
                     {canSteer && onSteer ? (
                       <button
                         type="button"
@@ -230,7 +230,7 @@ function AgentRow({
                           if (!directive || !directive.trim()) return
                           onSteer(directive.trim())
                         }}
-                        className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
+                        className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
                       >
                         Send directive
                       </button>
@@ -243,7 +243,7 @@ function AgentRow({
                           setMenuOpen(false)
                           onPause(agent.status !== 'paused')
                         }}
-                        className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
+                        className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
                       >
                         {agent.status === 'paused' ? 'Resume' : 'Pause'}
                       </button>
@@ -290,8 +290,8 @@ function AgentCompactCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        'relative w-40 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 px-2.5 py-2 text-left transition-colors hover:bg-neutral-200 dark:border-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-800/80',
-        isSelected && 'border-neutral-700 ring-1 ring-neutral-600/40',
+        'relative w-40 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white px-2.5 py-2 text-left transition-colors hover:border-neutral-300 hover:bg-neutral-50',
+        isSelected && 'border-orange-200 ring-1 ring-orange-200',
       )}
     >
       {/* Top accent bar */}
@@ -312,7 +312,7 @@ function AgentCompactCard({
             )}
           />
         )}
-        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-neutral-900">
           {agent.name}
         </span>
         <span
@@ -350,7 +350,7 @@ export function AgentsWorkingPanel({
   return (
     <div
       className={cn(
-        'rounded-xl border border-neutral-200 bg-neutral-50 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-900',
+        'rounded-xl border border-neutral-200 bg-white shadow-sm',
         className,
       )}
     >
@@ -363,7 +363,7 @@ export function AgentsWorkingPanel({
           {activeCount > 0 ? (
             <div className="flex items-center gap-1">
               <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-              <span className="font-mono text-[10px] font-medium text-emerald-400">
+              <span className="font-mono text-[10px] font-medium text-emerald-600">
                 {activeCount} live
               </span>
             </div>
@@ -376,7 +376,7 @@ export function AgentsWorkingPanel({
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
-            className="rounded p-0.5 text-neutral-500 transition-colors hover:text-neutral-300"
+            className="rounded p-0.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
             aria-label={collapsed ? 'Expand agents panel' : 'Collapse agents panel'}
           >
             <svg

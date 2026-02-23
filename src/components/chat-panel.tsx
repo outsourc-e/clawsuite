@@ -142,7 +142,7 @@ export function ChatPanel() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="fixed right-0 top-0 h-full w-[420px] max-w-[100vw] border-l border-primary-200 bg-surface overflow-hidden flex flex-col z-20 shadow-xl"
+            className="fixed inset-y-0 right-0 h-[100dvh] max-h-[100dvh] w-[420px] max-w-[100vw] border-l border-primary-200 bg-surface overflow-hidden flex flex-col z-20 shadow-xl"
           >
             {/* Panel header */}
             <div className="flex items-center justify-between h-10 px-3 border-b border-primary-200 shrink-0">
@@ -249,7 +249,7 @@ export function ChatPanel() {
             </AnimatePresence>
 
             {/* Chat content */}
-            <div className="flex-1 min-h-0 overflow-hidden relative">
+            <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
               <ChatScreen
                 key={activeFriendlyId}
                 activeFriendlyId={activeFriendlyId}

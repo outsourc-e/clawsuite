@@ -18,18 +18,14 @@ import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
-// import { useSettings } from '@/hooks/use-settings'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-import { cn } from '@/lib/utils'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
-// import { SystemMetricsFooter } from '@/components/system-metrics-footer'
-import { DesktopAgentRosterSidebar } from '@/components/desktop-agent-roster-sidebar'
-import { DesktopLiveFeedPanel } from '@/components/desktop-live-feed-panel'
+// System metrics footer removed — not needed in production UI
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
 
@@ -57,8 +53,6 @@ export function WorkspaceShell() {
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
-  // const { settings } = useSettings()
-  // const showSystemMetrics = settings.showSystemMetrics ?? true
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
 
   // ChatGPT-style: track visual viewport height for keyboard-aware layout
@@ -97,9 +91,8 @@ export function WorkspaceShell() {
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
-  const isOnAgentHubRoute = pathname === '/agent-swarm' || pathname === '/agents' || pathname === '/sessions' || pathname === '/instances'
-  // Desktop nav now uses hover expansion rail, so no backdrop click-target is needed.
-  const showDesktopSidebarBackdrop = false
+  const showDesktopSidebarBackdrop =
+    !isMobile && !isOnChatRoute && !sidebarCollapsed
 
   // Sessions query — shared across sidebar and chat
   const sessionsQuery = useQuery({
@@ -173,7 +166,7 @@ export function WorkspaceShell() {
   // Show loading indicator while checking auth
   if (!authState.checked) {
     return (
-      <div className="theme-bg theme-text flex h-screen items-center justify-center">
+      <div className="flex items-center justify-center h-screen bg-surface">
         <div className="text-center">
           <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent mb-4" />
           <p className="text-sm text-primary-500">Initializing ClawSuite...</p>
@@ -190,15 +183,10 @@ export function WorkspaceShell() {
   return (
     <>
       <div
-        className="theme-bg theme-text relative overflow-hidden bg-surface text-primary-900"
+        className="relative overflow-hidden bg-surface text-primary-900"
         style={{ height: 'calc(var(--vvh, 100dvh) + var(--kb-inset, 0px))' }}
       >
-        <div className={cn(
-          "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]",
-          isOnAgentHubRoute
-            ? "lg:grid-cols-[auto_auto_1fr] xl:grid-cols-[auto_auto_1fr_auto]"
-            : "lg:grid-cols-[auto_1fr]"
-        )}>
+        <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]">
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
           {!isMobile && (
@@ -219,8 +207,6 @@ export function WorkspaceShell() {
               />
             </div>
           )}
-
-          {!isMobile && isOnAgentHubRoute ? <DesktopAgentRosterSidebar /> : null}
 
           {/* Main content area — renders the matched route */}
           <main
@@ -249,8 +235,6 @@ export function WorkspaceShell() {
             </div>
           </main>
 
-          {!isMobile && isOnAgentHubRoute ? <DesktopLiveFeedPanel /> : null}
-
           {/* Chat panel — visible on non-chat routes */}
           {!isOnChatRoute && !isMobile && <ChatPanel />}
         </div>
@@ -268,7 +252,6 @@ export function WorkspaceShell() {
         ) : null}
       </div>
 
-      {/* System metrics footer removed from dashboard — re-enable in settings if needed */}
       {isMobile ? <MobileTabBar /> : null}
     </>
   )

@@ -138,7 +138,7 @@ export function MobileTabBar() {
       <nav
         ref={navRef}
         className={cn(
-          'theme-glass fixed inset-x-0 bottom-0 z-40 isolate border-t border-neutral-200/50 bg-white/95 pb-[max(var(--safe-b),env(safe-area-inset-bottom))] dark:border-neutral-700/50 dark:bg-neutral-950/95 md:hidden transition-all duration-200',
+          'fixed inset-x-0 bottom-0 z-40 isolate border-t border-neutral-200/50 bg-white/95 pb-[max(var(--safe-b),env(safe-area-inset-bottom))] dark:border-neutral-700/50 dark:bg-neutral-950/95 md:hidden transition-all duration-200',
           hideTabBar
             ? 'translate-y-[110%] opacity-0 pointer-events-none'
             : 'translate-y-0 opacity-100',
