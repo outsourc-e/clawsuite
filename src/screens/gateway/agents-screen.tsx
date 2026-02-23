@@ -1,20 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  AlertDiamondIcon,
-  ArrowTurnBackwardIcon,
-  BotIcon,
-} from '@hugeicons/core-free-icons'
-import { EmptyState } from '@/components/empty-state'
 import {
   AgentRegistryCard,
   type AgentRegistryCardData,
   type AgentRegistryStatus,
 } from '@/components/agent-view/agent-registry-card'
+import { AgentStreamPanel } from '@/components/agent-view/agent-stream-panel'
 import { toggleAgentPause } from '@/lib/gateway-api'
 import { toast } from '@/components/ui/toast'
+import { AgentHubLayout } from './agent-hub-layout'
 
 type AgentGatewayEntry = {
   id?: string
@@ -58,6 +53,11 @@ type AgentDefinition = {
 
 type AgentRuntime = AgentRegistryCardData & {
   matchedSessions: Array<SessionEntry>
+}
+
+type AgentsScreenVariant = 'mission-control' | 'registry'
+type AgentsScreenProps = {
+  variant?: AgentsScreenVariant
 }
 
 const CATEGORY_ORDER = ['Core', 'Coding', 'System', 'Integrations'] as const
@@ -456,15 +456,25 @@ async function readResponseError(response: Response): Promise<string> {
   return response.statusText || `HTTP ${response.status}`
 }
 
-export function AgentsScreen() {
+export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps) {
   const navigate = useNavigate()
+  const missionControlEnabled = variant === 'mission-control'
   const [optimisticPausedByAgentId, setOptimisticPausedByAgentId] = useState<
     Record<string, boolean>
   >({})
+  const [optimisticPausedByControlKey, setOptimisticPausedByControlKey] =
+    useState<Record<string, boolean>>({})
   const [spawningByAgentId, setSpawningByAgentId] = useState<
     Record<string, boolean>
   >({})
   const [historyAgentId, setHistoryAgentId] = useState<string | null>(null)
+  const [streamingAgentKey, setStreamingAgentKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (missionControlEnabled) {
+      setStreamingAgentKey(null)
+    }
+  }, [missionControlEnabled])
 
   const agentsQuery = useQuery({
     queryKey: ['gateway', 'agents'],
@@ -491,6 +501,19 @@ export function AgentsScreen() {
     retry: false,
   })
 
+  useEffect(() => {
+    if (!sessionsQuery.isSuccess) return
+
+    setOptimisticPausedByAgentId((previous) => {
+      if (Object.keys(previous).length === 0) return previous
+      return {}
+    })
+    setOptimisticPausedByControlKey((previous) => {
+      if (Object.keys(previous).length === 0) return previous
+      return {}
+    })
+  }, [sessionsQuery.dataUpdatedAt, sessionsQuery.isSuccess])
+
   const parsedDefinitions = useMemo(
     () => parseAgentDefinitions(agentsQuery.data),
     [agentsQuery.data],
@@ -499,7 +522,29 @@ export function AgentsScreen() {
   const usingFallbackRegistry =
     !agentsQuery.isLoading && parsedDefinitions === null
 
-  const registryDefinitions = parsedDefinitions ?? FALLBACK_AGENT_REGISTRY
+  const registryDefinitions = useMemo(() => {
+    const merged = new Map<string, AgentDefinition>()
+
+    FALLBACK_AGENT_REGISTRY.forEach((definition) => {
+      merged.set(definition.id, definition)
+    })
+
+    ;(parsedDefinitions ?? []).forEach((definition) => {
+      const existing = merged.get(definition.id)
+      if (!existing) {
+        merged.set(definition.id, definition)
+        return
+      }
+
+      merged.set(definition.id, {
+        ...existing,
+        ...definition,
+        aliases: dedupe([...existing.aliases, ...definition.aliases]),
+      })
+    })
+
+    return Array.from(merged.values())
+  }, [parsedDefinitions])
 
   const runtimeAgents = useMemo(() => {
     const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
@@ -526,11 +571,18 @@ export function AgentsScreen() {
         optimisticPausedByAgentId,
         definition.id,
       )
-      const pausedOverride = hasOverride
-        ? optimisticPausedByAgentId[definition.id]
-        : undefined
-
       const sessionKey = readString(primarySession?.key)
+      const controlKey = sessionKey || definition.id
+      const hasControlOverride = Object.prototype.hasOwnProperty.call(
+        optimisticPausedByControlKey,
+        controlKey,
+      )
+      const pausedOverride = hasControlOverride
+        ? optimisticPausedByControlKey[controlKey]
+        : hasOverride
+          ? optimisticPausedByAgentId[definition.id]
+          : undefined
+
       const friendlyId = getSessionFriendlyId(primarySession)
       const status = deriveAgentStatus(primarySession, pausedOverride)
 
@@ -543,11 +595,16 @@ export function AgentsScreen() {
         status,
         sessionKey: sessionKey || undefined,
         friendlyId: friendlyId || undefined,
-        controlKey: sessionKey || definition.id,
+        controlKey,
         matchedSessions,
       } satisfies AgentRuntime
     })
-  }, [registryDefinitions, sessionsQuery.data, optimisticPausedByAgentId])
+  }, [
+    registryDefinitions,
+    sessionsQuery.data,
+    optimisticPausedByAgentId,
+    optimisticPausedByControlKey,
+  ])
 
   const groupedSections = useMemo(() => {
     const grouped = new Map<string, Array<AgentRuntime>>()
@@ -579,6 +636,14 @@ export function AgentsScreen() {
       }
     })
   }, [runtimeAgents])
+
+  const streamingAgent = useMemo(
+    () =>
+      runtimeAgents.find(
+        (agent) => readString(agent.sessionKey) === readString(streamingAgentKey),
+      ) ?? null,
+    [runtimeAgents, streamingAgentKey],
+  )
 
   const selectedHistoryAgent = useMemo(
     () => runtimeAgents.find((agent) => agent.id === historyAgentId) ?? null,
@@ -669,6 +734,15 @@ export function AgentsScreen() {
     setHistoryAgentId(agent.id)
   }
 
+  function handleStreamTap(agent: AgentRegistryCardData) {
+    const sessionKey = readString(agent.sessionKey)
+    if (!sessionKey) {
+      toast('Spawn agent first', { type: 'warning' })
+      return
+    }
+    setStreamingAgentKey(sessionKey)
+  }
+
   async function handlePauseToggle(
     agent: AgentRegistryCardData,
     nextPaused: boolean,
@@ -684,10 +758,19 @@ export function AgentsScreen() {
       agent.id,
     )
     const previousValue = optimisticPausedByAgentId[agent.id]
+    const hadControlPrevious = Object.prototype.hasOwnProperty.call(
+      optimisticPausedByControlKey,
+      controlKey,
+    )
+    const previousControlValue = optimisticPausedByControlKey[controlKey]
 
     setOptimisticPausedByAgentId((previous) => ({
       ...previous,
       [agent.id]: nextPaused,
+    }))
+    setOptimisticPausedByControlKey((previous) => ({
+      ...previous,
+      [controlKey]: nextPaused,
     }))
 
     try {
@@ -698,6 +781,10 @@ export function AgentsScreen() {
       setOptimisticPausedByAgentId((previous) => ({
         ...previous,
         [agent.id]: paused,
+      }))
+      setOptimisticPausedByControlKey((previous) => ({
+        ...previous,
+        [controlKey]: paused,
       }))
 
       toast(`${agent.name} ${paused ? 'paused' : 'resumed'}`, {
@@ -711,6 +798,15 @@ export function AgentsScreen() {
           next[agent.id] = previousValue
         } else {
           delete next[agent.id]
+        }
+        return next
+      })
+      setOptimisticPausedByControlKey((previous) => {
+        const next = { ...previous }
+        if (hadControlPrevious) {
+          next[controlKey] = previousControlValue
+        } else {
+          delete next[controlKey]
         }
         return next
       })
@@ -729,6 +825,13 @@ export function AgentsScreen() {
       delete next[agent.id]
       return next
     })
+    setOptimisticPausedByControlKey((previous) => {
+      const controlKey = readString(agent.controlKey)
+      if (!controlKey) return previous
+      const next = { ...previous }
+      delete next[controlKey]
+      return next
+    })
     void sessionsQuery.refetch()
   }
 
@@ -736,7 +839,20 @@ export function AgentsScreen() {
     ? new Date(agentsQuery.dataUpdatedAt).toLocaleTimeString()
     : null
 
-  const desktopAgents = agentsQuery.data?.agents || []
+  if (missionControlEnabled) {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-x-hidden">
+        {usingFallbackRegistry ? (
+          <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
+            Gateway registry unavailable. Showing fallback definitions.
+          </div>
+        ) : null}
+        <div className="min-h-0 flex-1">
+          <AgentHubLayout agents={runtimeAgents} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -744,7 +860,7 @@ export function AgentsScreen() {
         <div className="border-b border-primary-200 px-3 py-2">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-sm font-semibold text-ink">Agent Hub</h1>
+              <h1 className="text-sm font-semibold text-ink">ClawSuite</h1>
               <p className="text-[11px] text-primary-500">Registry</p>
             </div>
             <div className="flex items-center gap-2">
@@ -819,6 +935,8 @@ export function AgentsScreen() {
                         key={agent.id}
                         agent={agent}
                         isSpawning={Boolean(spawningByAgentId[agent.id])}
+                        mobileOptimized
+                        onTap={handleStreamTap}
                         onChat={handleChat}
                         onSpawn={handleSpawn}
                         onHistory={handleHistory}
@@ -835,133 +953,106 @@ export function AgentsScreen() {
       </div>
 
       <div className="hidden h-full min-h-0 flex-col overflow-x-hidden md:flex">
-        <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold text-ink md:text-[15px]">
-              Agents
-            </h1>
-            {agentsQuery.isFetching && !agentsQuery.isLoading ? (
-              <span className="text-[10px] text-primary-500 animate-pulse">
-                syncing...
+        <>
+          <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
+            <div className="flex items-center gap-3">
+              <h1 className="text-sm font-semibold text-ink md:text-[15px]">
+                Gateway Agents
+              </h1>
+              <span className="text-xs font-medium text-primary-500">
+                Registry
               </span>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2 md:gap-3">
-            {lastUpdated ? (
-              <span className="text-[10px] text-primary-500">
-                Updated {lastUpdated}
-              </span>
-            ) : null}
-            <span
-              className={`inline-block size-2 rounded-full ${agentsQuery.isError ? 'bg-red-500' : agentsQuery.isSuccess ? 'bg-emerald-500' : 'bg-amber-500'}`}
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto px-3 pt-3 pb-24 md:px-6 md:pt-4 md:pb-0">
-          {agentsQuery.isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="flex items-center gap-2 text-primary-500">
-                <div className="size-4 border-2 border-primary-300 border-t-primary-600 rounded-full animate-spin" />
-                <span className="text-sm">Connecting to gateway...</span>
-              </div>
+              {agentsQuery.isFetching && !agentsQuery.isLoading ? (
+                <span className="text-[10px] text-primary-500 animate-pulse">
+                  syncing...
+                </span>
+              ) : null}
             </div>
-          ) : agentsQuery.isError ? (
-            <div className="flex flex-col items-center justify-center h-32 gap-3">
-              <HugeiconsIcon
-                icon={AlertDiamondIcon}
-                size={24}
-                strokeWidth={1.5}
-                className="text-red-500"
+            <div className="flex items-center gap-2 md:gap-3">
+              {lastUpdated ? (
+                <span className="text-[10px] text-primary-500">
+                  Updated {lastUpdated}
+                </span>
+              ) : null}
+              <span
+                className={`inline-block size-2 rounded-full ${agentsQuery.isError ? 'bg-red-500' : agentsQuery.isSuccess ? 'bg-emerald-500' : 'bg-amber-500'}`}
               />
-              <p className="text-sm text-primary-600">
-                {agentsQuery.error instanceof Error
-                  ? agentsQuery.error.message
-                  : 'Failed to fetch'}
-              </p>
-              <button
-                type="button"
-                onClick={() => agentsQuery.refetch()}
-                className="inline-flex items-center gap-1.5 rounded-md border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-100"
-              >
-                <HugeiconsIcon
-                  icon={ArrowTurnBackwardIcon}
-                  size={14}
-                  strokeWidth={1.5}
-                />
-                Retry
-              </button>
             </div>
-          ) : (
-            <>
-              <div className="mb-4 grid gap-3 text-[13px] sm:grid-cols-2 lg:mb-6 lg:grid-cols-3 lg:gap-6">
-                <div>
-                  <span className="text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                    Default Agent
-                  </span>
-                  <p className="font-medium text-ink mt-0.5">
-                    {agentsQuery.data?.defaultId || '-'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                    Main Key
-                  </span>
-                  <p className="font-medium text-ink mt-0.5">
-                    {agentsQuery.data?.mainKey || '-'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[11px] font-medium text-primary-500 uppercase tracking-wider">
-                    Scope
-                  </span>
-                  <p className="font-medium text-ink mt-0.5">
-                    {agentsQuery.data?.scope || '-'}
-                  </p>
-                </div>
-              </div>
+          </div>
 
-              {desktopAgents.length === 0 ? (
-                <EmptyState
-                  icon={BotIcon}
-                  title="No agents detected"
-                  description="Start a conversation and let the AI orchestrate sub-agents."
-                />
+          {usingFallbackRegistry ? (
+            <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
+              Gateway registry unavailable. Showing fallback definitions.
+            </div>
+          ) : null}
+
+          <div className="flex-1 min-h-0">
+            <div className="h-full overflow-auto px-6 py-4">
+              {registryDefinitions.length === 0 ? (
+                <div className="rounded-2xl bg-white/60 dark:bg-neutral-900/50 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-sm p-5">
+                  <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                    Add your first agent
+                  </h2>
+                  <ul className="mt-3 space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
+                    <li>Create an agent profile</li>
+                    <li>Connect a gateway</li>
+                    <li>Spawn your first session</li>
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigate({ to: '/settings' })
+                    }}
+                    className="mt-4 inline-flex h-9 items-center rounded-xl bg-accent-500 px-4 text-sm font-medium text-white shadow-sm hover:bg-accent-600"
+                  >
+                    Open Settings
+                  </button>
+                </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {desktopAgents.map((agent) => {
-                    const isDefault = agent.id === agentsQuery.data?.defaultId
-                    return (
-                      <div
-                        key={agent.id}
-                        className={`rounded-lg border p-4 transition-colors ${
-                          isDefault
-                            ? 'border-accent-300 bg-accent-50/50'
-                            : 'border-primary-200 hover:bg-primary-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-[13px] text-ink">
-                            {agent.name || agent.id}
-                          </span>
-                          {isDefault ? (
-                            <span className="text-[10px] font-medium bg-accent-100 text-accent-700 px-1.5 py-0.5 rounded">
-                              default
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="text-[11px] text-primary-500 mt-1 font-mono">
-                          {agent.id}
-                        </p>
+                <div className="space-y-4">
+                  {groupedSections.map((section) => (
+                    <section key={section.category} className="space-y-2">
+                      <div className="flex items-center justify-between px-1">
+                        <h2 className="text-xs font-semibold tracking-wide text-neutral-500 dark:text-neutral-400">
+                          {section.category}
+                        </h2>
+                        <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                          {section.agents.length}
+                        </span>
                       </div>
-                    )
-                  })}
+
+                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                        {section.agents.map((agent) => (
+                          <AgentRegistryCard
+                            key={agent.id}
+                            agent={agent}
+                            isSpawning={Boolean(spawningByAgentId[agent.id])}
+                            onTap={handleStreamTap}
+                            onChat={handleChat}
+                            onSpawn={handleSpawn}
+                            onHistory={handleHistory}
+                            onPauseToggle={handlePauseToggle}
+                            onKilled={handleKilled}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               )}
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        </>
       </div>
+
+      {!missionControlEnabled && streamingAgent ? (
+        <AgentStreamPanel
+          sessionKey={readString(streamingAgent.sessionKey)}
+          agentName={streamingAgent.name}
+          agentColor={streamingAgent.color}
+          onClose={() => setStreamingAgentKey(null)}
+        />
+      ) : null}
 
       {selectedHistoryAgent ? (
         <div className="fixed inset-0 z-[90] md:hidden">

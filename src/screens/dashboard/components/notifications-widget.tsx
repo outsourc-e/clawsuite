@@ -133,29 +133,29 @@ export function NotificationsWidget({
       title="Notifications"
       icon={Notification03Icon}
       action={
-        <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-100/70 px-2 py-0.5 text-[11px] font-medium text-primary-500 tabular-nums">
+        <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 font-mono text-[11px] text-neutral-200 tabular-nums">
           {notifications.length}
         </span>
       }
       onRemove={onRemove}
       editMode={editMode}
-      className="h-full"
+      className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
     >
       {notificationsQuery.isLoading && notifications.length === 0 ? (
-        <div className="flex h-[150px] items-center justify-center gap-3 rounded-xl border border-primary-200 bg-primary-100/50">
+        <div className="flex h-[150px] items-center justify-center gap-3 rounded-xl border border-neutral-800 bg-neutral-950">
           <span
-            className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-accent-600"
+            className="size-4 animate-spin rounded-full border-2 border-neutral-700 border-t-neutral-300"
             role="status"
             aria-label="Loading"
           />
-          <span className="text-sm text-primary-600">
+          <span className="text-sm text-neutral-400">
             Loading notifications…
           </span>
         </div>
       ) : notifications.length === 0 ? (
-        <div className="flex h-[150px] flex-col items-center justify-center gap-1 rounded-xl border border-primary-200 bg-primary-100/50">
-          <p className="text-sm font-semibold text-ink">No notifications</p>
-          <p className="text-xs text-primary-500 text-pretty">
+        <div className="flex h-[150px] flex-col items-center justify-center gap-1 rounded-xl border border-neutral-800 bg-neutral-950">
+          <p className="text-sm font-semibold text-neutral-100">No notifications</p>
+          <p className="text-xs text-neutral-400 text-pretty">
             Session events will appear here
           </p>
         </div>
@@ -166,8 +166,8 @@ export function NotificationsWidget({
               <article
                 key={item.id}
                 className={cn(
-                  'rounded-lg border border-primary-200 px-3 py-2.5',
-                  index % 2 === 0 ? 'bg-primary-50/90' : 'bg-primary-100/55',
+                  'rounded-lg border border-neutral-800 px-3 py-2.5',
+                  index % 2 === 0 ? 'bg-neutral-950' : 'bg-neutral-950/80',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -175,17 +175,17 @@ export function NotificationsWidget({
                     className={cn(
                       'text-sm font-semibold',
                       item.label === 'Error'
-                        ? 'text-red-700'
-                        : 'text-accent-700',
+                        ? 'text-red-400'
+                        : 'text-neutral-200',
                     )}
                   >
                     {item.label}
                   </span>
-                  <span className="font-mono text-xs text-primary-500 tabular-nums">
+                  <span className="font-mono text-[10px] text-neutral-500 tabular-nums">
                     {formatRelativeTime(item.occurredAt)}
                   </span>
                 </div>
-                <p className="mt-1 line-clamp-2 text-sm text-primary-600 text-pretty">
+                <p className="mt-1 line-clamp-2 text-sm text-neutral-400 text-pretty">
                   {item.detail}
                 </p>
               </article>

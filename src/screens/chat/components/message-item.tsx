@@ -649,11 +649,11 @@ function MessageItemComponent({
               )}
               {hasText &&
                 (isUser ? (
-                  <span className="text-pretty max-h-[600px] overflow-y-auto">
+                  <span className="text-pretty">
                     {displayText}
                   </span>
                 ) : hasRevealedText ? (
-                  <div className="relative max-h-[800px] overflow-y-auto">
+                  <div className="relative">
                     <MessageContent
                       markdown
                       className={cn(

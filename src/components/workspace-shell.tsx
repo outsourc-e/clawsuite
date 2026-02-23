@@ -18,16 +18,23 @@ import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
+// import { useSettings } from '@/hooks/use-settings'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
+import { ErrorBoundary } from '@/components/error-boundary'
+// import { SystemMetricsFooter } from '@/components/system-metrics-footer'
+import { DesktopAgentRosterSidebar } from '@/components/desktop-agent-roster-sidebar'
+import { DesktopLiveFeedPanel } from '@/components/desktop-live-feed-panel'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
 
 type SessionsListResponse = Array<SessionMeta>
+export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
+  'fixed inset-y-0 left-0 w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
 
 async function fetchSessions(): Promise<SessionsListResponse> {
   const res = await fetch('/api/sessions')
@@ -49,13 +56,18 @@ export function WorkspaceShell() {
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
+  // const { settings } = useSettings()
+  // const showSystemMetrics = settings.showSystemMetrics ?? true
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
 
   // ChatGPT-style: track visual viewport height for keyboard-aware layout
   useMobileKeyboard()
 
   const [creatingSession, setCreatingSession] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 767px)').matches
+  })
 
   // Fetch actual auth status from server instead of hardcoding
   interface AuthStatus {
@@ -84,6 +96,9 @@ export function WorkspaceShell() {
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const isOnAgentHubRoute = pathname === '/agent-swarm' || pathname === '/agents' || pathname === '/sessions' || pathname === '/instances'
+  // Desktop nav now uses hover expansion rail, so no backdrop click-target is needed.
+  const showDesktopSidebarBackdrop = false
 
   // Sessions query — shared across sidebar and chat
   const sessionsQuery = useQuery({
@@ -134,27 +149,30 @@ export function WorkspaceShell() {
     return () => media.removeEventListener('change', update)
   }, [])
 
-  // Auto-collapse sidebar on mobile
+  // Keep mobile sidebar state closed after resize and route changes.
   useEffect(() => {
-    if (isMobile) {
-      setSidebarCollapsed(true)
-    }
-  }, [isMobile, setSidebarCollapsed])
+    if (!isMobile) return
+    setSidebarCollapsed(true)
+  }, [isMobile, pathname, setSidebarCollapsed])
 
   // Listen for global sidebar toggle shortcut
   useEffect(() => {
     function handleToggleEvent() {
+      if (isMobile) {
+        setSidebarCollapsed(true)
+        return
+      }
       toggleSidebar()
     }
     window.addEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
     return () =>
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
-  }, [toggleSidebar])
+  }, [isMobile, setSidebarCollapsed, toggleSidebar])
 
   // Show loading indicator while checking auth
   if (!authState.checked) {
     return (
-      <div className="flex items-center justify-center h-screen bg-surface">
+      <div className="theme-bg theme-text flex h-screen items-center justify-center">
         <div className="text-center">
           <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-accent-500 border-r-transparent mb-4" />
           <p className="text-sm text-primary-500">Initializing ClawSuite...</p>
@@ -171,28 +189,32 @@ export function WorkspaceShell() {
   return (
     <>
       <div
-        className="relative overflow-hidden bg-surface text-primary-900"
+        className="theme-bg theme-text relative overflow-hidden bg-surface text-primary-900"
         style={{ height: 'calc(var(--vvh, 100dvh) + var(--kb-inset, 0px))' }}
       >
-        <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]">
+        <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr] lg:grid-cols-[auto_auto_1fr] xl:grid-cols-[auto_auto_1fr_auto]">
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
           {!isMobile && (
-            <ChatSidebar
-              sessions={sessions}
-              activeFriendlyId={activeFriendlyId}
-              creatingSession={creatingSession}
-              onCreateSession={startNewChat}
-              isCollapsed={sidebarCollapsed}
-              onToggleCollapse={toggleSidebar}
-              onSelectSession={handleSelectSession}
-              onActiveSessionDelete={handleActiveSessionDelete}
-              sessionsLoading={sessionsLoading}
-              sessionsFetching={sessionsFetching}
-              sessionsError={sessionsError}
-              onRetrySessions={refetchSessions}
-            />
+            <div className="relative z-30">
+              <ChatSidebar
+                sessions={sessions}
+                activeFriendlyId={activeFriendlyId}
+                creatingSession={creatingSession}
+                onCreateSession={startNewChat}
+                isCollapsed={sidebarCollapsed}
+                onToggleCollapse={toggleSidebar}
+                onSelectSession={handleSelectSession}
+                onActiveSessionDelete={handleActiveSessionDelete}
+                sessionsLoading={sessionsLoading}
+                sessionsFetching={sessionsFetching}
+                sessionsError={sessionsError}
+                onRetrySessions={refetchSessions}
+              />
+            </div>
           )}
+
+          {!isMobile && isOnAgentHubRoute ? <DesktopAgentRosterSidebar /> : null}
 
           {/* Main content area — renders the matched route */}
           <main
@@ -202,14 +224,26 @@ export function WorkspaceShell() {
             className={[
               'h-full min-h-0 min-w-0 overflow-x-hidden',
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
-              isMobile && !isOnChatRoute ? 'pb-16' : '',
+              isMobile && !isOnChatRoute
+                ? 'pb-[calc(var(--tabbar-h,64px)+1.5rem)]'
+                : !isMobile && !isOnChatRoute
+                  ? 'pb-6'
+                  : '',
             ].join(' ')}
             data-tour="chat-area"
           >
-            <div key={pathname} className="page-transition h-full">
-              <Outlet />
+            <div className="page-transition h-full">
+              <ErrorBoundary
+                className="h-full"
+                title="Something went wrong"
+                description="This page failed to render. Reload to try again."
+              >
+                <Outlet />
+              </ErrorBoundary>
             </div>
           </main>
+
+          {!isMobile && isOnAgentHubRoute ? <DesktopLiveFeedPanel /> : null}
 
           {/* Chat panel — visible on non-chat routes */}
           {!isOnChatRoute && !isMobile && <ChatPanel />}
@@ -217,8 +251,18 @@ export function WorkspaceShell() {
 
         {/* Floating chat toggle — visible on non-chat routes */}
         {!isOnChatRoute && !isMobile && <ChatPanelToggle />}
+
+        {showDesktopSidebarBackdrop ? (
+          <button
+            type="button"
+            aria-label="Collapse navigation sidebar"
+            onClick={() => setSidebarCollapsed(true)}
+            className={DESKTOP_SIDEBAR_BACKDROP_CLASS}
+          />
+        ) : null}
       </div>
 
+      {/* System metrics footer removed from dashboard — re-enable in settings if needed */}
       {isMobile ? <MobileTabBar /> : null}
     </>
   )

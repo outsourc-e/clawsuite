@@ -4,7 +4,7 @@ import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const MotionButton = motion(Button)
+const MotionButton = motion.create(Button)
 
 type ScrollToBottomButtonProps = {
   className?: string

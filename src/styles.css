@@ -49,6 +49,102 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
+/* === SEMANTIC THEME VARS === */
+:root {
+  --theme-bg: oklch(0.13 0.006 80);
+  --theme-panel: oklch(0.16 0.006 80);
+  --theme-card: oklch(0.2 0.006 80);
+  --theme-card2: oklch(0.24 0.008 80);
+  --theme-border: oklch(0.28 0.008 80 / 0.7);
+  --theme-text: oklch(0.94 0.002 80);
+  --theme-muted: oklch(0.56 0.006 80);
+  --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --theme-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --theme-shadow-3: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --theme-glass: rgba(15, 15, 15, 0.75);
+  --theme-focus: var(--color-accent-400);
+  --chart-1: var(--color-accent-500);
+  --chart-2: oklch(0.65 0.18 250);
+  --chart-3: oklch(0.65 0.18 155);
+  --chart-4: oklch(0.65 0.18 300);
+  --chart-5: oklch(0.75 0.16 60);
+  --chart-6: oklch(0.65 0.18 30);
+}
+
+[data-theme='ops-dark'] {
+  /* dense structural dark, crisp borders, minimal shadows — warm neutral */
+  --theme-bg: oklch(0.11 0.005 80);
+  --theme-panel: oklch(0.15 0.006 80);
+  --theme-card: oklch(0.19 0.006 80);
+  --theme-card2: oklch(0.23 0.008 80);
+  --theme-border: oklch(0.3 0.008 80 / 0.8);
+  --theme-text: oklch(0.95 0.002 80);
+  --theme-muted: oklch(0.55 0.006 80);
+  --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --theme-shadow-2: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --theme-shadow-3: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --theme-glass: rgba(12, 12, 12, 0.8);
+  /* override primary scale: warm dark (same hue as default .dark) */
+  --color-primary-50: oklch(0.13 0.006 80);
+  --color-primary-100: oklch(0.17 0.006 80);
+  --color-primary-200: oklch(0.24 0.008 80);
+  --color-primary-300: oklch(0.32 0.008 80);
+  --color-primary-400: oklch(0.44 0.008 80);
+  --color-primary-500: oklch(0.55 0.008 80);
+  --color-primary-600: oklch(0.66 0.007 80);
+  --color-primary-700: oklch(0.77 0.006 80);
+  --color-primary-800: oklch(0.85 0.004 80);
+  --color-primary-900: oklch(0.92 0.003 80);
+  --color-primary-950: oklch(0.96 0.002 80);
+  --color-surface: oklch(0.11 0.005 80);
+  --color-ink: oklch(0.95 0.002 80);
+}
+
+[data-theme='premium-dark'] {
+  /* deeper shadows, cool blue-slate tint — Nuxt premium feel */
+  --theme-bg: oklch(0.09 0.008 260);
+  --theme-panel: oklch(0.13 0.01 260);
+  --theme-card: oklch(0.17 0.01 260);
+  --theme-card2: oklch(0.22 0.012 260);
+  --theme-border: oklch(0.32 0.012 260 / 0.6);
+  --theme-text: oklch(0.96 0.004 260);
+  --theme-muted: oklch(0.55 0.008 260);
+  --theme-shadow-1: 0 2px 4px rgba(0, 0, 0, 0.6);
+  --theme-shadow-2: 0 6px 20px rgba(0, 0, 0, 0.7);
+  --theme-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.8);
+  --theme-glass: rgba(10, 10, 20, 0.8);
+  /* override primary scale: cool blue-slate (hue 250) */
+  --color-primary-50: oklch(0.13 0.012 250);
+  --color-primary-100: oklch(0.18 0.014 250);
+  --color-primary-200: oklch(0.25 0.016 250);
+  --color-primary-300: oklch(0.33 0.018 250);
+  --color-primary-400: oklch(0.44 0.018 250);
+  --color-primary-500: oklch(0.55 0.016 250);
+  --color-primary-600: oklch(0.66 0.014 250);
+  --color-primary-700: oklch(0.76 0.012 250);
+  --color-primary-800: oklch(0.84 0.008 250);
+  --color-primary-900: oklch(0.91 0.006 250);
+  --color-primary-950: oklch(0.96 0.004 250);
+  --color-surface: oklch(0.09 0.008 260);
+  --color-ink: oklch(0.96 0.004 260);
+}
+
+[data-theme='paper-light'] {
+  /* warm white bg, soft borders, gentle shadows */
+  --theme-bg: oklch(0.98 0.003 80);
+  --theme-panel: oklch(0.96 0.003 80);
+  --theme-card: oklch(1 0 0);
+  --theme-card2: oklch(0.97 0.003 80);
+  --theme-border: oklch(0.88 0.004 80 / 0.8);
+  --theme-text: oklch(0.2 0.006 80);
+  --theme-muted: oklch(0.55 0.006 80);
+  --theme-shadow-1: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --theme-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --theme-shadow-3: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --theme-glass: rgba(255, 255, 255, 0.85);
+  --theme-focus: var(--color-accent-600);
+}
+
 .dark {
   color-scheme: dark;
   --color-primary-50: oklch(0.16 0.006 80);
@@ -234,6 +330,48 @@
   }
 }
 
+.theme-bg {
+  background-color: var(--theme-bg);
+}
+
+.theme-panel {
+  background-color: var(--theme-panel);
+}
+
+.theme-card {
+  background-color: var(--theme-card);
+}
+
+.theme-border {
+  border-color: var(--theme-border);
+}
+
+.theme-text {
+  color: var(--theme-text);
+}
+
+.theme-muted {
+  color: var(--theme-muted);
+}
+
+.theme-shadow-1 {
+  box-shadow: var(--theme-shadow-1);
+}
+
+.theme-shadow-2 {
+  box-shadow: var(--theme-shadow-2);
+}
+
+.theme-glass {
+  background-color: var(--theme-glass);
+}
+
+[data-theme='paper-light'] .always-dark-card {
+  background-color: oklch(0.18 0.006 80);
+  color: oklch(0.95 0.002 80);
+  border-color: oklch(0.3 0.008 80 / 0.5);
+}
+
 html,
 body {
   @apply m-0 font-sans;
@@ -258,6 +396,16 @@ body {
   font-size: 0.95em;
   padding: 0.1rem 0.4rem;
   white-space: nowrap;
+}
+
+@keyframes subtle-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .code-block .shiki {

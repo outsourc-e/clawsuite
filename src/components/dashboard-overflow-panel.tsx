@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ApiIcon,
   BrainIcon,
+  ChartLineData02Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
@@ -39,6 +40,7 @@ const SYSTEM_ITEMS: Array<OverflowItem> = [
 
 const GATEWAY_ITEMS: Array<OverflowItem> = [
   { icon: ServerStack01Icon, label: 'Channels', to: '/channels' },
+  { icon: ChartLineData02Icon, label: 'Costs', to: '/costs' },
 ]
 
 type Props = {

@@ -64,7 +64,6 @@ import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
-import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useTapDebug } from '@/hooks/use-tap-debug'
 
 type ChatScreenProps = {
@@ -77,6 +76,33 @@ type ChatScreenProps = {
   forcedSessionKey?: string
   /** Hide header + file explorer + terminal for panel mode */
   compact?: boolean
+}
+
+function normalizeMimeType(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return value.trim().toLowerCase()
+}
+
+function isImageMimeType(value: unknown): boolean {
+  const normalized = normalizeMimeType(value)
+  return normalized.startsWith('image/')
+}
+
+function readDataUrlMimeType(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const match = /^data:([^;,]+)[^,]*,/i.exec(value.trim())
+  return match?.[1]?.trim().toLowerCase() || ''
+}
+
+function stripDataUrlPrefix(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const commaIndex = trimmed.indexOf(',')
+  if (trimmed.toLowerCase().startsWith('data:') && commaIndex >= 0) {
+    return trimmed.slice(commaIndex + 1).trim()
+  }
+  return trimmed
 }
 
 function normalizeMessageValue(value: unknown): string {
@@ -172,8 +198,6 @@ export function ChatScreen({
   })
   const { isMobile } = useChatMobile(queryClient)
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
-  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
-  const mobileKeyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const isAgentViewOpen = useAgentViewStore((state) => state.isOpen)
   const setAgentViewOpen = useAgentViewStore((state) => state.setOpen)
   const isTerminalPanelOpen = useTerminalPanelStore(
@@ -238,7 +262,7 @@ export function ChatScreen({
   // Re-apply display filter to realtime messages
   const finalDisplayMessages = useMemo(() => {
     // Rebuild display filter on merged messages
-    return realtimeMessages.filter((msg) => {
+    const filtered = realtimeMessages.filter((msg) => {
       if (msg.role === 'user') {
         const text = textFromMessage(msg)
         if (text.startsWith('A subagent task')) return false
@@ -259,6 +283,15 @@ export function ChatScreen({
         return hasText
       }
       return false
+    })
+    // Dedup: SSE + history merge can produce duplicates — remove by role+text
+    const seen = new Set<string>()
+    return filtered.filter((msg) => {
+      const text = textFromMessage(msg)
+      const key = `${msg.role}:${text.slice(0, 200)}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
     })
   }, [realtimeMessages])
 
@@ -512,22 +545,18 @@ export function ChatScreen({
 
   const terminalPanelInset =
     !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
+  const mobileComposerInsetBase =
+    'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px) + var(--safe-b) + 84px)'
   const mobileScrollBottomOffset = useMemo(() => {
     if (!isMobile) return 0
-    if (mobileKeyboardActive) {
-      return 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
-    }
-    return `calc(var(--chat-composer-height, 96px) + ${MOBILE_TAB_BAR_OFFSET})`
-  }, [isMobile, mobileKeyboardActive])
+    return mobileComposerInsetBase
+  }, [isMobile, mobileComposerInsetBase])
 
   // Keep message list clear of composer, keyboard, and desktop terminal panel.
   const stableContentStyle = useMemo<React.CSSProperties>(() => {
     if (isMobile) {
-      const mobileBase = mobileKeyboardActive
-        ? 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
-        : `calc(var(--chat-composer-height, 96px) + ${MOBILE_TAB_BAR_OFFSET})`
       return {
-        paddingBottom: `calc(${mobileBase} + var(--safe-b) + 16px)`,
+        paddingBottom: `calc(${mobileComposerInsetBase} + 20px)`,
       }
     }
     return {
@@ -536,7 +565,7 @@ export function ChatScreen({
           ? `${terminalPanelInset + 16}px`
           : '16px',
     }
-  }, [isMobile, mobileKeyboardActive, terminalPanelInset])
+  }, [isMobile, mobileComposerInsetBase, terminalPanelInset])
 
   const shouldRedirectToNew =
     !isNewChat &&
@@ -755,16 +784,28 @@ export function ChatScreen({
       streamFinish()
     }, 120_000)
 
-    // Map to gateway-expected field names:
-    // gateway wants: mimeType, fileName, content (base64 without data: prefix)
-    const payloadAttachments = normalizedAttachments.map((attachment) => ({
-      id: attachment.id,
-      fileName: attachment.name,
-      mimeType: attachment.contentType,
-      type: attachment.contentType?.startsWith('image/') ? 'image' : 'file',
-      content: attachment.dataUrl?.replace(/^data:[^;]+;base64,/, '') ?? '',
-      size: attachment.size,
-    }))
+    // Send a compatibility shape for gateway attachment parsing.
+    // Different gateway/channel versions read different keys.
+    const payloadAttachments = normalizedAttachments.map((attachment) => {
+      const mimeType =
+        normalizeMimeType(attachment.contentType) ||
+        readDataUrlMimeType(attachment.dataUrl)
+      const encodedContent = stripDataUrlPrefix(attachment.dataUrl)
+      return {
+        id: attachment.id,
+        name: attachment.name,
+        fileName: attachment.name,
+        contentType: mimeType || undefined,
+        mimeType: mimeType || undefined,
+        mediaType: mimeType || undefined,
+        type: isImageMimeType(mimeType) ? 'image' : 'file',
+        content: encodedContent,
+        data: encodedContent,
+        base64: encodedContent,
+        dataUrl: attachment.dataUrl,
+        size: attachment.size,
+      }
+    })
 
     fetch('/api/send', {
       method: 'POST',

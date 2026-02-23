@@ -288,24 +288,19 @@ function ChatMessageListComponent({
       return true
     })
 
-    const seenUserFingerprints = new Map<string, number>()
+    const seenUserIds = new Set<string>()
     return filteredMessages.filter((message) => {
       if (message.role !== 'user') return true
 
-      const trimmedText = textFromMessage(message).trim()
-      if (trimmedText.length === 0) return true
-
-      const fingerprint = `${message.role}:${trimmedText}`
-      const timestamp = getMessageTimestamp(message)
-      const previousTimestamp = seenUserFingerprints.get(fingerprint)
-      if (
-        typeof previousTimestamp === 'number' &&
-        Math.abs(timestamp - previousTimestamp) <= 5000
-      ) {
-        return false
+      const messageId =
+        (message as any).id ||
+        (message as any).messageId ||
+        (message as any).clientId
+      if (typeof messageId !== 'string' || messageId.trim().length === 0) {
+        return true
       }
-
-      seenUserFingerprints.set(fingerprint, timestamp)
+      if (seenUserIds.has(messageId)) return false
+      seenUserIds.add(messageId)
       return true
     })
   }, [hideSystemMessages, messages])
@@ -657,7 +652,14 @@ function ChatMessageListComponent({
     return () => {
       if (frameId !== null) window.cancelAnimationFrame(frameId)
     }
-  }, [loading, displayMessages.length, sessionKey, scrollToBottom])
+  }, [
+    loading,
+    displayMessages.length,
+    isStreaming,
+    sessionKey,
+    scrollToBottom,
+    streamingText,
+  ])
 
   useEffect(() => {
     setExpandAllToolSections(false)
@@ -846,10 +848,10 @@ function ChatMessageListComponent({
               value={messageSearchValue}
               onChange={(e) => setMessageSearchValue(e.target.value)}
               placeholder="Search messages..."
-              className="min-w-0 flex-1 rounded-md border border-primary-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 py-1.5 text-sm text-primary-900 dark:text-gray-100 outline-none placeholder:text-primary-400 dark:placeholder:text-gray-500 focus:border-primary-400 dark:focus:border-primary-500 focus:ring-1 focus:ring-primary-400 dark:focus:ring-primary-500"
+              className="min-w-0 flex-1 rounded-md border border-primary-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1.5 text-sm text-primary-900 dark:text-neutral-100 outline-none placeholder:text-primary-400 dark:placeholder:text-neutral-500 focus:border-primary-400 dark:focus:border-primary-500 focus:ring-1 focus:ring-primary-400 dark:focus:ring-primary-500"
             />
             {isMessageSearchActive && (
-              <span className="shrink-0 text-xs text-primary-500 dark:text-gray-400">
+              <span className="shrink-0 text-xs text-primary-500 dark:text-neutral-400">
                 {messageSearchMatches.length > 0
                   ? `${activeSearchMatchIndex + 1} of ${messageSearchMatches.length}`
                   : 'No matches'}
@@ -860,7 +862,7 @@ function ChatMessageListComponent({
                 type="button"
                 onClick={jumpToPreviousMatch}
                 disabled={messageSearchMatches.length === 0}
-                className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200 disabled:opacity-30"
+                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
                 aria-label="Previous match"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -877,7 +879,7 @@ function ChatMessageListComponent({
                 type="button"
                 onClick={jumpToNextMatch}
                 disabled={messageSearchMatches.length === 0}
-                className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200 disabled:opacity-30"
+                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
                 aria-label="Next match"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -893,7 +895,7 @@ function ChatMessageListComponent({
               <button
                 type="button"
                 onClick={closeMessageSearch}
-                className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200"
+                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-700 dark:hover:text-neutral-200"
                 aria-label="Close search"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">

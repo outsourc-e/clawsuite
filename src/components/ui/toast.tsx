@@ -74,23 +74,23 @@ export function Toaster() {
   if (!toasts.length) return null
 
   return createPortal(
-    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+    <div className="pointer-events-none fixed top-4 left-2 right-2 z-[9999] flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-auto">
       {toasts.map((t) => (
         <div
           key={t.id}
           className={cn(
-            'pointer-events-auto flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-sm animate-in slide-in-from-right-5 fade-in duration-200',
+            'pointer-events-auto flex w-full max-w-[calc(100vw-1rem)] items-start gap-2.5 rounded-xl px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-sm animate-in slide-in-from-right-5 fade-in duration-200 sm:w-auto',
             typeStyles[t.type],
           )}
         >
           <span className="text-base">{t.icon ?? defaultIcons[t.type]}</span>
-          <span>{t.message}</span>
+          <span className="min-w-0 break-words">{t.message}</span>
           <button
             type="button"
             onClick={() =>
               setToasts((prev) => prev.filter((x) => x.id !== t.id))
             }
-            className="ml-2 rounded-full p-0.5 opacity-70 hover:opacity-100 transition-opacity"
+            className="ml-2 shrink-0 rounded-full p-0.5 opacity-70 transition-opacity hover:opacity-100"
           >
             ✕
           </button>

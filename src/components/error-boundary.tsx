@@ -26,8 +26,7 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    if (import.meta.env.DEV)
-      console.error('Unhandled UI error', error, errorInfo)
+    console.error('Unhandled UI error', error, errorInfo)
   }
 
   reloadPage() {
@@ -57,6 +56,13 @@ export class ErrorBoundary extends Component<
           <p className="mt-2 text-pretty text-sm text-primary-700">
             {description}
           </p>
+          {this.state.error ? (
+            <pre className="mt-3 max-h-32 overflow-auto rounded bg-red-50 p-2 text-left text-[10px] text-red-800">
+              {this.state.error.message}
+              {'\n'}
+              {this.state.error.stack?.split('\n').slice(0, 5).join('\n')}
+            </pre>
+          ) : null}
           <div className="mt-5 flex justify-center">
             <Button onClick={() => this.reloadPage()}>Reload</Button>
           </div>

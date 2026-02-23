@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { ActivityEvent } from '@/types/activity-event'
 import { useActivityEvents } from '@/screens/activity/use-activity-events'
+import { formatModelName } from '../lib/formatters'
 import { cn } from '@/lib/utils'
 
 type ActivityLogWidgetProps = {
@@ -51,6 +52,19 @@ function parseJsonRecord(raw: string): Record<string, unknown> | null {
   }
 }
 
+/** Sanitize model label — use canonical formatter, fallback to "Custom" */
+function sanitizeModelLabel(raw: string): string {
+  if (!raw) return 'Custom'
+  const formatted = formatModelName(raw)
+  if (formatted === '—') return 'Custom'
+  return formatted
+}
+
+/** Sanitize event text that might contain "Unknown model" */
+function sanitizeEventText(text: string): string {
+  return text.replace(/unknown\s+model/gi, 'Custom')
+}
+
 function toFriendlySource(source?: string): string {
   const text = readString(source)
   if (!text) return 'Gateway'
@@ -60,22 +74,9 @@ function toFriendlySource(source?: string): string {
   return tail.charAt(0).toUpperCase() + tail.slice(1)
 }
 
-function formatModelName(raw: string): string {
-  if (!raw) return 'Unknown model'
-  const lower = raw.toLowerCase()
-  if (lower.includes('opus')) {
-    const match = raw.match(/opus[- ]?(\d+)[- ]?(\d+)/i)
-    return match ? `Opus ${match[1]}.${match[2]}` : 'Opus'
-  }
-  if (lower.includes('sonnet')) {
-    const match = raw.match(/sonnet[- ]?(\d+)[- ]?(\d+)/i)
-    return match ? `Sonnet ${match[1]}.${match[2]}` : 'Sonnet'
-  }
-  if (lower.includes('gpt')) return raw.replace('gpt-', 'GPT-')
-  if (raw.includes('/')) return raw.split('/').pop() ?? raw
-  return raw
-}
+// formatModelName and formatRelativeTime imported from ../lib/formatters
 
+/** Compact time format for activity log items (shorter than standard relative time) */
 function formatRelativeTime(timestamp: number): string {
   const diffMs = Math.max(0, Date.now() - timestamp)
   const seconds = Math.floor(diffMs / 1000)
@@ -142,12 +143,13 @@ function parseKnownJsonEvent(event: ActivityEvent): ActivityPreviewRow | null {
   }
 
   if (event.type === 'session' || parsedEventType.includes('session')) {
+    const modelLabel = sanitizeModelLabel(parsedModel)
     return {
       id: event.id,
       icon: '•',
-      iconClassName: 'text-primary-500',
+      iconClassName: 'text-blue-400',
       sourceLabel: summarySource,
-      summary: `Session started: ${formatModelName(parsedModel || 'Unknown model')}`,
+      summary: modelLabel !== 'Custom' || parsedModel ? `Session started: ${modelLabel}` : 'Session started',
       timestamp: event.timestamp,
     }
   }
@@ -170,7 +172,7 @@ function toPreviewRow(event: ActivityEvent): ActivityPreviewRow | null {
       icon: '⚠',
       iconClassName: 'text-amber-600',
       sourceLabel,
-      summary: readString(event.title) || readString(event.detail) || 'Error event',
+      summary: sanitizeEventText(readString(event.title) || readString(event.detail) || 'Error event'),
       timestamp: event.timestamp,
     }
   }
@@ -190,20 +192,20 @@ function toPreviewRow(event: ActivityEvent): ActivityPreviewRow | null {
     return {
       id: event.id,
       icon: '•',
-      iconClassName: 'text-primary-500',
+      iconClassName: 'text-blue-400',
       sourceLabel,
-      summary: readString(event.title) || 'Session started',
+      summary: sanitizeEventText(readString(event.title) || 'Session started'),
       timestamp: event.timestamp,
     }
   }
 
-  const fallbackSummary = readString(event.title) || readString(event.detail)
+  const fallbackSummary = sanitizeEventText(readString(event.title) || readString(event.detail) || '')
   if (!fallbackSummary) return null
 
   return {
     id: event.id,
     icon: '•',
-    iconClassName: 'text-primary-500',
+    iconClassName: 'text-blue-400',
     sourceLabel,
     summary: fallbackSummary,
     timestamp: event.timestamp,
@@ -247,7 +249,7 @@ function activityStatusDotClass(statusIcon: ParsedActivityItem['statusIcon']): s
   if (statusIcon === 'success') return 'bg-emerald-500'
   if (statusIcon === 'warning') return 'bg-amber-500'
   if (statusIcon === 'error') return 'bg-red-500'
-  return 'bg-primary-400'
+  return 'bg-blue-400'
 }
 
 export function ActivityLogWidget({
@@ -301,21 +303,21 @@ export function ActivityLogWidget({
       title="Activity Log"
       icon={Activity01Icon}
       action={
-        <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-100/70 px-2 py-0.5 text-[11px] font-medium text-primary-500 tabular-nums">
+        <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 font-mono text-[11px] text-neutral-200 tabular-nums">
           {Math.max(previewRows.length, mobileRows.length)}
         </span>
       }
       onRemove={onRemove}
       editMode={editMode}
-      className="h-full"
+      className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
     >
       <div className="mb-2">
         <span
           className={cn(
             'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
             isConnected
-              ? 'border-emerald-200 bg-emerald-100/70 text-emerald-700'
-              : 'border-red-200 bg-red-100/80 text-red-700',
+              ? 'border-emerald-900 bg-emerald-950/50 text-emerald-400'
+              : 'border-red-900 bg-red-950/50 text-red-400',
           )}
         >
           <span
@@ -329,11 +331,11 @@ export function ActivityLogWidget({
       </div>
 
       {isLoading && mobileRows.length === 0 ? (
-        <div className="rounded-lg border border-primary-200 bg-primary-100/45 px-3 py-3 text-sm text-primary-600">
+        <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-3 text-sm text-neutral-400">
           Loading activity…
         </div>
       ) : mobileRows.length === 0 ? (
-        <div className="rounded-lg border border-primary-200 bg-primary-100/45 px-3 py-3 text-sm text-primary-600">
+        <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-3 text-sm text-neutral-400">
           No activity events yet
         </div>
       ) : (
@@ -343,7 +345,7 @@ export function ActivityLogWidget({
               return (
                 <article
                   key={row.id}
-                  className="flex items-center gap-2 rounded-xl border border-white/30 bg-white/55 px-3 py-2 dark:border-white/10 dark:bg-neutral-900/45"
+                  className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2"
                 >
                   <span
                     className={cn(
@@ -352,14 +354,14 @@ export function ActivityLogWidget({
                     )}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                    <p className="truncate text-sm font-medium text-neutral-100">
                       {row.title}
                     </p>
-                    <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
+                    <p className="truncate text-xs text-neutral-400">
                       {row.subtitle}
                     </p>
                   </div>
-                  <span className="shrink-0 text-xs text-neutral-500 dark:text-neutral-400">
+                  <span className="shrink-0 text-[10px] text-neutral-500">
                     {row.timeAgo}
                   </span>
                 </article>
@@ -372,19 +374,19 @@ export function ActivityLogWidget({
               return (
                 <article
                   key={row.id}
-                  className="rounded-lg border border-primary-200/80 bg-primary-50/70 px-3 py-2"
+                  className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2"
                 >
                   <div className="flex items-start gap-2">
                     <span className={cn('mt-0.5 text-xs', row.iconClassName)}>
                       {row.icon}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-sm text-primary-700">
-                        <span className="font-semibold text-ink">{row.sourceLabel}</span>{' '}
+                      <p className="line-clamp-2 text-sm text-neutral-300">
+                        <span className="font-semibold text-neutral-100">{row.sourceLabel}</span>{' '}
                         <span>{row.summary}</span>
                       </p>
                     </div>
-                    <span className="shrink-0 text-[11px] text-primary-400">
+                    <span className="shrink-0 text-[10px] text-neutral-500">
                       {formatRelativeTime(row.timestamp)}
                     </span>
                   </div>
@@ -399,7 +401,7 @@ export function ActivityLogWidget({
         <button
           type="button"
           onClick={() => void navigate({ to: '/activity' })}
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 transition-colors hover:text-accent-600"
+          className="inline-flex items-center gap-1 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-300"
         >
           View all →
         </button>

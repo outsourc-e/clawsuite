@@ -67,22 +67,52 @@ function normalizeTaskList(payload: unknown): Task[] {
   })
 }
 
+function isTask(value: unknown): value is Task {
+  if (!value || typeof value !== 'object') return false
+  const maybeTask = value as Partial<Task>
+  return (
+    typeof maybeTask.id === 'string' &&
+    typeof maybeTask.title === 'string' &&
+    typeof maybeTask.description === 'string' &&
+    typeof maybeTask.status === 'string' &&
+    typeof maybeTask.priority === 'string' &&
+    Array.isArray(maybeTask.tags) &&
+    typeof maybeTask.createdAt === 'string' &&
+    typeof maybeTask.updatedAt === 'string'
+  )
+}
+
+function createClientTaskId(): string {
+  return `TASK-${Date.now().toString(36).toUpperCase()}`
+}
+
+async function readApiError(response: Response): Promise<string> {
+  try {
+    const payload = (await response.json()) as Record<string, unknown>
+    if (typeof payload.error === 'string') return payload.error
+    if (typeof payload.message === 'string') return payload.message
+    return `Request failed (${response.status})`
+  } catch {
+    return `Request failed (${response.status})`
+  }
+}
+
 type TaskStore = {
   tasks: Task[]
   afterSync: boolean
   syncFromApi: () => Promise<void>
-  addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void
+  addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
   updateTask: (
     id: string,
     updates: Partial<Omit<Task, 'id' | 'createdAt'>>,
-  ) => void
-  moveTask: (id: string, status: TaskStatus) => void
-  deleteTask: (id: string) => void
+  ) => Promise<void>
+  moveTask: (id: string, status: TaskStatus) => Promise<void>
+  deleteTask: (id: string) => Promise<void>
 }
 
 export const useTaskStore = create<TaskStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       tasks: SEED_TASKS,
       afterSync: false,
       syncFromApi: async function syncFromApi() {
@@ -104,53 +134,118 @@ export const useTaskStore = create<TaskStore>()(
           set({ afterSync: true })
         }
       },
-      addTask: (taskData) => {
+      addTask: async (taskData) => {
         const now = new Date().toISOString()
         const task: Task = {
           ...taskData,
-          id: `TASK-${Date.now().toString(36).toUpperCase()}`,
+          id: createClientTaskId(),
           createdAt: now,
           updatedAt: now,
         }
         set((state) => ({ tasks: [task, ...state.tasks] }))
-        // Persist to API
-        void fetch('/api/tasks', {
+
+        const response = await fetch('/api/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(task),
-        }).catch(() => {})
+        }).catch(() => null)
+
+        if (!response) {
+          set((state) => ({ tasks: state.tasks.filter((t) => t.id !== task.id) }))
+          throw new Error('Failed to create task')
+        }
+
+        if (!response.ok) {
+          const message = await readApiError(response)
+          set((state) => ({ tasks: state.tasks.filter((t) => t.id !== task.id) }))
+          throw new Error(message)
+        }
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          task?: unknown
+        }
+        if (isTask(payload.task)) {
+          const serverTask: Task = payload.task
+          set((state) => ({
+            tasks: state.tasks.map((t) => (t.id === task.id ? serverTask : t)),
+          }))
+        }
       },
-      updateTask: (id, updates) => {
+      updateTask: async (id, updates) => {
+        const previousTask = get().tasks.find((task) => task.id === id)
+        if (!previousTask) {
+          throw new Error('Task not found')
+        }
+        const optimisticTask: Task = {
+          ...previousTask,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        }
         set((state) => ({
-          tasks: state.tasks.map((t) =>
-            t.id === id
-              ? { ...t, ...updates, updatedAt: new Date().toISOString() }
-              : t,
-          ),
+          tasks: state.tasks.map((t) => (t.id === id ? optimisticTask : t)),
         }))
-        void fetch(`/api/tasks/${id}`, {
+
+        const response = await fetch(`/api/tasks/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updates),
-        }).catch(() => {})
+        }).catch(() => null)
+
+        if (!response) {
+          set((state) => ({
+            tasks: state.tasks.map((t) => (t.id === id ? previousTask : t)),
+          }))
+          throw new Error('Failed to update task')
+        }
+
+        if (!response.ok) {
+          const message =
+            response.status === 404
+              ? 'Task not found'
+              : await readApiError(response)
+          set((state) => ({
+            tasks: state.tasks.map((t) => (t.id === id ? previousTask : t)),
+          }))
+          throw new Error(message)
+        }
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          task?: unknown
+        }
+        if (isTask(payload.task)) {
+          const serverTask: Task = payload.task
+          set((state) => ({
+            tasks: state.tasks.map((t) => (t.id === id ? serverTask : t)),
+          }))
+        }
       },
-      moveTask: (id, status) => {
-        set((state) => ({
-          tasks: state.tasks.map((t) =>
-            t.id === id
-              ? { ...t, status, updatedAt: new Date().toISOString() }
-              : t,
-          ),
-        }))
-        void fetch(`/api/tasks/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status }),
-        }).catch(() => {})
+      moveTask: async (id, status) => {
+        await get().updateTask(id, { status })
       },
-      deleteTask: (id) => {
+      deleteTask: async (id) => {
+        const previousTask = get().tasks.find((task) => task.id === id)
+        if (!previousTask) {
+          throw new Error('Task not found')
+        }
         set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) }))
-        void fetch(`/api/tasks/${id}`, { method: 'DELETE' }).catch(() => {})
+
+        const response = await fetch(`/api/tasks/${id}`, {
+          method: 'DELETE',
+        }).catch(() => null)
+
+        if (!response) {
+          set((state) => ({ tasks: [previousTask, ...state.tasks] }))
+          throw new Error('Failed to delete task')
+        }
+
+        if (!response.ok) {
+          const message =
+            response.status === 404
+              ? 'Task not found'
+              : await readApiError(response)
+          set((state) => ({ tasks: [previousTask, ...state.tasks] }))
+          throw new Error(message)
+        }
       },
     }),
     {

@@ -5,23 +5,20 @@ import {
   Cancel01Icon,
   CheckmarkCircle02Icon,
   CloudIcon,
-  ComputerIcon,
-  Moon01Icon,
   Notification03Icon,
   PaintBoardIcon,
   Settings02Icon,
   SourceCodeSquareIcon,
-  Sun01Icon,
   UserIcon,
   MessageMultiple01Icon,
 } from '@hugeicons/core-free-icons'
 import { useState, useEffect, Component } from 'react'
 import type * as React from 'react'
-import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
+import type { AccentColor } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
-import { applyTheme, useSettings } from '@/hooks/use-settings'
+import { useSettings } from '@/hooks/use-settings'
+import { THEMES, type AppTheme } from '@/lib/theme-system'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -73,10 +70,10 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-4">
-      <h3 className="text-sm font-semibold text-primary-900 dark:text-gray-100">
+      <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
         {title}
       </h3>
-      <p className="text-xs text-primary-500 dark:text-gray-400">
+      <p className="text-xs text-primary-500 dark:text-neutral-400">
         {description}
       </p>
     </div>
@@ -95,11 +92,11 @@ function Row({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-2">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-primary-900 dark:text-gray-100">
+        <p className="text-sm font-medium text-primary-900 dark:text-neutral-100">
           {label}
         </p>
         {description && (
-          <p className="text-xs text-primary-500 dark:text-gray-400">
+          <p className="text-xs text-primary-500 dark:text-neutral-400">
             {description}
           </p>
         )}
@@ -184,10 +181,10 @@ function ProfileContent() {
       <div className="flex items-center gap-4 pb-2">
         <UserAvatar size={48} src={cs.avatarDataUrl} alt={displayName} />
         <div>
-          <p className="text-sm font-medium text-primary-900 dark:text-gray-100">
+          <p className="text-sm font-medium text-primary-900 dark:text-neutral-100">
             {displayName}
           </p>
-          <p className="text-xs text-primary-500 dark:text-gray-400">
+          <p className="text-xs text-primary-500 dark:text-neutral-400">
             Shown in sidebar and chat.
           </p>
         </div>
@@ -221,7 +218,7 @@ function ProfileContent() {
                 onChange={handleAvatarUpload}
                 disabled={processing}
                 aria-label="Upload profile picture"
-                className="block max-w-[12rem] cursor-pointer text-xs text-primary-700 dark:text-gray-300 file:mr-2 file:cursor-pointer file:rounded-md file:border file:border-primary-200 dark:file:border-gray-600 file:bg-primary-100 dark:file:bg-gray-700 file:px-2 file:py-1 file:text-xs file:font-medium file:text-primary-900 dark:file:text-gray-100 file:transition-colors hover:file:bg-primary-200 dark:hover:file:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="block max-w-[12rem] cursor-pointer text-xs text-primary-700 dark:text-neutral-300 file:mr-2 file:cursor-pointer file:rounded-md file:border file:border-primary-200 dark:file:border-neutral-600 file:bg-primary-100 dark:file:bg-neutral-700 file:px-2 file:py-1 file:text-xs file:font-medium file:text-primary-900 dark:file:text-neutral-100 file:transition-colors hover:file:bg-primary-200 dark:hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </label>
             <Button
@@ -246,12 +243,7 @@ function ProfileContent() {
 
 function AppearanceContent() {
   const { settings, updateSettings } = useSettings()
-
-  function handleThemeChange(value: string) {
-    const theme = value as SettingsThemeMode
-    applyTheme(theme)
-    updateSettings({ theme })
-  }
+  const { appTheme } = settings
 
   function badgeClass(color: AccentColor): string {
     if (color === 'orange') return 'bg-orange-500'
@@ -267,23 +259,37 @@ function AppearanceContent() {
         description="Theme, accent color, and loading animation."
       />
       <Row label="Theme">
-        <Tabs value={settings.theme} onValueChange={handleThemeChange}>
-          <TabsList variant="default" className="gap-1">
-            <TabsTab value="system">
-              <HugeiconsIcon icon={ComputerIcon} size={16} strokeWidth={1.5} />
-              <span>System</span>
-            </TabsTab>
-            <TabsTab value="light">
-              <HugeiconsIcon icon={Sun01Icon} size={16} strokeWidth={1.5} />
-              <span>Light</span>
-            </TabsTab>
-            <TabsTab value="dark">
-              <HugeiconsIcon icon={Moon01Icon} size={16} strokeWidth={1.5} />
-              <span>Dark</span>
-            </TabsTab>
-          </TabsList>
-        </Tabs>
+        <div className="flex min-w-[18rem] flex-col gap-2">
+          <div className="grid grid-cols-1 gap-1 rounded-xl border border-primary-200 bg-primary-100/70 p-1 sm:grid-cols-3">
+            {THEMES.map((themeOption) => {
+              const active = appTheme === themeOption.value
+              return (
+                <button
+                  key={themeOption.value}
+                  type="button"
+                  onClick={() =>
+                    updateSettings({ appTheme: themeOption.value as AppTheme })
+                  }
+                  aria-pressed={active}
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-xs font-medium transition-colors',
+                    active
+                      ? 'bg-accent-500 text-white'
+                      : 'text-primary-700 hover:bg-primary-200',
+                  )}
+                >
+                  {themeOption.label}
+                </button>
+              )
+            })}
+          </div>
+          <p className="text-xs text-primary-500 dark:text-neutral-400">
+            {THEMES.find((themeOption) => themeOption.value === appTheme)
+              ?.description ?? ''}
+          </p>
+        </div>
       </Row>
+
       <Row label="Accent color">
         <div className="flex gap-1.5">
           {(['orange', 'purple', 'blue', 'green'] as const).map((color) => (
@@ -304,6 +310,29 @@ function AppearanceContent() {
               <span className="capitalize">{color}</span>
             </Button>
           ))}
+        </div>
+      </Row>
+      <Row label="System metrics bar">
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-primary-500">
+            {settings.showSystemMetrics ? 'Visible' : 'Hidden'}
+          </span>
+          <button
+            type="button"
+            onClick={() => updateSettings({ showSystemMetrics: !settings.showSystemMetrics })}
+            className={cn(
+              'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+              settings.showSystemMetrics ? 'bg-accent-500' : 'bg-primary-200 dark:bg-neutral-700',
+            )}
+            aria-label="Toggle system metrics bar"
+          >
+            <span
+              className={cn(
+                'inline-block size-3.5 rounded-full bg-white shadow transition-transform',
+                settings.showSystemMetrics ? 'translate-x-4' : 'translate-x-0.5',
+              )}
+            />
+          </button>
         </div>
       </Row>
       <LoaderContent />
@@ -352,7 +381,7 @@ function LoaderContent() {
   }
   return (
     <div className="pt-2">
-      <p className="mb-2 text-xs text-primary-500 dark:text-gray-400">
+      <p className="mb-2 text-xs text-primary-500 dark:text-neutral-400">
         Loading animation
       </p>
       <div className="grid grid-cols-4 gap-1.5">
@@ -436,7 +465,7 @@ function EditorContent() {
             aria-valuemax={20}
             aria-valuenow={settings.editorFontSize}
           />
-          <span className="w-10 text-right text-sm tabular-nums text-primary-700 dark:text-gray-300">
+          <span className="w-10 text-right text-sm tabular-nums text-primary-700 dark:text-neutral-300">
             {settings.editorFontSize}px
           </span>
         </div>
@@ -491,7 +520,7 @@ function NotificationsContent() {
             aria-valuemax={100}
             aria-valuenow={settings.usageThreshold}
           />
-          <span className="w-10 text-right text-sm tabular-nums text-primary-700 dark:text-gray-300">
+          <span className="w-10 text-right text-sm tabular-nums text-primary-700 dark:text-neutral-300">
             {settings.usageThreshold}%
           </span>
         </div>
@@ -572,7 +601,7 @@ function AdvancedContent() {
             placeholder="https://api.openclaw.ai"
             value={settings.gatewayUrl}
             onChange={(e) => validateAndUpdateUrl(e.target.value)}
-            className="h-9 w-full rounded-lg border border-primary-200 dark:border-gray-600 bg-primary-50 dark:bg-gray-800 px-2.5 text-sm text-primary-900 dark:text-gray-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
+            className="h-9 w-full rounded-lg border border-primary-200 dark:border-neutral-600 bg-primary-50 dark:bg-neutral-800 px-2.5 text-sm text-primary-900 dark:text-neutral-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
             aria-label="Gateway URL"
             aria-invalid={!!urlError}
             aria-describedby={urlError ? urlErrorId : undefined}
@@ -625,7 +654,7 @@ function AdvancedContent() {
         </Button>
       </Row>
 
-      <div className="border-t border-primary-200 dark:border-gray-700 pt-4">
+      <div className="border-t border-primary-200 dark:border-neutral-700 pt-4">
         <SectionHeader
           title="Smart Suggestions"
           description="Proactive model suggestions."
@@ -645,7 +674,7 @@ function AdvancedContent() {
             onChange={(e) =>
               updateSettings({ preferredBudgetModel: e.target.value })
             }
-            className="h-9 w-full max-w-[14rem] rounded-lg border border-primary-200 dark:border-gray-600 bg-primary-50 dark:bg-gray-800 px-2 text-sm text-primary-900 dark:text-gray-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
+            className="h-9 w-full max-w-[14rem] rounded-lg border border-primary-200 dark:border-neutral-600 bg-primary-50 dark:bg-neutral-800 px-2 text-sm text-primary-900 dark:text-neutral-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
             aria-label="Preferred budget model"
           >
             <option value="">Auto-detect</option>
@@ -663,7 +692,7 @@ function AdvancedContent() {
             onChange={(e) =>
               updateSettings({ preferredPremiumModel: e.target.value })
             }
-            className="h-9 w-full max-w-[14rem] rounded-lg border border-primary-200 dark:border-gray-600 bg-primary-50 dark:bg-gray-800 px-2 text-sm text-primary-900 dark:text-gray-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
+            className="h-9 w-full max-w-[14rem] rounded-lg border border-primary-200 dark:border-neutral-600 bg-primary-50 dark:bg-neutral-800 px-2 text-sm text-primary-900 dark:text-neutral-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
             aria-label="Preferred premium model"
           >
             <option value="">Auto-detect</option>
@@ -684,7 +713,7 @@ function AdvancedContent() {
         </Row>
       </div>
 
-      <div className="border-t border-primary-200 dark:border-gray-700 pt-4">
+      <div className="border-t border-primary-200 dark:border-neutral-700 pt-4">
         <SectionHeader
           title="Onboarding"
           description="Restart the welcome tour."
@@ -775,7 +804,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  className="text-primary-500 dark:text-gray-400 hover:bg-primary-100 dark:hover:bg-gray-800"
+                  className="text-primary-500 dark:text-neutral-400 hover:bg-primary-100 dark:hover:bg-neutral-800"
                   aria-label="Close"
                 >
                   <HugeiconsIcon
@@ -800,7 +829,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-medium transition-colors',
                     active === s.id
                       ? 'border-accent-500 text-accent-600'
-                      : 'border-transparent text-primary-500 dark:text-gray-400 hover:text-primary-700 dark:hover:text-gray-200',
+                      : 'border-transparent text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200',
                   )}
                 >
                   <HugeiconsIcon icon={s.icon} size={14} strokeWidth={1.5} />
@@ -816,7 +845,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </SettingsErrorBoundary>
 
           {/* Footer */}
-          <div className="border-t border-primary-200 dark:border-gray-700 px-5 py-2.5 text-xs text-primary-500 dark:text-gray-400 flex items-center gap-1.5">
+          <div className="border-t border-primary-200 dark:border-neutral-700 px-5 py-2.5 text-xs text-primary-500 dark:text-neutral-400 flex items-center gap-1.5">
             <HugeiconsIcon icon={Settings02Icon} size={14} strokeWidth={1.5} />
             Changes saved automatically.
           </div>

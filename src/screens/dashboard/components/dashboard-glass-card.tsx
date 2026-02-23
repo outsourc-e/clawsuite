@@ -50,16 +50,20 @@ export function DashboardGlassCard({
       role="region"
       aria-label={title}
       className={cn(
-        'group flex h-full flex-col overflow-hidden rounded-xl border transition-colors',
+        'group relative flex h-full flex-col overflow-hidden rounded-xl border transition-colors',
         tier === 'primary' &&
-          'border-primary-200 bg-primary-50 px-4 py-3.5 hover:border-primary-300 dark:bg-primary-50/95 md:px-5 md:py-4',
+          'border-primary-200 bg-primary-50 px-4 py-3.5 hover:border-primary-300 dark:bg-primary-50/95 md:px-5 md:py-4 lg:px-4 lg:py-3',
         tier === 'secondary' &&
-          'border-primary-200 bg-primary-50/90 px-3.5 py-3 hover:border-primary-300 dark:bg-primary-50/95 md:px-4 md:py-3',
+          'border-primary-200 bg-primary-50/90 px-3.5 py-3 hover:border-primary-300 dark:bg-primary-50/95 md:px-4 md:py-3 lg:px-3 lg:py-2.5',
         tier === 'tertiary' &&
-          'border-primary-200/80 bg-primary-50/70 px-3 py-2.5 hover:border-primary-200 dark:bg-primary-50/80 md:px-3.5 md:py-2.5',
+          'border-primary-200/80 bg-primary-50/70 px-3 py-2.5 hover:border-primary-200 dark:bg-primary-50/80 md:px-3.5 md:py-2.5 lg:px-2.5 lg:py-2',
         className,
       )}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+      />
       <header className="mb-2 flex shrink-0 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <HugeiconsIcon

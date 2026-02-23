@@ -1,6 +1,6 @@
 import { ChartLineData02Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { WidgetShell } from './widget-shell'
 import { cn } from '@/lib/utils'
 
@@ -23,6 +23,7 @@ export type UsageMeterData = {
   totalInputOutput: number
   totalCached: number
   providers: Array<ProviderUsage>
+  sessionCount?: number
 }
 
 type UsageApiResponse = {
@@ -155,36 +156,104 @@ function parseUsagePayload(payload: unknown): UsageMeterData {
   }
 }
 
-function parseErrorMessage(payload: UsageApiResponse): string {
-  const message = readString(payload.error)
-  return message.length > 0 ? message : 'Usage unavailable'
+/** Fetch a URL with a hard timeout; returns null on timeout or network error. */
+function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(url, { signal: controller.signal })
+    .catch(() => null)
+    .finally(() => clearTimeout(timer))
 }
 
 export async function fetchUsage(): Promise<UsageQueryResult> {
   try {
-    const response = await fetch('/api/usage')
-    const payload = (await response
-      .json()
-      .catch(() => ({}))) as UsageApiResponse
+    // Fire both in parallel, each with a hard timeout to prevent hanging.
+    // session-status is lower priority — give usage a longer window.
+    const [usageRes, ssRes] = await Promise.all([
+      fetchWithTimeout('/api/usage', 10_000),
+      fetchWithTimeout('/api/session-status', 8_000),
+    ])
 
-    if (response.status === 501 || payload.unavailable) {
+    const usagePayload = usageRes
+      ? ((await usageRes.json().catch(() => ({}))) as UsageApiResponse)
+      : ({} as UsageApiResponse)
+
+    if (usageRes?.status === 501 || usagePayload.unavailable) {
       return {
         kind: 'unavailable',
         message: 'Unavailable on this Gateway version',
       }
     }
 
-    if (!response.ok || payload.ok === false) {
-      return {
-        kind: 'error',
-        message: parseErrorMessage(payload),
+    // Parse lifetime data
+    const data = usagePayload.usage
+      ? parseUsagePayload(usagePayload.usage)
+      : parseUsagePayload({})
+
+    // Overlay today's data from session-status if available
+    if (ssRes?.ok) {
+      const ssPayload = (await ssRes.json().catch(() => ({}))) as Record<
+        string,
+        unknown
+      >
+      const payload = (ssPayload.payload ?? ssPayload) as Record<
+        string,
+        unknown
+      >
+      const dailyCost = readNumber(payload.dailyCost ?? payload.costUsd)
+      const dailyTokens = readNumber(payload.totalTokens)
+      const sessions = Array.isArray(payload.sessions)
+        ? (payload.sessions as Array<Record<string, unknown>>)
+        : []
+      const oneDayAgo = Date.now() - 86_400_000
+      const activeSessions = sessions.filter((s) => {
+        if (typeof s.updatedAt === 'number' && (s.updatedAt as number) <= oneDayAgo) return false
+        const key = readString(s.key ?? '')
+        const label = readString(s.label ?? '')
+        // Exclude subagent sessions from the count
+        return (
+          !key.startsWith('agent:main:subagent:') &&
+          !key.includes('subagent') &&
+          !label.toLowerCase().includes('subagent')
+        )
+      })
+
+      // Override with today's data — this is what matters
+      if (dailyCost > 0) data.totalCost = dailyCost
+      if (dailyTokens > 0) data.totalUsage = dailyTokens
+
+      // Build provider breakdown from models array if available
+      const models = payload.models as
+        | Array<Record<string, unknown>>
+        | undefined
+      if (models && models.length > 0) {
+        data.providers = models
+          .filter((m) => readString(m.provider) || readString(m.model))
+          .map((m) => ({
+            provider: readString(m.provider) || readString(m.model),
+            total:
+              readNumber(m.inputTokens) +
+              readNumber(m.outputTokens),
+            inputOutput:
+              readNumber(m.inputTokens) +
+              readNumber(m.outputTokens),
+            cached: 0,
+            cost: readNumber(m.costUsd),
+            directCost: readNumber(m.costUsd),
+            percentUsed: undefined,
+          }))
+          .sort((a, b) => b.cost - a.cost)
       }
+
+      // Clear meaningless usage% — we only show cost + tokens
+      data.usagePercent = undefined
+      data.usageLimit = undefined
+
+      // Store active session count for display
+      data.sessionCount = activeSessions.length
     }
 
-    return {
-      kind: 'ok',
-      data: parseUsagePayload(payload.usage),
-    }
+    return { kind: 'ok', data }
   } catch (error) {
     return {
       kind: 'error',
@@ -194,6 +263,8 @@ export async function fetchUsage(): Promise<UsageQueryResult> {
 }
 
 function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`
   return new Intl.NumberFormat().format(Math.max(0, Math.round(tokens)))
 }
 
@@ -206,67 +277,60 @@ function formatUsd(amount: number): string {
   }).format(amount)
 }
 
-function clampPercent(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)))
+function getProviderBarColor(provider: string): string {
+  const p = provider.toLowerCase()
+  if (p.includes('anthropic')) return 'bg-purple-500'
+  if (p.includes('openrouter')) return 'bg-emerald-500'
+  if (p.includes('openclaw')) return 'bg-blue-500'
+  if (p.includes('openai')) return 'bg-amber-500'
+  if (p.includes('google')) return 'bg-red-500'
+  if (p.includes('gemini')) return 'bg-red-500'
+  return 'bg-neutral-500'
 }
 
-type UsageProgress = {
-  percent: number | null
-  current: number
-  max: number | null
+function getProviderTextColor(provider: string): string {
+  const p = provider.toLowerCase()
+  if (p.includes('anthropic')) return 'text-purple-400'
+  if (p.includes('openrouter')) return 'text-emerald-400'
+  if (p.includes('openclaw')) return 'text-blue-400'
+  if (p.includes('openai')) return 'text-amber-400'
+  if (p.includes('google')) return 'text-red-400'
+  if (p.includes('gemini')) return 'text-red-400'
+  return 'text-neutral-400'
 }
 
-function resolveUsageProgress(data: UsageMeterData | null): UsageProgress {
-  if (!data) {
-    return {
-      percent: null,
-      current: 0,
-      max: null,
-    }
-  }
-
-  const current = Math.max(0, data.totalUsage)
-  const explicitMax = data.usageLimit && data.usageLimit > 0 ? data.usageLimit : null
-
-  if (typeof data.usagePercent === 'number' && Number.isFinite(data.usagePercent)) {
-    const percent = clampPercent(data.usagePercent)
-    const inferredMax =
-      percent > 0 ? Math.max(current, Math.round(current / (percent / 100))) : null
-
-    return {
-      percent,
-      current,
-      max: explicitMax ?? inferredMax,
-    }
-  }
-
-  if (explicitMax && explicitMax > 0) {
-    return {
-      percent: clampPercent((current / explicitMax) * 100),
-      current,
-      max: explicitMax,
-    }
-  }
-
-  return {
-    percent: null,
-    current,
-    max: null,
-  }
+function capitalizeProvider(name: string): string {
+  if (!name) return '—'
+  // Keep known names clean
+  const lower = name.toLowerCase()
+  if (lower === 'anthropic') return 'Anthropic'
+  if (lower === 'openrouter') return 'OpenRouter'
+  if (lower === 'openclaw') return 'OpenClaw'
+  if (lower === 'openai') return 'OpenAI'
+  if (lower === 'google') return 'Google'
+  if (lower === 'gemini') return 'Gemini'
+  return name.charAt(0).toUpperCase() + name.slice(1)
 }
 
 type UsageMeterWidgetProps = {
   draggable?: boolean
   onRemove?: () => void
   editMode?: boolean
+  /** When provided, overrides the self-fetched cost total as the "today's spend" hero value. */
+  overrideCost?: number
+  /** When provided, overrides the self-fetched token total as the "tokens today" hero value. */
+  overrideTokens?: number
 }
 
 export function UsageMeterWidget({
   draggable: _draggable = false,
   onRemove,
   editMode,
+  overrideCost,
+  overrideTokens,
 }: UsageMeterWidgetProps) {
   const [view, setView] = useState<'tokens' | 'cost'>('tokens')
+  const [timedOut, setTimedOut] = useState(false)
   const usageQuery = useQuery({
     queryKey: ['dashboard', 'usage'],
     queryFn: fetchUsage,
@@ -274,87 +338,128 @@ export function UsageMeterWidget({
     refetchInterval: 30_000,
   })
 
+  // Use isLoading only for the very first fetch (no cached data yet).
+  // isFetching is true during any background refetch — don't block UI for those.
+  const isLoading = usageQuery.isLoading
   const queryResult = usageQuery.data
   const usageData = queryResult?.kind === 'ok' ? queryResult.data : null
+  // Show skeleton while the very first fetch is in flight (no data at all yet)
+  const showSkeleton = isLoading && !queryResult
+  // "Settled" = query finished and not in a loading state
+  const isSettled = !usageQuery.isLoading && !usageQuery.isFetching
 
-  const usageProgress = useMemo(
-    function readUsageProgress() {
-      return resolveUsageProgress(usageData)
-    },
-    [usageData],
+  // 15s hard timeout — stops infinite skeleton if query hangs
+  useEffect(() => {
+    if (!isLoading) {
+      setTimedOut(false)
+      return
+    }
+    const timer = window.setTimeout(() => setTimedOut(true), 15_000)
+    return () => window.clearTimeout(timer)
+  }, [isLoading])
+
+  const topProviders = useMemo(() => {
+    if (!usageData || usageData.providers.length === 0) return []
+    const maxCost = Math.max(...usageData.providers.map((p) => p.cost))
+    return usageData.providers.slice(0, 5).map((p) => ({
+      ...p,
+      barWidth: maxCost > 0 ? (p.cost / maxCost) * 100 : 0,
+    }))
+  }, [usageData])
+
+  // Use overrideCost (from dashboard's session-status) when provided — avoids $0.00 vs actual contradiction
+  const displayCost = overrideCost !== undefined ? overrideCost : (usageData?.totalCost ?? 0)
+  // Use overrideTokens (from dashboard's session-status dailyBreakdown) when provided
+  const displayTokens = overrideTokens !== undefined ? overrideTokens : (usageData?.totalUsage ?? 0)
+
+  // Whether there is anything meaningful to show (non-zero cost, tokens, or provider rows)
+  const hasAnyData = displayCost > 0 || displayTokens > 0 || topProviders.length > 0
+
+  const tabSwitcher = (
+    <div className="hidden items-center gap-0.5 rounded-full border border-neutral-800 bg-neutral-950 p-0.5 text-[10px] md:inline-flex">
+      {(['cost', 'tokens'] as const).map((tab) => (
+        <button
+          key={tab}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            setView(tab)
+          }}
+          className={cn(
+            'rounded-full px-2 py-0.5 font-medium transition-colors',
+            view === tab
+              ? 'bg-neutral-800 text-neutral-100 shadow-sm'
+              : 'text-neutral-500 hover:text-neutral-300',
+          )}
+        >
+          {tab === 'tokens' ? 'Tokens' : 'Cost'}
+        </button>
+      ))}
+    </div>
   )
 
-  const tokenSubtitle =
-    usageProgress.max !== null
-      ? `${formatTokens(usageProgress.current)} / ${formatTokens(usageProgress.max)} tokens`
-      : `${formatTokens(usageProgress.current)} tokens`
+  const showTimeoutOrError = (showSkeleton && timedOut) || queryResult?.kind === 'error' || queryResult?.kind === 'unavailable'
+  // Show empty state when: settled (not loading/fetching) and no meaningful data
+  const showEmptyState = !showSkeleton && !showTimeoutOrError && (!usageData || !hasAnyData)
 
   return (
     <WidgetShell
       size="medium"
-      title="Usage Meter"
+      title="Usage Today"
       icon={ChartLineData02Icon}
-      action={
-        <div className="hidden items-center gap-0.5 rounded-full border border-primary-200 bg-primary-100/70 p-0.5 text-[10px] md:inline-flex">
-          {(['tokens', 'cost'] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation()
-                setView(tab)
-              }}
-              className={cn(
-                'rounded-full px-2 py-0.5 font-medium transition-colors',
-                view === tab
-                  ? 'bg-accent-100 text-accent-700 shadow-sm'
-                  : 'text-primary-500 hover:text-primary-700',
-              )}
-            >
-              {tab === 'tokens' ? 'Tokens' : 'Cost'}
-            </button>
-          ))}
-        </div>
-      }
+      action={!showSkeleton && !showEmptyState ? tabSwitcher : undefined}
       onRemove={onRemove}
       editMode={editMode}
-      className="h-full"
+      loading={showSkeleton && !timedOut}
+      className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
     >
-      {queryResult?.kind === 'unavailable' ? (
-        <div className="rounded-lg border border-primary-200 bg-primary-100/45 px-3 py-3 text-sm text-primary-600">
-          {queryResult.message}
+      {showTimeoutOrError ? (
+        <div className="flex flex-col items-start gap-2 rounded-lg border border-red-900 bg-red-950/30 px-3 py-3">
+          <p className="text-sm font-medium text-red-300">Usage unavailable</p>
+          <p className="text-[11px] text-red-400">
+            {queryResult?.kind === 'unavailable'
+              ? queryResult.message
+              : timedOut
+                ? 'Request timed out. Check gateway connection.'
+                : (queryResult as { kind: 'error'; message: string } | undefined)?.message ?? 'Could not load usage data.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => { setTimedOut(false); void usageQuery.refetch() }}
+            className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-900"
+          >
+            Retry
+          </button>
         </div>
-      ) : queryResult?.kind === 'error' ? (
-        <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-3 text-sm text-red-700">
-          {queryResult.message}
+      ) : showEmptyState ? (
+        <div className="flex h-full flex-col items-center justify-center gap-1.5 py-4 text-center">
+          <p className="text-sm font-medium text-neutral-300">No usage yet today</p>
+          <p className="text-[11px] text-neutral-500">
+            Usage will appear once your first session is active.
+          </p>
+          {isSettled && (
+            <button
+              type="button"
+              onClick={() => void usageQuery.refetch()}
+              className="mt-1 rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-900"
+            >
+              Refresh
+            </button>
+          )}
         </div>
-      ) : !usageData ? (
-        <div className="rounded-lg border border-primary-200 bg-primary-100/45 px-3 py-3 text-sm text-primary-600">
-          Loading usage data…
-        </div>
-      ) : (
+      ) : !usageData ? null : (
         <>
+          {/* Mobile layout */}
           <div className="space-y-3 md:hidden">
-            <p className="text-[11px] font-medium tracking-wide text-neutral-500 dark:text-neutral-400">
-              Usage
-            </p>
-            <p className="text-3xl font-semibold leading-none text-neutral-900 dark:text-neutral-50">
-              {usageProgress.percent === null ? '—' : `${usageProgress.percent}%`}
-            </p>
-
-            <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200/60 dark:bg-neutral-800/60">
-              {usageProgress.percent === null ? (
-                <div className="h-2 w-full rounded-full bg-[repeating-linear-gradient(45deg,rgba(16,185,129,0.2),rgba(16,185,129,0.2)_8px,rgba(16,185,129,0.4)_8px,rgba(16,185,129,0.4)_16px)]" />
-              ) : (
-                <div
-                  className="h-2 rounded-full bg-emerald-500/60 transition-[width] duration-500"
-                  style={{ width: `${usageProgress.percent}%` }}
-                />
-              )}
+            <div className="flex items-baseline gap-2">
+              <p className="font-mono text-2xl sm:text-3xl font-bold leading-none tabular-nums text-neutral-100">
+                {view === 'cost' ? formatUsd(displayCost) : formatTokens(displayTokens)}
+              </p>
+              <span className="text-xs text-neutral-400">{view === 'cost' ? 'today' : 'tokens'}</span>
             </div>
 
-            <div className="inline-flex rounded-full bg-neutral-100/70 p-1 dark:bg-neutral-800/50 gap-1">
-              {(['tokens', 'cost'] as const).map((tab) => (
+            <div className="inline-flex gap-1 rounded-full border border-neutral-800 bg-neutral-950 p-1">
+              {(['cost', 'tokens'] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -365,8 +470,8 @@ export function UsageMeterWidget({
                   className={cn(
                     'px-3 py-1 text-xs rounded-full transition-colors',
                     view === tab
-                      ? 'bg-white shadow-sm dark:bg-neutral-900'
-                      : 'text-neutral-600 dark:text-neutral-300',
+                      ? 'bg-neutral-800 text-neutral-100 shadow-sm'
+                      : 'text-neutral-500',
                   )}
                 >
                   {tab === 'tokens' ? 'Tokens' : 'Cost'}
@@ -374,50 +479,104 @@ export function UsageMeterWidget({
               ))}
             </div>
 
-            {view === 'cost' ? (
-              <p className="text-xs text-neutral-600 dark:text-neutral-300">
-                {formatUsd(usageData.totalCost)} total • {formatUsd(usageData.totalDirectCost)} direct
-              </p>
-            ) : (
-              <div className="space-y-1">
-                <p className="text-xs text-neutral-600 dark:text-neutral-300">{tokenSubtitle}</p>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                  In/Out {formatTokens(usageData.totalInputOutput)} • Cached{' '}
-                  {formatTokens(usageData.totalCached)}
-                </p>
+            {/* Mobile provider bars */}
+            {topProviders.length > 0 && (
+              <div className="space-y-2">
+                {topProviders.map((p) => (
+                  <div key={p.provider} className="space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <span className={cn('text-[11px] font-semibold', getProviderTextColor(p.provider))}>
+                        {capitalizeProvider(p.provider)}
+                      </span>
+                      <span className="font-mono text-[11px] tabular-nums text-neutral-300">
+                        {view === 'cost' ? formatUsd(p.cost) : formatTokens(p.total)}
+                      </span>
+                    </div>
+                    <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-800">
+                      <div
+                        className={cn('h-1 rounded-full transition-[width] duration-500', getProviderBarColor(p.provider))}
+                        style={{ width: `${p.barWidth}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          <div className="hidden space-y-2.5 md:block">
-            <div>
-              <p className="font-mono text-2xl font-bold leading-none text-ink tabular-nums">
-                {usageProgress.percent ?? 0}%
-              </p>
-              <p className="mt-1 text-xs text-primary-500">Usage</p>
+          {/* Desktop layout */}
+          <div className="hidden space-y-3 md:block">
+            {/* Hero numbers */}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-mono text-2xl sm:text-3xl font-bold leading-none text-neutral-100 tabular-nums">
+                  {view === 'cost' ? formatUsd(displayCost) : formatTokens(displayTokens)}
+                </p>
+                <p className="mt-1 text-[11px] uppercase tracking-wider text-neutral-500">
+                  {view === 'cost' ? 'today\'s spend' : 'tokens today'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-mono text-sm font-semibold tabular-nums text-neutral-300">
+                  {view === 'cost' ? formatTokens(displayTokens) : formatUsd(displayCost)}
+                </p>
+                <p className="mt-0.5 text-[11px] uppercase tracking-wider text-neutral-500">
+                  {view === 'cost' ? 'tokens' : 'spend'}
+                </p>
+              </div>
             </div>
 
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200/80 dark:bg-gray-700/70">
-              {usageProgress.percent === null ? (
-                <div className="h-1.5 w-full rounded-full bg-[repeating-linear-gradient(45deg,rgba(251,146,60,0.2),rgba(251,146,60,0.2)_8px,rgba(251,146,60,0.4)_8px,rgba(251,146,60,0.4)_16px)]" />
-              ) : (
-                <div
-                  className="h-1.5 rounded-full bg-orange-400 transition-[width] duration-500"
-                  style={{ width: `${usageProgress.percent}%` }}
-                />
-              )}
-            </div>
-
-            <p className="text-xs text-primary-500">{tokenSubtitle}</p>
-
-            {view === 'cost' ? (
-              <p className="text-xs text-primary-600">
-                {formatUsd(usageData.totalDirectCost)} direct • {formatUsd(usageData.totalCost)} total
-              </p>
+            {/* Provider breakdown bars */}
+            {topProviders.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+                  By Provider
+                </p>
+                {topProviders.map((p) => (
+                  <div key={p.provider} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={cn('text-[11px] font-semibold', getProviderTextColor(p.provider))}>
+                        {capitalizeProvider(p.provider)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] tabular-nums text-neutral-500">
+                          {formatTokens(p.total)} tok
+                        </span>
+                        <span className="font-mono text-[11px] font-semibold tabular-nums text-neutral-200">
+                          {formatUsd(p.cost)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-800">
+                      <div
+                        className={cn(
+                          'h-1.5 rounded-full transition-[width] duration-500',
+                          getProviderBarColor(p.provider),
+                        )}
+                        style={{ width: `${p.barWidth}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <p className="text-xs text-primary-600">
-                In/Out {formatTokens(usageData.totalInputOutput)} • Cached{' '}
-                {formatTokens(usageData.totalCached)}
+              <div className="space-y-1">
+                {view === 'cost' ? (
+                  <p className="text-xs text-neutral-400">
+                    Direct: {formatUsd(usageData.totalDirectCost)} • Total: {formatUsd(displayCost)}
+                  </p>
+                ) : (
+                  <p className="text-xs text-neutral-400">
+                    In/Out: {formatTokens(usageData.totalInputOutput)} • Cached: {formatTokens(usageData.totalCached)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Session count if available */}
+            {typeof usageData.sessionCount === 'number' && usageData.sessionCount > 0 && (
+              <p className="text-[10px] text-neutral-500">
+                {usageData.sessionCount} active session{usageData.sessionCount !== 1 ? 's' : ''}
               </p>
             )}
           </div>

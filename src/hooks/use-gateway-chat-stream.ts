@@ -28,11 +28,18 @@ export function useGatewayChatStream(
     onDone,
   } = options
 
-  const { connectionState, setConnectionState, processEvent, lastError } =
-    useGatewayChatStore()
+  const connectionState = useGatewayChatStore((s) => s.connectionState)
+  const setConnectionState = useGatewayChatStore((s) => s.setConnectionState)
+  const processEvent = useGatewayChatStore((s) => s.processEvent)
+  const clearStreamingSession = useGatewayChatStore((s) => s.clearStreamingSession)
+  const clearAllStreaming = useGatewayChatStore((s) => s.clearAllStreaming)
+  const lastError = useGatewayChatStore((s) => s.lastError)
 
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const streamTimeoutsRef = useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map())
   const reconnectAttempts = useRef(0)
   const mountedRef = useRef(true)
 
@@ -45,6 +52,32 @@ export function useGatewayChatStream(
   onChunkRef.current = onChunk
   onThinkingRef.current = onThinking
   onDoneRef.current = onDone
+
+  const clearStreamTimeout = useCallback((sessionKey: string) => {
+    const timeoutId = streamTimeoutsRef.current.get(sessionKey)
+    if (!timeoutId) return
+    clearTimeout(timeoutId)
+    streamTimeoutsRef.current.delete(sessionKey)
+  }, [])
+
+  const touchStreamTimeout = useCallback(
+    (sessionKey: string) => {
+      clearStreamTimeout(sessionKey)
+      const timeoutId = setTimeout(() => {
+        streamTimeoutsRef.current.delete(sessionKey)
+        clearStreamingSession(sessionKey)
+      }, 30000)
+      streamTimeoutsRef.current.set(sessionKey, timeoutId)
+    },
+    [clearStreamTimeout, clearStreamingSession],
+  )
+
+  const clearAllStreamTimeouts = useCallback(() => {
+    for (const timeoutId of streamTimeoutsRef.current.values()) {
+      clearTimeout(timeoutId)
+    }
+    streamTimeoutsRef.current.clear()
+  }, [])
 
   const connect = useCallback(() => {
     if (!enabled || !mountedRef.current) return
@@ -85,6 +118,8 @@ export function useGatewayChatStream(
 
     eventSource.addEventListener('disconnected', () => {
       if (!mountedRef.current) return
+      clearAllStreamTimeouts()
+      clearAllStreaming()
       setConnectionState('disconnected')
       scheduleReconnect()
     })
@@ -93,6 +128,8 @@ export function useGatewayChatStream(
       if (!mountedRef.current) return
 
       if (eventSource.readyState === EventSource.CLOSED) {
+        clearAllStreamTimeouts()
+        clearAllStreaming()
         setConnectionState('disconnected')
         scheduleReconnect()
       }
@@ -114,6 +151,7 @@ export function useGatewayChatStream(
           sessionKey: string
         }
         processEvent({ type: 'chunk', ...data })
+        touchStreamTimeout(data.sessionKey)
         onChunkRef.current?.(data.text, data.sessionKey)
       } catch {
         // Ignore parse errors
@@ -129,6 +167,7 @@ export function useGatewayChatStream(
           sessionKey: string
         }
         processEvent({ type: 'thinking', ...data })
+        touchStreamTimeout(data.sessionKey)
         onThinkingRef.current?.(data.text, data.sessionKey)
       } catch {
         // Ignore parse errors
@@ -147,6 +186,7 @@ export function useGatewayChatStream(
           sessionKey: string
         }
         processEvent({ type: 'tool', ...data })
+        touchStreamTimeout(data.sessionKey)
       } catch {
         // Ignore parse errors
       }
@@ -191,6 +231,7 @@ export function useGatewayChatStream(
           message?: GatewayMessage
         }
         processEvent({ type: 'done', ...data })
+        clearStreamTimeout(data.sessionKey)
         onDoneRef.current?.(data.state, data.sessionKey)
       } catch {
         // Ignore parse errors
@@ -204,6 +245,10 @@ export function useGatewayChatStream(
     enabled,
     setConnectionState,
     processEvent,
+    clearAllStreaming,
+    clearAllStreamTimeouts,
+    clearStreamTimeout,
+    touchStreamTimeout,
   ])
 
   const scheduleReconnect = useCallback(() => {
@@ -224,6 +269,8 @@ export function useGatewayChatStream(
   }, [enabled, connect])
 
   const disconnect = useCallback(() => {
+    clearAllStreamTimeouts()
+
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
       eventSourceRef.current = null
@@ -234,8 +281,9 @@ export function useGatewayChatStream(
       reconnectTimeoutRef.current = null
     }
 
+    clearAllStreaming()
     setConnectionState('disconnected')
-  }, [setConnectionState])
+  }, [clearAllStreaming, clearAllStreamTimeouts, setConnectionState])
 
   const reconnect = useCallback(() => {
     disconnect()

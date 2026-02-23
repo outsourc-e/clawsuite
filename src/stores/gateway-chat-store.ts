@@ -75,6 +75,9 @@ type GatewayChatState = {
   getRealtimeMessages: (sessionKey: string) => Array<GatewayMessage>
   getStreamingState: (sessionKey: string) => StreamingState | null
   clearSession: (sessionKey: string) => void
+  clearRealtimeBuffer: (sessionKey: string) => void
+  clearStreamingSession: (sessionKey: string) => void
+  clearAllStreaming: () => void
   mergeHistoryMessages: (
     sessionKey: string,
     historyMessages: Array<GatewayMessage>,
@@ -87,6 +90,15 @@ const createEmptyStreamingState = (): StreamingState => ({
   thinking: '',
   toolCalls: [],
 })
+
+function getMessageId(msg: GatewayMessage | null | undefined): string | undefined {
+  if (!msg) return undefined
+  const id = (msg as { id?: string }).id
+  if (typeof id === 'string' && id.trim().length > 0) return id
+  const messageId = (msg as { messageId?: string }).messageId
+  if (typeof messageId === 'string' && messageId.trim().length > 0) return messageId
+  return undefined
+}
 
 export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
   connectionState: 'disconnected',
@@ -141,63 +153,75 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
       case 'chunk': {
         const streamingMap = new Map(state.streamingState)
-        const streaming =
+        const prev =
           streamingMap.get(sessionKey) ?? createEmptyStreamingState()
 
         // Gateway sends full accumulated text with fullReplace=true
         // Replace entire text (default), or append if fullReplace is explicitly false
-        if (event.fullReplace === false) {
-          streaming.text += event.text
-        } else {
-          streaming.text = event.text
+        const next: StreamingState = {
+          ...prev,
+          text: event.fullReplace === false ? prev.text + event.text : event.text,
+          runId: event.runId ?? prev.runId,
         }
-        if (event.runId) streaming.runId = event.runId
 
-        streamingMap.set(sessionKey, streaming)
+        streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
         break
       }
 
       case 'thinking': {
         const streamingMap = new Map(state.streamingState)
-        const streaming =
+        const prev =
           streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const next: StreamingState = {
+          ...prev,
+          thinking: event.text,
+          runId: event.runId ?? prev.runId,
+        }
 
-        streaming.thinking = event.text
-        if (event.runId) streaming.runId = event.runId
-
-        streamingMap.set(sessionKey, streaming)
+        streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
         break
       }
 
       case 'tool': {
         const streamingMap = new Map(state.streamingState)
-        const streaming =
+        const prev =
           streamingMap.get(sessionKey) ?? createEmptyStreamingState()
 
-        if (event.runId) streaming.runId = event.runId
-
-        const existingToolIndex = streaming.toolCalls.findIndex(
+        const existingToolIndex = prev.toolCalls.findIndex(
           (tc) => tc.id === event.toolCallId,
         )
-
+        let nextToolCalls = prev.toolCalls
         if (existingToolIndex >= 0) {
-          streaming.toolCalls[existingToolIndex] = {
-            ...streaming.toolCalls[existingToolIndex],
-            phase: event.phase,
-            args: event.args,
-          }
+          nextToolCalls = prev.toolCalls.map((toolCall, index) =>
+            index === existingToolIndex
+              ? {
+                  ...toolCall,
+                  phase: event.phase,
+                  args: event.args,
+                }
+              : toolCall,
+          )
         } else if (event.toolCallId) {
-          streaming.toolCalls.push({
-            id: event.toolCallId,
-            name: event.name,
-            phase: event.phase,
-            args: event.args,
-          })
+          nextToolCalls = [
+            ...prev.toolCalls,
+            {
+              id: event.toolCallId,
+              name: event.name,
+              phase: event.phase,
+              args: event.args,
+            },
+          ]
         }
 
-        streamingMap.set(sessionKey, streaming)
+        const next: StreamingState = {
+          ...prev,
+          runId: event.runId ?? prev.runId,
+          toolCalls: nextToolCalls,
+        }
+
+        streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
         break
       }
@@ -257,10 +281,10 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
           // Deduplicate: by ID or exact content only (bug #7 fix)
           const completeText = extractTextFromContent(completeMessage.content)
-          const completeId = (completeMessage as any).id || (completeMessage as any).messageId
+          const completeId = getMessageId(completeMessage)
           const isDuplicate = sessionMessages.some((existing) => {
             if (existing.role !== 'assistant') return false
-            const existingId = (existing as any).id || (existing as any).messageId
+            const existingId = getMessageId(existing)
             if (completeId && existingId && completeId === existingId) return true
             if (completeText && completeText === extractTextFromContent(existing.content)) return true
             return false
@@ -297,6 +321,24 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     set({ realtimeMessages: messages, streamingState: streaming })
   },
 
+  clearRealtimeBuffer: (sessionKey) => {
+    const messages = new Map(get().realtimeMessages)
+    messages.delete(sessionKey)
+    set({ realtimeMessages: messages })
+  },
+
+  clearStreamingSession: (sessionKey) => {
+    const streaming = new Map(get().streamingState)
+    if (!streaming.has(sessionKey)) return
+    streaming.delete(sessionKey)
+    set({ streamingState: streaming })
+  },
+
+  clearAllStreaming: () => {
+    if (get().streamingState.size === 0) return
+    set({ streamingState: new Map() })
+  },
+
   mergeHistoryMessages: (sessionKey, historyMessages) => {
     const realtimeMessages = get().realtimeMessages.get(sessionKey) ?? []
 
@@ -306,12 +348,12 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
     // Find messages in realtime that aren't in history yet
     const newRealtimeMessages = realtimeMessages.filter((rtMsg) => {
-      const rtId = (rtMsg as { id?: string }).id
+      const rtId = getMessageId(rtMsg)
       const rtText = extractTextFromContent(rtMsg.content)
 
       return !historyMessages.some((histMsg) => {
         // First check: match by message id if both have one
-        const histId = (histMsg as { id?: string }).id
+        const histId = getMessageId(histMsg)
         if (rtId && histId && rtId === histId) {
           return true
         }
@@ -328,10 +370,6 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     })
 
     if (newRealtimeMessages.length === 0) {
-      // History has caught up, clear realtime buffer
-      const messages = new Map(get().realtimeMessages)
-      messages.delete(sessionKey)
-      set({ realtimeMessages: messages })
       return historyMessages
     }
 
