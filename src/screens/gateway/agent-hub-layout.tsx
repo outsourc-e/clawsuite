@@ -963,6 +963,7 @@ function OfficeView({
           const isActive = agent.status === 'active'
           const isSelected = agent.id === selectedOutputAgentId
           const isSpawning = agent.status === 'spawning'
+          const statusMeta = getAgentStatusMeta(agent.status)
 
           // Fix 2: Standardised status dots
           // 🟢 Green = active  🟡 Yellow = has session (idle/ready)  ⚫ Gray = no session  🔴 Red = error
@@ -1040,19 +1041,21 @@ function OfficeView({
                   </span>
                 </div>
 
-                {/* Activity line (monospace) */}
+                <p
+                  className={cn(
+                    'mt-2 text-[11px] font-medium',
+                    statusMeta.className,
+                  )}
+                >
+                  ● {statusMeta.label}
+                </p>
                 {agent.lastLine ? (
-                  <p className="mt-2 line-clamp-2 min-h-[2.4em] font-mono text-xs leading-relaxed text-neutral-500">
+                  <p className="mt-1 line-clamp-2 min-h-[2.1em] font-mono text-xs leading-relaxed text-neutral-500">
                     {agent.lastLine}
                   </p>
                 ) : (
-                  <p
-                    className={cn(
-                      'mt-2 min-h-[2.4em] font-mono text-xs leading-relaxed',
-                      getAgentStatusMeta(agent.status).className,
-                    )}
-                  >
-                    ● {getAgentStatusMeta(agent.status).label}
+                  <p className="mt-1 min-h-[2.1em] font-mono text-xs leading-relaxed text-neutral-400">
+                    {agent.status === 'none' ? 'Waiting for session' : 'No recent output'}
                   </p>
                 )}
 
@@ -1935,14 +1938,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     () => teamWithRuntimeStatus.map((member) => ({ id: member.id, name: member.name })),
     [teamWithRuntimeStatus],
   )
+  const activeTaskSource = useMemo(
+    () => (missionActive && missionTasks.length > 0 ? missionTasks : boardTasks),
+    [boardTasks, missionActive, missionTasks],
+  )
   const agentTaskCounts = useMemo(() => {
     const counts: Record<string, number> = {}
-    boardTasks.forEach((task) => {
+    activeTaskSource.forEach((task) => {
       if (!task.agentId) return
       counts[task.agentId] = (counts[task.agentId] ?? 0) + 1
     })
     return counts
-  }, [boardTasks])
+  }, [activeTaskSource])
   const activeTemplateId = useMemo(() => resolveActiveTemplate(team), [team])
   const missionBadge = useMemo(() => {
     if (missionState === 'paused') {
@@ -2011,7 +2018,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         status = 'idle'
       }
 
-      const inProgressTask = boardTasks.find(
+      const inProgressTask = activeTaskSource.find(
         (t) => t.agentId === member.id && t.status === 'in_progress',
       )
 
@@ -2039,7 +2046,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     agentSessionMap,
     agentActivity,
     pausedByAgentId,
-    boardTasks,
+    activeTaskSource,
     agentTaskCounts,
   ])
 
@@ -3100,14 +3107,48 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 ) : null}
               </div>
             ) : view === 'timeline' ? (
-              <div className="flex min-h-0 h-full flex-1 items-center justify-center bg-neutral-50 px-6">
-                <div className="rounded-xl border border-dashed border-neutral-300 bg-white px-6 py-5 text-center shadow-sm">
-                  <h3 className="text-sm font-semibold text-neutral-900">
-                    Timeline view coming soon
-                  </h3>
-                  <p className="mt-1 text-xs text-neutral-500">
-                    Switch back to Board for active mission orchestration.
+              <div className="flex min-h-0 flex-1 flex-col h-full">
+                <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-2.5">
+                  <p className="truncate text-xs font-medium text-neutral-800">
+                    Mission: {truncateMissionGoal(activeMissionGoal || missionGoal.trim())}
                   </p>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <div className="flex items-center rounded-lg border border-neutral-200 bg-neutral-50 p-0.5">
+                      {(['board', 'timeline'] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          className={cn(
+                            'rounded-md px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
+                            (view as string) === v
+                              ? 'bg-white text-neutral-900 shadow-sm'
+                              : 'text-neutral-500 hover:text-neutral-700',
+                          )}
+                          onClick={() => setView(v)}
+                        >
+                          {v.charAt(0).toUpperCase() + v.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        missionBadge.className,
+                      )}
+                    >
+                      {missionBadge.label}
+                    </span>
+                  </div>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <TaskBoard
+                    agents={boardAgents}
+                    initialTasks={missionTasks}
+                    activeMissionId={missionIdRef.current || undefined}
+                    selectedAgentId={selectedAgentId}
+                    onRef={handleTaskBoardRef}
+                    onTasksChange={setBoardTasks}
+                  />
                 </div>
               </div>
             ) : (
@@ -3149,6 +3190,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <TaskBoard
                     agents={boardAgents}
                     initialTasks={missionTasks}
+                    activeMissionId={missionIdRef.current || undefined}
                     selectedAgentId={selectedAgentId}
                     onRef={handleTaskBoardRef}
                     onTasksChange={setBoardTasks}
@@ -3225,9 +3267,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }
 
   function renderOverviewContent() {
-    const activeCount = agentWorkingRows.filter((row) => row.status === 'active').length
+    const activeCount = agentWorkingRows.filter(
+      (row) => row.status === 'active' || row.status === 'spawning',
+    ).length
     const pendingApprovalCount = approvals.filter((a) => a.status === 'pending').length
-    const taskSource = missionActive ? missionTasks : boardTasks
+    const taskSource = missionActive ? activeTaskSource : boardTasks
     const doneTasks = taskSource.filter((task) => task.status === 'done').length
     const totalTasks = taskSource.length
     const recentReports = loadMissionHistory().slice(0, 5)
@@ -3266,7 +3310,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setActiveTab('missions')}
+                    onClick={() => {
+                      setView('board')
+                      setActiveTab('missions')
+                    }}
                     className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50"
                   >
                     View Mission
@@ -3382,9 +3429,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             ) : overviewAgentsView === 'live' ? (
               <OfficeView
                 agentRows={agentWorkingRows}
-                missionRunning={missionActive}
+                missionRunning={isMissionRunning}
                 onViewOutput={(agentId) => {
                   handleAgentSelection(agentId)
+                  setView('board')
                   setActiveTab('missions')
                 }}
                 selectedOutputAgentId={selectedOutputAgentId}
@@ -3476,6 +3524,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         type="button"
                         onClick={() => {
                           handleAgentSelection(agent.id)
+                          setView('board')
                           setActiveTab('missions')
                         }}
                         className={cn(

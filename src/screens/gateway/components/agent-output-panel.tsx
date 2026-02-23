@@ -38,6 +38,15 @@ function parseSsePayload(raw: string): Record<string, unknown> | null {
   }
 }
 
+function payloadMatchesSession(
+  payload: Record<string, unknown> | null,
+  sessionKey: string,
+): boolean {
+  if (!payload) return false
+  const payloadSessionKey = readString(payload.sessionKey)
+  return !payloadSessionKey || payloadSessionKey === sessionKey
+}
+
 // Strip DeepSeek-R1 <think>...</think> reasoning blocks from displayed content.
 // Applied at render time only — raw content is preserved in state for streaming continuity.
 function stripThinkBlocks(content: string): string {
@@ -181,6 +190,7 @@ export function AgentOutputPanel({
       if (!(event instanceof MessageEvent)) return
       const payload = parseSsePayload(event.data as string)
       if (!payload) return
+      if (!payloadMatchesSession(payload, sessionKey)) return
       const text = readEventText(payload)
       if (!text) return
       const fullReplace = payload.fullReplace === true
@@ -198,6 +208,7 @@ export function AgentOutputPanel({
       if (!(event instanceof MessageEvent)) return
       const payload = parseSsePayload(event.data as string)
       if (!payload) return
+      if (!payloadMatchesSession(payload, sessionKey)) return
       const name = readString(payload.name) || 'tool'
       const args = payload.args ?? payload.input ?? payload.parameters
       const argsStr = truncateArgs(args)
@@ -213,6 +224,8 @@ export function AgentOutputPanel({
       let doneLabel = 'Session ended'
       if (event instanceof MessageEvent) {
         const payload = parseSsePayload(event.data as string)
+        if (!payload) return
+        if (!payloadMatchesSession(payload, sessionKey)) return
         const state = readString(payload?.state).toLowerCase()
         const error = readString(payload?.errorMessage)
         if (state === 'error') {
@@ -234,6 +247,7 @@ export function AgentOutputPanel({
       if (!(event instanceof MessageEvent)) return
       const payload = parseSsePayload(event.data as string)
       if (!payload) return
+      if (!payloadMatchesSession(payload, sessionKey)) return
       const text = readEventText(payload)
       if (!text) return
       setMessages((prev) => [
@@ -247,6 +261,7 @@ export function AgentOutputPanel({
       if (!(event instanceof MessageEvent)) return
       const payload = parseSsePayload(event.data as string)
       if (!payload) return
+      if (!payloadMatchesSession(payload, sessionKey)) return
       const role = readEventRole(payload)
       const text = readEventText(payload)
       if (!text) return
@@ -273,15 +288,15 @@ export function AgentOutputPanel({
           {tasks.map((task) => (
             <div
               key={task.id}
-              className="rounded-lg bg-primary-50 px-3 py-2 dark:bg-neutral-800/80"
+              className="rounded-lg border border-neutral-200 bg-white px-3 py-2"
             >
               <div className="flex items-center gap-2">
                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                <span className="text-xs font-medium text-primary-700 dark:text-neutral-100">
+                <span className="text-xs font-medium text-neutral-900">
                   {task.title}
                 </span>
               </div>
-              <p className="mt-1 text-[10px] text-primary-400">
+              <p className="mt-1 text-[10px] text-neutral-500">
                 {task.status === 'in_progress'
                   ? 'Working...'
                   : task.status === 'done'
@@ -295,7 +310,7 @@ export function AgentOutputPanel({
 
       {/* Terminal output */}
       {sessionKey && streamDisconnected && !sessionEnded ? (
-        <div className="mb-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300">
+        <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700">
           Stream disconnected
         </div>
       ) : null}
@@ -303,27 +318,27 @@ export function AgentOutputPanel({
         <div
           ref={scrollRef}
           className={cn(
-            'overflow-y-auto rounded-lg bg-neutral-900 p-3 font-mono text-[11px] leading-relaxed',
+            'overflow-y-auto rounded-lg border border-neutral-200 bg-white p-3 font-mono text-[11px] leading-relaxed text-neutral-900',
             compact ? 'h-full min-h-[120px]' : 'mt-1 min-h-[80px] max-h-[220px]',
           )}
         >
           {messages.length === 0 && !sessionEnded ? (
-            <p className="animate-pulse text-neutral-400">Waiting for response…</p>
+            <p className="animate-pulse text-neutral-500">Waiting for response...</p>
           ) : (
             <>
               {messages.map((msg, index) =>
                 msg.role === 'tool' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="text-neutral-500"
+                    className="text-neutral-600"
                   >
-                    <span className="text-neutral-600">▶ </span>
+                    <span className="text-neutral-400">▶ </span>
                     {msg.content}
                   </div>
                 ) : msg.role === 'user' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="my-1 rounded border border-neutral-700 bg-neutral-800 px-2 py-1 text-neutral-300"
+                    className="my-1 rounded border border-neutral-200 bg-neutral-50 px-2 py-1 text-neutral-800"
                   >
                     <span className="mr-1 text-[9px] uppercase tracking-wider text-neutral-500">you »</span>
                     {msg.content}
@@ -331,34 +346,34 @@ export function AgentOutputPanel({
                 ) : msg.done ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="border-t border-neutral-800 pt-1 text-emerald-400"
+                    className="border-t border-neutral-200 pt-1 text-emerald-700"
                   >
                     {msg.content}
                   </div>
                 ) : (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="whitespace-pre-wrap text-neutral-100"
+                    className="whitespace-pre-wrap text-neutral-900"
                   >
                     {stripThinkBlocks(msg.content)}
                   </div>
                 ),
               )}
               {!sessionEnded && messages.length > 0 && (
-                <span className="animate-pulse text-green-400">▊</span>
+                <span className="animate-pulse text-emerald-600">▊</span>
               )}
             </>
           )}
         </div>
       ) : (
         // Fallback placeholder when no sessionKey
-        <div className={cn('rounded-lg bg-neutral-900 p-3 font-mono text-[11px] text-green-400', compact ? 'flex-1' : 'mt-3 min-h-[80px]')}>
+        <div className={cn('rounded-lg border border-neutral-200 bg-white p-3 font-mono text-[11px] text-neutral-900', compact ? 'flex-1' : 'mt-3 min-h-[80px]')}>
           {tasks.length === 0 ? (
             <p className="text-neutral-500">No dispatched tasks yet.</p>
           ) : (
             <>
               <p>$ Dispatching to {agentName}…</p>
-              <p className="animate-pulse">▊</p>
+              <p className="animate-pulse text-emerald-600">▊</p>
             </>
           )}
         </div>
@@ -375,15 +390,15 @@ export function AgentOutputPanel({
   }
 
   return (
-    <div className="border-t border-primary-200 dark:border-neutral-700 p-3">
+    <div className="border-t border-neutral-200 bg-white p-3">
       {/* Header */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <h3 className="truncate text-xs font-semibold text-primary-900 dark:text-neutral-100">
+          <h3 className="truncate text-xs font-semibold text-neutral-900">
             {agentName}
           </h3>
           {modelId ? (
-            <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 font-mono text-[9px] font-semibold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+            <span className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-neutral-700">
               {modelId}
             </span>
           ) : null}
@@ -396,7 +411,7 @@ export function AgentOutputPanel({
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 text-xs text-primary-400 transition-colors hover:text-primary-600 dark:hover:text-neutral-200"
+          className="shrink-0 text-xs text-neutral-500 transition-colors hover:text-neutral-700"
         >
           ✕
         </button>
