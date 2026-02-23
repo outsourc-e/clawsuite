@@ -90,10 +90,30 @@ export function getProviderMeta(provider: string) {
  */
 export function ProviderLogo({ provider, size = 28 }: { provider: string; size?: number }) {
   const [failed, setFailed] = useState(false)
-  const key = provider.toLowerCase()
+  const rawKey = provider.toLowerCase()
+  // Normalize: exact match first, then try known slug prefixes (handles "ollama-pc1" → "ollama")
+  const key = SIMPLEICONS_SLUGS[rawKey]
+    ? rawKey
+    : (Object.keys(SIMPLEICONS_SLUGS).find((k) => rawKey.startsWith(`${k}-`) || rawKey.startsWith(`${k}:`)) ?? rawKey)
   const meta = getProviderMeta(provider)
   const slug = SIMPLEICONS_SLUGS[key]
   const hex = PROVIDER_HEX[key]
+
+  // Inline SVG for OpenAI — CDN unreliable for dark-brand providers; render crisp inline SVG instead
+  if (key === 'openai' || key === 'openai-codex' || key === 'anthropic-oauth') {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="text-neutral-800 dark:text-white"
+        aria-label={meta.label}
+      >
+        <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 11.44.525a5.985 5.985 0 0 0-5.708 4.17 6.046 6.046 0 0 0-4.039 2.916 6.046 6.046 0 0 0 .745 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.516 2.9A5.985 5.985 0 0 0 12.56 23.48a5.985 5.985 0 0 0 5.708-4.17 6.046 6.046 0 0 0 4.039-2.916 6.046 6.046 0 0 0-.025-7.573zM12.56 21.9a4.52 4.52 0 0 1-2.897-1.056l.143-.081 4.806-2.776a.795.795 0 0 0 .397-.689v-6.787l2.032 1.173a.071.071 0 0 1 .038.052v5.614a4.524 4.524 0 0 1-4.52 4.57zm-9.715-4.154a4.52 4.52 0 0 1-.54-3.03l.142.085 4.807 2.776a.793.793 0 0 0 .794 0l5.864-3.388v2.344a.072.072 0 0 1-.03.056L8.68 19.733a4.52 4.52 0 0 1-5.835-1.987zm-1.265-10.51a4.52 4.52 0 0 1 2.36-1.986V9.07a.77.77 0 0 0 .396.68l5.864 3.387-2.033 1.174a.072.072 0 0 1-.066 0L3.44 11.507a4.518 4.518 0 0 1-.86-4.271zm16.697 3.855-5.864-3.387 2.032-1.173a.072.072 0 0 1 .066 0l4.823 2.786a4.52 4.52 0 0 1-.706 8.156v-5.27a.795.795 0 0 0-.351-.612zm2.022-3.017-.143-.085-4.806-2.776a.795.795 0 0 0-.795 0L9.57 8.517V6.173a.072.072 0 0 1 .03-.057l4.83-2.786a4.52 4.52 0 0 1 6.585 4.685zm-12.64 4.135-2.032-1.174a.072.072 0 0 1-.038-.053V9.285a4.52 4.52 0 0 1 7.415-3.473l-.143.082L9.17 8.67a.795.795 0 0 0-.398.69zm1.103-2.378 2.607-1.506 2.607 1.506v3.012l-2.607 1.506-2.607-1.506V11.83z" />
+      </svg>
+    )
+  }
 
   if (!failed && slug) {
     const brandHex = hex ?? '555555'
@@ -132,21 +152,23 @@ export function ProviderLogo({ provider, size = 28 }: { provider: string; size?:
     )
   }
 
-  // Custom inline SVG for providers not in SimpleIcons
+  // Custom emoji for providers not in SimpleIcons (or as CDN fallback)
   const CUSTOM_PROVIDER_ICONS: Record<string, string> = {
     deepseek:   '🐋',
     minimax:    '⚡',
     fireworks:  '🎆',
     together:   '🤝',
     togetherai: '🤝',
+    ollama:     '🦙',
   }
   const customEmoji = CUSTOM_PROVIDER_ICONS[key]
   if (customEmoji) {
     return <span className="leading-none" style={{ fontSize: size * 0.55 }}>{customEmoji}</span>
   }
 
-  // Fallback: branded letter abbreviation in 2 chars
-  const letters = provider.replace(/[-_.]/g, ' ').trim().slice(0, 2).toUpperCase()
+  // Fallback: branded letter abbreviation — prefer display label over raw provider string
+  const labelSource = meta.label?.length > 1 ? meta.label : provider.replace(/[-_.]/g, ' ').trim()
+  const letters = labelSource.replace(/\s+/g, '').slice(0, 2).toUpperCase()
   return (
     <span className={cn('font-black leading-none', meta.color)} style={{ fontSize: Math.max(10, size * 0.4) }}>
       {letters}
@@ -327,6 +349,9 @@ export function AgentWizardModal({
 }: AgentWizardProps) {
   const isCustomPrompt = member.backstory.trim() !== '' && !systemPromptTemplates.some((t) => t.prompt === member.backstory)
 
+  // Header subtitle: show role if set, otherwise "Configure your agent"
+  const headerSubtitle = member.roleDescription?.trim() || 'Configure your agent'
+
   return (
     <WizardModal open onClose={onClose} width="max-w-2xl">
       {/* Header */}
@@ -335,7 +360,7 @@ export function AgentWizardModal({
         {avatarNode}
         <div className="min-w-0 flex-1">
           <p className="text-lg font-bold text-neutral-900 dark:text-white">{member.name || `Agent ${memberIndex + 1}`}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Agent {memberIndex + 1}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">{headerSubtitle}</p>
         </div>
         <button type="button" onClick={onClose}
           className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
@@ -345,12 +370,19 @@ export function AgentWizardModal({
 
       {/* Form body */}
       <div className="px-6 py-5 space-y-4">
-        {/* Name + Model + Role row */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div>
-            <FieldLabel>Name</FieldLabel>
-            <input value={member.name} onChange={(e) => onUpdate({ name: e.target.value })} className={INPUT_CLS} />
-          </div>
+        {/* Row 1: NAME (full width, prominent) */}
+        <div>
+          <FieldLabel>Name</FieldLabel>
+          <input
+            value={member.name}
+            onChange={(e) => onUpdate({ name: e.target.value })}
+            className="h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-base font-semibold text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 transition-colors"
+            placeholder={`Agent ${memberIndex + 1}`}
+          />
+        </div>
+
+        {/* Row 2: MODEL (half) + ROLE (half) */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <FieldLabel>Model</FieldLabel>
             <select value={member.modelId} onChange={(e) => onUpdate({ modelId: e.target.value })} className={SELECT_CLS}>
@@ -372,7 +404,7 @@ export function AgentWizardModal({
 
         {/* System Prompt */}
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-1.5">
             <FieldLabel>System Prompt</FieldLabel>
             <div className="flex gap-1.5">
               <span className={cn('rounded-md border px-1.5 py-0.5 text-[9px] font-semibold',
@@ -389,19 +421,19 @@ export function AgentWizardModal({
             </div>
           </div>
 
-          {/* Template pills by category */}
+          {/* Template chips by category — compact */}
           {(['engineering', 'research', 'content', 'ops', 'general'] as const).map((cat) => {
             const catTemplates = systemPromptTemplates.filter((t) => t.category === cat)
-            const catLabels: Record<string, string> = { engineering: '⚙️ Eng', research: '🔬 Research', content: '📝 Content', ops: '🗺️ Ops', general: '🤖 General' }
+            const catLabels: Record<string, string> = { engineering: '⚙️ Eng', research: '🔬', content: '📝', ops: '🗺️', general: '🤖' }
             return (
-              <div key={cat} className="flex flex-wrap items-center gap-1 mb-1">
-                <span className="shrink-0 w-16 text-[9px] font-bold uppercase tracking-widest text-neutral-300 dark:text-neutral-600">{catLabels[cat]}</span>
+              <div key={cat} className="flex flex-wrap items-center gap-1 mb-0.5">
+                <span className="shrink-0 w-8 text-[8px] font-bold uppercase tracking-widest text-neutral-300 dark:text-neutral-600">{catLabels[cat]}</span>
                 {catTemplates.map((tpl) => {
                   const active = member.backstory === tpl.prompt
                   return (
                     <button key={tpl.id} type="button"
                       onClick={() => onUpdate({ backstory: active ? '' : tpl.prompt })}
-                      className={cn('rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors',
+                      className={cn('rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors',
                         active ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
                           : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-500 hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700')}
                       title={tpl.prompt.slice(0, 120)}
@@ -417,8 +449,8 @@ export function AgentWizardModal({
           <textarea
             value={member.backstory}
             onChange={(e) => onUpdate({ backstory: e.target.value })}
-            rows={6}
-            className="mt-2 min-h-[120px] w-full resize-y rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 py-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 font-mono leading-relaxed"
+            rows={4}
+            className="mt-2 min-h-[100px] w-full resize-y rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 py-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 font-mono leading-relaxed"
             placeholder="Persona, instructions, and context for this agent..."
           />
         </div>
@@ -444,7 +476,7 @@ export function AgentWizardModal({
           onClick={onClose}
           className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
         >
-          {addMode ? '+ Add Agent' : '✓ Done'}
+          {addMode ? '+ Add Agent' : 'Save Changes'}
         </button>
       </div>
     </WizardModal>
@@ -683,6 +715,7 @@ function pickUniqueTeamIcon(existing: string[]): string {
 }
 
 export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons = [], onSaveCurrentAs, onApplyTemplate, onClose }: AddTeamModalProps) {
+  const [step, setStep] = useState<1 | 2>(1)
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(
     () => new Set(currentTeam.map((m) => m.id))
@@ -690,17 +723,19 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
   const [teamName, setTeamName] = useState('')
   const [teamIcon, setTeamIcon] = useState(() => pickUniqueTeamIcon(existingIcons))
 
-  // When a template is picked, pre-fill the name and select the matching agents by display name
-  function handleSelectTemplate(tpl: AddTeamModalProps['quickStartTemplates'][number]) {
-    setSelectedTemplate(tpl.id)
+  // When a template is picked and "Next" is clicked, pre-fill name and agents
+  function applyTemplateToStep2(tpl: AddTeamModalProps['quickStartTemplates'][number] | null) {
+    if (!tpl) {
+      // Skip / build from scratch — all agents selected, blank name
+      setSelectedAgents(new Set(currentTeam.map((m) => m.id)))
+      return
+    }
     setTeamName(tpl.label)
-    // Try to match agents by name — agent names that appear in the template agents list
     const matched = new Set(
       currentTeam
         .filter((m) => tpl.agents.some((a) => a.toLowerCase() === m.name.toLowerCase()))
         .map((m) => m.id)
     )
-    // Fall back to all agents if none matched (template agents might have different names)
     setSelectedAgents(matched.size > 0 ? matched : new Set(currentTeam.map((m) => m.id)))
   }
 
@@ -719,7 +754,6 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
   function handleCreate() {
     const name = teamName.trim() || `Custom Team ${new Date().toLocaleDateString()}`
     const agentIds = currentTeam.filter((m) => selectedAgents.has(m.id)).map((m) => m.id)
-    // Apply template if one was selected
     if (selectedTemplate) {
       const tpl = quickStartTemplates.find((t) => t.id === selectedTemplate)
       if (tpl?.templateId && tpl.templateId in TEAM_TEMPLATES) {
@@ -734,14 +768,21 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
 
   return (
     <WizardModal open onClose={onClose} width="max-w-lg">
-      {/* Header */}
+      {/* Header — step indicator */}
       <div className="flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4 border-l-orange-400">
         <div className="flex size-12 items-center justify-center rounded-full bg-orange-50 dark:bg-orange-900/20 text-2xl shadow-sm">
           {teamIcon}
         </div>
         <div className="flex-1">
           <p className="text-base font-bold text-neutral-900 dark:text-white">New Team</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Configure agents, name, and icon</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            {step === 1 ? 'Step 1 — Choose a Template' : 'Step 2 — Configure Team'}
+          </p>
+        </div>
+        {/* Step dots */}
+        <div className="flex items-center gap-1.5 mr-2">
+          <span className={cn('size-2 rounded-full transition-colors', step === 1 ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+          <span className={cn('size-2 rounded-full transition-colors', step === 2 ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
         </div>
         <button type="button" onClick={onClose}
           className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
@@ -749,127 +790,163 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
         </button>
       </div>
 
-      <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
-        {/* Quick-start templates — compact chips */}
-        <div>
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Start from a Template</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {quickStartTemplates.map((tpl) => (
-              <button
-                key={tpl.id}
-                type="button"
-                onClick={() => handleSelectTemplate(tpl)}
-                className={cn('flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all',
-                  selectedTemplate === tpl.id
-                    ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/15 shadow-sm'
-                    : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600')}
-              >
-                <span className="shrink-0">{tpl.icon}</span>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-100 truncate">{tpl.label}</p>
-                  <p className="text-[9px] text-neutral-400 truncate">{tpl.description}</p>
-                </div>
-                <span className={cn('ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold',
-                  tpl.tier === 'budget' ? 'bg-green-100 text-green-700' : tpl.tier === 'balanced' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700')}>
-                  {tpl.tier === 'budget' ? '💰' : tpl.tier === 'balanced' ? '⚖️' : '🚀'}
-                </span>
-              </button>
-            ))}
+      {/* ── Step 1: Choose a Template ── */}
+      {step === 1 ? (
+        <>
+          <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">
+            <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">Pick a template to pre-configure your team, or start from scratch.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {quickStartTemplates.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => setSelectedTemplate(tpl.id === selectedTemplate ? null : tpl.id)}
+                  className={cn('flex items-center gap-2 rounded-xl border-2 px-3 py-3 text-left transition-all',
+                    selectedTemplate === tpl.id
+                      ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/15 shadow-sm'
+                      : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600')}
+                >
+                  <span className="shrink-0 text-xl">{tpl.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-100 truncate">{tpl.label}</p>
+                    <p className="text-[9px] text-neutral-400 truncate mt-0.5">{tpl.description}</p>
+                  </div>
+                  <span className={cn('ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold',
+                    tpl.tier === 'budget' ? 'bg-green-100 text-green-700' : tpl.tier === 'balanced' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700')}>
+                    {tpl.tier === 'budget' ? '💰' : tpl.tier === 'balanced' ? '⚖️' : '🚀'}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
-          <span className="text-[10px] text-neutral-400 font-medium">AGENTS TO INCLUDE</span>
-          <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
-        </div>
-
-        {/* Agent selector */}
-        <div className="space-y-1.5">
-          {currentTeam.length === 0 ? (
-            <p className="text-center text-xs text-neutral-400 py-3">No agents configured yet</p>
-          ) : currentTeam.map((m) => {
-            const checked = selectedAgents.has(m.id)
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => toggleAgent(m.id)}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all',
-                  checked
-                    ? 'border-orange-300 bg-orange-50/50 dark:border-orange-700/50 dark:bg-orange-900/10'
-                    : 'border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/30 opacity-60 hover:opacity-80',
-                )}
-              >
-                {/* Checkbox */}
-                <span className={cn(
-                  'flex size-4 shrink-0 items-center justify-center rounded border-2 transition-all',
-                  checked ? 'border-orange-500 bg-orange-500' : 'border-neutral-300 dark:border-neutral-600',
-                )}>
-                  {checked ? <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> : null}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-100 truncate">{m.name}</p>
-                  <p className="text-[10px] text-neutral-400 truncate">{m.modelId}</p>
-                </div>
-              </button>
-            )
-          })}
-          {selectedAgents.size === 0 ? (
-            <p className="text-[10px] text-red-500 text-center pt-1">Select at least one agent</p>
-          ) : (
-            <p className="text-[10px] text-neutral-400 text-center pt-1">{selectedAgents.size} of {currentTeam.length} agents selected</p>
-          )}
-        </div>
-
-        {/* Team Name */}
-        <div>
-          <FieldLabel>Team Name</FieldLabel>
-          <input
-            value={teamName}
-            onChange={(e) => setTeamName(e.target.value)}
-            placeholder="e.g. Research Squad, Dev Team…"
-            className={INPUT_CLS}
-          />
-        </div>
-
-        {/* Team Icon — inline row */}
-        <div>
-          <FieldLabel>Team Icon</FieldLabel>
-          <div className="flex flex-wrap gap-1">
-            {INLINE_TEAM_ICONS.map((ic) => (
-              <button
-                key={ic}
-                type="button"
-                onClick={() => setTeamIcon(ic)}
-                className={cn(
-                  'flex size-8 items-center justify-center rounded-md text-lg transition-all hover:scale-110',
-                  teamIcon === ic ? 'bg-orange-100 dark:bg-orange-900/30 ring-1 ring-orange-400' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800',
-                )}
-              >
-                {ic}
-              </button>
-            ))}
+          <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+            <button
+              type="button"
+              onClick={() => { applyTemplateToStep2(null); setSelectedTemplate(null); setStep(2) }}
+              className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors underline underline-offset-2"
+            >
+              Skip — build from scratch
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const tpl = quickStartTemplates.find((t) => t.id === selectedTemplate) ?? null
+                applyTemplateToStep2(tpl)
+                setStep(2)
+              }}
+              className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+            >
+              Next →
+            </button>
           </div>
-        </div>
-      </div>
+        </>
+      ) : null}
 
-      <div className="flex justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
-        <button type="button" onClick={onClose}
-          className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={!canCreate}
-          className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
-        >
-          Create Team
-        </button>
-      </div>
+      {/* ── Step 2: Configure Team ── */}
+      {step === 2 ? (
+        <>
+          <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Agent checklist */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <FieldLabel>Agents to Include</FieldLabel>
+                <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+                  {selectedAgents.size} of {currentTeam.length} selected
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {currentTeam.length === 0 ? (
+                  <p className="text-center text-xs text-neutral-400 py-3">No agents configured yet</p>
+                ) : currentTeam.map((m) => {
+                  const checked = selectedAgents.has(m.id)
+                  // Get short model label
+                  const modelParts = m.modelId.split('/')
+                  const modelShort = modelParts[modelParts.length - 1] || m.modelId
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => toggleAgent(m.id)}
+                      className={cn(
+                        'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all',
+                        checked
+                          ? 'border-orange-300 bg-orange-50/50 dark:border-orange-700/50 dark:bg-orange-900/10'
+                          : 'border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/30 opacity-60 hover:opacity-80',
+                      )}
+                    >
+                      <span className={cn(
+                        'flex size-4 shrink-0 items-center justify-center rounded border-2 transition-all',
+                        checked ? 'border-orange-500 bg-orange-500' : 'border-neutral-300 dark:border-neutral-600',
+                      )}>
+                        {checked ? <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> : null}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-100 truncate leading-tight">{m.name}</p>
+                        <p className="text-[10px] text-neutral-400 truncate leading-tight mt-0.5">{m.modelId}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] font-medium text-neutral-500 dark:text-neutral-400">
+                        {modelShort}
+                      </span>
+                    </button>
+                  )
+                })}
+                {selectedAgents.size === 0 ? (
+                  <p className="text-[10px] text-red-500 text-center pt-1">Select at least one agent</p>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Team Name + Icon side by side */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <FieldLabel>Team Name</FieldLabel>
+                <input
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  placeholder="e.g. Research Squad, Dev Team…"
+                  className={INPUT_CLS}
+                />
+              </div>
+              <div>
+                <FieldLabel>Team Icon</FieldLabel>
+                <div className="flex flex-wrap gap-1 max-h-[72px] overflow-y-auto">
+                  {INLINE_TEAM_ICONS.slice(0, 20).map((ic) => (
+                    <button
+                      key={ic}
+                      type="button"
+                      onClick={() => setTeamIcon(ic)}
+                      className={cn(
+                        'flex size-8 items-center justify-center rounded-md text-lg transition-all hover:scale-110',
+                        teamIcon === ic ? 'bg-orange-100 dark:bg-orange-900/30 ring-1 ring-orange-400' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                      )}
+                    >
+                      {ic}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+            >
+              ← Back
+            </button>
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={!canCreate}
+              className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+            >
+              Create Team
+            </button>
+          </div>
+        </>
+      ) : null}
     </WizardModal>
   )
 }
