@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { Markdown } from '@/components/prompt-kit/markdown'
 import type { HubTask } from './task-board'
 
 type OutputMessage = {
@@ -16,6 +17,8 @@ export type AgentOutputPanelProps = {
   onClose: () => void
   /** Model preset id — shown in header badge e.g. 'pc1-coder', 'sonnet' */
   modelId?: string
+  /** Optional runtime status label shown in the header badge. */
+  statusLabel?: string
   /** Compact mode: no outer border/padding and no internal header. Use inside LiveActivityPanel. */
   compact?: boolean
 }
@@ -149,6 +152,7 @@ export function AgentOutputPanel({
   tasks,
   onClose,
   modelId,
+  statusLabel,
   compact = false,
 }: AgentOutputPanelProps) {
   const [messages, setMessages] = useState<OutputMessage[]>([])
@@ -172,6 +176,15 @@ export function AgentOutputPanel({
       el.scrollTop = el.scrollHeight
     }
   }, [messages])
+
+  const streamStatus = sessionEnded
+    ? 'Completed'
+    : streamDisconnected
+      ? 'Disconnected'
+      : sessionKey
+        ? 'Streaming'
+        : 'Idle'
+  const headerStatus = statusLabel || streamStatus
 
   // SSE stream consumption
   useEffect(() => {
@@ -284,7 +297,7 @@ export function AgentOutputPanel({
     <>
       {/* Task list */}
       {tasks.length > 0 && (
-        <div className={cn('space-y-1.5', compact ? 'mb-2' : 'mb-2')}>
+        <div className={cn('space-y-1.5', compact ? 'mb-2' : 'mb-3')}>
           {tasks.map((task) => (
             <div
               key={task.id}
@@ -318,8 +331,8 @@ export function AgentOutputPanel({
         <div
           ref={scrollRef}
           className={cn(
-            'overflow-y-auto rounded-lg border border-neutral-200 bg-white p-3 font-mono text-[11px] leading-relaxed text-neutral-900',
-            compact ? 'h-full min-h-[120px]' : 'mt-1 min-h-[80px] max-h-[220px]',
+          'overflow-y-auto rounded-lg border border-neutral-200 bg-white p-3 text-[11px] leading-relaxed text-neutral-900',
+            compact ? 'h-full min-h-[120px]' : 'mt-1 min-h-[300px] flex-1 text-sm leading-6',
           )}
         >
           {messages.length === 0 && !sessionEnded ? (
@@ -330,7 +343,7 @@ export function AgentOutputPanel({
                 msg.role === 'tool' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="text-neutral-600"
+                    className="mb-1 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 font-mono text-xs leading-5 text-neutral-700"
                   >
                     <span className="text-neutral-400">▶ </span>
                     {msg.content}
@@ -338,24 +351,30 @@ export function AgentOutputPanel({
                 ) : msg.role === 'user' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="my-1 rounded border border-neutral-200 bg-neutral-50 px-2 py-1 text-neutral-800"
+                    className="my-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm leading-6 text-neutral-800"
                   >
-                    <span className="mr-1 text-[9px] uppercase tracking-wider text-neutral-500">you »</span>
-                    {msg.content}
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+                      You
+                    </div>
+                    <Markdown className="text-sm leading-6 text-neutral-800 [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2">
+                      {msg.content}
+                    </Markdown>
                   </div>
                 ) : msg.done ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="border-t border-neutral-200 pt-1 text-emerald-700"
+                    className="mt-2 border-t border-neutral-200 pt-2 text-sm font-medium text-emerald-700"
                   >
                     {msg.content}
                   </div>
                 ) : (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="whitespace-pre-wrap text-neutral-900"
+                    className="my-2 rounded-lg border border-neutral-100 bg-white text-neutral-900"
                   >
-                    {stripThinkBlocks(msg.content)}
+                    <Markdown className="text-sm leading-6 text-neutral-900 [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_pre]:my-2">
+                      {stripThinkBlocks(msg.content)}
+                    </Markdown>
                   </div>
                 ),
               )}
@@ -367,7 +386,7 @@ export function AgentOutputPanel({
         </div>
       ) : (
         // Fallback placeholder when no sessionKey
-        <div className={cn('rounded-lg border border-neutral-200 bg-white p-3 font-mono text-[11px] text-neutral-900', compact ? 'flex-1' : 'mt-3 min-h-[80px]')}>
+        <div className={cn('rounded-lg border border-neutral-200 bg-white p-3 text-sm leading-6 text-neutral-900', compact ? 'flex-1' : 'mt-1 min-h-[300px]')}>
           {tasks.length === 0 ? (
             <p className="text-neutral-500">No dispatched tasks yet.</p>
           ) : (
@@ -390,20 +409,33 @@ export function AgentOutputPanel({
   }
 
   return (
-    <div className="border-t border-neutral-200 bg-white p-3">
-      {/* Header */}
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="flex h-full min-h-0 flex-col border border-neutral-200 bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <h3 className="truncate text-xs font-semibold text-neutral-900">
+          <h3 className="truncate text-sm font-semibold text-neutral-900">
             {agentName}
           </h3>
           {modelId ? (
-            <span className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-neutral-700">
+            <span className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-neutral-700">
               {modelId}
             </span>
           ) : null}
+          <span
+            className={cn(
+              'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+              headerStatus === 'Completed'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : headerStatus === 'Disconnected'
+                  ? 'border-amber-200 bg-amber-50 text-amber-700'
+                  : headerStatus === 'Streaming'
+                    ? 'border-sky-200 bg-sky-50 text-sky-700'
+                    : 'border-neutral-200 bg-neutral-50 text-neutral-700',
+            )}
+          >
+            {headerStatus}
+          </span>
           {tokenCount > 0 ? (
-            <span className="shrink-0 font-mono text-[9px] text-neutral-400 tabular-nums">
+            <span className="shrink-0 font-mono text-[10px] text-neutral-400 tabular-nums">
               ~{tokenCount.toLocaleString()} tok
             </span>
           ) : null}
@@ -411,12 +443,15 @@ export function AgentOutputPanel({
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 text-xs text-neutral-500 transition-colors hover:text-neutral-700"
+          className="flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-sm text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700"
+          aria-label="Close agent output"
         >
           ✕
         </button>
       </div>
-      {inner}
+      <div className="flex min-h-0 flex-1 flex-col p-4">
+        {inner}
+      </div>
     </div>
   )
 }

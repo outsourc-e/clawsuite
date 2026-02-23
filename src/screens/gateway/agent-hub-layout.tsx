@@ -1989,6 +1989,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const selectedOutputAgentName = selectedOutputAgentId
     ? teamById.get(selectedOutputAgentId)?.name ?? selectedOutputAgentId
     : ''
+  const selectedOutputModelId = selectedOutputAgentId
+    ? teamById.get(selectedOutputAgentId)?.modelId
+    : undefined
 
   // Build AgentWorkingRow array for AgentsWorkingPanel
   const agentWorkingRows = useMemo((): AgentWorkingRow[] => {
@@ -2049,6 +2052,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     activeTaskSource,
     agentTaskCounts,
   ])
+  const selectedOutputStatusLabel = useMemo(() => {
+    if (!selectedOutputAgentId) return undefined
+    const row = agentWorkingRows.find((entry) => entry.id === selectedOutputAgentId)
+    return row ? toTitleCase(row.status) : undefined
+  }, [agentWorkingRows, selectedOutputAgentId])
 
   const moveTasksToStatus = useCallback((taskIds: Array<string>, status: TaskStatus) => {
     if (taskIds.length === 0) return
@@ -3014,9 +3022,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         ) : null}
 
         {/* Mission board area + optional inline agent output */}
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           {/* Board / Create Mission */}
-          <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="relative min-w-0 flex-1 overflow-hidden">
             {!missionActive ? (
               <div className="flex min-h-0 h-full flex-1">
                 <div className="min-h-0 flex-1">
@@ -3198,19 +3206,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </div>
               </div>
             )}
+            {!isMobileHub && missionActive && selectedOutputAgentId ? (
+              <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex w-[400px] max-w-[92vw] justify-end p-3">
+                <div className="pointer-events-auto flex h-full w-full min-h-0 flex-col overflow-hidden rounded-xl shadow-2xl">
+                  <AgentOutputPanel
+                    agentName={selectedOutputAgentName}
+                    sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
+                    tasks={selectedOutputTasks}
+                    onClose={() => setSelectedOutputAgentId(undefined)}
+                    modelId={selectedOutputModelId}
+                    statusLabel={selectedOutputStatusLabel}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
-
-          {/* Inline agent output panel (desktop, right of task board) */}
-          {!isMobileHub && missionActive && selectedOutputAgentId ? (
-            <div className="w-72 shrink-0 border-l border-neutral-200 bg-white">
-              <AgentOutputPanel
-                agentName={selectedOutputAgentName}
-                sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
-                tasks={selectedOutputTasks}
-                onClose={() => setSelectedOutputAgentId(undefined)}
-              />
-            </div>
-          ) : null}
         </div>
       </div>
     )
@@ -4706,6 +4716,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
                 tasks={selectedOutputTasks}
                 onClose={() => setSelectedOutputAgentId(undefined)}
+                modelId={selectedOutputModelId}
+                statusLabel={selectedOutputStatusLabel}
               />
             </div>
           </div>
