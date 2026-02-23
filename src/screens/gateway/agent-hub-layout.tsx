@@ -4148,7 +4148,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return (
       <div className="p-4 h-full min-h-0 overflow-y-auto bg-neutral-50 dark:bg-[var(--theme-bg,#0b0e14)]">
         {/* ── Virtual Office Hero (full width, contained) ── */}
-        <div className="w-full overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm" style={{ height: 260 }}>
+        <div className="w-full overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm" style={{ height: 420 }}>
           <PixelOfficeView
             agentRows={agentWorkingRows}
             missionRunning={isMissionRunning}
@@ -4161,7 +4161,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined
             }
             processType={processType}
-            containerHeight={260}
+            containerHeight={420}
           />
         </div>
 
