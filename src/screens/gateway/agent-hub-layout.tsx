@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AgentHubErrorBoundary } from './components/agent-hub-error-boundary'
 import { useQuery } from '@tanstack/react-query'
 import { TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
 import { TaskBoard as _TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
@@ -6250,6 +6251,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }
 
   return (
+    <AgentHubErrorBoundary>
     <div className="flex h-full min-h-0 flex-col bg-white dark:bg-[var(--theme-bg,#0b0e14)]">
       {/* ── Brand top accent border ──────────────────────────────────────── */}
       <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
@@ -7012,5 +7014,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
       </div>
     </div>
+    </AgentHubErrorBoundary>
   )
 }
