@@ -191,6 +191,25 @@ const CONFIG_SECTIONS: Array<{ id: ConfigSection; icon: string; label: string }>
 ]
 
 const WIZARD_STEP_ORDER: WizardStep[] = ['gateway', 'team', 'goal', 'launch']
+const CUSTOM_PROVIDER_OPTION = '__custom__'
+const KNOWN_GATEWAY_PROVIDERS = [
+  'openai',
+  'anthropic',
+  'google-antigravity',
+  'google',
+  'deepseek',
+  'minimax',
+  'openrouter',
+  'mistral',
+  'xai',
+  'groq',
+  'github-copilot',
+  'ollama',
+  'together',
+  'fireworks',
+  'perplexity',
+  'cohere',
+] as const
 
 function GatewayStatusPill({
   status,
@@ -1696,6 +1715,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [wizardCheckingGateway, setWizardCheckingGateway] = useState(false)
   const [configuredProviders, setConfiguredProviders] = useState<string[]>([])
   const [addProviderName, setAddProviderName] = useState('')
+  const [addProviderSelection, setAddProviderSelection] = useState('')
+  const [selectedModel, setSelectedModel] = useState('')
   const [addProviderApiKey, setAddProviderApiKey] = useState('')
   const [isAddingProvider, setIsAddingProvider] = useState(false)
 
@@ -2000,6 +2021,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .filter((entry): entry is { value: string; provider: string; label: string } => Boolean(entry))
   }, [modelsQuery.data?.models])
 
+  const addProviderAvailableModels = useMemo(() => {
+    const provider = addProviderName.trim().toLowerCase()
+    if (!provider) return []
+    return gatewayModels.filter(
+      (model) => model.provider.trim().toLowerCase() === provider,
+    )
+  }, [addProviderName, gatewayModels])
+
+  useEffect(() => {
+    if (!selectedModel) return
+    const isStillAvailable = addProviderAvailableModels.some((model) => model.value === selectedModel)
+    if (!isStillAvailable) {
+      setSelectedModel('')
+    }
+  }, [addProviderAvailableModels, selectedModel])
+
   const refreshGatewayStatus = useCallback(async (): Promise<boolean> => {
     try {
       const res = await fetch('/api/gateway/status')
@@ -2040,6 +2077,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const handleAddProvider = useCallback(async () => {
     const provider = addProviderName.trim()
     const apiKey = addProviderApiKey.trim()
+    const defaultModel = selectedModel.trim()
 
     if (!provider) {
       toast('Provider name is required', { type: 'error' })
@@ -2059,6 +2097,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           action: 'add-provider',
           provider,
           apiKey,
+          defaultModel: defaultModel || undefined,
         }),
       })
       const payload = (await response.json().catch(() => ({}))) as {
@@ -2075,6 +2114,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       setAddProviderApiKey('')
       setAddProviderName('')
+      setAddProviderSelection('')
+      setSelectedModel('')
       await refreshConfiguredProviders()
       void modelsQuery.refetch()
       toast(`Provider "${provider}" added`, { type: 'success' })
@@ -2085,7 +2126,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     } finally {
       setIsAddingProvider(false)
     }
-  }, [addProviderApiKey, addProviderName, modelsQuery, refreshConfiguredProviders])
+  }, [addProviderApiKey, addProviderName, modelsQuery, refreshConfiguredProviders, selectedModel])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -4577,28 +4618,86 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <p className="mt-1 text-[11px] text-neutral-500">
                     Add a provider profile and API key to the gateway config.
                   </p>
-                  <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
-                    <input
-                      value={addProviderName}
-                      onChange={(event) => setAddProviderName(event.target.value)}
-                      placeholder="Provider name (e.g. openrouter)"
-                      className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                    />
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <select
+                        value={addProviderSelection}
+                        onChange={(event) => {
+                          const nextValue = event.target.value
+                          setAddProviderSelection(nextValue)
+                          setSelectedModel('')
+                          if (nextValue !== CUSTOM_PROVIDER_OPTION) {
+                            setAddProviderName(nextValue)
+                          } else {
+                            setAddProviderName('')
+                          }
+                        }}
+                        className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                      >
+                        <option value="">Select provider…</option>
+                        {KNOWN_GATEWAY_PROVIDERS.map((provider) => (
+                          <option key={provider} value={provider}>
+                            {provider}
+                          </option>
+                        ))}
+                        <option value={CUSTOM_PROVIDER_OPTION}>Custom...</option>
+                      </select>
+                    </div>
+                    {addProviderSelection === CUSTOM_PROVIDER_OPTION ? (
+                      <input
+                        value={addProviderName}
+                        onChange={(event) => {
+                          setAddProviderName(event.target.value)
+                          setSelectedModel('')
+                        }}
+                        placeholder="Custom provider name"
+                        className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                      />
+                    ) : null}
+                    {addProviderName.trim() ? (
+                      <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
+                        <p className="text-[11px] font-medium text-neutral-700">
+                          Default model for <span className="font-mono">{addProviderName.trim()}</span>
+                        </p>
+                        {addProviderAvailableModels.length > 0 ? (
+                          <select
+                            value={selectedModel}
+                            onChange={(event) => setSelectedModel(event.target.value)}
+                            className="mt-1 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                          >
+                            <option value="">Use gateway default (optional)</option>
+                            {addProviderAvailableModels.map((model) => (
+                              <option key={model.value} value={model.value}>
+                                {model.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="mt-0.5 text-[11px] text-neutral-500">
+                            {modelsQuery.isLoading
+                              ? 'Loading available models…'
+                              : 'No models found yet for this provider. Models will be available after adding the API key.'}
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
                     <input
                       type="password"
                       value={addProviderApiKey}
                       onChange={(event) => setAddProviderApiKey(event.target.value)}
                       placeholder="API key"
-                      className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
+                      className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
                     />
-                    <button
-                      type="button"
-                      onClick={() => void handleAddProvider()}
-                      disabled={isAddingProvider}
-                      className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isAddingProvider ? 'Adding…' : 'Add Provider'}
-                    </button>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void handleAddProvider()}
+                        disabled={isAddingProvider}
+                        className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isAddingProvider ? 'Adding…' : 'Add Provider'}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 {configuredProviders.length === 0 ? (

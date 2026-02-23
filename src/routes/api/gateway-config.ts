@@ -65,6 +65,12 @@ function sanitizeApiKey(value: unknown): string {
   return sanitized
 }
 
+function sanitizeOptionalDefaultModel(value: unknown): string | null {
+  if (value === undefined || value === null) return null
+  const sanitized = sanitizeEnvValue(value, 'defaultModel')
+  return sanitized || null
+}
+
 export const Route = createFileRoute('/api/gateway-config')({
   server: {
     handlers: {
@@ -107,6 +113,7 @@ export const Route = createFileRoute('/api/gateway-config')({
           if (action === 'add-provider') {
             const provider = sanitizeProviderName(rawBody.provider)
             const apiKey = sanitizeApiKey(rawBody.apiKey)
+            const defaultModel = sanitizeOptionalDefaultModel(rawBody.defaultModel)
 
             const configDir = join(homedir(), '.openclaw')
             const configPath = join(configDir, 'openclaw.json')
@@ -155,6 +162,14 @@ export const Route = createFileRoute('/api/gateway-config')({
               !Array.isArray(providers[provider])
                 ? (providers[provider] as Record<string, unknown>)
                 : {}
+            if (defaultModel) {
+              const normalizedDefaultModel = defaultModel.startsWith(`${provider}/`)
+                ? defaultModel.slice(provider.length + 1)
+                : defaultModel
+              if (normalizedDefaultModel) {
+                existingProvider.defaultModel = normalizedDefaultModel
+              }
+            }
             providers[provider] = existingProvider
             models.providers = providers
             config.models = models
