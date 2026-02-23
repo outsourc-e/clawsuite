@@ -18,12 +18,7 @@ export const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
   sonnet: 'border border-blue-200 bg-blue-50 text-blue-700',
   codex: 'border border-emerald-200 bg-emerald-50 text-emerald-700',
   flash: 'border border-violet-200 bg-violet-50 text-violet-700',
-  gpt5: 'border border-green-200 bg-green-50 text-green-700',
-  o3: 'border border-pink-200 bg-pink-50 text-pink-700',
-  'gemini-pro': 'border border-indigo-200 bg-indigo-50 text-indigo-700',
-  deepseek: 'border border-cyan-200 bg-cyan-50 text-cyan-700',
   minimax: 'border border-amber-200 bg-amber-50 text-amber-700',
-  grok: 'border border-red-200 bg-red-50 text-red-700',
 }
 
 export const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
@@ -32,12 +27,7 @@ export const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
   sonnet: 'Sonnet',
   codex: 'Codex',
   flash: 'Flash',
-  gpt5: 'GPT-5',
-  o3: 'o3',
-  'gemini-pro': 'Gemini Pro',
-  deepseek: 'DeepSeek',
   minimax: 'MiniMax',
-  grok: 'Grok 3',
 }
 
 function toTitleCase(value: string): string {
