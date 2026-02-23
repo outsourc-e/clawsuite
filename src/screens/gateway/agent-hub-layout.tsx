@@ -2899,10 +2899,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         } catch { /* ignore parse errors */ }
       })
 
-      source.addEventListener('message', () => {
-        markStreamAlive()
-      })
-
       source.addEventListener('message', (event) => {
         if (!(event instanceof MessageEvent)) return
         markStreamAlive()
@@ -4146,9 +4142,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="p-4 h-full min-h-0 overflow-y-auto bg-neutral-50 dark:bg-[var(--theme-bg,#0b0e14)]">
-        {/* ── Virtual Office Hero (full width, contained) ── */}
-        <div className="w-full overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm" style={{ height: 420 }}>
+      <div className="flex flex-col h-full min-h-0 bg-neutral-50 dark:bg-[var(--theme-bg,#0b0e14)]">
+        {/* ── Virtual Office Hero — fills all available height, focal point ── */}
+        <div className="flex-1 min-h-[480px] mx-4 mt-4 overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
           <PixelOfficeView
             agentRows={agentWorkingRows}
             missionRunning={isMissionRunning}
@@ -4161,12 +4157,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined
             }
             processType={processType}
-            containerHeight={420}
+            containerHeight={600}
           />
         </div>
 
-          {/* ── 3-card responsive grid ── */}
-          <section className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* ── 3-card row — anchored below the office ── */}
+          <section className="flex-shrink-0 mx-4 mt-4 mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
@@ -6058,26 +6054,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* ── Tab content area ── */}
         <div className="min-w-0 flex-1 overflow-hidden">
-          <div
-            className="h-full min-h-0 bg-white"
-            style={{ display: activeTab === 'overview' ? 'block' : 'none' }}
-          >
-            {renderOverviewContent()}
-          </div>
+          {activeTab === 'overview' && (
+            <div className="h-full min-h-0 bg-white">
+              {renderOverviewContent()}
+            </div>
+          )}
 
-          <div
-            className="h-full min-h-0 bg-white"
-            style={{ display: activeTab === 'configure' ? 'block' : 'none' }}
-          >
-            {renderConfigureContent()}
-          </div>
+          {activeTab === 'configure' && (
+            <div className="h-full min-h-0 bg-white">
+              {renderConfigureContent()}
+            </div>
+          )}
 
-          <div
-            className="h-full min-h-0 bg-white"
-            style={{ display: activeTab === 'missions' ? 'block' : 'none' }}
-          >
-            {renderMissionsTabContent()}
-          </div>
+          {activeTab === 'missions' && (
+            <div className="h-full min-h-0 bg-white">
+              {renderMissionsTabContent()}
+            </div>
+          )}
         </div>
 
         {/* ── Collapsible Live Feed + Approvals + Mission Controls sidebar ── */}
