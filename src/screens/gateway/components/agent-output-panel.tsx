@@ -10,6 +10,15 @@ type OutputMessage = {
   done?: boolean
 }
 
+type SessionOutputCacheEntry = {
+  messages: OutputMessage[]
+  sessionEnded: boolean
+  tokenCount: number
+}
+
+const MAX_CACHED_MESSAGES = 200
+const sessionOutputCache = new Map<string, SessionOutputCacheEntry>()
+
 export type AgentOutputPanelProps = {
   agentName: string
   sessionKey: string | null
@@ -147,6 +156,20 @@ function appendAssistantMessage(previous: OutputMessage[], text: string): Output
   return [...previous, { role: 'assistant', content: text, timestamp: Date.now() }]
 }
 
+function trimMessages(messages: OutputMessage[]): OutputMessage[] {
+  if (messages.length <= MAX_CACHED_MESSAGES) return messages
+  return messages.slice(-MAX_CACHED_MESSAGES)
+}
+
+function appendBoundedMessage(previous: OutputMessage[], message: OutputMessage): OutputMessage[] {
+  return [...trimMessages(previous), message].slice(-MAX_CACHED_MESSAGES)
+}
+
+function readCachedSessionState(sessionKey: string | null): SessionOutputCacheEntry | null {
+  if (!sessionKey) return null
+  return sessionOutputCache.get(sessionKey) ?? null
+}
+
 export function AgentOutputPanel({
   agentName,
   sessionKey,
@@ -157,20 +180,37 @@ export function AgentOutputPanel({
   statusLabel,
   compact = false,
 }: AgentOutputPanelProps) {
-  const [messages, setMessages] = useState<OutputMessage[]>([])
-  const [sessionEnded, setSessionEnded] = useState(false)
-  const [tokenCount, setTokenCount] = useState(0)
+  const cachedInitial = readCachedSessionState(sessionKey)
+  const [messages, setMessages] = useState<OutputMessage[]>(cachedInitial?.messages ?? [])
+  const [sessionEnded, setSessionEnded] = useState(cachedInitial?.sessionEnded ?? false)
+  const [tokenCount, setTokenCount] = useState(cachedInitial?.tokenCount ?? 0)
   const [streamDisconnected, setStreamDisconnected] = useState(false)
   const [streamReconnectNonce, setStreamReconnectNonce] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Reset state when sessionKey changes
+  // Hydrate state when sessionKey changes
   useEffect(() => {
-    setMessages([])
-    setSessionEnded(false)
-    setTokenCount(0)
+    const cached = readCachedSessionState(sessionKey)
+    setMessages(cached?.messages ?? [])
+    setSessionEnded(cached?.sessionEnded ?? false)
+    setTokenCount(cached?.tokenCount ?? 0)
     setStreamDisconnected(false)
   }, [sessionKey])
+
+  // Persist state to in-memory cache, bounded by message count.
+  useEffect(() => {
+    if (!sessionKey) return
+    const boundedMessages = trimMessages(messages)
+    if (boundedMessages !== messages) {
+      setMessages(boundedMessages)
+      return
+    }
+    sessionOutputCache.set(sessionKey, {
+      messages: boundedMessages,
+      sessionEnded,
+      tokenCount,
+    })
+  }, [messages, sessionEnded, sessionKey, tokenCount])
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -220,7 +260,7 @@ export function AgentOutputPanel({
         setTokenCount((n) => n + Math.ceil(text.length / 4))
       }
 
-      setMessages((prev) => upsertAssistantStream(prev, text, fullReplace))
+      setMessages((prev) => trimMessages(upsertAssistantStream(prev, text, fullReplace)))
       onLine?.(text)
     })
 
@@ -234,10 +274,9 @@ export function AgentOutputPanel({
       const args = payload.args ?? payload.input ?? payload.parameters
       const argsStr = truncateArgs(args)
       const content = argsStr ? `${name}(${argsStr})` : `${name}()`
-      setMessages((prev) => [
-        ...prev,
-        { role: 'tool', content, timestamp: Date.now() },
-      ])
+      setMessages((prev) =>
+        appendBoundedMessage(prev, { role: 'tool', content, timestamp: Date.now() }),
+      )
     })
 
     // 'done' — session/run completed: add status marker
@@ -257,10 +296,14 @@ export function AgentOutputPanel({
       }
       setSessionEnded(true)
       setStreamDisconnected(false)
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: doneLabel, timestamp: Date.now(), done: true },
-      ])
+      setMessages((prev) =>
+        appendBoundedMessage(prev, {
+          role: 'assistant',
+          content: doneLabel,
+          timestamp: Date.now(),
+          done: true,
+        }),
+      )
     })
 
     // 'user_message' — user turn sent to the agent
@@ -271,10 +314,9 @@ export function AgentOutputPanel({
       if (!payloadMatchesSession(payload, sessionKey)) return
       const text = readEventText(payload)
       if (!text) return
-      setMessages((prev) => [
-        ...prev,
-        { role: 'user', content: text, timestamp: Date.now() },
-      ])
+      setMessages((prev) =>
+        appendBoundedMessage(prev, { role: 'user', content: text, timestamp: Date.now() }),
+      )
     })
 
     // 'message' — final/standalone message payload from gateway
@@ -287,13 +329,12 @@ export function AgentOutputPanel({
       const text = readEventText(payload)
       if (!text) return
       if (role === 'user') {
-        setMessages((prev) => [
-          ...prev,
-          { role: 'user', content: text, timestamp: Date.now() },
-        ])
+        setMessages((prev) =>
+          appendBoundedMessage(prev, { role: 'user', content: text, timestamp: Date.now() }),
+        )
         return
       }
-      setMessages((prev) => appendAssistantMessage(prev, text))
+      setMessages((prev) => trimMessages(appendAssistantMessage(prev, text)))
       onLine?.(text)
     })
 
@@ -303,7 +344,7 @@ export function AgentOutputPanel({
   }, [onLine, sessionKey, streamReconnectNonce])
 
   const inner = (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Task list */}
       {tasks.length > 0 && (
         <div className={cn('space-y-1.5', compact ? 'mb-2' : 'mb-3')}>
@@ -347,7 +388,7 @@ export function AgentOutputPanel({
         <div
           ref={scrollRef}
           className={cn(
-            'overflow-y-auto rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-[11px] leading-relaxed text-neutral-900 dark:text-neutral-100',
+            'min-h-0 flex-1 overflow-y-auto rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-[11px] leading-relaxed text-neutral-900 dark:text-neutral-100',
             compact ? 'min-h-0 flex-1' : 'mt-1 min-h-[300px] flex-1 text-sm leading-6',
           )}
         >
@@ -402,7 +443,7 @@ export function AgentOutputPanel({
         </div>
       ) : (
         // Fallback placeholder when no sessionKey
-        <div className={cn('rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-sm leading-6 text-neutral-900 dark:text-neutral-100', compact ? 'min-h-0 flex-1 overflow-y-auto' : 'mt-1 min-h-[300px]')}>
+        <div className={cn('min-h-0 flex-1 overflow-y-auto rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-sm leading-6 text-neutral-900 dark:text-neutral-100', compact ? 'min-h-0 flex-1 overflow-y-auto' : 'mt-1 min-h-[300px]')}>
           {tasks.length === 0 ? (
             <p className="text-neutral-500">No dispatched tasks yet.</p>
           ) : (
@@ -413,12 +454,12 @@ export function AgentOutputPanel({
           )}
         </div>
       )}
-    </>
+    </div>
   )
 
   if (compact) {
     return (
-      <div className="flex h-full flex-col p-3">
+      <div className="flex h-full min-h-0 flex-col p-3">
         {inner}
       </div>
     )
