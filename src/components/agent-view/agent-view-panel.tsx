@@ -119,6 +119,7 @@ type OcUsageLine = {
   format?: 'percent' | 'dollars' | 'tokens'
   value?: string
   color?: string
+  resetsAt?: string
 }
 
 type OcProviderEntry = {
@@ -129,7 +130,20 @@ type OcProviderEntry = {
   lines: Array<OcUsageLine>
 }
 
-type OcUsageRow = { label: string; pct: number }
+type OcUsageRow = { label: string; pct: number; resetHint: string | null }
+
+function ocFormatResetHint(resetsAt?: string): string | null {
+  if (!resetsAt) return null
+  const now = Date.now()
+  const diff = new Date(resetsAt).getTime() - now
+  if (diff <= 0) return null
+  const hours = diff / 3_600_000
+  if (hours >= 24) {
+    const days = Math.ceil(hours / 24)
+    return `~${days}d`
+  }
+  return `~${Math.ceil(hours)}h`
+}
 
 function ocBarColor(pct: number): string {
   if (pct >= 80) return 'bg-red-500'
@@ -199,10 +213,13 @@ function OrchestratorCard({
   const [usageRows, setUsageRows] = useState<OcUsageRow[]>([])
   const [providerLabel, setProviderLabel] = useState<string | null>(null)
   const [usageExpanded, setUsageExpanded] = useState(true)
-  const [preferredProvider] = useState<string | null>(() => {
+  const [preferredProvider, setPreferredProvider] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     try { return window.localStorage.getItem(PREFERRED_PROVIDER_KEY_OC) } catch { return null }
   })
+  const [allOcProviders, setAllOcProviders] = useState<OcProviderEntry[]>([])
+  const [providerFlash, setProviderFlash] = useState(false)
+  const flashTimerRefOc = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function getPrimaryProvider(all: OcProviderEntry[], preferred: string | null) {
     if (preferred) {
@@ -210,6 +227,33 @@ function OrchestratorCard({
       if (m) return m
     }
     return all.find((p) => p.status === 'ok' && p.lines.length > 0) ?? null
+  }
+
+  function updateUsageRowsFromProviders(providers: OcProviderEntry[], preferred: string | null) {
+    const primary = getPrimaryProvider(providers, preferred)
+    if (!primary) return
+    const rows: OcUsageRow[] = primary.lines
+      .filter((l) => l.type === 'progress' && l.used !== undefined)
+      .slice(0, 2)
+      .map((l) => ({ label: l.label, pct: Math.min(100, Math.round(l.used as number)), resetHint: ocFormatResetHint(l.resetsAt) }))
+    setUsageRows(rows)
+    const name = primary.displayName.split(' ')[0]
+    const lbl = primary.plan ? `${name} ${primary.plan}` : name
+    setProviderLabel(lbl.length > 14 ? name : lbl)
+  }
+
+  function cycleOcProvider() {
+    const okProviders = allOcProviders.filter((p) => p.status === 'ok' && p.lines.length > 0)
+    if (okProviders.length < 2) return
+    const currentIdx = okProviders.findIndex((p) => p.provider === preferredProvider)
+    const next = okProviders[(currentIdx + 1) % okProviders.length]
+    if (!next) return
+    setPreferredProvider(next.provider)
+    try { localStorage.setItem(PREFERRED_PROVIDER_KEY_OC, next.provider) } catch { /* noop */ }
+    updateUsageRowsFromProviders(allOcProviders, next.provider)
+    if (flashTimerRefOc.current) clearTimeout(flashTimerRefOc.current)
+    setProviderFlash(true)
+    flashTimerRefOc.current = setTimeout(() => setProviderFlash(false), 300)
   }
 
   useEffect(() => {
@@ -237,25 +281,20 @@ function OrchestratorCard({
         } | null
         if (!data2?.providers || cancelled) return
 
-        const primary = getPrimaryProvider(data2.providers, preferredProvider)
-        if (!primary) return
-
-        // Only show the first 2 progress bars (Session + Weekly); keep full labels
-        const rows: OcUsageRow[] = primary.lines
-          .filter((l) => l.type === 'progress' && l.used !== undefined)
-          .slice(0, 2)
-          .map((l) => ({ label: l.label, pct: Math.min(100, Math.round(l.used as number)) }))
-        if (!cancelled) setUsageRows(rows)
-
-        const name = primary.displayName.split(' ')[0]
-        const lbl = primary.plan ? `${name} ${primary.plan}` : name
-        if (!cancelled) setProviderLabel(lbl.length > 14 ? name : lbl)
+        if (!cancelled) {
+          setAllOcProviders(data2.providers)
+          updateUsageRowsFromProviders(data2.providers, preferredProvider)
+        }
       } catch { /* noop */ }
     }
 
     void fetchAll()
     const timer = setInterval(fetchAll, USAGE_POLL_MS)
-    return () => { cancelled = true; clearInterval(timer) }
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+      if (flashTimerRefOc.current) clearTimeout(flashTimerRefOc.current)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferredProvider])
 
@@ -275,9 +314,10 @@ function OrchestratorCard({
   }
 
   // Build usage rows: provider rows if available, else synthetic context row
-  const ctxRow: OcUsageRow = { label: 'Ctx', pct: contextPct ?? 0 }
+  const ctxRow: OcUsageRow = { label: 'Ctx', pct: contextPct ?? 0, resetHint: null }
   const displayRows: OcUsageRow[] = usageRows.length > 0 ? usageRows : (contextPct !== null ? [ctxRow] : [])
   const usageHeader = providerLabel ? `USAGE · ${providerLabel.toUpperCase()}` : 'USAGE'
+  const canCycleOc = allOcProviders.filter((p) => p.status === 'ok' && p.lines.length > 0).length > 1
 
   return (
     <div
@@ -361,24 +401,48 @@ function OrchestratorCard({
       {/* ── Usage section — seamless inside the card ── */}
       {!compact && displayRows.length > 0 && (
         <div className="mt-2 border-t border-primary-300/40 pt-2 space-y-1">
-          {/* Collapsible header — provider name inline, no dropdown */}
-          <button
-            type="button"
-            onClick={() => setUsageExpanded((v) => !v)}
-            className="flex w-full items-center justify-between text-[9px] font-semibold uppercase tracking-widest text-primary-400 hover:text-primary-500 transition-colors cursor-pointer"
-            aria-expanded={usageExpanded}
-          >
-            <span>{usageHeader}</span>
-            <span className="text-primary-300">{usageExpanded ? '▲' : '▼'}</span>
-          </button>
+          {/* Header: provider name (click to cycle) | chevron (click to collapse) */}
+          <div className="flex w-full items-center justify-between">
+            <button
+              type="button"
+              onClick={canCycleOc ? cycleOcProvider : undefined}
+              className={cn(
+                'flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest transition-colors',
+                canCycleOc
+                  ? 'cursor-pointer text-primary-400 hover:text-primary-600'
+                  : 'cursor-default text-primary-400',
+                providerFlash && 'text-emerald-500',
+              )}
+              title={canCycleOc ? 'Click to switch provider' : undefined}
+            >
+              <span>{usageHeader}</span>
+              {canCycleOc && <span className="text-[8px] opacity-60">↻</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => setUsageExpanded((v) => !v)}
+              className="text-[9px] text-primary-300 hover:text-primary-500 transition-colors cursor-pointer"
+              aria-expanded={usageExpanded}
+              aria-label={usageExpanded ? 'Collapse usage' : 'Expand usage'}
+            >
+              {usageExpanded ? '▲' : '▼'}
+            </button>
+          </div>
 
           {usageExpanded && (
             <div className="space-y-1">
               {displayRows.map((row) => (
                 <div key={row.label} className="flex items-center gap-1.5">
-                  <span className="w-12 shrink-0 text-[9px] text-primary-500 leading-none">
-                    {row.label}
-                  </span>
+                  <div className="w-12 shrink-0">
+                    <span className="block text-[9px] text-primary-500 leading-none">
+                      {row.label}
+                    </span>
+                    {row.resetHint && (
+                      <span className="block text-[8px] text-primary-400 leading-none mt-0.5">
+                        {row.resetHint}
+                      </span>
+                    )}
+                  </div>
                   <div className="h-1 flex-1 rounded-full bg-primary-200/70">
                     <div
                       className={cn('h-full rounded-full transition-all', ocBarColor(row.pct))}

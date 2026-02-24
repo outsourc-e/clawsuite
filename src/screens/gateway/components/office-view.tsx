@@ -274,12 +274,34 @@ function PlantSVG({ x, y }: { x: number; y: number }) {
   )
 }
 
+function formatElapsed(startedAt: number): string {
+  const diffMs = Date.now() - startedAt
+  if (diffMs < 60_000) return `${Math.floor(diffMs / 1000)}s ago`
+  const mins = Math.floor(diffMs / 60_000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  return `${hrs}h ago`
+}
+
+function kindLabel(kind: string): string {
+  if (kind === 'subagent' || kind === 'sub-agent') return 'Sub-Agent'
+  if (kind === 'main') return 'Main'
+  if (kind === 'chat') return 'Chat'
+  return kind.charAt(0).toUpperCase() + kind.slice(1)
+}
+
 function RemoteSessionCard({ session, onClick }: { session: RemoteSession; onClick: () => void }) {
   const statusColor = session.status === 'active'
     ? 'bg-emerald-400 animate-pulse'
     : session.status === 'done'
       ? 'bg-neutral-300 dark:bg-neutral-600'
       : 'bg-amber-400'
+
+  const badgeColorClass = session.kind === 'main'
+    ? 'bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400 border-violet-200 dark:border-violet-800'
+    : session.kind === 'subagent' || session.kind === 'sub-agent'
+      ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+      : 'bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 border-blue-200 dark:border-blue-800'
 
   return (
     <button
@@ -301,10 +323,16 @@ function RemoteSessionCard({ session, onClick }: { session: RemoteSession; onCli
           {session.model.split('/').pop()}
         </span>
       ) : null}
-      <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-        chat agent
-      </span>
-      <span className="text-[9px] text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100">👁 View Output</span>
+      <div className="flex items-center gap-1.5 flex-wrap justify-center">
+        <span className={cn('text-[9px] px-1.5 py-0.5 rounded border', badgeColorClass)}>
+          {kindLabel(session.kind)}
+        </span>
+        {session.startedAt ? (
+          <span className="text-[9px] text-neutral-400 tabular-nums">
+            {formatElapsed(session.startedAt)}
+          </span>
+        ) : null}
+      </div>
     </button>
   )
 }

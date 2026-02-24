@@ -6,7 +6,6 @@ import {
   CheckmarkCircle01Icon,
   Delete02Icon,
   EyeIcon,
-  KeyIcon,
   MoreVerticalIcon,
   PauseIcon,
   PlayIcon,
@@ -354,64 +353,42 @@ export function AgentCard({
           {renderWardenMenu('size-7 rounded-full')}
         </div>
 
+        {/* Status + model row */}
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5">
+          <span
+            className={cn(
+              'inline-flex size-2 shrink-0 rounded-full',
+              node.status === 'failed' ? 'bg-red-400' :
+              node.status === 'thinking' ? 'bg-accent-400 animate-pulse' :
+              node.status === 'complete' ? 'bg-emerald-400' :
+              node.status === 'queued' ? 'bg-primary-500' :
+              'bg-emerald-400 animate-pulse',
+            )}
+          />
+          <span className={cn('text-[11px] font-medium capitalize', getStatusTextClassName(node.status))}>
+            {getStatusLabel(node.status)}
+          </span>
+          <span className="ml-auto font-mono text-[10px] text-primary-600 truncate max-w-[120px]">
+            {node.model.split('/').pop()}
+          </span>
+        </div>
+
+        {/* Last output / task preview */}
         <div className="mb-3 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5">
-          <p className="mb-1 text-[11px] font-medium text-primary-700">Task</p>
-          <p className="text-[12px] leading-relaxed text-primary-800">{node.task}</p>
+          <p className="mb-1 text-[10px] font-medium text-primary-600">Task</p>
+          <p className="text-[11px] leading-relaxed text-primary-800 line-clamp-3">{node.task}</p>
         </div>
 
-        <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5 text-[11px]">
-          <div className="flex items-center justify-between gap-2"><span className="text-primary-600">Runtime</span><span className="font-mono text-primary-900">{formatRuntime(node.runtimeSeconds)}</span></div>
-          <div className="flex items-center justify-between gap-2"><span className="text-primary-600">Tokens</span><span className="font-mono text-primary-900">{node.tokenCount.toLocaleString()}</span></div>
-          <div className="flex items-center justify-between gap-2"><span className="text-primary-600">Cost</span><span className="font-mono text-primary-900">${node.cost.toFixed(2)}</span></div>
-          <div className="flex items-center justify-between gap-2"><span className="text-primary-600">Model</span><span className="font-mono text-primary-900">{node.model}</span></div>
+        {/* Compact stats */}
+        <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary-300/60 bg-primary-200/30 px-2.5 py-2 text-[10px] tabular-nums text-primary-600">
+          <span>{formatRuntime(node.runtimeSeconds)}</span>
+          <span className="text-primary-300">·</span>
+          <span>{node.tokenCount.toLocaleString()} tok</span>
+          <span className="text-primary-300">·</span>
+          <span>${node.cost.toFixed(2)}</span>
         </div>
 
-        {node.sessionKey ? (
-          <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
-            <HugeiconsIcon icon={KeyIcon} size={14} strokeWidth={1.5} className="text-primary-600" />
-            <p className="min-w-0 flex-1 truncate font-mono text-[11px] text-primary-700">{node.sessionKey}</p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-[10px]"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(node.sessionKey || '')
-                  toast('Session key copied', { type: 'success' })
-                } catch {
-                  toast('Could not copy session key', { type: 'error' })
-                }
-              }}
-            >
-              Copy
-            </Button>
-          </div>
-        ) : null}
-
-        <div className="mb-3 rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
-          <div className="mb-1 h-2 overflow-hidden rounded-full bg-primary-300/50">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${node.progress}%` }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className={cn(
-                'h-full rounded-full',
-                node.status === 'complete'
-                  ? 'bg-emerald-500'
-                  : node.status === 'failed'
-                    ? 'bg-red-500'
-                    : node.status === 'thinking'
-                      ? 'bg-accent-500'
-                      : 'bg-emerald-500',
-              )}
-            />
-          </div>
-          <p className={cn('text-[10px] font-medium tabular-nums', getStatusTextClassName(node.status))}>
-            {node.progress}% · {getStatusLabel(node.status)}
-          </p>
-        </div>
-
+        {/* Actions */}
         {showActions ? (
           <div className="flex items-center gap-2">
             {onChat ? (
@@ -421,8 +398,19 @@ export function AgentCard({
                 className="h-8 flex-1 justify-center"
                 onClick={() => onChat(node.id)}
               >
-                <HugeiconsIcon icon={AiChat01Icon} size={16} strokeWidth={1.5} />
-                Chat
+                <HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.5} />
+                View Output
+              </Button>
+            ) : null}
+            {(node.status === 'running' || node.status === 'thinking') && onKill ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
+                onClick={() => setKillConfirmOpen(true)}
+              >
+                <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.5} />
+                Kill
               </Button>
             ) : null}
             {node.status === 'queued' ? (
