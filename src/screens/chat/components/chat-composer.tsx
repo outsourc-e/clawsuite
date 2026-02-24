@@ -553,6 +553,7 @@ function ChatComposerComponent({
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const dragCounterRef = useRef(0)
   const shouldRefocusAfterSendRef = useRef(false)
+  const submittingRef = useRef(false)
   const modelSelectorRef = useRef<HTMLDivElement | null>(null)
   const composerWrapperRef = useRef<HTMLDivElement | null>(null)
   const focusFrameRef = useRef<number | null>(null)
@@ -1107,16 +1108,25 @@ function ChatComposerComponent({
 
   const handleSubmit = useCallback(() => {
     if (disabled) return
+    if (submittingRef.current) return
     const body = value.trim()
     if (body.length === 0 && attachments.length === 0) return
+    submittingRef.current = true
     const attachmentPayload = attachments.map((attachment) => ({
       ...attachment,
     }))
-    onSubmit(body, attachmentPayload, {
-      reset,
-      setValue: setComposerValue,
-      setAttachments: setComposerAttachments,
-    })
+    try {
+      onSubmit(body, attachmentPayload, {
+        reset,
+        setValue: setComposerValue,
+        setAttachments: setComposerAttachments,
+      })
+    } finally {
+      // Reset after a tick so rapid re-fires (double-click, Enter+form submit) are blocked
+      setTimeout(() => {
+        submittingRef.current = false
+      }, 300)
+    }
     clearDraft()
     shouldRefocusAfterSendRef.current = true
     setFocusAfterSubmitTick((prev) => prev + 1)
@@ -1310,7 +1320,8 @@ function ChatComposerComponent({
     setIsSlashMenuDismissed(true)
   }, [])
 
-  const handlePromptSubmit = useCallback(() => {
+  const handlePromptSubmit = useCallback((e?: React.FormEvent) => {
+    e?.preventDefault()
     if (isSlashMenuOpen) {
       const applied = slashMenuRef.current?.selectActive() ?? false
       if (!applied) {
