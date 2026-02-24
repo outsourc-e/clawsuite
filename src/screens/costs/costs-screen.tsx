@@ -124,12 +124,12 @@ export function CostsScreen() {
   }
 
   return (
-    <div className="min-h-full bg-surface px-4 pt-5 pb-10 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
+    <div className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
       <div className="mx-auto w-full max-w-[1200px]">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <header className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
           <div>
-            <h1 className="text-xl font-semibold">Cost & Token Analytics</h1>
-            <p className="mt-1 text-sm text-primary-500 dark:text-neutral-400">
+            <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">Cost & Token Analytics</h1>
+            <p className="text-xs text-primary-500 dark:text-neutral-400">
               Model spend, token usage, and session-level cost breakdown.
             </p>
           </div>
@@ -145,7 +145,7 @@ export function CostsScreen() {
               Refresh
             </button>
           </div>
-        </div>
+        </header>
 
         {isLoading ? (
           <div className="rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8 text-sm text-primary-700 dark:text-neutral-300">

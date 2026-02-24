@@ -591,11 +591,11 @@ export function DebugConsoleScreen() {
   return (
     <main className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
       <div className="mx-auto w-full max-w-[1200px] space-y-4">
-        <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl md:p-5">
-          <h1 className="text-xl font-medium text-ink text-balance md:text-3xl">
+        <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
+          <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
             Gateway Debug Console
           </h1>
-          <p className="mt-1 text-sm text-primary-600 text-pretty md:text-base">
+          <p className="mt-1 text-xs text-primary-500 text-pretty dark:text-neutral-400">
             Diagnose connection failures, inspect recent issues, and get safe
             troubleshooting suggestions without running commands automatically.
           </p>

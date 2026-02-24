@@ -4474,10 +4474,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="relative flex flex-col h-full min-h-0 bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
-        <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-7xl flex-1 min-h-0 px-3 sm:px-4 flex flex-col">
+        <div className="relative mt-4 sm:mt-5 flex w-full min-h-0 flex-1 flex-col">
           <div className="flex-1 min-h-[420px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
             <PixelOfficeView
               agentRows={agentWorkingRows}
@@ -4497,7 +4497,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
 
           {/* ── 3-card row — shrink-0, anchored at bottom ── */}
-          <section className="relative mx-auto mb-4 mt-8 w-full max-w-7xl shrink-0 grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
+          <section className="relative mb-4 mt-8 grid w-full shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
@@ -4732,9 +4732,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   function renderConfigureContent() {
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 p-4 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
-        <div className="relative mx-auto flex w-full max-w-[1200px] flex-col gap-4">
+        <div className="relative flex w-full min-h-0 flex-1 flex-col gap-4 py-3 pb-24 sm:py-4 sm:pb-4">
 
         {/* ── Header + horizontal pill tabs ── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -4783,7 +4783,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
 
         {/* ── Content area ── */}
-        <div className="min-w-0 overflow-y-auto">
+        <div className="min-w-0 flex-1 overflow-y-auto">
           {configSection === 'agents' ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">
@@ -5686,7 +5686,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return (
       <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white" />
-        <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
+        <div className="relative flex w-full min-h-0 flex-1 flex-col gap-4 py-3 pb-24 sm:py-4 sm:pb-4">
           <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3">
             <div>
               <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Mission Control</h2>
@@ -6923,12 +6923,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   return (
     <AgentHubErrorBoundary>
-    <div className="flex h-full min-h-0 flex-col bg-white dark:bg-[var(--theme-bg,#0b0e14)]">
+    <div className="flex h-full min-h-0 flex-col bg-primary-100/30 dark:bg-[var(--theme-bg,#0b0e14)]">
       {/* ── Brand top accent border ──────────────────────────────────────── */}
       <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
 
+      <div className="mx-auto flex w-full max-w-[1600px] min-h-0 flex-1 flex-col px-4 md:px-6">
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <header className="relative z-10 shrink-0 mx-4 mt-3 mb-0 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 md:mx-6 md:px-5 md:py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+      <header className="relative z-10 shrink-0 mt-3 mb-0 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 md:px-5 md:py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
@@ -6978,7 +6979,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       </header>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-primary-200 bg-primary-50 px-4 mt-2 md:px-6 md:mt-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+      <div className="mt-2 flex shrink-0 items-center gap-2 border-b border-primary-200 bg-primary-50 md:mt-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
         <div className="min-w-0 flex-1 overflow-x-auto">
           <div className="flex w-full min-w-max items-center">
             {TAB_DEFS.map((tab) => {
@@ -7618,8 +7619,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </dl>
                   </div>
                 </div>
-              ) : null}
-            </div>
+        ) : null}
+      </div>
 
             <div className="flex items-center justify-between border-t border-neutral-200 px-5 py-3">
               <button
@@ -7895,6 +7896,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
       ) : null}
 
+      </div>
       {/* ── Mobile: Bottom Tab Nav ─────────────────────────────────────────── */}
       <div
         className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200 bg-white/95 backdrop-blur-sm md:hidden"

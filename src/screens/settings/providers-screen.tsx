@@ -129,23 +129,23 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
   return (
     <div
       className={cn(
-        'h-full text-primary-900',
-        embedded ? 'bg-primary-50' : 'overflow-y-auto bg-surface',
+        'text-primary-900 dark:text-neutral-100',
+        embedded ? 'h-full bg-primary-50' : 'min-h-full bg-surface',
       )}
     >
       <main
         className={cn(
-          'mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 pt-5 md:px-6 md:pt-8',
-          embedded ? 'pb-6 md:pb-6' : 'pb-24 md:pb-8',
+          'mx-auto flex w-full max-w-[1200px] flex-col gap-4',
+          embedded ? 'px-4 pt-4 pb-6 md:px-6 md:pb-6' : 'px-4 pt-5 pb-24 md:px-6 md:pt-8',
         )}
       >
-        <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl md:p-5">
+        <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1.5">
-              <h1 className="text-xl font-medium text-primary-900 text-balance md:text-2xl">
+              <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
                 Provider Setup
               </h1>
-              <p className="text-sm text-primary-600 text-pretty">
+              <p className="text-xs text-primary-500 text-pretty dark:text-neutral-400">
                 View configured providers and walk through safe setup
                 instructions for new providers.
               </p>

@@ -674,12 +674,12 @@ export function TasksScreen() {
 
   return (
     <main className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
-      <section className="mx-auto w-full max-w-[1600px]">
-        <header className="mb-4 flex flex-wrap items-center justify-between gap-2.5 md:mb-6">
+      <section className="mx-auto w-full max-w-[1200px]">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60 md:mb-6">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-base font-semibold text-ink md:text-lg">Tasks</h1>
-              <p className="text-[11px] text-primary-400">
+              <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">Tasks</h1>
+              <p className="text-xs text-primary-500 dark:text-neutral-400">
                 {tasks.filter((task) => task.status !== 'done').length} active ·{' '}
                 {tasks.filter((task) => task.status === 'done').length} completed
               </p>
