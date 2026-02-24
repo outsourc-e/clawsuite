@@ -105,7 +105,6 @@ type MessageItemProps = {
   toolResultsByCallId?: Map<string, GatewayMessage>
   toolCalls?: Array<StreamToolCall>
   onRetryMessage?: (message: GatewayMessage) => void
-  onDeleteMessage?: (id: string) => void
   forceActionsVisible?: boolean
   wrapperRef?: React.RefObject<HTMLDivElement | null>
   wrapperClassName?: string
@@ -289,7 +288,6 @@ function MessageItemComponent({
   toolResultsByCallId,
   toolCalls: streamToolCalls = [],
   onRetryMessage,
-  onDeleteMessage,
   forceActionsVisible = false,
   wrapperRef,
   wrapperClassName,
@@ -537,7 +535,6 @@ function MessageItemComponent({
   )
   const [toolCallsOpen, setToolCallsOpen] = useState(false)
   const [copyDone, setCopyDone] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   useEffect(() => {
     if (expandAllToolSections) {
@@ -551,15 +548,6 @@ function MessageItemComponent({
       window.setTimeout(() => setCopyDone(false), 1500)
     })
   }, [fullText])
-
-  const handleDelete = useCallback(function handleDelete() {
-    if (!deleteConfirm) {
-      setDeleteConfirm(true)
-      window.setTimeout(() => setDeleteConfirm(false), 3000)
-      return
-    }
-    onDeleteMessage?.(wrapperDataMessageId ?? '')
-  }, [deleteConfirm, onDeleteMessage, wrapperDataMessageId])
 
   // Never show "Queued" — messages are sent instantly to the gateway.
   // The old "sending" status was misleading since the API call takes <100ms.
@@ -645,20 +633,6 @@ function MessageItemComponent({
               </svg>
             </button>
           )}
-          {/* Delete */}
-          <button
-            type="button"
-            title={deleteConfirm ? 'Click again to confirm delete' : 'Delete'}
-            onClick={handleDelete}
-            className={cn(
-              'rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700',
-              deleteConfirm && 'bg-red-50 dark:bg-red-950/40',
-            )}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={cn('w-3.5 h-3.5', deleteConfirm ? 'text-red-500' : 'text-neutral-400 hover:text-neutral-200')}>
-              <path d="M3 5h10M6 5V3h4v2M6 8v4M10 8v4M4 5l1 8h6l1-8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
         </div>
       )}
       {thinking && !hasText && (
@@ -899,7 +873,6 @@ function areMessagesEqual(
   }
   if (prevProps.wrapperClassName !== nextProps.wrapperClassName) return false
   if (prevProps.onRetryMessage !== nextProps.onRetryMessage) return false
-  if (prevProps.onDeleteMessage !== nextProps.onDeleteMessage) return false
   if (prevProps.toolCalls !== nextProps.toolCalls) return false
   if (prevProps.wrapperDataMessageId !== nextProps.wrapperDataMessageId) {
     return false
