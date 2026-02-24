@@ -128,6 +128,7 @@ type ChatMessageListProps = {
   bottomOffset?: number | string
   keyboardInset?: number
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
+  liveToolActivity?: Array<{ name: string; timestamp: number }>
   hideSystemMessages?: boolean
 }
 
@@ -153,6 +154,7 @@ function ChatMessageListComponent({
   bottomOffset = 0,
   keyboardInset = 0,
   activeToolCalls = [],
+  liveToolActivity = [],
   hideSystemMessages = false,
 }: ChatMessageListProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
@@ -1063,6 +1065,7 @@ function ChatMessageListComponent({
             </>
           )}
           {showTypingIndicator ||
+          liveToolActivity.length > 0 ||
           (isStreaming && !streamingText) ||
           (isStreaming && activeToolCalls.length > 0) ? (
             <div
@@ -1070,7 +1073,26 @@ function ChatMessageListComponent({
               role="status"
               aria-live="polite"
             >
-              {activeToolCalls.length > 0 ? (
+              {liveToolActivity.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {liveToolActivity.map((tool, index) => (
+                    <span
+                      key={tool.name}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                        index === 0
+                          ? 'animate-pulse border-accent-200 bg-accent-50 text-accent-700 dark:border-accent-800 dark:bg-accent-950/40 dark:text-accent-400'
+                          : 'border-neutral-200 bg-neutral-100 text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+                      )}
+                    >
+                      {getToolIcon(tool.name)} {tool.name}
+                      {index === 0 ? (
+                        <span className="ml-0.5 opacity-60">···</span>
+                      ) : null}
+                    </span>
+                  ))}
+                </div>
+              ) : activeToolCalls.length > 0 ? (
                 activeToolCalls.map((tool) => (
                   <div key={tool.id} className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="size-5 rounded-full bg-accent-100 flex items-center justify-center shrink-0">
@@ -1214,6 +1236,7 @@ function areChatMessageListEqual(
     prev.bottomOffset === next.bottomOffset &&
     prev.keyboardInset === next.keyboardInset &&
     prev.activeToolCalls === next.activeToolCalls &&
+    prev.liveToolActivity === next.liveToolActivity &&
     prev.hideSystemMessages === next.hideSystemMessages
   )
 }

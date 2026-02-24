@@ -230,6 +230,9 @@ export function ChatScreen({
   const [waitingForResponse, setWaitingForResponse] = useState(
     () => hasPendingSend() || hasPendingGeneration(),
   )
+  const [liveToolActivity, setLiveToolActivity] = useState<
+    Array<{ name: string; timestamp: number }>
+  >([])
   const streamTimer = useRef<number | null>(null)
   const streamIdleTimer = useRef<number | null>(null)
   const lastAssistantSignature = useRef('')
@@ -380,6 +383,44 @@ export function ChatScreen({
     realtimeStreamingText,
     isRealtimeStreaming,
   )
+
+  useEffect(() => {
+    if (!waitingForResponse) {
+      const timer = window.setTimeout(() => setLiveToolActivity([]), 800)
+      return () => window.clearTimeout(timer)
+    }
+
+    const events = new EventSource('/api/events')
+    const onActivity = (event: MessageEvent) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          type?: unknown
+          title?: unknown
+        }
+        if (payload.type !== 'tool' || typeof payload.title !== 'string') {
+          return
+        }
+
+        const name = payload.title
+          .replace(/^Tool activity:\s*/i, '')
+          .trim()
+        if (!name) return
+
+        setLiveToolActivity((prev) => {
+          const filtered = prev.filter((entry) => entry.name !== name)
+          return [{ name, timestamp: Date.now() }, ...filtered].slice(0, 5)
+        })
+      } catch {
+        // Ignore malformed activity events.
+      }
+    }
+
+    events.addEventListener('activity', onActivity)
+    return () => {
+      events.removeEventListener('activity', onActivity)
+      events.close()
+    }
+  }, [waitingForResponse])
 
   useEffect(() => {
     function checkApprovals() {
@@ -1595,6 +1636,7 @@ export function ChatScreen({
               }
               hideSystemMessages={isMobile}
               activeToolCalls={activeToolCalls}
+              liveToolActivity={liveToolActivity}
             />
           )}
           {showComposer ? (
