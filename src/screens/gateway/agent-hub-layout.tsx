@@ -2148,6 +2148,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [missionHistory, setMissionHistory] = useState<MissionCheckpoint[]>(() => loadMissionHistory())
   const [artifactPreview, setArtifactPreview] = useState<MissionArtifact | null>(null)
   const [selectedReport, setSelectedReport] = useState<StoredMissionReport | null>(null)
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [completionModalReport, setCompletionModalReport] = useState<StoredMissionReport | null>(null)
   const [missionTokenCount, setMissionTokenCount] = useState(0)
   const [pausedByAgentId, setPausedByAgentId] = useState<Record<string, boolean>>({})
   const [steerAgentId, setSteerAgentId] = useState<string | null>(null)
@@ -2173,6 +2175,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [agentOutputLines, setAgentOutputLines] = useState<Record<string, string[]>>({})
   const missionCompletionSnapshotRef = useRef<MissionReportPayload | null>(null)
   const prevMissionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
+  const prevMissionActiveRef = useRef(false)
   const lastReportedMissionIdRef = useRef<string>('')
   // Mission ID for checkpointing
   const missionIdRef = useRef<string>('')
@@ -4052,13 +4055,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionTokenCount(0)
     const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
     setSelectedOutputAgentId(firstAssignedAgentId)
-    if (firstAssignedAgentId) setOutputPanelVisible(true)
     setPausedByAgentId({})
     sessionActivityRef.current = new Map()
     // ── Auto-switch to Mission tab and show live feed ──────────────────────
     setActiveTab('missions')
     setMissionSubTab('active')
-    setLiveFeedVisible(true)
     setWizardOpen(false)
     emitFeedEvent({
       type: 'mission_started',
@@ -4094,6 +4095,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       setMissionSubTab('active')
     }
   }, [missionActive, missionState])
+
+  useEffect(() => {
+    // Detect transition from active -> inactive (mission just ended)
+    if (prevMissionActiveRef.current === true && missionActive === false && missionReports.length > 0) {
+      const latest = missionReports[0] // reports are newest-first
+      if (latest) {
+        setCompletionModalReport(latest)
+        setShowCompletionModal(true)
+      }
+    }
+    prevMissionActiveRef.current = missionActive
+  }, [missionActive, missionReports])
 
   const isMissionRunning = missionActive && missionState === 'running'
 
@@ -6963,6 +6976,64 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
         </div>
       ) : null}
+
+      {showCompletionModal && completionModalReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Mission Complete</p>
+                <p className="mt-0.5 text-base font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2">
+                  {completionModalReport.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCompletionModal(false)}
+                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-px border-b border-neutral-100 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800">
+              {[
+                { label: 'Tasks', value: `${completionModalReport.taskStats.completed}/${completionModalReport.taskStats.total}` },
+                { label: 'Duration', value: formatDuration(completionModalReport.duration) },
+                { label: 'Tokens', value: completionModalReport.tokenCount.toLocaleString() },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-white dark:bg-neutral-900 px-4 py-3 text-center">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">{label}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{value}</p>
+                </div>
+              ))}
+            </div>
+            {completionModalReport.report && (
+              <div className="max-h-48 overflow-y-auto px-6 py-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">Report</p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap leading-relaxed">
+                  {completionModalReport.report}
+                </p>
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => { setShowCompletionModal(false); setMissionSubTab('history') }}
+                className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+              >
+                View History
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowCompletionModal(false); setMissionBoardModalOpen(true); setMissionWizardStep(0) }}
+                className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+              >
+                New Mission
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Mobile: Agent Output Bottom Sheet ──────────────────────────────── */}
       {isMobileHub && missionActive && selectedOutputAgentId ? (
