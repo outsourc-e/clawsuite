@@ -942,9 +942,7 @@ export function AgentViewPanel() {
                           </div>
                         </CollapsiblePanel>
                       )}
-                      {!historyVisible && (
-                        <p className="mt-1 px-2 text-[10px] italic text-primary-400">hidden</p>
-                      )}
+
                     </Collapsible>
                   </section>
                 ) : null}
@@ -1071,9 +1069,7 @@ export function AgentViewPanel() {
                         <BrowserSidebarPreview />
                       </CollapsiblePanel>
                     )}
-                    {!browserVisible && (
-                      <p className="mt-1 px-2 text-[10px] italic text-primary-400">hidden</p>
-                    )}
+
                   </Collapsible>
                 </section>
               </div>
