@@ -139,7 +139,7 @@ export function NotificationsWidget({
       }
       onRemove={onRemove}
       editMode={editMode}
-      className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
+      className="h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-purple-500 bg-white dark:bg-neutral-900 p-4 sm:p-5 [&_svg]:text-purple-500"
     >
       {notificationsQuery.isLoading && notifications.length === 0 ? (
         <div className="flex h-[150px] items-center justify-center gap-3 rounded-xl border border-neutral-800 bg-neutral-950">

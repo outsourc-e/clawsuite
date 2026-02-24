@@ -55,7 +55,7 @@ export function ServicesHealthWidget({
           {upCount}/{totalCount}
         </span>
       }
-      className="h-full rounded-xl border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500"
+      className="h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-emerald-500 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_svg]:text-emerald-500"
     >
       <div className="space-y-1.5">
         {services.map((service) => {
@@ -77,7 +77,7 @@ export function ServicesHealthWidget({
                   {service.name}
                 </p>
                 {typeof service.latencyMs === 'number' ? (
-                  <p className="font-mono text-[10px] tabular-nums text-primary-400 dark:text-neutral-500">
+                  <p className="font-mono text-[10px] tabular-nums text-neutral-500 dark:text-neutral-400">
                     {service.latencyMs}ms
                   </p>
                 ) : null}

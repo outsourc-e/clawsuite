@@ -129,7 +129,7 @@ export function RecentSessionsWidget({
       }
       draggable={draggable}
       onRemove={onRemove}
-      className="h-full rounded-xl border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500"
+      className="h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-teal-500 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_svg]:text-teal-500"
     >
       {isLoading ? (
         <div className="flex h-32 items-center justify-center gap-3 rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950">
@@ -176,7 +176,7 @@ export function RecentSessionsWidget({
                       icon={ArrowRight01Icon}
                       size={14}
                       strokeWidth={1.5}
-                      className="text-primary-400 dark:text-neutral-500 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="text-neutral-500 dark:text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100"
                     />
                   </span>
                 </div>

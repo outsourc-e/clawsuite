@@ -149,7 +149,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
             Backlog {backlogCount} • In progress {inProgressCount} • Done {doneCount}
           </span>
         }
-        className="h-full rounded-xl border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 md:hidden [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500"
+        className="h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-orange-500 bg-white dark:bg-neutral-900 p-4 sm:p-5 md:hidden [&_svg]:text-orange-500"
       >
         {cronJobsQuery.isLoading && tasks.length === 0 ? (
           <div className="rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-3 text-sm text-primary-500 dark:text-neutral-400">
@@ -197,7 +197,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
           <button
             type="button"
             onClick={() => void navigate({ to: '/cron' })}
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-primary-700 dark:hover:text-neutral-300"
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-neutral-700 dark:hover:text-neutral-300"
           >
             View all ›
           </button>
@@ -270,7 +270,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
             <button
               type="button"
               onClick={() => void navigate({ to: '/cron' })}
-              className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-primary-700 dark:hover:text-neutral-300"
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-neutral-700 dark:hover:text-neutral-300"
             >
               View all →
             </button>

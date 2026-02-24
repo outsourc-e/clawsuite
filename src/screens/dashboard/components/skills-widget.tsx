@@ -103,7 +103,7 @@ export function SkillsWidget({
       }
       draggable={draggable}
       onRemove={onRemove}
-      className="h-full rounded-xl border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_h2]:text-balance [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500"
+      className="h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-blue-500 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_h2]:text-balance [&_svg]:text-blue-500"
     >
       {skillsQuery.isLoading && skills.length === 0 ? (
         <div className="flex h-28 items-center justify-center gap-3 rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950">

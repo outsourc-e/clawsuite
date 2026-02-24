@@ -52,11 +52,11 @@ export function DashboardGlassCard({
       className={cn(
         'group relative flex h-full flex-col overflow-hidden rounded-xl border transition-colors',
         tier === 'primary' &&
-          'border-primary-200 bg-primary-50 px-4 py-3.5 hover:border-primary-300 dark:bg-primary-50/95 md:px-5 md:py-4',
+          'border-neutral-200 bg-white px-4 py-3.5 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 md:px-5 md:py-4',
         tier === 'secondary' &&
-          'border-primary-200 bg-primary-50/90 px-3.5 py-3 hover:border-primary-300 dark:bg-primary-50/95 md:px-4 md:py-3',
+          'border-neutral-200 bg-white px-3.5 py-3 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 md:px-4 md:py-3',
         tier === 'tertiary' &&
-          'border-primary-200/80 bg-primary-50/70 px-3 py-2.5 hover:border-primary-200 dark:bg-primary-50/80 md:px-3.5 md:py-2.5',
+          'border-neutral-200 bg-white px-3 py-2.5 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 md:px-3.5 md:py-2.5',
         className,
       )}
     >
@@ -70,9 +70,9 @@ export function DashboardGlassCard({
             icon={icon}
             size={15}
             strokeWidth={1.5}
-            className="shrink-0 text-primary-400"
+            className="shrink-0 text-neutral-600 dark:text-neutral-300"
           />
-          <h2 className="truncate text-xs font-medium uppercase tracking-wide text-primary-500">
+          <h2 className="truncate text-xs font-semibold text-neutral-900 dark:text-neutral-100">
             {title}
             {titleAccessory ? (
               <span className="ml-1.5 inline-flex align-middle normal-case tracking-normal">

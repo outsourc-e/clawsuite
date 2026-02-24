@@ -92,8 +92,8 @@ export function WidgetShell({
       className={cn(
         // Base glass card
         'group relative flex flex-col overflow-hidden rounded-2xl',
-        'border border-white/30 dark:border-white/10',
-        'bg-white/60 dark:bg-neutral-950/60 backdrop-blur-md',
+        'border border-neutral-200 dark:border-neutral-700',
+        'bg-white dark:bg-neutral-900 backdrop-blur-md',
         'shadow-sm transition-shadow',
         // Size
         SIZE_STYLES[size],
@@ -127,12 +127,12 @@ export function WidgetShell({
               icon={icon}
               size={size === 'small' ? 13 : 15}
               strokeWidth={1.5}
-              className="shrink-0 text-primary-400"
+              className="shrink-0 text-neutral-600 dark:text-neutral-300"
             />
           ) : null}
           <h2
             className={cn(
-              'truncate font-medium uppercase tracking-wide text-primary-500',
+              'truncate font-semibold text-neutral-900 dark:text-neutral-100',
               TITLE_SIZE[size],
             )}
           >

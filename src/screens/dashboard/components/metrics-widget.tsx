@@ -152,7 +152,7 @@ function TimeRangePills({ value, onChange }: TimeRangePillsProps) {
             'rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase transition-colors',
             value === r
               ? 'bg-primary-100 dark:bg-neutral-800 text-primary-900 dark:text-neutral-100'
-              : 'text-primary-400 dark:text-neutral-500 hover:text-primary-700 dark:hover:text-neutral-300',
+              : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300',
           )}
         >
           {r.toUpperCase()}
@@ -207,7 +207,7 @@ function MetricCard({
       aria-label={`${label} details`}
       aria-description={`${description}${rawValue ? ` Raw value: ${rawValue}` : ''}`}
     >
-      <p className="text-[11px] font-medium uppercase tracking-wider text-primary-400 dark:text-neutral-500">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
         {label}
       </p>
 
@@ -231,7 +231,7 @@ function MetricCard({
               {trendLabel ? ` ${trendLabel}` : ''}
             </p>
           ) : null}
-          <span className="ml-auto text-lg leading-none text-primary-400 dark:text-neutral-500">
+          <span className="ml-auto text-lg leading-none text-neutral-500 dark:text-neutral-400">
             ›
           </span>
         </div>
@@ -335,7 +335,7 @@ export function MetricsWidget({
               <button
                 type="button"
                 onClick={closeMobilePopover}
-                className="absolute right-3 top-2 text-xl leading-none text-primary-400 dark:text-neutral-500"
+                className="absolute right-3 top-2 text-xl leading-none text-neutral-500 dark:text-neutral-400"
                 aria-label={`Dismiss ${title} details`}
               >
                 ×
@@ -373,7 +373,7 @@ export function MetricsWidget({
         title={title}
         icon={icon}
         className={cn(
-          'hidden h-full rounded-xl border bg-white dark:bg-neutral-900 p-4 sm:p-5 md:flex [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500',
+          'hidden h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-blue-500 bg-white dark:bg-neutral-900 p-4 sm:p-5 md:flex [&_svg]:text-blue-500',
           METRIC_COLOR_CLASSES[accent],
           className,
         )}
@@ -401,7 +401,7 @@ export function MetricsWidget({
             <p
               className={cn(
                 'truncate font-mono text-2xl font-semibold leading-none tabular-nums',
-                isError ? 'text-primary-400 dark:text-neutral-500' : 'text-primary-900 dark:text-neutral-100',
+                isError ? 'text-neutral-500 dark:text-neutral-400' : 'text-primary-900 dark:text-neutral-100',
               )}
             >
               {isError ? '—' : value}

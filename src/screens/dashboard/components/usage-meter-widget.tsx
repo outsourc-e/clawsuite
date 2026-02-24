@@ -389,7 +389,7 @@ export function UsageMeterWidget({
             'rounded-full px-2 py-0.5 font-medium transition-colors',
             view === tab
               ? 'bg-primary-100 dark:bg-neutral-800 text-primary-900 dark:text-neutral-100 shadow-sm'
-              : 'text-primary-400 dark:text-neutral-500 hover:text-primary-700 dark:hover:text-neutral-300',
+              : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300',
           )}
         >
           {tab === 'tokens' ? 'Tokens' : 'Cost'}
@@ -411,7 +411,7 @@ export function UsageMeterWidget({
       onRemove={onRemove}
       editMode={editMode}
       loading={showSkeleton && !timedOut}
-      className="h-full rounded-xl border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500"
+      className="h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-purple-500 bg-white dark:bg-neutral-900 p-4 sm:p-5 [&_svg]:text-purple-500"
     >
       {showTimeoutOrError ? (
         <div className="flex flex-col items-start gap-2 rounded-lg border border-red-900 bg-red-950/30 px-3 py-3">
@@ -434,7 +434,7 @@ export function UsageMeterWidget({
       ) : showEmptyState ? (
         <div className="flex h-full flex-col items-center justify-center gap-1.5 py-4 text-center">
           <p className="text-sm font-medium text-primary-700 dark:text-neutral-300">No usage yet today</p>
-          <p className="text-[11px] text-primary-400 dark:text-neutral-500">
+          <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
             Usage will appear once your first session is active.
           </p>
           {isSettled && (
@@ -471,7 +471,7 @@ export function UsageMeterWidget({
                     'px-3 py-1 text-xs rounded-full transition-colors',
                     view === tab
                       ? 'bg-primary-100 dark:bg-neutral-800 text-primary-900 dark:text-neutral-100 shadow-sm'
-                      : 'text-primary-400 dark:text-neutral-500',
+                      : 'text-neutral-500 dark:text-neutral-400',
                   )}
                 >
                   {tab === 'tokens' ? 'Tokens' : 'Cost'}
@@ -512,7 +512,7 @@ export function UsageMeterWidget({
                 <p className="font-mono text-2xl sm:text-3xl font-bold leading-none text-primary-900 dark:text-neutral-100 tabular-nums">
                   {view === 'cost' ? formatUsd(displayCost) : formatTokens(displayTokens)}
                 </p>
-                <p className="mt-1 text-[11px] uppercase tracking-wider text-primary-400 dark:text-neutral-500">
+                <p className="mt-1 text-[11px] uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   {view === 'cost' ? 'today\'s spend' : 'tokens today'}
                 </p>
               </div>
@@ -520,7 +520,7 @@ export function UsageMeterWidget({
                 <p className="font-mono text-sm font-semibold tabular-nums text-primary-700 dark:text-neutral-300">
                   {view === 'cost' ? formatTokens(displayTokens) : formatUsd(displayCost)}
                 </p>
-                <p className="mt-0.5 text-[11px] uppercase tracking-wider text-primary-400 dark:text-neutral-500">
+                <p className="mt-0.5 text-[11px] uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   {view === 'cost' ? 'tokens' : 'spend'}
                 </p>
               </div>
@@ -529,7 +529,7 @@ export function UsageMeterWidget({
             {/* Provider breakdown bars */}
             {topProviders.length > 0 ? (
               <div className="space-y-2">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-primary-400 dark:text-neutral-500">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   By Provider
                 </p>
                 {topProviders.map((p) => (
@@ -539,7 +539,7 @@ export function UsageMeterWidget({
                         {capitalizeProvider(p.provider)}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] tabular-nums text-primary-400 dark:text-neutral-500">
+                        <span className="font-mono text-[10px] tabular-nums text-neutral-500 dark:text-neutral-400">
                           {formatTokens(p.total)} tok
                         </span>
                         <span className="font-mono text-[11px] font-semibold tabular-nums text-primary-800 dark:text-neutral-200">
@@ -575,7 +575,7 @@ export function UsageMeterWidget({
 
             {/* Session count if available */}
             {typeof usageData.sessionCount === 'number' && usageData.sessionCount > 0 && (
-              <p className="text-[10px] text-primary-400 dark:text-neutral-500">
+              <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
                 {usageData.sessionCount} active session{usageData.sessionCount !== 1 ? 's' : ''}
               </p>
             )}

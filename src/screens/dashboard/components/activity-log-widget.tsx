@@ -309,7 +309,7 @@ export function ActivityLogWidget({
       }
       onRemove={onRemove}
       editMode={editMode}
-      className="h-full rounded-xl border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500"
+      className="h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-orange-500 bg-white dark:bg-neutral-900 p-4 sm:p-5 [&_svg]:text-orange-500"
     >
       <div className="mb-2">
         <span
@@ -361,7 +361,7 @@ export function ActivityLogWidget({
                       {row.subtitle}
                     </p>
                   </div>
-                  <span className="shrink-0 text-[10px] text-primary-400 dark:text-neutral-500">
+                  <span className="shrink-0 text-[10px] text-neutral-500 dark:text-neutral-400">
                     {row.timeAgo}
                   </span>
                 </article>
@@ -386,7 +386,7 @@ export function ActivityLogWidget({
                         <span>{row.summary}</span>
                       </p>
                     </div>
-                    <span className="shrink-0 text-[10px] text-primary-400 dark:text-neutral-500">
+                    <span className="shrink-0 text-[10px] text-neutral-500 dark:text-neutral-400">
                       {formatRelativeTime(row.timestamp)}
                     </span>
                   </div>
@@ -401,7 +401,7 @@ export function ActivityLogWidget({
         <button
           type="button"
           onClick={() => void navigate({ to: '/activity' })}
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-primary-700 dark:hover:text-neutral-300"
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-neutral-700 dark:hover:text-neutral-300"
         >
           View all →
         </button>
