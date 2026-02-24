@@ -4188,7 +4188,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
 
           {/* ── 3-card row — shrink-0, anchored at bottom ── */}
-          <section className="relative mx-auto mb-4 mt-4 w-full max-w-7xl shrink-0 grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
+          <section className="relative mx-auto mb-4 mt-8 w-full max-w-7xl shrink-0 grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
