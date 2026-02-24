@@ -34,6 +34,9 @@ export const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
   codex: 'border border-emerald-200 bg-emerald-50 text-emerald-700',
   flash: 'border border-violet-200 bg-violet-50 text-violet-700',
   minimax: 'border border-amber-200 bg-amber-50 text-amber-700',
+  'pc1-coder': 'border border-cyan-200 bg-cyan-50 text-cyan-700',
+  'pc1-planner': 'border border-indigo-200 bg-indigo-50 text-indigo-700',
+  'pc1-critic': 'border border-purple-200 bg-purple-50 text-purple-700',
 }
 
 export const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
@@ -43,6 +46,9 @@ export const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
   codex: 'Codex',
   flash: 'Flash',
   minimax: 'MiniMax',
+  'pc1-coder': 'PC1 Coder',
+  'pc1-planner': 'PC1 Planner',
+  'pc1-critic': 'PC1 Critic',
 }
 
 const DEFAULT_OFFICE_MODEL_BADGE = 'border border-neutral-200 bg-neutral-50 text-neutral-700'

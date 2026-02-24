@@ -87,6 +87,7 @@ const TEMPLATE_MODEL_SUGGESTIONS: Record<TeamTemplateId, Array<ModelPresetId>> =
   research: ['opus', 'sonnet', 'auto'],
   coding: ['opus', 'codex', 'sonnet'],
   content: ['opus', 'sonnet', 'flash'],
+  'pc1-loop': ['pc1-planner', 'pc1-coder', 'pc1-critic'],
 }
 
 // Maps ModelPresetId → real model string for gateway. Empty string = omit (use gateway default).
@@ -97,6 +98,9 @@ const MODEL_PRESET_MAP: Record<string, string> = {
   codex: 'openai-codex/gpt-5.3-codex',
   flash: 'google/gemini-2.5-flash',
   minimax: 'minimax/MiniMax-M2.5',
+  'pc1-coder': 'ollama-pc1/pc1-coder:latest',
+  'pc1-planner': 'ollama-pc1/pc1-planner:latest',
+  'pc1-critic': 'ollama-pc1/pc1-critic:latest',
 }
 
 type GatewayModelEntry = {
@@ -705,22 +709,41 @@ function truncateMissionGoal(goal: string, max = 110): string {
   return `${goal.slice(0, max - 1).trimEnd()}…`
 }
 
+const PC1_AGENT_DEFAULTS: Record<string, { modelId: string; roleDescription: string }> = {
+  Atlas: {
+    modelId: 'pc1-planner',
+    roleDescription: 'Planning & decomposition — Sonnet 4.5 Distill MoE (175 TPS)',
+  },
+  Forge: {
+    modelId: 'pc1-coder',
+    roleDescription: 'Code generation & patching — Qwen3-Coder 30B (97 TPS)',
+  },
+  Lens: {
+    modelId: 'pc1-critic',
+    roleDescription: 'Code review & QA — Opus 4.5 Distill (83 TPS)',
+  },
+}
+
 function buildTeamFromTemplate(templateId: TeamTemplateId): TeamMember[] {
   const template = TEAM_TEMPLATES.find((entry) => entry.id === templateId)
   if (!template) return []
 
   const modelSuggestions = TEMPLATE_MODEL_SUGGESTIONS[template.id]
+  const isPC1Loop = templateId === 'pc1-loop'
 
-  return template.agents.map((agentName, index) => ({
-    id: `${template.id}-${agentName}`,
-    name: toTitleCase(agentName),
-    avatar: getAgentAvatarForSlot(index),
-    modelId: modelSuggestions[index] ?? 'auto',
-    roleDescription: `${toTitleCase(agentName)} lead for this mission`,
-    goal: '',
-    backstory: '',
-    status: 'available',
-  }))
+  return template.agents.map((agentName, index) => {
+    const pc1Defaults = isPC1Loop ? PC1_AGENT_DEFAULTS[agentName] : undefined
+    return {
+      id: `${template.id}-${agentName}`,
+      name: toTitleCase(agentName),
+      avatar: getAgentAvatarForSlot(index),
+      modelId: pc1Defaults?.modelId ?? modelSuggestions[index] ?? 'auto',
+      roleDescription: pc1Defaults?.roleDescription ?? `${toTitleCase(agentName)} lead for this mission`,
+      goal: '',
+      backstory: '',
+      status: 'available',
+    }
+  })
 }
 
 function buildTeamFromRuntime(
@@ -1532,6 +1555,7 @@ const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
   research: 'Research Team',
   coding: 'Coding Sprint',
   content: 'Content Pipeline',
+  'pc1-loop': 'PC1 Loop (Local ⚡)',
 }
 
 const LEGACY_AGENT_AVATARS = ['🔍', '✍️', '📝', '🧪', '🎨', '📊', '🛡️', '⚡', '🔬', '🎯'] as const
@@ -1863,6 +1887,9 @@ const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
   codex:  'border border-emerald-200 bg-emerald-50 text-emerald-700',
   flash:  'border border-violet-200 bg-violet-50 text-violet-700',
   minimax: 'border border-amber-200 bg-amber-50 text-amber-700',
+  'pc1-coder':   'border border-cyan-200 bg-cyan-50 text-cyan-700',
+  'pc1-planner': 'border border-indigo-200 bg-indigo-50 text-indigo-700',
+  'pc1-critic':  'border border-purple-200 bg-purple-50 text-purple-700',
 }
 
 const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
@@ -1872,6 +1899,9 @@ const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
   codex:  'Codex',
   flash:  'Flash',
   minimax: 'MiniMax',
+  'pc1-coder':   'PC1 Coder',
+  'pc1-planner': 'PC1 Planner',
+  'pc1-critic':  'PC1 Critic',
 }
 
 const DEFAULT_OFFICE_MODEL_BADGE =

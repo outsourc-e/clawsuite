@@ -11,6 +11,9 @@ export const MODEL_PRESETS = [
   { id: 'codex', label: 'GPT-5 Codex', desc: 'Code specialist — OpenAI' },
   { id: 'flash', label: 'Gemini 2.5 Flash', desc: 'Quick & cheap — Google' },
   { id: 'minimax', label: 'MiniMax M2.5', desc: 'Cost efficient — MiniMax' },
+  { id: 'pc1-coder', label: 'PC1 Coder (97 TPS)', desc: 'Qwen3-Coder 30B · Local · RTX 4090' },
+  { id: 'pc1-planner', label: 'PC1 Planner (175 TPS)', desc: 'Qwen3-30B Sonnet Distill MoE · Local · RTX 4090' },
+  { id: 'pc1-critic', label: 'PC1 Critic (83 TPS)', desc: 'Qwen3-14B Opus Distill · Local · RTX 4090' },
 ] as const
 
 export const TEAM_TEMPLATES = [
@@ -31,6 +34,12 @@ export const TEAM_TEMPLATES = [
     name: 'Content Pipeline',
     agents: ['Scout', 'Quill', 'Polish'],
     icon: '📝',
+  },
+  {
+    id: 'pc1-loop',
+    name: 'PC1 Loop (Local ⚡)',
+    agents: ['Atlas', 'Forge', 'Lens'],
+    icon: '⚡',
   },
 ] as const
 
@@ -88,6 +97,9 @@ const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
   codex: 'bg-emerald-100 text-emerald-700',
   flash: 'bg-violet-100 text-violet-700',
   minimax: 'bg-amber-100 text-amber-700',
+  'pc1-coder': 'bg-cyan-100 text-cyan-700',
+  'pc1-planner': 'bg-indigo-100 text-indigo-700',
+  'pc1-critic': 'bg-purple-100 text-purple-700',
 }
 
 const DEFAULT_MODEL_BADGE_COLOR =
