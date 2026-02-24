@@ -4156,13 +4156,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .slice(0, 3)
 
     // Shared card style
-    const cardCls = 'group relative overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)] p-5 shadow-sm hover:shadow-md transition-shadow duration-200'
-    const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/50'
+    const cardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)] p-4 shadow-sm'
+    const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="flex flex-col h-full min-h-0 bg-neutral-50 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex flex-col h-full min-h-0 bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — fills all available height, focal point ── */}
-        <div className="flex-1 min-h-[480px] mx-4 mt-4 overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
+        <div className="relative flex-1 min-h-[480px] mx-4 mt-4 overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
           <PixelOfficeView
             agentRows={agentWorkingRows}
             missionRunning={isMissionRunning}
@@ -4185,7 +4186,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
 
           {/* ── 3-card row — anchored below the office ── */}
-          <section className="flex-shrink-0 mx-4 mt-4 mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <section className="relative mx-auto mb-24 mt-6 w-full max-w-7xl shrink-0 grid grid-cols-1 gap-4 px-3 sm:mb-4 sm:mt-8 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
@@ -5191,9 +5192,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const missionTasksForBoard = missionTasks.length > 0 ? missionTasks : boardTasks
     const runningTaskStats = computeMissionTaskStats(missionTasksForBoard)
     const runningElapsed = missionStartedAtRef.current ? formatDuration(Date.now() - missionStartedAtRef.current) : '0s'
-    const runningProgressPct = runningTaskStats.total > 0
-      ? Math.round((runningTaskStats.completed / runningTaskStats.total) * 100)
-      : 0
+    const runningProgressPct = runningTaskStats.total > 0 ? Math.round((runningTaskStats.completed / runningTaskStats.total) * 100) : 0
     const missionTeamOptions = [
       { id: '__current__', label: currentTeamLabel, team },
       ...teamConfigs.map((config) => ({
@@ -5288,6 +5287,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       { id: 'active', label: 'Active Mission' },
       { id: 'history', label: 'History' },
     ]
+    const missionSubTabIndex = missionSubTabs.findIndex((t) => t.id === missionSubTab)
     const historyCards = missionHistory.map((cp) => {
       const completedTasks = cp.tasks.filter((t) => t.status === 'done' || t.status === 'completed').length
       const totalTasks = cp.tasks.length
@@ -5306,10 +5306,33 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         status: derivedStatus,
         statusClassName,
         title: truncateMissionGoal(cp.label, 96),
+        goal: cp.label,
         subtitle: `${completedTasks}/${totalTasks} tasks`,
         updatedAt: cp.completedAt ?? cp.updatedAt,
       }
     })
+    const recentCompletedMissions = [
+      ...missionHistory
+        .filter((cp) => cp.status === 'completed')
+        .map((cp) => {
+          const completedAt = cp.completedAt ?? cp.updatedAt
+          const duration = completedAt > cp.startedAt ? formatDuration(completedAt - cp.startedAt) : 'Unknown duration'
+          return {
+            id: `history-${cp.id}`,
+            title: truncateMissionGoal(cp.label, 72),
+            completedAt,
+            duration,
+          }
+        }),
+      ...missionReports.map((report) => ({
+        id: `report-${report.id}`,
+        title: truncateMissionGoal(report.name || report.goal || 'Mission', 72),
+        completedAt: report.completedAt,
+        duration: formatDuration(report.duration),
+      })),
+    ]
+      .sort((a, b) => b.completedAt - a.completedAt)
+      .slice(0, 3)
     const doneTaskCount = missionTasks.filter((task) => task.status === 'done').length
     const totalTaskCount = missionTasks.length
     const totalReportsCount = missionHistory.length || historyCards.length
@@ -5317,227 +5340,310 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const hasRecoveredCheckpoint = Boolean(restoreCheckpoint && !restoreDismissed)
 
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50 dark:bg-[var(--theme-bg,#0b0e14)]">
-        <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/90">
-          <div>
-            <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Mission Timeline</h2>
-            <p className="text-[11px] text-neutral-500 dark:text-slate-400">
-              Execution flow with active and historical mission context
-              {savedDraftCount > 0 ? ` · ${savedDraftCount} draft${savedDraftCount === 1 ? '' : 's'}` : ''}
-              {hasRecoveredCheckpoint ? ' · restore available' : ''}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => openNewMissionModal()}
-            className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
-          >
-            + New Mission
-          </button>
-        </div>
-
-        <div className="border-b border-neutral-200 bg-gradient-to-r from-white via-orange-50/40 to-amber-50/40 px-4 py-2.5 dark:border-slate-700 dark:from-slate-900/80 dark:via-slate-900/70 dark:to-slate-900/80">
-          <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/80 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
-            {missionSubTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setMissionSubTab(tab.id)}
-                className={cn(
-                  'rounded-full px-4 py-1.5 text-sm transition-colors',
-                  missionSubTab === tab.id
-                    ? 'bg-orange-50 border border-orange-200 text-orange-600 font-semibold'
-                    : 'text-neutral-500 hover:text-neutral-700',
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto p-4">
-          {missionSubTab === 'overview' ? (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <article className="min-w-[180px] flex-1 rounded-xl border border-neutral-200 bg-white p-5">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Mission State</p>
-                  <p className="mt-1 text-lg font-semibold text-neutral-900">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
-                </article>
-                <article className="min-w-[180px] flex-1 rounded-xl border border-neutral-200 bg-white p-5">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Tasks</p>
-                  <p className="mt-1 text-lg font-semibold text-neutral-900">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
-                </article>
-                <article className="min-w-[180px] flex-1 rounded-xl border border-neutral-200 bg-white p-5">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Total Reports</p>
-                  <p className="mt-1 text-lg font-semibold text-neutral-900">{totalReportsCount}</p>
-                </article>
-              </div>
-
-              {missionActive ? (
-                <section className="rounded-xl border border-neutral-200 bg-white p-5">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Active Mission</p>
-                  <p className="mt-1 text-base font-semibold text-neutral-900">{activeMissionGoal || missionGoal || 'Untitled mission'}</p>
-                  <button
-                    type="button"
-                    onClick={() => setMissionSubTab('active')}
-                    className="mt-4 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-semibold text-orange-700 hover:bg-orange-100"
-                  >
-                    View Active Mission →
-                  </button>
-                </section>
-              ) : (
-                <section className="rounded-xl border border-neutral-200 bg-white p-12 text-center">
-                  <p className="text-base font-semibold text-neutral-900">No active mission</p>
-                  <p className="mt-1 text-sm text-neutral-400">Launch a mission to view live timeline activity.</p>
-                  <button
-                    type="button"
-                    onClick={() => openNewMissionModal()}
-                    className="mt-4 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-                  >
-                    + New Mission
-                  </button>
-                </section>
-              )}
+      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 p-3 pb-24 sm:p-4 sm:pb-4 dark:bg-[var(--theme-bg,#0b0e14)]">
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
+        <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/90">
+            <div>
+              <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Mission Control</h2>
+              <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+                Track active runs, review history, and launch new missions
+                {savedDraftCount > 0 ? ` · ${savedDraftCount} draft${savedDraftCount === 1 ? '' : 's'}` : ''}
+                {hasRecoveredCheckpoint ? ' · restore available' : ''}
+              </p>
             </div>
-          ) : null}
+            <div className="flex items-center gap-2">
+              {missionActive ? (
+                <button
+                  type="button"
+                  onClick={() => stopMissionAndCleanup('aborted')}
+                  className="min-h-11 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 shadow-sm hover:bg-red-100"
+                >
+                  Stop Mission
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => openNewMissionModal()}
+                className="min-h-11 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600"
+              >
+                New Mission
+              </button>
+            </div>
+          </div>
 
-          {missionSubTab === 'active' ? (
-            missionActive ? (
+          <div className="-mx-1 overflow-x-auto px-1 pb-1">
+            <div className="relative flex min-w-[420px] items-center gap-2 rounded-xl border border-neutral-200 bg-white/80 p-1 dark:border-slate-700 dark:bg-slate-900/40">
+              <span
+                aria-hidden
+                className="pointer-events-none absolute bottom-1 h-[2px] rounded-full bg-orange-500 transition-transform duration-300 ease-out"
+                style={{
+                  width: 'calc((100% - 1rem) / 3)',
+                  transform: `translateX(calc(${Math.max(0, missionSubTabIndex)} * 100% + ${Math.max(0, missionSubTabIndex)} * 0.5rem))`,
+                }}
+              />
+              {missionSubTabs.map((tab) => {
+                const isActive = missionSubTab === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setMissionSubTab(tab.id)}
+                    className={cn(
+                      'relative z-10 flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+                      isActive
+                        ? 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300'
+                        : 'text-neutral-600 hover:bg-neutral-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto">
+            {missionSubTab === 'overview' ? (
               <div className="space-y-4">
-                <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">MISSION GOAL</p>
-                      <p className="mt-1 text-base font-semibold text-neutral-900 dark:text-white">{activeMissionGoal || missionGoal || ''}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Running</span>
-                      <button type="button" onClick={() => void handleMissionPause(false)} className="rounded-md bg-emerald-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-600">Start</button>
-                      <button type="button" onClick={() => void handleMissionPause(true)} className="rounded-md bg-amber-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-600">Pause</button>
-                      <button type="button" onClick={() => stopMissionAndCleanup('aborted')} className="rounded-md bg-red-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-red-600">Stop</button>
-                    </div>
-                  </div>
+                <div className="flex flex-wrap gap-3">
+                  <article className="min-w-[180px] flex-1 rounded-xl border border-neutral-200 bg-white p-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Mission State</p>
+                    <p className="mt-1 text-lg font-semibold text-neutral-900">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
+                  </article>
+                  <article className="min-w-[180px] flex-1 rounded-xl border border-neutral-200 bg-white p-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Tasks</p>
+                    <p className="mt-1 text-lg font-semibold text-neutral-900">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
+                  </article>
+                  <article className="min-w-[180px] flex-1 rounded-xl border border-neutral-200 bg-white p-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Total Reports</p>
+                    <p className="mt-1 text-lg font-semibold text-neutral-900">{totalReportsCount}</p>
+                  </article>
+                </div>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex -space-x-2">
-                      {team.map((member) => {
-                        const parts = member.name.trim().split(/\s+/).filter(Boolean)
-                        const initials = parts.length > 1
-                          ? `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
-                          : (parts[0] ?? '?').slice(0, 2).toUpperCase()
-                        return (
-                          <div key={member.id} className="flex h-8 w-8 items-center justify-center rounded-full border border-white bg-neutral-900 text-[10px] font-semibold text-white" title={member.name}>
-                            {initials}
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-neutral-500 dark:text-slate-400">
-                      <span>{runningTaskStats.completed}/{runningTaskStats.total} tasks</span>
-                      <span>{runningElapsed}</span>
-                    </div>
-                  </div>
+                {missionActive ? (
+                  <section className="rounded-xl border border-neutral-200 bg-white p-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Active Mission</p>
+                    <p className="mt-1 text-base font-semibold text-neutral-900">{activeMissionGoal || missionGoal || 'Untitled mission'}</p>
+                    <button
+                      type="button"
+                      onClick={() => setMissionSubTab('active')}
+                      className="mt-4 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-semibold text-orange-700 hover:bg-orange-100"
+                    >
+                      View Active Mission →
+                    </button>
+                  </section>
+                ) : (
+                  <section className="rounded-xl border border-neutral-200 bg-white p-12 text-center">
+                    <p className="text-base font-semibold text-neutral-900">No active mission</p>
+                    <p className="mt-1 text-sm text-neutral-400">Launch a mission to view live timeline activity.</p>
+                  </section>
+                )}
 
-                  <div className="mt-3 h-1.5 rounded-full bg-neutral-100 dark:bg-slate-800">
-                    <div
-                      className="h-1.5 rounded-full bg-orange-500 transition-all duration-300"
-                      style={{ width: `${Math.max(4, runningProgressPct)}%` }}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Recent Missions</p>
+                      <button type="button" onClick={() => setMissionSubTab('history')} className="text-[11px] font-medium text-orange-600 hover:text-orange-700">Open History</button>
+                    </div>
+                    {recentCompletedMissions.length === 0 ? (
+                      <p className="mt-3 text-sm text-neutral-500">No completed missions yet.</p>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        {recentCompletedMissions.map((entry) => (
+                          <article key={entry.id} className="rounded-lg border border-neutral-100 bg-neutral-50/70 px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-neutral-900 dark:text-white">{entry.title}</p>
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Completed</span>
+                            </div>
+                            <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-400">
+                              {entry.duration} · {timeAgoFromMs(entry.completedAt)}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                  <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Quick Launch Teams</p>
+                    {teamConfigs.length === 0 ? (
+                      <p className="mt-3 text-sm text-neutral-500 dark:text-slate-400">Save a team config in Configure to quick-launch missions here.</p>
+                    ) : (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {teamConfigs.slice(0, 6).map((config) => (
+                          <button
+                            key={`ql-${config.id}`}
+                            type="button"
+                            onClick={() => openNewMissionModal({ teamConfigId: config.id, name: `Mission with ${config.name}` })}
+                            className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                          >
+                            {config.icon ?? '👥'} {config.name} · {config.team.length}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
+              </div>
+            ) : null}
+
+            {missionSubTab === 'active' ? (
+              missionActive ? (
+                <div className="space-y-4">
+                  <section className="mx-auto w-full max-w-5xl rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">MISSION GOAL</p>
+                        <p className="mt-1 text-base font-semibold text-neutral-900 dark:text-white">{activeMissionGoal || missionGoal || ''}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Running</span>
+                        <button type="button" onClick={() => void handleMissionPause(false)} className="rounded-md bg-emerald-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-600">Start</button>
+                        <button type="button" onClick={() => void handleMissionPause(true)} className="rounded-md bg-amber-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-600">Pause</button>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex -space-x-2">
+                        {team.map((member) => {
+                          const parts = member.name.trim().split(/\s+/).filter(Boolean)
+                          const initials = parts.length > 1
+                            ? `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
+                            : (parts[0] ?? '?').slice(0, 2).toUpperCase()
+                          return (
+                            <div key={member.id} className="flex h-8 w-8 items-center justify-center rounded-full border border-white bg-neutral-900 text-[10px] font-semibold text-white" title={member.name}>
+                              {initials}
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-neutral-500 dark:text-slate-400">
+                        <span>{runningTaskStats.completed}/{runningTaskStats.total} tasks</span>
+                        <span>{runningElapsed}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 h-1.5 rounded-full bg-neutral-100 dark:bg-slate-800">
+                      <div className="h-1.5 rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
+                    </div>
+                  </section>
+
+                  <section className="mx-auto w-full max-w-5xl rounded-xl border border-neutral-200 bg-white p-3.5 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                    <p className="text-xs font-semibold">Mission Progress</p>
+                    <p className="text-[11px] text-neutral-500 dark:text-slate-400">{runningTaskStats.completed}/{runningTaskStats.total} tasks complete</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {agentWorkingRows.map((agent) => (
+                        <span
+                          key={agent.id}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-2 py-1 text-[11px] text-neutral-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        >
+                          <span className={cn('size-2 rounded-full', agent.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-400')} />
+                          {agent.name}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+
+                  <div className="mx-auto w-full max-w-5xl">
+                    <MissionTimeline tasks={missionTasks} agentOutputs={new Map(Object.entries(agentOutputLines))}
+                      agentSessionMap={agentSessionMap}
+                      agentStatuses={new Map(
+                        Object.entries(agentSessionStatus).map(([id, s]) => [
+                          id,
+                          { status: s.status, lastSeen: typeof s.lastSeen === 'number' ? s.lastSeen : Date.now() },
+                        ]),
+                      )}
+                      missionState={missionState}
+                      missionGoal={activeMissionGoal || missionGoal || ''}
+                      teamMembers={team}
+                      elapsedTime={missionStartedAtRef.current ? Date.now() - missionStartedAtRef.current : undefined}
                     />
                   </div>
-                </section>
 
-                <MissionTimeline tasks={missionTasks} agentOutputs={new Map(Object.entries(agentOutputLines))}
-                  agentSessionMap={agentSessionMap}
-                  agentStatuses={new Map(
-                    Object.entries(agentSessionStatus).map(([id, s]) => [
-                      id,
-                      { status: s.status, lastSeen: typeof s.lastSeen === 'number' ? s.lastSeen : Date.now() },
-                    ]),
-                  )}
-                  missionState={missionState}
-                  missionGoal={activeMissionGoal || missionGoal || ''}
-                  teamMembers={team}
-                  elapsedTime={missionStartedAtRef.current ? Date.now() - missionStartedAtRef.current : undefined}
-                />
+                  <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Live Feed</p>
+                    <div className="mt-3 h-56 overflow-hidden rounded-xl border border-neutral-200">
+                      <LiveFeedPanel />
+                    </div>
+                  </section>
 
-                <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Live Feed</p>
-                  <div className="mt-3 h-56 overflow-hidden rounded-xl border border-neutral-200">
-                    <LiveFeedPanel />
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Controls</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {agentWorkingRows.map((row) => (
-                      <div key={`controls-${row.id}`} className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => { setSteerAgentId(row.id); setSteerInput('') }}
-                          className="rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
-                        >
-                          Steer {row.name}
-                        </button>
-                        {row.status === 'error' ? (
+                  <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Controls</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {agentWorkingRows.map((row) => (
+                        <div key={`controls-${row.id}`} className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => {
-                              const member = team.find((m) => m.id === row.id)
-                              if (member) void handleRetrySpawn(member)
-                            }}
-                            className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                            onClick={() => { setSteerAgentId(row.id); setSteerInput('') }}
+                            className="rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
                           >
-                            Retry
+                            Steer {row.name}
                           </button>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
-            ) : (
-              <div className="flex h-full min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/70 text-center dark:border-slate-700 dark:bg-slate-900/30">
-                <p className="text-sm text-neutral-500 dark:text-slate-400">No active mission. Launch one to view live timeline progress.</p>
-              </div>
-            )
-          ) : null}
+                          {row.status === 'error' ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const member = team.find((m) => m.id === row.id)
+                                if (member) void handleRetrySpawn(member)
+                              }}
+                              className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                            >
+                              Retry
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              ) : (
+                <div className="flex h-full min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/70 text-center dark:border-slate-700 dark:bg-slate-900/30">
+                  <p className="text-sm text-neutral-500 dark:text-slate-400">No active mission. Launch one to view live timeline progress.</p>
+                </div>
+              )
+            ) : null}
 
-          {missionSubTab === 'history' ? (
-            <div className="space-y-3">
-              {historyCards.length === 0 ? (
+            {missionSubTab === 'history' ? (
+              historyCards.length === 0 ? (
                 <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/70 text-sm text-neutral-500 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-400">
                   No mission history yet.
                 </div>
               ) : (
-                historyCards.map((entry) => (
-                  <article
-                    key={entry.id}
-                    className={cn('rounded-xl border border-neutral-200 border-l-4 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]', entry.statusClassName)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-neutral-900 dark:text-white">{entry.title}</p>
-                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{entry.subtitle}</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {historyCards.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={cn('rounded-xl border border-l-4 border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]', entry.statusClassName)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-neutral-900 dark:text-white">{entry.title}</p>
+                          <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{entry.subtitle}</p>
+                        </div>
+                        <span className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
+                          entry.status === 'done' && 'bg-emerald-100 text-emerald-700',
+                          entry.status === 'aborted' && 'bg-red-100 text-red-700',
+                          entry.status === 'partial' && 'bg-amber-100 text-amber-700',
+                        )}>
+                          {entry.status}
+                        </span>
                       </div>
-                      <span className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
-                        entry.status === 'done' && 'bg-emerald-100 text-emerald-700',
-                        entry.status === 'aborted' && 'bg-red-100 text-red-700',
-                        entry.status === 'partial' && 'bg-amber-100 text-amber-700',
-                      )}>
-                        {entry.status}
-                      </span>
+                      <p className="mt-2 text-[11px] text-neutral-500 dark:text-slate-400">Updated {timeAgoFromMs(entry.updatedAt)}</p>
+                      <button
+                        type="button"
+                        onClick={() => openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal })}
+                        className="mt-3 rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                      >
+                        Re-run
+                      </button>
                     </div>
-                    <p className="mt-2 text-[11px] text-neutral-500 dark:text-slate-400">Updated {timeAgoFromMs(entry.updatedAt)}</p>
-                  </article>
-                ))
-              )}
-            </div>
-          ) : null}
+                  ))}
+                </div>
+              )
+            ) : null}
+          </div>
         </div>
-
         {missionBoardModalOpen ? (
           <div
             className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-900/35 px-4 py-6 backdrop-blur-[1px]"

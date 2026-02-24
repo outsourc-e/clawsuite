@@ -72,9 +72,18 @@ const themeScript = `
     const media = window.matchMedia('(prefers-color-scheme: dark)')
     // Enterprise theme (data-theme attribute)
     const enterpriseTheme = localStorage.getItem('clawsuite-theme')
-    if (enterpriseTheme && (enterpriseTheme === 'ops-dark' || enterpriseTheme === 'premium-dark' || enterpriseTheme === 'paper-light')) {
+    if (enterpriseTheme && (
+      enterpriseTheme === 'ops-dark' ||
+      enterpriseTheme === 'premium-dark' ||
+      enterpriseTheme === 'sunset-brand' ||
+      enterpriseTheme === 'paper-light'
+    )) {
       root.setAttribute('data-theme', enterpriseTheme)
-      if (enterpriseTheme.includes('dark')) {
+      if (
+        enterpriseTheme === 'ops-dark' ||
+        enterpriseTheme === 'premium-dark' ||
+        enterpriseTheme === 'sunset-brand'
+      ) {
         theme = 'dark'
       } else {
         theme = 'light'
@@ -246,8 +255,91 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            if (document.getElementById('splash-screen')) return;
+            var bg = '#f8fafc', txt = '#0f172a', muted = '#64748b';
+            try {
+              var s = localStorage.getItem('openclaw-settings');
+              var t = 'light';
+              if (s) { var p = JSON.parse(s); t = (p && p.state && p.state.settings && p.state.settings.theme) || 'light'; }
+              if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+              if (t === 'dark') { bg = '#0c0c12'; txt = '#f8fafc'; muted = '#94a3b8'; }
+            } catch(e){}
+
+            var quips = ["Warming up the claws...","Brewing agent espresso...","Deploying crustacean intelligence...","Loading forbidden knowledge...","Calibrating sarcasm module...","Spinning up the hive mind...","Polishing the shell...","Teaching agents to behave...","Summoning the swarm...","Initializing world domination...","Crunching the numbers (with claws)...","Consulting the oracle lobster...","Booting the lobster mainframe...","Decrypting the claw protocol..."];
+            var quip = quips[Math.floor(Math.random() * quips.length)];
+
+            var d = document.createElement('div');
+            d.id = 'splash-screen';
+            d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.8s ease;';
+            d.innerHTML = '<div style="width:96px;height:96px;margin-bottom:20px;filter:drop-shadow(0 8px 32px rgba(249,115,22,0.5))"><svg width="96" height="96" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sOB" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ea580c"/><stop offset="50%" stop-color="#f97316"/><stop offset="100%" stop-color="#fb923c"/></linearGradient></defs><rect x="5" y="5" width="90" height="90" rx="16" fill="url(#sOB)"/><rect x="20" y="25" width="60" height="50" rx="4" stroke="#1e293b" stroke-width="3" fill="none"/><circle cx="28" cy="32" r="2.5" fill="#1e293b"/><circle cx="37" cy="32" r="2.5" fill="#1e293b"/><circle cx="46" cy="32" r="2.5" fill="#1e293b"/><path d="M38 45L32 50L38 55" stroke="#1e293b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M62 45L68 50L62 55" stroke="#1e293b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="47" y="46" width="4" height="10" rx="2" fill="#1e293b"><animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/></rect></svg></div>'
+              + '<div style="font:700 24px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.06em;color:'+txt+'">ClawSuite</div>'
+              + '<div style="margin-top:10px;font:italic 13px/1 system-ui,-apple-system,sans-serif;color:'+muted+'">'+quip+'</div>'
+              + '<div style="margin-top:28px;width:140px;height:3px;background:#1e293b;border-radius:3px;overflow:hidden"><div id=splash-bar style="width:0%;height:100%;background:linear-gradient(90deg,#ea580c,#f97316,#fb923c);border-radius:3px;transition:width 0.4s ease"></div></div>';
+            document.body.prepend(d);
+
+            var bar = document.getElementById('splash-bar');
+            if (bar) {
+              setTimeout(function(){ bar.style.width='15%' }, 300);
+              setTimeout(function(){ bar.style.width='40%' }, 800);
+              setTimeout(function(){ bar.style.width='65%' }, 1500);
+              setTimeout(function(){ bar.style.width='85%' }, 2500);
+              setTimeout(function(){ bar.style.width='92%' }, 3200);
+            }
+
+            // Logo entrance animation
+            var logo = d.querySelector('div');
+            if (logo) {
+              logo.style.cssText += ';opacity:0;transform:scale(0.85);transition:opacity 0.6s ease,transform 0.6s ease;';
+              setTimeout(function(){ logo.style.opacity='1'; logo.style.transform='scale(1)'; }, 100);
+            }
+
+            // Pulsing glow behind logo
+            var glow = document.createElement('div');
+            glow.style.cssText = 'position:absolute;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,0.15) 0%,transparent 70%);animation:splashPulse 2s ease-in-out infinite;pointer-events:none;';
+            d.insertBefore(glow, d.firstChild);
+            // Position glow behind logo
+            glow.style.cssText += 'top:50%;left:50%;transform:translate(-50%,-60%);';
+
+            // Shimmer on progress bar
+            var shimmer = document.createElement('div');
+            shimmer.style.cssText = 'position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:splashShimmer 1.5s ease-in-out infinite;';
+            var barWrap = bar ? bar.parentElement : null;
+            if (barWrap) { barWrap.style.position = 'relative'; barWrap.style.overflow = 'hidden'; barWrap.appendChild(shimmer); }
+
+            // Add keyframes
+            var style = document.createElement('style');
+            style.textContent = '@keyframes splashPulse{0%,100%{opacity:0.5;transform:translate(-50%,-60%) scale(1)}50%{opacity:1;transform:translate(-50%,-60%) scale(1.15)}} @keyframes splashShimmer{0%{left:-100%}100%{left:100%}}';
+            document.head.appendChild(style);
+
+            window.__dismissSplash = function() {
+              var el = document.getElementById('splash-screen');
+              if (!el) return;
+              if (bar) bar.style.width = '100%';
+              setTimeout(function(){
+                el.style.opacity = '0';
+                setTimeout(function(){ el.remove(); }, 800);
+              }, 300);
+            };
+            // Fallback: always dismiss after 8s
+            setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 8000);
+          })()
+        `}} />
         <div className="root">{children}</div>
         <Scripts />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            var start = Date.now();
+            function check() {
+              var el = document.querySelector('nav, aside, .workspace-shell, [data-testid]');
+              var elapsed = Date.now() - start;
+              if (el && elapsed > 2500) { window.__dismissSplash && window.__dismissSplash(); }
+              else { setTimeout(check, 200); }
+            }
+            setTimeout(check, 2500);
+          })()
+        `}} />
       </body>
     </html>
   )
