@@ -2170,6 +2170,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const dispatchingRef = useRef(false)
   const artifactDedupRef = useRef<Set<string>>(new Set())
   const agentOutputLinesRef = useRef<Record<string, string[]>>({})
+  const [agentOutputLines, setAgentOutputLines] = useState<Record<string, string[]>>({})
   const missionCompletionSnapshotRef = useRef<MissionReportPayload | null>(null)
   const prevMissionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
   const lastReportedMissionIdRef = useRef<string>('')
@@ -2239,6 +2240,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (nextLines.length > 0) {
       const current = agentOutputLinesRef.current[agentId] ?? []
       agentOutputLinesRef.current[agentId] = [...current, ...nextLines].slice(-8)
+      setAgentOutputLines((prev) => ({
+        ...prev,
+        [agentId]: [...(prev[agentId] ?? []), ...nextLines].slice(-8),
+      }))
     }
 
     appendArtifacts(
@@ -4028,6 +4033,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setArtifacts([])
     artifactDedupRef.current = new Set()
     agentOutputLinesRef.current = {}
+    setAgentOutputLines({})
     agentSessionsDoneRef.current = new Set()
     expectedAgentCountRef.current = teamWithRuntimeStatus.length
     missionCompletionSnapshotRef.current = null
@@ -5441,9 +5447,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </div>
                 </section>
 
-                <MissionTimeline
-                  tasks={missionTasks}
-                  agentOutputs={new Map(Object.entries(agentOutputLinesRef.current))}
+                <MissionTimeline tasks={missionTasks} agentOutputs={new Map(Object.entries(agentOutputLines))}
                   agentStatuses={new Map(
                     Object.entries(agentSessionStatus).map(([id, s]) => [
                       id,
