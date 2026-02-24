@@ -1923,6 +1923,7 @@ function ChatComposerComponent({
             ) : (
               <PromptInputAction tooltip="Send message">
                 <Button
+                  type="button"
                   onClick={handleSubmit}
                   disabled={submitDisabled}
                   size="icon-sm"
