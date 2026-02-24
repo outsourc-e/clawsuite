@@ -109,7 +109,6 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
         ) : null}
 
         <span aria-hidden className="text-sm leading-none">{count > 0 ? '🔔' : '🔕'}</span>
-        <span className="hidden sm:inline">Approvals</span>
 
         {count > 0 ? (
           <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-none text-white">

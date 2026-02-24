@@ -6943,27 +6943,26 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               onApprove={handleApprove}
               onDeny={handleDeny}
             />
-            <button
-              type="button"
-              aria-pressed={liveFeedVisible}
-              title={liveFeedVisible ? 'Hide live feed' : 'Show live feed'}
-              onClick={() => setLiveFeedVisible((v) => !v)}
-              className={cn(
-                'flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
-                liveFeedVisible
-                  ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/50 dark:bg-orange-900/20 dark:text-orange-400'
-                  : 'border-primary-200 text-primary-500 hover:bg-primary-100 hover:text-primary-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800',
-              )}
-            >
-              <span aria-hidden>📡</span>
-              <span className="hidden sm:inline">Live View</span>
-              {unreadFeedCount > 0 && !liveFeedVisible ? (
-                <span className="ml-0.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                  {unreadFeedCount > 99 ? '99+' : unreadFeedCount}
-                </span>
-              ) : null}
-            </button>
             <div className="flex items-center gap-1 rounded-full border border-primary-200 bg-primary-100/65 p-1 dark:border-slate-700 dark:bg-slate-800/80">
+              <button
+                type="button"
+                aria-pressed={liveFeedVisible}
+                title={liveFeedVisible ? 'Hide live feed' : 'Show live feed'}
+                onClick={() => setLiveFeedVisible((v) => !v)}
+                className={cn(
+                  'relative inline-flex size-7 items-center justify-center rounded-full text-sm transition-colors',
+                  liveFeedVisible
+                    ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
+                    : 'text-primary-500 hover:bg-primary-50 hover:text-primary-700 dark:text-slate-400 dark:hover:bg-slate-700',
+                )}
+              >
+                <span aria-hidden>📡</span>
+                {unreadFeedCount > 0 && !liveFeedVisible ? (
+                  <span className="absolute -right-0.5 -top-0.5 flex size-3.5 items-center justify-center rounded-full bg-orange-500 text-[8px] font-bold text-white">
+                    {unreadFeedCount > 9 ? '9+' : unreadFeedCount}
+                  </span>
+                ) : null}
+              </button>
               <ThemeToggle variant="icon" />
               <button
                 type="button"
