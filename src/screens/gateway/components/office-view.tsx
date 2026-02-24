@@ -52,12 +52,12 @@ export function getAgentStatusMeta(status: AgentWorkingStatus): {
   pulse?: boolean
 } {
   switch (status) {
-    case 'active': return { label: 'Active', className: 'text-blue-600', dotClassName: 'bg-blue-500', pulse: true }
+    case 'active': return { label: 'Active', className: 'text-emerald-600', dotClassName: 'bg-emerald-500', pulse: true }
     case 'ready':
-    case 'idle': return { label: 'Ready', className: 'text-emerald-600', dotClassName: 'bg-emerald-500' }
+    case 'idle': return { label: 'Idle', className: 'text-neutral-600', dotClassName: 'bg-neutral-400' }
     case 'error': return { label: 'Error', className: 'text-red-600', dotClassName: 'bg-red-500' }
-    case 'none': return { label: 'No session', className: 'text-neutral-400', dotClassName: 'bg-neutral-400' }
-    case 'spawning': return { label: 'Spawning', className: 'text-amber-600', dotClassName: 'bg-amber-400', pulse: true }
+    case 'none': return { label: 'Offline', className: 'text-neutral-400', dotClassName: 'bg-neutral-400' }
+    case 'spawning': return { label: 'Starting', className: 'text-blue-600', dotClassName: 'bg-blue-500', pulse: true }
     case 'paused': return { label: 'Paused', className: 'text-amber-700', dotClassName: 'bg-amber-500' }
     default: return { label: String(status), className: 'text-neutral-600', dotClassName: 'bg-neutral-400' }
   }
@@ -101,8 +101,9 @@ function getSpeechLine(agent: AgentWorkingRow, phase: number): string {
 function getStatusDotClass(status: AgentWorkingStatus): string {
   switch (status) {
     case 'active': return 'bg-emerald-500'
-    case 'idle': case 'ready': return 'bg-amber-400'
-    case 'spawning': case 'paused': return 'bg-yellow-500'
+    case 'idle': case 'ready': case 'none': return 'bg-neutral-400'
+    case 'spawning': return 'bg-blue-500'
+    case 'paused': return 'bg-amber-500'
     case 'error': return 'bg-red-500'
     default: return 'bg-neutral-400'
   }
@@ -112,8 +113,11 @@ function getAgentStatusGlowClass(status: AgentWorkingStatus): string {
   switch (status) {
     case 'active':
       return 'office-status-glow-active'
+    case 'spawning':
+      return 'office-status-glow-starting'
+    case 'paused':
+      return 'office-status-glow-paused'
     case 'error':
-    case 'none':
       return 'office-status-glow-error'
     default:
       return 'office-status-glow-idle'
@@ -356,6 +360,14 @@ export function OfficeView({
             0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.32), 0 0 12px 2px rgba(245, 158, 11, 0.26); }
             50% { box-shadow: 0 0 0 7px rgba(245, 158, 11, 0), 0 0 18px 4px rgba(245, 158, 11, 0.34); }
           }
+          @keyframes office-status-glow-blue {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3), 0 0 12px 2px rgba(59, 130, 246, 0.25); }
+            50% { box-shadow: 0 0 0 7px rgba(59, 130, 246, 0), 0 0 18px 4px rgba(59, 130, 246, 0.32); }
+          }
+          @keyframes office-status-glow-neutral {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(115, 115, 115, 0.18), 0 0 10px 2px rgba(115, 115, 115, 0.2); }
+            50% { box-shadow: 0 0 0 6px rgba(115, 115, 115, 0), 0 0 14px 3px rgba(115, 115, 115, 0.24); }
+          }
           @keyframes office-status-glow-red {
             0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.34), 0 0 12px 2px rgba(239, 68, 68, 0.3); }
             50% { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0), 0 0 19px 5px rgba(239, 68, 68, 0.36); }
@@ -367,6 +379,12 @@ export function OfficeView({
             animation: office-status-glow-green 2.2s ease-in-out infinite;
           }
           .office-status-glow-idle {
+            animation: office-status-glow-neutral 2.6s ease-in-out infinite;
+          }
+          .office-status-glow-starting {
+            animation: office-status-glow-blue 2.4s ease-in-out infinite;
+          }
+          .office-status-glow-paused {
             animation: office-status-glow-amber 2.6s ease-in-out infinite;
           }
           .office-status-glow-error {
@@ -515,7 +533,7 @@ export function OfficeView({
           <span>{agentRows.length}/{DESK_POSITIONS.length} desks occupied</span>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> Working</span>
-            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-amber-400" /> Idle</span>
+            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-neutral-400" /> Idle</span>
             <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-red-500" /> Error</span>
             <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-neutral-400" /> Empty</span>
           </div>

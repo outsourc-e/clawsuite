@@ -111,34 +111,82 @@ export function MissionTimeline({
 
         {teamMembers.map((member) => {
           const status = agentStatuses.get(member.id)
-          const assignedTaskCount = tasks.filter((task) => task.agentId === member.id).length
+          const assignedTasks = tasks.filter((task) => task.agentId === member.id)
+          const assignedTaskCount = assignedTasks.length
+          const hasCompletedAssignedTasks =
+            assignedTaskCount > 0 &&
+            assignedTasks.every((task) =>
+              task.status === 'done' ||
+              (task.status as string) === 'completed' ||
+              (task.status as string) === 'complete',
+            )
           const outputLines = agentOutputs.get(member.id) ?? agentOutputs.get(member.name) ?? []
           const agentStatus = (status?.status ?? '').toLowerCase()
           const isActive = agentStatus === 'active'
-          const inactiveLabel =
-            agentStatus === 'paused'
-              ? 'Paused'
-              : agentStatus === 'idle' || agentStatus === 'ready'
-                ? 'Idle'
-                : !agentStatus
-                  ? 'Waiting'
-                  : agentStatus === 'stopped' || agentStatus === 'error'
-                    ? 'Stopped'
-                    : 'Waiting'
+          const normalizedStatusLabel =
+            agentStatus === 'active'
+              ? 'Active'
+              : agentStatus === 'paused'
+                ? 'Paused'
+                : agentStatus === 'error' || agentStatus === 'failed'
+                  ? 'Error'
+                  : agentStatus === 'done' || agentStatus === 'complete' || agentStatus === 'completed'
+                    ? 'Done'
+                    : agentStatus === 'stopped'
+                      ? hasCompletedAssignedTasks
+                        ? 'Done'
+                        : 'Idle'
+                      : agentStatus === 'idle' || agentStatus === 'ready'
+                        ? 'Idle'
+                        : !agentStatus || agentStatus === 'spawning' || agentStatus === 'waiting' || agentStatus === 'not-started'
+                          ? 'Waiting'
+                          : 'Waiting'
+          const statusBadgeClass =
+            normalizedStatusLabel === 'Active'
+              ? 'bg-emerald-700 text-white'
+              : normalizedStatusLabel === 'Paused'
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                : normalizedStatusLabel === 'Waiting'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
+                  : normalizedStatusLabel === 'Done'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+                    : normalizedStatusLabel === 'Error'
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                      : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+          const statusDotClass =
+            normalizedStatusLabel === 'Active'
+              ? 'bg-emerald-500'
+              : normalizedStatusLabel === 'Paused'
+                ? 'bg-amber-500'
+                : normalizedStatusLabel === 'Waiting'
+                  ? 'bg-blue-500'
+                  : normalizedStatusLabel === 'Done'
+                    ? 'bg-emerald-500'
+                    : normalizedStatusLabel === 'Error'
+                      ? 'bg-red-500'
+                      : 'bg-neutral-300'
+          const statusTitle =
+            normalizedStatusLabel === 'Active'
+              ? 'Agent is actively working'
+              : normalizedStatusLabel === 'Idle'
+                ? 'Agent is connected and waiting for tasks'
+                : normalizedStatusLabel === 'Waiting'
+                  ? 'Agent is starting up'
+                  : normalizedStatusLabel === 'Paused'
+                    ? 'Mission is paused'
+                    : undefined
           const isExpanded = Boolean(expandedOutputs[member.id])
 
           return (
             <li key={`agent-${member.id}`} className="flex items-start gap-3">
-              <span className={cn('mt-2 h-3 w-3 rounded-full', isActive ? 'bg-emerald-500' : 'bg-neutral-300')} />
+              <span className={cn('mt-2 h-3 w-3 rounded-full', statusDotClass)} />
               <div className={cn('min-w-0 flex-1', missionCardCls)}>
                 <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-base font-bold text-neutral-900 dark:text-neutral-100">{member.name}</p>
-                  {isActive ? (
-                    <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-xs text-white">Active</span>
-                  ) : (
-                    <span className="text-sm text-neutral-400">{inactiveLabel}</span>
-                  )}
+                  <span className={cn('rounded-full px-2.5 py-1 text-xs', statusBadgeClass)} title={statusTitle}>
+                    {normalizedStatusLabel}
+                  </span>
                 </div>
                 <p className="mt-1 text-sm text-neutral-500">Assigned tasks: {assignedTaskCount}</p>
 
