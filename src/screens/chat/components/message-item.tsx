@@ -527,7 +527,11 @@ function MessageItemComponent({
               />
               <span>💭 Thinking...</span>
               {effectiveIsStreaming ? (
-                <LoadingIndicator ariaLabel="Assistant thinking" />
+                <span className="flex items-center gap-1">
+                  <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:0ms]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:150ms]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:300ms]" />
+                </span>
               ) : null}
               <HugeiconsIcon
                 icon={ArrowDown01Icon}

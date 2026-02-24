@@ -156,7 +156,7 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
                     {formatTokens(model.tokens)} · {formatMoney(model.cost)}
                   </p>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-primary-100 dark:bg-neutral-800">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
                   <div
                     className={cn('h-full rounded-full transition-[width] duration-500', model.barClass)}
                     style={{ width: `${model.widthPct}%` }}
