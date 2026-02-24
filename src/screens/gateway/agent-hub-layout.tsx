@@ -4162,9 +4162,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return (
       <div className="relative flex flex-col h-full min-h-0 bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
-        {/* ── Virtual Office Hero — same gutter as widget cards ── */}
-        <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-7xl px-3 sm:px-4">
-          <div className="h-[520px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
+        {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
+        <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-7xl flex-1 min-h-0 px-3 sm:px-4 flex flex-col">
+          <div className="flex-1 min-h-[420px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
@@ -4187,8 +4187,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
         </div>
 
-          {/* ── 3-card row — anchored below the office ── */}
-          <section className="relative mx-auto mb-24 mt-6 w-full max-w-7xl shrink-0 grid grid-cols-1 gap-4 px-3 sm:mb-4 sm:mt-8 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
+          {/* ── 3-card row — shrink-0, anchored at bottom ── */}
+          <section className="relative mx-auto mb-4 mt-4 w-full max-w-7xl shrink-0 grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
