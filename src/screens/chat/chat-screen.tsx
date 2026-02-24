@@ -119,6 +119,47 @@ function normalizeMessageValue(value: unknown): string {
   return trimmed.length > 0 ? trimmed : ''
 }
 
+function messageFallbackSignature(message: GatewayMessage): string {
+  const raw = message as Record<string, unknown>
+  const timestamp = normalizeMessageValue(
+    typeof raw.timestamp === 'number' ? String(raw.timestamp) : raw.timestamp,
+  )
+
+  const contentParts = Array.isArray(message.content)
+    ? message.content
+        .map((part: any) => {
+          if (part.type === 'text') {
+            return `t:${typeof part.text === 'string' ? part.text.trim() : ''}`
+          }
+          if (part.type === 'thinking') {
+            return `th:${typeof (part as any).thinking === 'string' ? (part as any).thinking : ''}`
+          }
+          if (part.type === 'toolCall') {
+            const toolPart = part as any
+            return `tc:${toolPart.id ?? ''}:${toolPart.name ?? ''}`
+          }
+          return `p:${(part as any).type ?? ''}`
+        })
+        .join('|')
+    : ''
+
+  const attachments = Array.isArray(message.attachments)
+    ? message.attachments
+        .map((attachment) => {
+          const name = typeof attachment?.name === 'string' ? attachment.name : ''
+          const size = typeof attachment?.size === 'number' ? String(attachment.size) : ''
+          const type =
+            typeof attachment?.contentType === 'string'
+              ? attachment.contentType
+              : ''
+          return `${name}:${size}:${type}`
+        })
+        .join('|')
+    : ''
+
+  return `${message.role ?? 'unknown'}:${timestamp}:${contentParts}:${attachments}`
+}
+
 function getMessageClientId(message: GatewayMessage): string {
   const raw = message as Record<string, unknown>
   const directClientId = normalizeMessageValue(raw.clientId)
@@ -416,20 +457,21 @@ export function ChatScreen({
         normalizeMessageValue(raw.clientId),
         normalizeMessageValue(raw.client_id),
         normalizeMessageValue(raw.nonce),
+        normalizeMessageValue(raw.idempotencyKey),
         normalizeMessageValue(raw.__optimisticId),
       ].filter(Boolean)
 
       const primaryKey =
         idCandidates.length > 0
           ? `${msg.role}:id:${idCandidates[0]}`
-          : `${msg.role}:fallback:${normalizeMessageValue(typeof raw.timestamp === 'number' ? String(raw.timestamp) : raw.timestamp)}:${textFromMessage(msg).trim()}`
+          : `${msg.role}:fallback:${messageFallbackSignature(msg)}`
 
       if (seen.has(primaryKey)) return false
       seen.add(primaryKey)
       return true
     })
 
-    if (!isRealtimeStreaming || activeToolCalls.length === 0) {
+    if (!isRealtimeStreaming) {
       return deduped
     }
 
@@ -439,23 +481,36 @@ export function ChatScreen({
       phase: toolCall.phase,
     }))
 
-    for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
-      if (nextMessages[index]?.role !== 'assistant') continue
-      nextMessages[index] = {
-        ...nextMessages[index],
-        __streamToolCalls: streamToolCalls,
-      } as GatewayMessage
-      return nextMessages
-    }
-
-    nextMessages.push({
+    const streamingMsg = {
       role: 'assistant',
       content: [],
       __streamingStatus: 'streaming',
+      __streamingText: realtimeStreamingText,
+      __streamingThinking: realtimeStreamingThinking,
       __streamToolCalls: streamToolCalls,
-    } as GatewayMessage)
+    } as GatewayMessage
+
+    const existingStreamIdx = nextMessages.findIndex(
+      (message) => message.__streamingStatus === 'streaming',
+    )
+
+    if (existingStreamIdx >= 0) {
+      nextMessages[existingStreamIdx] = {
+        ...nextMessages[existingStreamIdx],
+        ...streamingMsg,
+      }
+      return nextMessages
+    }
+
+    nextMessages.push(streamingMsg)
     return nextMessages
-  }, [activeToolCalls, isRealtimeStreaming, realtimeMessages])
+  }, [
+    activeToolCalls,
+    isRealtimeStreaming,
+    realtimeMessages,
+    realtimeStreamingText,
+    realtimeStreamingThinking,
+  ])
 
   // Derive streaming state from realtime SSE state (bug #2 fix)
   const derivedStreamingInfo = useMemo(() => {

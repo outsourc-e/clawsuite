@@ -94,16 +94,18 @@ function getWordBoundaryIndex(text: string, wordCount: number): number {
   return text.length
 }
 
+type StreamToolCall = {
+  id: string
+  name: string
+  phase: 'calling' | 'running' | 'done' | 'error'
+  args?: unknown
+  result?: string
+}
+
 type MessageItemProps = {
   message: GatewayMessage
   toolResultsByCallId?: Map<string, GatewayMessage>
-  toolCalls?: Array<{
-    id: string
-    name: string
-    phase: 'calling' | 'running' | 'done' | 'error'
-    args?: unknown
-    result?: string
-  }>
+  toolCalls?: Array<StreamToolCall>
   onRetryMessage?: (message: GatewayMessage) => void
   forceActionsVisible?: boolean
   wrapperRef?: React.RefObject<HTMLDivElement | null>
@@ -251,6 +253,40 @@ function normalizeStreamToolPhase(
     return 'error'
   }
   return 'running'
+}
+
+function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
+  const icons: Record<string, string> = {
+    web_search: '🔍',
+    Read: '📖',
+    exec: '⚡',
+    memory_search: '🧠',
+    memory_get: '🧠',
+    Write: '✏️',
+    Edit: '✏️',
+    browser: '🌐',
+  }
+
+  const icon = icons[toolCall.name] ?? '🔧'
+  const isDone = toolCall.phase === 'done'
+  const isError = toolCall.phase === 'error'
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+        isDone
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+          : isError
+            ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400'
+            : 'border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+      )}
+    >
+      {icon} {toolCall.name}
+      {isDone ? ' ✓' : null}
+      {isError ? ' ✗' : null}
+    </span>
+  )
 }
 
 function attachmentSource(attachment: GatewayAttachment | undefined): string {
@@ -699,53 +735,24 @@ function MessageItemComponent({
                     )}
                   </div>
                 ) : null)}
+              {!isUser && hasStreamToolCalls ? (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {effectiveStreamToolCalls.map((toolCall) => (
+                    <ToolCallPill key={toolCall.id} toolCall={toolCall} />
+                  ))}
+                </div>
+              ) : effectiveIsStreaming && !hasRevealedText ? (
+                <div className="mb-2 flex items-center gap-2 text-xs text-neutral-400">
+                  <span className="animate-pulse">⚡</span>
+                  <span>Working...</span>
+                </div>
+              ) : null}
+
               {effectiveIsStreaming && !hasRevealedText && (
                 <div className="flex items-center gap-1 px-1 py-0.5">
                   <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:0ms]" />
                   <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:150ms]" />
                   <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:300ms]" />
-                </div>
-              )}
-
-              {hasStreamToolCalls && !isUser && (
-                <div className="mt-2 space-y-1.5">
-                  {effectiveStreamToolCalls.map((tc) => (
-                    <div
-                      key={tc.id}
-                      className={cn(
-                        'flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px] font-mono',
-                        tc.phase === 'running' &&
-                          'border-accent-200 bg-accent-50 text-accent-700 dark:border-accent-800/50 dark:bg-accent-900/20 dark:text-accent-400',
-                        tc.phase === 'done' &&
-                          'border-emerald-200 bg-emerald-50/60 text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-400',
-                        tc.phase === 'error' &&
-                          'border-red-200 bg-red-50/60 text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-400',
-                        tc.phase === 'calling' &&
-                          'border-primary-200 bg-primary-50 text-primary-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
-                      )}
-                    >
-                      <span aria-hidden>
-                        {tc.phase === 'running'
-                          ? '⟳'
-                          : tc.phase === 'done'
-                            ? '✓'
-                            : tc.phase === 'error'
-                              ? '✗'
-                              : '→'}
-                      </span>
-                      <span className="font-semibold">{tc.name}</span>
-                      {tc.phase === 'running' && (
-                        <span className="ml-auto animate-pulse opacity-60">
-                          running...
-                        </span>
-                      )}
-                      {tc.phase === 'done' && tc.result && (
-                        <span className="ml-1 max-w-[200px] truncate opacity-60">
-                          {tc.result.slice(0, 60)}
-                        </span>
-                      )}
-                    </div>
-                  ))}
                 </div>
               )}
             </div>

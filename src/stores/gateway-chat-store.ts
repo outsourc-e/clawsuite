@@ -91,6 +91,10 @@ const createEmptyStreamingState = (): StreamingState => ({
   toolCalls: [],
 })
 
+function normalizeString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 function getMessageId(msg: GatewayMessage | null | undefined): string | undefined {
   if (!msg) return undefined
   const id = (msg as { id?: string }).id
@@ -98,6 +102,37 @@ function getMessageId(msg: GatewayMessage | null | undefined): string | undefine
   const messageId = (msg as { messageId?: string }).messageId
   if (typeof messageId === 'string' && messageId.trim().length > 0) return messageId
   return undefined
+}
+
+function getClientNonce(msg: GatewayMessage | null | undefined): string {
+  if (!msg) return ''
+  const raw = msg as Record<string, unknown>
+  return (
+    normalizeString(raw.clientId) ||
+    normalizeString(raw.client_id) ||
+    normalizeString(raw.nonce) ||
+    normalizeString(raw.idempotencyKey)
+  )
+}
+
+function messageMultipartSignature(msg: GatewayMessage | null | undefined): string {
+  if (!msg) return ''
+  const content = Array.isArray(msg.content)
+    ? msg.content
+        .map((part) => {
+          if (part.type === 'text') return `t:${String((part as any).text ?? '').trim()}`
+          if (part.type === 'thinking') return `h:${String((part as any).thinking ?? '').trim()}`
+          if (part.type === 'toolCall') return `tc:${String((part as any).id ?? '')}:${String((part as any).name ?? '')}`
+          return `p:${String((part as any).type ?? '')}`
+        })
+        .join('|')
+    : ''
+  const attachments = Array.isArray((msg as any).attachments)
+    ? (msg as any).attachments
+        .map((attachment: any) => `${String(attachment?.name ?? '')}:${String(attachment?.size ?? '')}:${String(attachment?.contentType ?? '')}`)
+        .join('|')
+    : ''
+  return `${msg.role ?? 'unknown'}:${content}:${attachments}`
 }
 
 export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
@@ -119,32 +154,64 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     switch (event.type) {
       case 'message':
       case 'user_message': {
-        // Add a complete message to the realtime buffer
         const messages = new Map(state.realtimeMessages)
         const sessionMessages = [...(messages.get(sessionKey) ?? [])]
 
-        // Check for duplicates — by ID first, then exact content match (bug #7 fix)
-        const newId = (event.message as any).id || (event.message as any).messageId
-        const newText = extractTextFromContent(event.message.content)
-        const isDuplicate = sessionMessages.some((existing) => {
+        const newId = getMessageId(event.message)
+        const newClientNonce = getClientNonce(event.message)
+        const newMultipartSignature = messageMultipartSignature(event.message)
+
+        const optimisticIndex =
+          newClientNonce.length > 0
+            ? sessionMessages.findIndex((existing) => {
+                if (existing.role !== event.message.role) return false
+                const existingNonce = getClientNonce(existing)
+                if (existingNonce.length === 0 || existingNonce !== newClientNonce) {
+                  return false
+                }
+                return (
+                  normalizeString((existing as any).status) === 'sending' ||
+                  Boolean((existing as any).__optimisticId)
+                )
+              })
+            : -1
+
+        const duplicateIndex = sessionMessages.findIndex((existing) => {
           if (existing.role !== event.message.role) return false
-          // ID match (most reliable)
-          const existingId = (existing as any).id || (existing as any).messageId
+          const existingId = getMessageId(existing)
           if (newId && existingId && newId === existingId) return true
-          // Exact content match (no time-window fallback — was dropping valid messages)
-          if (newText && newText === extractTextFromContent(existing.content))
+
+          const existingNonce = getClientNonce(existing)
+          if (newClientNonce && existingNonce && newClientNonce === existingNonce) {
             return true
-          return false
+          }
+
+          return (
+            newMultipartSignature.length > 0 &&
+            newMultipartSignature === messageMultipartSignature(existing)
+          )
         })
 
-        if (!isDuplicate) {
-          // Mark user messages from external sources
-          const message: GatewayMessage = {
-            ...event.message,
-            __realtimeSource:
-              event.type === 'user_message' ? (event as any).source : undefined,
+        // Mark user messages from external sources
+        const incomingMessage: GatewayMessage = {
+          ...event.message,
+          __realtimeSource:
+            event.type === 'user_message' ? (event as any).source : undefined,
+          status: undefined,
+        }
+
+        if (optimisticIndex >= 0) {
+          sessionMessages[optimisticIndex] = {
+            ...sessionMessages[optimisticIndex],
+            ...incomingMessage,
           }
-          sessionMessages.push(message)
+          messages.set(sessionKey, sessionMessages)
+          set({ realtimeMessages: messages, lastEventAt: now })
+          break
+        }
+
+        if (duplicateIndex === -1) {
+          sessionMessages.push(incomingMessage)
           messages.set(sessionKey, sessionMessages)
           set({ realtimeMessages: messages, lastEventAt: now })
         }
@@ -189,30 +256,28 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const prev =
           streamingMap.get(sessionKey) ?? createEmptyStreamingState()
 
+        const toolCallId =
+          event.toolCallId ??
+          `${event.name || 'tool'}-${event.runId || sessionKey}-${prev.toolCalls.length}`
         const existingToolIndex = prev.toolCalls.findIndex(
-          (tc) => tc.id === event.toolCallId,
+          (tc) => tc.id === toolCallId,
         )
-        let nextToolCalls = prev.toolCalls
+
+        let nextToolCalls = [...prev.toolCalls]
+
         if (existingToolIndex >= 0) {
-          nextToolCalls = prev.toolCalls.map((toolCall, index) =>
-            index === existingToolIndex
-              ? {
-                  ...toolCall,
-                  phase: event.phase,
-                  args: event.args,
-                }
-              : toolCall,
-          )
-        } else if (event.toolCallId) {
-          nextToolCalls = [
-            ...prev.toolCalls,
-            {
-              id: event.toolCallId,
-              name: event.name,
-              phase: event.phase,
-              args: event.args,
-            },
-          ]
+          nextToolCalls[existingToolIndex] = {
+            ...nextToolCalls[existingToolIndex],
+            phase: event.phase,
+            args: event.args,
+          }
+        } else if (event.phase === 'calling' || event.phase === 'start') {
+          nextToolCalls.push({
+            id: toolCallId,
+            name: event.name,
+            phase: event.phase,
+            args: event.args,
+          })
         }
 
         const next: StreamingState = {
@@ -350,22 +415,29 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     const newRealtimeMessages = realtimeMessages.filter((rtMsg) => {
       const rtId = getMessageId(rtMsg)
       const rtText = extractTextFromContent(rtMsg.content)
+      const rtNonce = getClientNonce(rtMsg)
+      const rtSignature = messageMultipartSignature(rtMsg)
 
       return !historyMessages.some((histMsg) => {
-        // First check: match by message id if both have one
         const histId = getMessageId(histMsg)
         if (rtId && histId && rtId === histId) {
           return true
         }
 
-        // Second check: match by text content + role (most reliable)
+        const histNonce = getClientNonce(histMsg)
+        if (rtNonce && histNonce && rtNonce === histNonce) {
+          return true
+        }
+
         if (histMsg.role === rtMsg.role && rtText) {
           const histText = extractTextFromContent(histMsg.content)
           if (histText === rtText) return true
         }
 
-        // Third check: removed time-window fallback (bug #7 — was dropping valid messages)
-        return false
+        return (
+          rtSignature.length > 0 &&
+          rtSignature === messageMultipartSignature(histMsg)
+        )
       })
     })
 

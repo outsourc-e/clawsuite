@@ -7,7 +7,7 @@ import { LiveFeedPanel } from './components/live-feed-panel'
 import { AgentOutputPanel } from './components/agent-output-panel'
 import { emitFeedEvent, onFeedEvent, type FeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
-import { OfficeView as PixelOfficeView } from './components/office-view'
+import { OfficeView as PixelOfficeView, type RemoteSession } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { toast } from '@/components/ui/toast'
@@ -909,6 +909,18 @@ function readSessionActivityMarker(session: SessionRecord): string {
   const lastMessage = readSessionLastMessage(session)
   const status = readString(session.status)
   return `${updatedAtRaw}|${status}|${lastMessage}`
+}
+
+function inferSessionStatus(session: SessionRecord): 'active' | 'idle' | 'done' {
+  if (session.endedAt || readString(session.status) === 'done' || readString(session.status) === 'ended') return 'done'
+  const lastActiveRaw = session.lastActiveAt
+  const lastActiveAt = typeof lastActiveRaw === 'number'
+    ? lastActiveRaw
+    : typeof lastActiveRaw === 'string'
+      ? Date.parse(lastActiveRaw)
+      : 0
+  if (Number.isFinite(lastActiveAt) && lastActiveAt > 0 && Date.now() - lastActiveAt < 10_000) return 'active'
+  return 'idle'
 }
 
 function parseSsePayload(raw: string): Record<string, unknown> | null {
@@ -1955,6 +1967,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [, setTeamPanelFlash] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string>()
   const [selectedOutputAgentId, setSelectedOutputAgentId] = useState<string>()
+  const [remoteOutputSession, setRemoteOutputSession] = useState<{ sessionKey: string; label: string } | null>(null)
+  void remoteOutputSession
+  const [remoteSessions, setRemoteSessions] = useState<RemoteSession[]>([])
   const [outputPanelVisible, setOutputPanelVisible] = useState(false)
   const [agentPopupId, setAgentPopupId] = useState<string | null>(null)
   const [boardTasks, _setBoardTasks] = useState<Array<HubTask>>([])
@@ -2531,6 +2546,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   useEffect(() => {
     if (!selectedOutputAgentId) return
+    if (selectedOutputAgentId.startsWith('remote:')) return
     const exists = team.some((member) => member.id === selectedOutputAgentId)
     if (!exists) setSelectedOutputAgentId(undefined)
   }, [selectedOutputAgentId, team])
@@ -2549,6 +2565,74 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       }
       return next
     })
+  }, [agentSessionMap])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function pollRemoteSessions() {
+      try {
+        const response = await fetch('/api/sessions')
+        if (!response.ok || cancelled) return
+        const payload = (await response.json().catch(() => ({}))) as { sessions?: Array<SessionRecord> } | Array<SessionRecord>
+        const sessions = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload.sessions)
+            ? payload.sessions
+            : []
+        const knownSessionKeys = new Set(Object.values(agentSessionMap))
+        const now = Date.now()
+
+        const remote = sessions
+          .filter((session) => {
+            const kind = readString(session.kind)
+            const sessionKey = readSessionId(session)
+            if (kind !== 'subagent' || !sessionKey) return false
+            if (knownSessionKeys.has(sessionKey)) return false
+            const status = inferSessionStatus(session)
+            if (status !== 'done') return true
+            const endedAtRaw = session.endedAt
+            const endedAt = typeof endedAtRaw === 'number'
+              ? endedAtRaw
+              : typeof endedAtRaw === 'string'
+                ? Date.parse(endedAtRaw)
+                : 0
+            const age = endedAt > 0 ? now - endedAt : 0
+            return age <= 60_000
+          })
+          .map((session) => {
+            const sessionKey = readSessionId(session)
+            const createdAtRaw = session.createdAt
+            const createdAt = typeof createdAtRaw === 'number'
+              ? createdAtRaw
+              : typeof createdAtRaw === 'string'
+                ? Date.parse(createdAtRaw)
+                : now
+            return {
+              sessionKey,
+              label: readSessionName(session) || sessionKey,
+              model: readString(session.model) || readString(session.modelId) || undefined,
+              status: inferSessionStatus(session),
+              startedAt: Number.isFinite(createdAt) && createdAt > 0 ? createdAt : now,
+              kind: readString(session.kind) || 'subagent',
+            } satisfies RemoteSession
+          })
+
+        if (!cancelled) setRemoteSessions(remote)
+      } catch {
+        // ignore poll errors
+      }
+    }
+
+    void pollRemoteSessions()
+    const interval = window.setInterval(() => {
+      void pollRemoteSessions()
+    }, 5_000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
   }, [agentSessionMap])
 
   useEffect(
@@ -3074,6 +3158,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     ? teamById.get(selectedOutputAgentId)?.modelId
     : undefined
 
+  const handleViewRemoteOutput = useCallback((sessionKey: string, label: string) => {
+    setSelectedOutputAgentId(`remote:${sessionKey}`)
+    setRemoteOutputSession({ sessionKey, label })
+    setOutputPanelVisible(true)
+  }, [])
+
   // Build AgentWorkingRow array for AgentsWorkingPanel
   const agentWorkingRows = useMemo((): AgentWorkingRow[] => {
     return teamWithRuntimeStatus.map((member) => {
@@ -3138,6 +3228,31 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const row = agentWorkingRows.find((entry) => entry.id === selectedOutputAgentId)
     return row ? toTitleCase(row.status) : undefined
   }, [agentWorkingRows, selectedOutputAgentId])
+  const isRemoteOutputSelected = Boolean(selectedOutputAgentId?.startsWith('remote:'))
+  const selectedRemoteSession = isRemoteOutputSelected && remoteOutputSession
+    ? remoteSessions.find((session) => session.sessionKey === remoteOutputSession.sessionKey) ?? {
+        sessionKey: remoteOutputSession.sessionKey,
+        label: remoteOutputSession.label,
+        model: undefined,
+        status: 'idle' as const,
+      }
+    : null
+  const selectedOutputSessionKey = isRemoteOutputSelected
+    ? selectedRemoteSession?.sessionKey ?? null
+    : selectedOutputAgentId
+      ? agentSessionMap[selectedOutputAgentId] ?? null
+      : null
+  const resolvedSelectedOutputAgentName = isRemoteOutputSelected
+    ? selectedRemoteSession?.label ?? 'Remote Session'
+    : selectedOutputAgentName
+  const resolvedSelectedOutputModelId = isRemoteOutputSelected
+    ? selectedRemoteSession?.model
+    : selectedOutputModelId
+  const resolvedSelectedOutputStatusLabel = isRemoteOutputSelected
+    ? selectedRemoteSession?.status
+      ? toTitleCase(selectedRemoteSession.status)
+      : undefined
+    : selectedOutputStatusLabel
 
   // Safety net: auto-complete mission if all agents reach terminal state (handles missed SSE done events)
   useEffect(() => {
@@ -4589,6 +4704,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined
               }
               processType={processType}
+              remoteSessions={remoteSessions}
+              onViewRemoteOutput={handleViewRemoteOutput}
               containerHeight={520}
             />
           </div>
@@ -6186,6 +6303,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined
                           }
                           processType={processType}
+                          remoteSessions={remoteSessions}
+                          onViewRemoteOutput={handleViewRemoteOutput}
                           containerHeight={360}
                         />
                       </section>
@@ -7011,7 +7130,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-white/90 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900/60">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
-                  {selectedOutputAgentName}
+                  {resolvedSelectedOutputAgentName}
                 </p>
                 <p className="text-[10px] text-neutral-500 dark:text-neutral-400">Live agent output stream</p>
               </div>
@@ -7032,12 +7151,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <div className="min-h-0 flex-1 overflow-hidden">
               <div className="h-full overflow-y-auto">
                 <AgentOutputPanel
-                  agentName={selectedOutputAgentName}
-                  sessionKey={agentSessionMap[selectedOutputAgentId] ?? null}
-                  tasks={selectedOutputTasks}
+                  agentName={resolvedSelectedOutputAgentName}
+                  sessionKey={selectedOutputSessionKey}
+                  tasks={isRemoteOutputSelected ? [] : selectedOutputTasks}
                   onClose={() => setOutputPanelVisible(false)}
-                  modelId={selectedOutputModelId}
-                  statusLabel={selectedOutputStatusLabel}
+                  modelId={resolvedSelectedOutputModelId}
+                  statusLabel={resolvedSelectedOutputStatusLabel}
                 />
               </div>
             </div>
@@ -7817,7 +7936,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           <div className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl">
             <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 p-3">
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
-                {selectedOutputAgentName} Output
+                {resolvedSelectedOutputAgentName} Output
               </h3>
               <button
                 type="button"
@@ -7830,12 +7949,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
             <div className="flex-1 overflow-y-auto">
               <AgentOutputPanel
-                agentName={selectedOutputAgentName}
-                sessionKey={selectedOutputAgentId ? agentSessionMap[selectedOutputAgentId] ?? null : null}
-                tasks={selectedOutputTasks}
+                agentName={resolvedSelectedOutputAgentName}
+                sessionKey={selectedOutputSessionKey}
+                tasks={isRemoteOutputSelected ? [] : selectedOutputTasks}
                 onClose={() => setOutputPanelVisible(false)}
-                modelId={selectedOutputModelId}
-                statusLabel={selectedOutputStatusLabel}
+                modelId={resolvedSelectedOutputModelId}
+                statusLabel={resolvedSelectedOutputStatusLabel}
               />
             </div>
           </div>
