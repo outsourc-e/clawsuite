@@ -8,38 +8,20 @@ type DispatchGatewayResponse = {
   runId?: string
 }
 
-function looksLikeMethodMissingError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false
-  const message = error.message.toLowerCase()
-  return (
-    message.includes('method') &&
-    (message.includes('not found') || message.includes('unknown'))
-  )
-}
-
 async function dispatchViaGateway(payload: {
   sessionKey: string
   message: string
   idempotencyKey: string
 }) {
-  try {
-    return await gatewayRpc<DispatchGatewayResponse>('sessions.send', {
-      sessionKey: payload.sessionKey,
-      message: payload.message,
-      timeoutMs: 120_000,
-      idempotencyKey: payload.idempotencyKey,
-    })
-  } catch (error) {
-    if (!looksLikeMethodMissingError(error)) throw error
-
-    return gatewayRpc<DispatchGatewayResponse>('chat.send', {
-      sessionKey: payload.sessionKey,
-      message: payload.message,
-      deliver: false,
-      timeoutMs: 120_000,
-      idempotencyKey: payload.idempotencyKey,
-    })
-  }
+  // Mission agent dispatch path:
+  // This endpoint triggers background agent work and should not behave like user chat delivery.
+  return gatewayRpc<DispatchGatewayResponse>('chat.send', {
+    sessionKey: payload.sessionKey,
+    message: payload.message,
+    deliver: false,
+    timeoutMs: 120_000,
+    idempotencyKey: payload.idempotencyKey,
+  })
 }
 
 export const Route = createFileRoute('/api/agent-dispatch')({

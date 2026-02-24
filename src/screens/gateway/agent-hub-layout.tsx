@@ -3430,6 +3430,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   useEffect(() => {
     const isMissionRunning = missionActive && missionState === 'running'
+    const sseActivityGraceMs = 20_000
 
     // Reset activity markers when mission is not running
     if (!isMissionRunning) {
@@ -3481,7 +3482,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 : typeof updatedAtRaw === 'string'
                   ? Date.parse(updatedAtRaw)
                   : 0
-            const lastSeen = Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : now
+            const pollLastSeen = Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : now
+            const activityLastAt = agentActivity[agentId]?.lastAt
+            const lastSeen =
+              typeof activityLastAt === 'number' && Number.isFinite(activityLastAt)
+                ? Math.max(pollLastSeen, activityLastAt)
+                : pollLastSeen
             const lastMessage = readSessionLastMessage(session) || undefined
             const ageMs = now - lastSeen
             const rawStatus = readString(session.status)
@@ -3513,12 +3519,30 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               for (const agentId of Object.keys(agentSessionMap)) {
                 if (seenAgentIds.has(agentId)) continue
                 const existing = prev[agentId]
-                const lastSeen = existing?.lastSeen ?? now
+                const activityLastAt = agentActivity[agentId]?.lastAt
+                const hasRecentSseActivity =
+                  typeof activityLastAt === 'number' &&
+                  Number.isFinite(activityLastAt) &&
+                  now - activityLastAt <= sseActivityGraceMs
+                const existingLastSeen = existing?.lastSeen ?? now
+                const lastSeen =
+                  hasRecentSseActivity && typeof activityLastAt === 'number'
+                    ? Math.max(existingLastSeen, activityLastAt)
+                    : existingLastSeen
                 const ageMs = now - lastSeen
                 // Grace period: keep existing status for up to 60s before marking stopped
-                if (!existing || ageMs > 60_000) {
+                if (!existing || (ageMs > 60_000 && !hasRecentSseActivity)) {
                   next[agentId] = {
                     status: 'stopped',
+                    lastSeen,
+                    ...(existing?.lastMessage ? { lastMessage: existing.lastMessage } : {}),
+                  }
+                } else if (hasRecentSseActivity) {
+                  next[agentId] = {
+                    status:
+                      existing.status === 'error' || existing.status === 'stopped'
+                        ? 'idle'
+                        : 'active',
                     lastSeen,
                     ...(existing?.lastMessage ? { lastMessage: existing.lastMessage } : {}),
                   }
@@ -3578,7 +3602,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [agentSessionMap, missionActive, missionState])
+  }, [agentActivity, agentSessionMap, missionActive, missionState])
 
   useEffect(() => {
     const previous = prevMissionStateRef.current
@@ -3904,6 +3928,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   function openNewMissionModal(prefill?: Partial<MissionBoardDraft>) {
     prevAutoNameRef.current = ''
+    setActiveTab('missions')
+    setMissionSubTab('overview')
     setNewMissionName(prefill?.name ?? '')
     setNewMissionGoal(prefill?.goal ?? missionGoal)
     closeMentionMenu()
@@ -4102,10 +4128,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Recent Missions</h2>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('missions')}
+                  onClick={() => {
+                    setActiveTab('missions')
+                    setMissionSubTab('overview')
+                  }}
                   className="text-[10px] font-medium text-accent-500 hover:text-accent-600 transition-colors"
                 >
-                  View All →
+                  Open Missions →
                 </button>
               </div>
 
@@ -5213,7 +5242,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3">
             <div>
               <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Mission Control</h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">Track active runs, review history, and launch new missions</p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">Track active runs, open mission history, and launch new missions</p>
             </div>
             <div className="flex items-center gap-2">
               {missionActive ? (
@@ -7376,7 +7405,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800">
                   ↓ Download
                 </button>
-                <button type="button" onClick={() => { setShowCompletionModal(false); setMissionBoardModalOpen(true); setMissionWizardStep(0) }}
+                <button type="button" onClick={() => { setShowCompletionModal(false); openNewMissionModal() }}
                   className="rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-600">
                   New Mission
                 </button>
