@@ -101,6 +101,7 @@ export const Route = createFileRoute('/api/session-status')({
             enriched.model = model
             enriched.modelProvider = mainUsage.modelProvider ?? ''
             enriched.sessionKey = mainUsage.key ?? ''
+            enriched.sessionLabel = mainUsage.label ?? mainUsage.name ?? ''
             enriched.messageCounts = u.messageCounts ?? {}
             enriched.latency = u.latency ?? {}
 

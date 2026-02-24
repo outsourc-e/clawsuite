@@ -201,6 +201,7 @@ function OrchestratorCard({
   const glowClass = STATE_GLOW[state] ?? STATE_GLOW.idle
 
   const [agentName, setAgentName] = useState(getStoredAgentName)
+  const [sessionName, setSessionName] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -235,7 +236,7 @@ function OrchestratorCard({
     const rows: OcUsageRow[] = primary.lines
       .filter((l) => l.type === 'progress' && l.used !== undefined)
       .slice(0, 2)
-      .map((l) => ({ label: l.label, pct: Math.min(100, Math.round(l.used as number)), resetHint: ocFormatResetHint(l.resetsAt) }))
+      .map((l) => ({ label: l.label.replace(/\s*\([^)]*\)\s*$/, '').trim(), pct: Math.min(100, Math.round(l.used as number)), resetHint: ocFormatResetHint(l.resetsAt) }))
     setUsageRows(rows)
     const name = primary.displayName.split(' ')[0]
     const lbl = primary.plan ? `${name} ${primary.plan}` : name
@@ -267,6 +268,8 @@ function OrchestratorCard({
         const payload = data.payload ?? data
         const m = payload.model ?? payload.currentModel ?? ''
         if (!cancelled && m) setModel(String(m))
+        const sn = String(payload.sessionLabel ?? payload.sessionName ?? payload.name ?? payload.label ?? '')
+        if (!cancelled && sn) setSessionName(sn)
         const pct = ocParseContextPct(payload)
         if (!cancelled) setContextPct(Math.min(100, Math.round(pct)))
       } catch { /* noop */ }
@@ -298,7 +301,7 @@ function OrchestratorCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferredProvider])
 
-  const displayName = agentName || 'Agent'
+  const displayName = agentName || sessionName || 'Agent'
 
   function startEdit() {
     setEditValue(agentName)
@@ -400,7 +403,7 @@ function OrchestratorCard({
 
       {/* ── Usage section — seamless inside the card ── */}
       {!compact && displayRows.length > 0 && (
-        <div className="mt-2 border-t border-primary-300/40 pt-2 space-y-1">
+        <div className="mt-2 border-t border-primary-300/40 pt-2 px-4 space-y-1">
           {/* Header: provider name (click to cycle) | chevron (click to collapse) */}
           <div className="flex w-full items-center justify-between">
             <button
@@ -433,16 +436,9 @@ function OrchestratorCard({
             <div className="space-y-1">
               {displayRows.map((row) => (
                 <div key={row.label} className="flex items-center gap-1.5">
-                  <div className="w-12 shrink-0">
-                    <span className="block text-[9px] text-primary-500 leading-none">
-                      {row.label}
-                    </span>
-                    {row.resetHint && (
-                      <span className="block text-[8px] text-primary-400 leading-none mt-0.5">
-                        {row.resetHint}
-                      </span>
-                    )}
-                  </div>
+                  <span className="w-12 shrink-0 text-[9px] text-primary-500 leading-none">
+                    {row.label}
+                  </span>
                   <div className="h-1 flex-1 rounded-full bg-primary-200/70">
                     <div
                       className={cn('h-full rounded-full transition-all', ocBarColor(row.pct))}
@@ -452,6 +448,11 @@ function OrchestratorCard({
                   <span className={cn('w-6 text-right text-[9px] tabular-nums', ocTextColor(row.pct))}>
                     {row.pct}%
                   </span>
+                  {row.resetHint && (
+                    <span className="text-[8px] text-neutral-400 ml-1 shrink-0">
+                      {row.resetHint}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
