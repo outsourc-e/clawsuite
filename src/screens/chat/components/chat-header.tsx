@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
@@ -77,6 +77,8 @@ function formatSyncAge(updatedAt: number): string {
 
 type ChatHeaderProps = {
   activeTitle: string
+  onRenameTitle?: (nextTitle: string) => Promise<void> | void
+  renamingTitle?: boolean
   wrapperRef?: React.Ref<HTMLDivElement>
   onOpenSessions?: () => void
   showFileExplorerButton?: boolean
@@ -98,6 +100,8 @@ type ChatHeaderProps = {
 
 function ChatHeaderComponent({
   activeTitle,
+  onRenameTitle,
+  renamingTitle = false,
   wrapperRef,
   onOpenSessions,
   showFileExplorerButton = false,
@@ -113,6 +117,10 @@ function ChatHeaderComponent({
   const [syncLabel, setSyncLabel] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(activeTitle)
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+  const isSavingTitleRef = useRef(false)
 
   useEffect(() => {
     if (dataUpdatedAt <= 0) return
@@ -148,6 +156,56 @@ function ChatHeaderComponent({
     }
     window.dispatchEvent(new CustomEvent('clawsuite:chat-agent-details'))
   }, [onOpenAgentDetails])
+
+  useEffect(() => {
+    if (isEditingTitle) return
+    setTitleDraft(activeTitle)
+  }, [activeTitle, isEditingTitle])
+
+  useEffect(() => {
+    if (!isEditingTitle) return
+    const id = window.setTimeout(() => {
+      titleInputRef.current?.focus()
+      titleInputRef.current?.select()
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [isEditingTitle])
+
+  const canRenameTitle = Boolean(onRenameTitle && !isMobile)
+
+  const startTitleEdit = useCallback(() => {
+    if (!canRenameTitle || renamingTitle) return
+    setTitleDraft(activeTitle)
+    setIsEditingTitle(true)
+  }, [activeTitle, canRenameTitle, renamingTitle])
+
+  const cancelTitleEdit = useCallback(() => {
+    setTitleDraft(activeTitle)
+    setIsEditingTitle(false)
+  }, [activeTitle])
+
+  const saveTitleEdit = useCallback(async () => {
+    if (!onRenameTitle || isSavingTitleRef.current) return
+
+    const trimmed = titleDraft.trim()
+    if (!trimmed) {
+      cancelTitleEdit()
+      return
+    }
+
+    if (trimmed === activeTitle.trim()) {
+      setIsEditingTitle(false)
+      return
+    }
+
+    isSavingTitleRef.current = true
+    try {
+      await onRenameTitle(trimmed)
+      setIsEditingTitle(false)
+    } finally {
+      isSavingTitleRef.current = false
+    }
+  }, [activeTitle, cancelTitleEdit, onRenameTitle, titleDraft])
 
   if (isMobile) {
     return (
@@ -217,12 +275,60 @@ function ChatHeaderComponent({
           </TooltipRoot>
         </TooltipProvider>
       ) : null}
-      <div
-        className="min-w-0 flex-1 truncate text-sm font-medium text-balance"
-        suppressHydrationWarning
-      >
-        {activeTitle}
+      <div className="group min-w-0 flex-1">
+        {isEditingTitle ? (
+          <input
+            ref={titleInputRef}
+            value={titleDraft}
+            disabled={renamingTitle}
+            onChange={(event) => setTitleDraft(event.target.value)}
+            onBlur={() => {
+              void saveTitleEdit()
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                void saveTitleEdit()
+                return
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                cancelTitleEdit()
+              }
+            }}
+            className="h-7 w-full min-w-0 border-b border-transparent bg-transparent px-0 text-sm font-medium text-balance text-ink outline-none transition-colors focus:border-primary-300"
+            aria-label="Session name"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={startTitleEdit}
+            disabled={!canRenameTitle || renamingTitle}
+            className="flex max-w-full items-center gap-1.5 rounded-sm text-left"
+            aria-label="Rename session"
+            title={canRenameTitle ? 'Click to rename session' : undefined}
+          >
+            <span
+              className="min-w-0 truncate text-sm font-medium text-balance"
+              suppressHydrationWarning
+            >
+              {activeTitle}
+            </span>
+            <span
+              aria-hidden
+              className="text-xs text-primary-400 opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              ✏️
+            </span>
+          </button>
+        )}
       </div>
+      {renamingTitle ? (
+        <span
+          className="mr-1 inline-flex size-3 animate-spin rounded-full border border-primary-300 border-t-primary-700"
+          aria-label="Saving session name"
+        />
+      ) : null}
       {syncLabel ? (
         <span
           className={cn(

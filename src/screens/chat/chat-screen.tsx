@@ -44,6 +44,7 @@ import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
+import { useRenameSession } from './hooks/use-rename-session'
 import { ContextBar } from './components/context-bar'
 import {
   addApproval,
@@ -263,6 +264,8 @@ export function ChatScreen({
   const terminalPanelHeight = useTerminalPanelStore(
     (state) => state.panelHeight,
   )
+  const { renameSession, renaming: renamingSessionTitle } = useRenameSession()
+
   const {
     sessionsQuery,
     sessions,
@@ -1487,6 +1490,16 @@ export function ChatScreen({
     setAgentViewOpen(true)
   }, [setAgentViewOpen])
 
+  const handleRenameActiveSessionTitle = useCallback(
+    async (nextTitle: string) => {
+      const sessionKey =
+        resolvedSessionKey || activeSession?.key || activeSessionKey || ''
+      if (!sessionKey) return
+      await renameSession(sessionKey, activeSession?.friendlyId ?? null, nextTitle)
+    },
+    [activeSession?.friendlyId, activeSession?.key, activeSessionKey, renameSession, resolvedSessionKey],
+  )
+
   // Listen for mobile header agent-details tap
   useEffect(() => {
     const handler = () => setAgentViewOpen(true)
@@ -1533,6 +1546,8 @@ export function ChatScreen({
           {!compact && (
             <ChatHeader
               activeTitle={activeTitle}
+              onRenameTitle={handleRenameActiveSessionTitle}
+              renamingTitle={renamingSessionTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
               showFileExplorerButton={!isMobile}
