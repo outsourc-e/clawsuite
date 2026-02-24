@@ -199,8 +199,7 @@ function OrchestratorCard({
   const [usageRows, setUsageRows] = useState<OcUsageRow[]>([])
   const [providerLabel, setProviderLabel] = useState<string | null>(null)
   const [usageExpanded, setUsageExpanded] = useState(true)
-  const [providers, setProviders] = useState<OcProviderEntry[]>([])
-  const [preferredProvider, setPreferredProvider] = useState<string | null>(() => {
+  const [preferredProvider] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     try { return window.localStorage.getItem(PREFERRED_PROVIDER_KEY_OC) } catch { return null }
   })
@@ -238,13 +237,14 @@ function OrchestratorCard({
         } | null
         if (!data2?.providers || cancelled) return
 
-        setProviders(data2.providers)
         const primary = getPrimaryProvider(data2.providers, preferredProvider)
         if (!primary) return
 
+        // Only show the first 2 progress bars (Session + Weekly); keep full labels
         const rows: OcUsageRow[] = primary.lines
           .filter((l) => l.type === 'progress' && l.used !== undefined)
-          .map((l) => ({ label: l.label.slice(0, 6), pct: Math.min(100, Math.round(l.used as number)) }))
+          .slice(0, 2)
+          .map((l) => ({ label: l.label, pct: Math.min(100, Math.round(l.used as number)) }))
         if (!cancelled) setUsageRows(rows)
 
         const name = primary.displayName.split(' ')[0]
@@ -258,11 +258,6 @@ function OrchestratorCard({
     return () => { cancelled = true; clearInterval(timer) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferredProvider])
-
-  function handleProviderChange(provider: string) {
-    setPreferredProvider(provider)
-    try { window.localStorage.setItem(PREFERRED_PROVIDER_KEY_OC, provider) } catch { /* noop */ }
-  }
 
   const displayName = agentName || 'Agent'
 
@@ -365,8 +360,8 @@ function OrchestratorCard({
 
       {/* ── Usage section — seamless inside the card ── */}
       {!compact && displayRows.length > 0 && (
-        <div className="mt-3 border-t border-primary-300/40 pt-2.5 space-y-1.5">
-          {/* Collapsible header */}
+        <div className="mt-2 border-t border-primary-300/40 pt-2 space-y-1">
+          {/* Collapsible header — provider name inline, no dropdown */}
           <button
             type="button"
             onClick={() => setUsageExpanded((v) => !v)}
@@ -378,40 +373,23 @@ function OrchestratorCard({
           </button>
 
           {usageExpanded && (
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {displayRows.map((row) => (
-                <div key={row.label} className="flex items-center gap-2">
-                  <span className="w-10 shrink-0 text-[10px] text-primary-500">
+                <div key={row.label} className="flex items-center gap-1.5">
+                  <span className="w-12 shrink-0 text-[9px] text-primary-500 leading-none">
                     {row.label}
                   </span>
-                  <div className="h-1.5 flex-1 rounded-full bg-primary-200/70">
+                  <div className="h-1 flex-1 rounded-full bg-primary-200/70">
                     <div
                       className={cn('h-full rounded-full transition-all', ocBarColor(row.pct))}
                       style={{ width: `${row.pct}%` }}
                     />
                   </div>
-                  <span className={cn('w-7 text-right text-[10px] tabular-nums', ocTextColor(row.pct))}>
+                  <span className={cn('w-6 text-right text-[9px] tabular-nums', ocTextColor(row.pct))}>
                     {row.pct}%
                   </span>
                 </div>
               ))}
-
-              {/* Provider picker */}
-              {providers.filter((p) => p.status === 'ok').length > 1 && (
-                <select
-                  value={preferredProvider ?? ''}
-                  onChange={(e) => handleProviderChange(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-primary-300/50 bg-primary-50 px-2 py-1 text-[10px] text-primary-700"
-                >
-                  {providers
-                    .filter((p) => p.status === 'ok')
-                    .map((p) => (
-                      <option key={p.provider} value={p.provider}>
-                        {p.displayName}
-                      </option>
-                    ))}
-                </select>
-              )}
             </div>
           )}
         </div>

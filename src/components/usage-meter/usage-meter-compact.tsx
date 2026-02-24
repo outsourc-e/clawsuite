@@ -44,15 +44,6 @@ function getStoredPreferredProvider(): string | null {
   }
 }
 
-function savePreferredProvider(provider: string) {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(PREFERRED_PROVIDER_KEY, provider)
-  } catch {
-    /* ignore */
-  }
-}
-
 // ── Misc helpers ─────────────────────────────────────────────────────────────
 
 function readNumber(value: unknown): number {
@@ -87,17 +78,6 @@ function parseContextPercent(payload: unknown): number {
   )
 }
 
-function parseCurrentModel(payload: unknown): string | null {
-  if (!payload || typeof payload !== 'object') return null
-  const root = payload as Record<string, unknown>
-  const model =
-    root.model ??
-    (root.payload as Record<string, unknown> | undefined)?.model ??
-    (root.today as Record<string, unknown> | undefined)?.model ??
-    (root.usage as Record<string, unknown> | undefined)?.model
-  return model && typeof model === 'string' ? model : null
-}
-
 function barColor(pct: number): string {
   if (pct >= 80) return 'bg-red-500'
   if (pct >= 60) return 'bg-amber-400'
@@ -121,13 +101,8 @@ export function UsageMeterCompact() {
   const [contextPct, setContextPct] = useState<number | null>(null)
   const [progressRows, setProgressRows] = useState<UsageRow[]>([])
   const [providerLabel, setProviderLabel] = useState<string | null>(null)
-  const [providers, setProviders] = useState<ProviderUsageEntry[]>([])
-  const [preferredProvider, setPreferredProviderState] = useState<string | null>(
-    getStoredPreferredProvider,
-  )
-  const [currentModel, setCurrentModel] = useState<string | null>(null)
+  const [preferredProvider] = useState<string | null>(getStoredPreferredProvider)
   const [expanded, setExpanded] = useState(true)
-  const [settingDefault, setSettingDefault] = useState(false)
 
   // ── Derived primary provider ─────────────────────────────────────────────
 
@@ -154,14 +129,12 @@ export function UsageMeterCompact() {
       const payload = data.payload ?? data
       const pct = parseContextPercent(payload)
       setContextPct(Math.min(100, Math.round(pct)))
-      const model = parseCurrentModel(payload)
-      if (model) setCurrentModel(model)
     } catch {
       // silent — compact meter shows nothing on error
     }
   }, [])
 
-  // ── Fetch provider usage (accepts override for preferred) ────────────────
+  // ── Fetch provider usage ─────────────────────────────────────────────────
 
   const fetchProvider = useCallback(
     async (preferred: string | null) => {
@@ -174,15 +147,15 @@ export function UsageMeterCompact() {
         } | null
         if (!data?.providers) return
 
-        setProviders(data.providers)
         const primary = getPrimary(data.providers, preferred)
         if (!primary) return
 
-        // All progress lines → one bar each
+        // Show only first 2 progress bars (Session + Weekly); keep full labels
         const rows: UsageRow[] = primary.lines
           .filter((l) => l.type === 'progress' && l.used !== undefined)
+          .slice(0, 2)
           .map((l) => ({
-            label: l.label.slice(0, 6),
+            label: l.label,
             pct: Math.min(100, Math.round(l.used as number)),
           }))
         setProgressRows(rows)
@@ -197,35 +170,6 @@ export function UsageMeterCompact() {
     },
     [getPrimary],
   )
-
-  // ── Preferred provider change ────────────────────────────────────────────
-
-  const handleProviderChange = useCallback(
-    (provider: string) => {
-      setPreferredProviderState(provider)
-      savePreferredProvider(provider)
-      void fetchProvider(provider)
-    },
-    [fetchProvider],
-  )
-
-  // ── Set session default model ────────────────────────────────────────────
-
-  const handleSetDefaultModel = useCallback(async () => {
-    if (!currentModel || settingDefault) return
-    setSettingDefault(true)
-    try {
-      await fetch('/api/session-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: currentModel }),
-      })
-    } catch {
-      // silent
-    } finally {
-      setSettingDefault(false)
-    }
-  }, [currentModel, settingDefault])
 
   // ── Polling effects ──────────────────────────────────────────────────────
 
@@ -257,7 +201,7 @@ export function UsageMeterCompact() {
 
   return (
     <div className="space-y-0 px-1">
-      {/* Collapsible header */}
+      {/* Collapsible header — provider name already in headerLabel, no dropdown */}
       <button
         onClick={() => setExpanded((v) => !v)}
         className={cn(
@@ -271,64 +215,30 @@ export function UsageMeterCompact() {
         <span className="text-neutral-300">{expanded ? '▲' : '▼'}</span>
       </button>
 
-      {/* Bars — always visible */}
-      <div className="space-y-1.5">
-        {allRows.map((row) => (
-          <div key={row.label} className="flex items-center gap-2">
-            <span className="w-10 shrink-0 text-[10px] text-neutral-500">
-              {row.label}
-            </span>
-            <div className="h-1.5 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700">
-              <div
-                className={cn('h-full rounded-full transition-all', barColor(row.pct))}
-                style={{ width: `${row.pct}%` }}
-              />
-            </div>
-            <span
-              className={cn(
-                'w-7 text-right text-[10px] tabular-nums',
-                textColor(row.pct),
-              )}
-            >
-              {row.pct}%
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* Expanded section: provider selector + set default */}
+      {/* Bars */}
       {expanded && (
-        <div className="mt-1.5 space-y-1">
-          {/* Provider selector */}
-          {providers.filter((p) => p.status === 'ok').length > 0 && (
-            <select
-              value={preferredProvider ?? ''}
-              onChange={(e) => handleProviderChange(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[10px] text-neutral-700 dark:text-neutral-300"
-            >
-              {providers
-                .filter((p) => p.status === 'ok')
-                .map((p) => (
-                  <option key={p.provider} value={p.provider}>
-                    {p.displayName}
-                  </option>
-                ))}
-            </select>
-          )}
-
-          {/* Set as session default model */}
-          {currentModel && (
-            <button
-              onClick={() => void handleSetDefaultModel()}
-              disabled={settingDefault}
-              className={cn(
-                'text-[9px] text-accent-500 hover:underline mt-0.5 block',
-                settingDefault && 'opacity-50 cursor-not-allowed',
-              )}
-            >
-              {settingDefault ? 'Setting…' : 'Set as session default'}
-            </button>
-          )}
+        <div className="space-y-1">
+          {allRows.map((row) => (
+            <div key={row.label} className="flex items-center gap-1.5">
+              <span className="w-12 shrink-0 text-[9px] leading-none text-neutral-500">
+                {row.label}
+              </span>
+              <div className="h-1 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700">
+                <div
+                  className={cn('h-full rounded-full transition-all', barColor(row.pct))}
+                  style={{ width: `${row.pct}%` }}
+                />
+              </div>
+              <span
+                className={cn(
+                  'w-6 text-right text-[9px] tabular-nums',
+                  textColor(row.pct),
+                )}
+              >
+                {row.pct}%
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>
