@@ -9,6 +9,8 @@ import { emitFeedEvent, onFeedEvent, type FeedEvent } from './components/feed-ev
 import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
 import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
+import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval, killAgentSession } from '@/lib/gateway-api'
@@ -6926,59 +6928,55 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div
-        className={cn(
-          'flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 px-5 py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
-          isMobileHub
-            ? 'bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:bg-slate-900/70'
-            : 'bg-white dark:bg-slate-800',
-        )}
-      >
-        <div className="flex min-w-0 items-baseline gap-2">
-          <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-900 dark:text-white">Agent Hub</h1>
-          <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
+      <header className="relative z-20 shrink-0 mx-3 mt-3 mb-2 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
+            <div className="flex min-w-0 flex-col">
+              <h1 className="text-sm font-semibold text-ink truncate">Agent Hub</h1>
+              <p className="font-mono text-[10px] text-primary-500 dark:text-slate-500">// Mission Control</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <ApprovalsBell
+              approvals={approvals}
+              onApprove={handleApprove}
+              onDeny={handleDeny}
+            />
+            <button
+              type="button"
+              aria-pressed={liveFeedVisible}
+              title={liveFeedVisible ? 'Hide live feed' : 'Show live feed'}
+              onClick={() => setLiveFeedVisible((v) => !v)}
+              className={cn(
+                'flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                liveFeedVisible
+                  ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/50 dark:bg-orange-900/20 dark:text-orange-400'
+                  : 'border-primary-200 text-primary-500 hover:bg-primary-100 hover:text-primary-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800',
+              )}
+            >
+              <span aria-hidden>📡</span>
+              <span className="hidden sm:inline">Live View</span>
+              {unreadFeedCount > 0 && !liveFeedVisible ? (
+                <span className="ml-0.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                  {unreadFeedCount > 99 ? '99+' : unreadFeedCount}
+                </span>
+              ) : null}
+            </button>
+            <div className="flex items-center gap-1 rounded-full border border-primary-200 bg-primary-100/65 p-1 dark:border-slate-700 dark:bg-slate-800/80">
+              <ThemeToggle variant="icon" />
+              <button
+                type="button"
+                onClick={() => setShortcutsModalOpen(true)}
+                className="inline-flex size-7 items-center justify-center rounded-full text-primary-500 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                title="Keyboard shortcuts"
+              >
+                <span className="text-[11px] font-semibold">?</span>
+              </button>
+            </div>
+          </div>
         </div>
-        {/* Right-side header controls */}
-        <div className="flex items-center gap-2">
-          {/* Approvals Bell — always visible in header */}
-          <ApprovalsBell
-            approvals={approvals}
-            onApprove={handleApprove}
-            onDeny={handleDeny}
-          />
-
-          {/* Live View toggle */}
-          <button
-            type="button"
-            aria-pressed={liveFeedVisible}
-            title={liveFeedVisible ? 'Hide live feed' : 'Show live feed (📡 activity log)'}
-            onClick={() => {
-              setLiveFeedVisible((v) => !v)
-            }}
-            className={cn(
-              'flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-              liveFeedVisible
-                ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/50 dark:bg-orange-900/20 dark:text-orange-400'
-                : 'border-neutral-200 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200',
-            )}
-          >
-            <span aria-hidden>📡</span>
-            <span>Live View</span>
-            {unreadFeedCount > 0 && !liveFeedVisible ? (
-              <span className="ml-0.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                {unreadFeedCount > 99 ? '99+' : unreadFeedCount}
-              </span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShortcutsModalOpen(true)}
-            className="min-h-9 rounded-lg border border-neutral-200 dark:border-neutral-700 px-2.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-          >
-            ?
-          </button>
-        </div>
-      </div>
+      </header>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
       <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-neutral-50/80 px-2 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">

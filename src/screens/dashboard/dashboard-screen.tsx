@@ -37,7 +37,7 @@ import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
 import { QuickActionsRow } from './components/quick-actions-row'
 import { TokenUsageHero } from './components/token-usage-hero'
-import { WidgetGrid, type WidgetGridItem } from './components/widget-grid'
+import { type WidgetGridItem } from './components/widget-grid'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
 import { useVisibleWidgets } from './hooks/use-visible-widgets'
@@ -338,6 +338,8 @@ export function DashboardScreen() {
       refetch,
     ],
   )
+
+  void metricItems
 
   // ── Enterprise desktop layout ──────────────────────────────────────────────
   // C2: SystemGlance → chips → Usage+Squad → Sessions+Tasks → Activity → Skills
@@ -938,9 +940,7 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
-              {/* 3. Metric cards row — Sessions · Active Agents · Cost Today · Uptime */}
-              {/* These complement SystemGlance: they add micro charts, trend pills & time-range selectors */}
-              <WidgetGrid items={metricItems} className="gap-4" />
+              <TokenUsageHero data={dashboardData} />
 
               {desktopLayout.showServices ? (
                 <ServicesHealthWidget
