@@ -2945,7 +2945,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         agentSessionsDoneRef.current.add(sessionKey)
         const memberName = teamRef.current.find((m) => agentSessionMap[m.id] === sessionKey)?.name ?? 'Agent'
         toast(`${memberName} completed`, { type: 'success', duration: 3000 })
-        emitFeedEvent({ type: 'agent', agentName: memberName, message: `${memberName} finished their tasks` })
+        emitFeedEvent({
+          type: 'agent' as FeedEvent['type'],
+          agentName: memberName,
+          message: `${memberName} finished their tasks`,
+        })
 
         // Mark agent status as idle
         setAgentSessionStatus((prev) => ({
@@ -6320,6 +6324,31 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
         ) : null}
+
+      {shortcutsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShortcutsModalOpen(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-5 py-4">
+              <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Keyboard Shortcuts</p>
+              <button type="button" onClick={() => setShortcutsModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200">✕</button>
+            </div>
+            <div className="p-5 space-y-2">
+              {[
+                ['Space', 'Pause / Resume mission'],
+                ['Cmd + Enter', 'Start mission'],
+                ['Esc', 'Close modals'],
+                ['N', 'New mission (when idle)'],
+                ['?', 'Show this shortcuts panel'],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-neutral-600 dark:text-neutral-400">{desc}</span>
+                  <kbd className="rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-2 py-0.5 text-[11px] font-mono text-neutral-700 dark:text-neutral-300">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Steer Agent Modal ────────────────────────────────────────────── */}
       {steerAgentId ? (() => {
