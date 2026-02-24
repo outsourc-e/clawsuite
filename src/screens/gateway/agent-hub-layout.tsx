@@ -94,7 +94,7 @@ const MODEL_PRESET_MAP: Record<string, string> = {
   auto: '',
   opus: 'anthropic/claude-opus-4-6',
   sonnet: 'anthropic/claude-sonnet-4-6',
-  codex: 'openai/gpt-5.3-codex',
+  codex: 'openai-codex/gpt-5.3-codex',
   flash: 'google/gemini-2.5-flash',
   minimax: 'minimax/MiniMax-M2.5',
 }
@@ -248,13 +248,12 @@ const MISSION_TEMPLATES = [
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
 
-type ActiveTab = 'overview' | 'missions' | 'history' | 'configure'
+type ActiveTab = 'overview' | 'missions' | 'configure'
 type ConfigSection = 'agents' | 'teams' | 'keys'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
   { id: 'overview', icon: '🏠', label: 'Overview' },
   { id: 'missions', icon: '🚀', label: 'Missions' },
-  { id: 'history', icon: '📋', label: 'History' },
   { id: 'configure', icon: '⚙️', label: 'Configure' },
 ]
 
@@ -1505,251 +1504,6 @@ function timeAgoFromMs(ms: number): string {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   return `${days}d ago`
-}
-
-function HistoryView() {
-  const [sessions, setSessions] = useState<SessionRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [localHistory] = useState<MissionCheckpoint[]>(() => loadMissionHistory())
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function fetchHistory() {
-      setLoading(true)
-      try {
-        const res = await fetch('/api/sessions')
-        if (!res.ok || cancelled) return
-        const data = (await res.json()) as { sessions?: SessionRecord[] }
-        const missionSessions = (data.sessions ?? [])
-          .filter((s) => {
-            const label = readString(s.label)
-            return label.startsWith('Mission:')
-          })
-          .sort((a, b) => {
-            const aTime = typeof a.updatedAt === 'number' ? a.updatedAt : 0
-            const bTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0
-            return bTime - aTime
-          })
-        if (!cancelled) setSessions(missionSessions)
-      } catch {
-        // ignore fetch errors
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void fetchHistory()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const hasLocalHistory = localHistory.length > 0
-  const hasApiSessions = sessions.length > 0
-
-  if (loading && !hasLocalHistory) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto mb-2 size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-600" />
-          <p className="font-mono text-[10px] text-neutral-500 dark:text-slate-400">// loading mission history…</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!hasLocalHistory && !hasApiSessions) {
-    return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="text-center">
-          <p className="mb-3 text-4xl opacity-30">📋</p>
-          <p className="text-sm font-medium text-neutral-700">No mission history yet</p>
-          <p className="mt-1 font-mono text-[10px] text-neutral-500 dark:text-slate-400">// start a mission to see it recorded here</p>
-        </div>
-      </div>
-    )
-  }
-
-  const PROCESS_TYPE_BADGE: Record<string, string> = {
-    sequential:   'bg-blue-50 text-blue-700 border border-blue-200',
-    hierarchical: 'bg-violet-50 text-violet-700 border border-violet-200',
-    parallel:     'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  }
-
-  const CHECKPOINT_STATUS_BADGE: Record<string, { label: string; icon: string; className: string }> = {
-    running:   { label: 'Running',   icon: '▶', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
-    paused:    { label: 'Paused',    icon: '⏸', className: 'bg-amber-50 text-amber-700 border border-amber-200' },
-    completed: { label: 'Completed', icon: '●', className: 'bg-neutral-100 text-neutral-600 border border-neutral-200' },
-    aborted:   { label: 'Aborted',   icon: '✕', className: 'bg-red-50 text-red-700 border border-red-200' },
-  }
-
-  return (
-    <div className="h-full overflow-y-auto p-4">
-      <h2 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-neutral-600 dark:text-slate-400">Mission Reports</h2>
-
-      {/* Local checkpoint history */}
-      {hasLocalHistory ? (
-        <div className="space-y-3">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700">📦 Local Checkpoints</p>
-          {localHistory.map((cp) => {
-            const completedTasks = cp.tasks.filter(t => t.status === 'done' || t.status === 'completed').length
-            const totalTasks = cp.tasks.length
-            const statusBadge = CHECKPOINT_STATUS_BADGE[cp.status] ?? CHECKPOINT_STATUS_BADGE['completed']!
-            const processClass = PROCESS_TYPE_BADGE[cp.processType] ?? ''
-            const timeRef = cp.completedAt ?? cp.updatedAt
-
-            return (
-              <div
-                key={cp.id}
-                className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 transition-colors hover:border-neutral-300"
-              >
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] text-neutral-500 dark:text-slate-400" aria-hidden>{statusBadge!.icon}</span>
-                  <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
-                    {cp.label}
-                  </h3>
-                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold', statusBadge!.className)}>
-                    {statusBadge!.label}
-                  </span>
-                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold capitalize', processClass)}>
-                    {cp.processType}
-                  </span>
-                </div>
-
-                {/* Team avatars */}
-                {cp.team.length > 0 ? (
-                  <div className="mb-2 flex -space-x-1.5">
-                    {cp.team.slice(0, 5).map((member, idx) => {
-                      const ac = AGENT_ACCENT_COLORS[idx % AGENT_ACCENT_COLORS.length]
-                      return (
-                        <span
-                          key={member.id}
-                          title={member.name}
-                          className={cn('flex size-6 items-center justify-center rounded-full border border-white text-sm leading-none', ac.avatar)}
-                        >
-                          <AgentAvatar index={resolveAgentAvatarIndex(member, idx)} color={ac.hex} size={16} />
-                        </span>
-                      )
-                    })}
-                    {cp.team.length > 5 ? (
-                      <span className="flex size-6 items-center justify-center rounded-full border border-white bg-neutral-200 text-[9px] font-bold text-neutral-600 dark:text-slate-400">
-                        +{cp.team.length - 5}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                <div className="flex items-center gap-3 font-mono text-[9px] text-neutral-700">
-                  {totalTasks > 0 ? (
-                    <span>{completedTasks}/{totalTasks} tasks</span>
-                  ) : null}
-                  {timeRef > 0 ? <span>{timeAgoFromMs(timeRef)}</span> : null}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      ) : null}
-
-      {/* API sessions history */}
-      {hasApiSessions ? (
-        <div className="space-y-3">
-          {hasLocalHistory ? (
-            <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700">🌐 Gateway Sessions</p>
-          ) : null}
-          {sessions.map((session) => {
-            const sessionId = readSessionId(session)
-            const label = readString(session.label)
-            const status = readString(session.status)
-            const lastMessage = readSessionLastMessage(session)
-            const updatedAtRaw = session.updatedAt
-            const updatedAt =
-              typeof updatedAtRaw === 'number'
-                ? updatedAtRaw
-                : typeof updatedAtRaw === 'string'
-                  ? Date.parse(updatedAtRaw)
-                  : 0
-            const isExpanded = expandedId === sessionId
-            // Clamp token count to 0 minimum (gateway may return negative for cache accounting)
-            const tokenCount = typeof session.tokenCount === 'number' ? Math.max(0, session.tokenCount) : undefined
-
-            const statusBadge =
-              status === 'active'
-                ? { label: 'Active', icon: '▶', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' }
-                : status === 'idle'
-                  ? { label: 'Idle', icon: '⏸', className: 'bg-amber-50 text-amber-700 border border-amber-200' }
-                  : { label: 'Ended', icon: '●', className: 'bg-neutral-100 text-neutral-600 border border-neutral-200' }
-
-            return (
-              <div
-                key={sessionId || label}
-                className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 transition-colors hover:border-neutral-300"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] text-neutral-500 dark:text-slate-400" aria-hidden>{statusBadge.icon}</span>
-                      <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
-                        {label.replace(/^Mission:\s*/, '')}
-                      </h3>
-                      <span
-                        className={cn(
-                          'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold',
-                          statusBadge.className,
-                        )}
-                      >
-                        {statusBadge.label}
-                      </span>
-                    </div>
-                    {lastMessage ? (
-                      <p className="mt-1.5 line-clamp-2 font-mono text-[10px] text-neutral-600 dark:text-slate-400">
-                        {lastMessage}
-                      </p>
-                    ) : null}
-                    <div className="mt-2 flex items-center gap-3 font-mono text-[9px] text-neutral-700">
-                      {updatedAt > 0 ? <span>{timeAgoFromMs(updatedAt)}</span> : null}
-                      {tokenCount !== undefined ? (
-                        <span>{tokenCount.toLocaleString()} tokens</span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId(isExpanded ? null : sessionId)}
-                    className="shrink-0 rounded-lg border border-neutral-200 bg-neutral-100 px-2.5 py-1 text-[10px] font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:text-neutral-900 dark:text-white"
-                  >
-                    {isExpanded ? 'Hide' : 'View'}
-                  </button>
-                </div>
-
-                {isExpanded ? (
-                  <div className="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                    <p className="mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400">
-                      Session Details
-                    </p>
-                    <dl className="space-y-1.5">
-                      <div className="flex gap-2">
-                        <dt className="shrink-0 font-mono text-[9px] text-neutral-500 dark:text-slate-400">ID</dt>
-                        <dd className="truncate font-mono text-[9px] text-neutral-600 dark:text-slate-400">{sessionId}</dd>
-                      </div>
-                      {lastMessage ? (
-                        <div className="flex flex-col gap-0.5">
-                          <dt className="font-mono text-[9px] text-neutral-700">Last output</dt>
-                          <dd className="line-clamp-4 font-mono text-[9px] text-neutral-500 dark:text-slate-400">{lastMessage}</dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                  </div>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-      ) : null}
-    </div>
-  )
 }
 
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
@@ -4300,7 +4054,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">No missions yet</p>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('missions')}
+                    onClick={() => openNewMissionModal()}
                     className="mt-1 rounded-lg bg-accent-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-accent-600 transition-colors"
                   >
                     + New Mission
@@ -6736,12 +6490,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {activeTab === 'missions' && (
                 <div className="h-full min-h-0 bg-white dark:bg-[var(--theme-panel,#111520)]">
                   {renderMissionsTabContent()}
-                </div>
-              )}
-
-              {activeTab === 'history' && (
-                <div className="h-full min-h-0 overflow-y-auto bg-white dark:bg-[var(--theme-panel,#111520)]">
-                  <HistoryView />
                 </div>
               )}
             </div>
