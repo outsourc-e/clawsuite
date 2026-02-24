@@ -3,10 +3,12 @@ import {
   ArrowDown01Icon,
   ArrowUp01Icon,
   BrainIcon,
+  PencilEdit02Icon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
 type MemoryFileMeta = {
@@ -25,6 +27,7 @@ type MemorySearchMatch = {
 type ListResponse = { files?: Array<MemoryFileMeta> }
 type ReadResponse = { path?: string; content?: string }
 type SearchResponse = { results?: Array<MemorySearchMatch> }
+type WriteResponse = { success?: boolean; path?: string; error?: string }
 
 async function readJson<T>(url: string): Promise<T> {
   const response = await fetch(url)
@@ -97,7 +100,12 @@ export function MemoryBrowserScreen() {
   const deferredSearch = useDeferredValue(searchInput)
   const [mobileFilesOpen, setMobileFilesOpen] = useState(true)
   const [focusLine, setFocusLine] = useState<number | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [draftContent, setDraftContent] = useState('')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const lineRefs = useRef<Record<number, HTMLDivElement | null>>({})
+  const queryClient = useQueryClient()
 
   const filesQuery = useQuery({
     queryKey: ['memory', 'list'],
@@ -139,6 +147,12 @@ export function MemoryBrowserScreen() {
   const lines = useMemo(() => content.split(/\r?\n/), [content])
 
   useEffect(() => {
+    if (isEditing) return
+    setDraftContent(content)
+    setHasUnsavedChanges(false)
+  }, [content, isEditing, selectedPath])
+
+  useEffect(() => {
     if (!focusLine) return
     const target = lineRefs.current[focusLine]
     if (!target) return
@@ -153,6 +167,64 @@ export function MemoryBrowserScreen() {
   }, [rootMemory, memoryFiles])
 
   const searchResults = searchQuery.data?.results ?? []
+
+  function trySelectFile(nextPath: string, nextFocusLine?: number): boolean {
+    if (nextPath !== selectedPath && isEditing && hasUnsavedChanges) {
+      const confirmed =
+        typeof window === 'undefined'
+          ? true
+          : window.confirm('You have unsaved changes. Discard them and switch files?')
+      if (!confirmed) return false
+    }
+
+    if (nextPath !== selectedPath && isEditing) {
+      setIsEditing(false)
+      setHasUnsavedChanges(false)
+      setDraftContent('')
+    }
+
+    setSelectedPath(nextPath)
+    setFocusLine(nextFocusLine ?? null)
+    return true
+  }
+
+  function handleStartEditing() {
+    setDraftContent(content)
+    setHasUnsavedChanges(false)
+    setIsEditing(true)
+  }
+
+  function handleCancelEditing() {
+    setDraftContent(content)
+    setHasUnsavedChanges(false)
+    setIsEditing(false)
+  }
+
+  async function handleSaveEditing() {
+    if (!selectedPath || isSaving) return
+    setIsSaving(true)
+    try {
+      const response = await fetch('/api/memory/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: selectedPath, content: draftContent }),
+      })
+      const payload = (await response.json().catch(() => ({}))) as WriteResponse
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || `Save failed (${response.status})`)
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['memory'] })
+      setIsEditing(false)
+      setHasUnsavedChanges(false)
+      toast('Saved ✓', { type: 'success' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save file'
+      toast(message, { type: 'warning' })
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-neutral-950 text-neutral-100">
@@ -202,8 +274,7 @@ export function MemoryBrowserScreen() {
                   file={rootMemory}
                   selected={selectedPath === rootMemory.path}
                   onSelect={(pathValue) => {
-                    setSelectedPath(pathValue)
-                    setFocusLine(null)
+                    trySelectFile(pathValue)
                   }}
                 />
               ) : null}
@@ -222,8 +293,7 @@ export function MemoryBrowserScreen() {
                     file={file}
                     selected={selectedPath === file.path}
                     onSelect={(pathValue) => {
-                      setSelectedPath(pathValue)
-                      setFocusLine(null)
+                      trySelectFile(pathValue)
                     }}
                   />
                 ))
@@ -250,9 +320,9 @@ export function MemoryBrowserScreen() {
                         key={`${result.path}:${result.line}:${index}`}
                         type="button"
                         onClick={() => {
-                          setSelectedPath(result.path)
-                          setFocusLine(result.line)
-                          setMobileFilesOpen(false)
+                          if (trySelectFile(result.path, result.line)) {
+                            setMobileFilesOpen(false)
+                          }
                         }}
                         className="w-full rounded-lg border border-neutral-800 bg-neutral-900/60 px-2.5 py-2 text-left hover:border-neutral-700 hover:bg-neutral-900"
                       >
@@ -292,9 +362,51 @@ export function MemoryBrowserScreen() {
                 </div>
               ) : null}
             </div>
+            {selectedPath ? (
+              <div className="ml-3 flex items-center gap-2">
+                {isEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={handleSaveEditing}
+                      className="rounded-md bg-accent-500 px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isSaving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={handleCancelEditing}
+                      className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-neutral-200 transition-colors hover:border-neutral-600 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    {hasUnsavedChanges ? (
+                      <span
+                        title="Unsaved changes"
+                        className="inline-block size-2 rounded-full bg-amber-400"
+                      />
+                    ) : null}
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleStartEditing}
+                    className="relative inline-flex items-center gap-1.5 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-neutral-100 transition-colors hover:border-neutral-600 hover:bg-neutral-800"
+                  >
+                    <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.7} />
+                    Edit
+                    {hasUnsavedChanges ? (
+                      <span className="absolute -right-1 -top-1 size-2 rounded-full bg-amber-400" />
+                    ) : null}
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
 
-          <div className="h-full overflow-auto p-2 md:p-3">
+          <div className={cn('h-full p-2 md:p-3', isEditing ? 'overflow-hidden' : 'overflow-auto')}>
             {filesQuery.isLoading ? (
               <StateBox label="Loading memory files..." />
             ) : filesQuery.error instanceof Error ? (
@@ -305,6 +417,19 @@ export function MemoryBrowserScreen() {
               <StateBox label="Loading file..." />
             ) : contentQuery.error instanceof Error ? (
               <StateBox label={contentQuery.error.message} error />
+            ) : isEditing ? (
+              <div className="h-full rounded-xl border border-neutral-800 bg-neutral-950 p-2">
+                <textarea
+                  value={draftContent}
+                  onChange={(event) => {
+                    const nextValue = event.target.value
+                    setDraftContent(nextValue)
+                    setHasUnsavedChanges(nextValue !== content)
+                  }}
+                  className="h-full w-full resize-none rounded-lg border border-neutral-800 bg-primary-50 px-3 py-2 font-mono text-[13px] text-neutral-900 outline-none ring-0 placeholder:text-neutral-500 dark:border-primary-300 dark:bg-primary-50 dark:text-neutral-100"
+                  spellCheck={false}
+                />
+              </div>
             ) : (
               <div className="rounded-xl border border-neutral-800 bg-neutral-950">
                 <div className="font-mono text-xs">
