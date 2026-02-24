@@ -2177,6 +2177,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [selectedReport, setSelectedReport] = useState<StoredMissionReport | null>(null)
   const [showCompletionModal, setShowCompletionModal] = useState(false)
   const [completionModalReport, setCompletionModalReport] = useState<StoredMissionReport | null>(null)
+  const [historyFilter, setHistoryFilter] = useState<"all" | "completed" | "aborted">("all")
   const [missionTokenCount, setMissionTokenCount] = useState(0)
   const [pausedByAgentId, setPausedByAgentId] = useState<Record<string, boolean>>({})
   const [steerAgentId, setSteerAgentId] = useState<string | null>(null)
@@ -5808,71 +5809,146 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               )
             ) : null}
 
-            {missionSubTab === 'history' ? (
-              historyCards.length === 0 ? (
-                <div className={cn('flex h-40 items-center justify-center text-sm text-neutral-500', missionCardCls)}>
-                  <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                  No mission history yet.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {historyCards.map((entry) => (
-                    <div
-                      key={`${entry.kind}-${entry.id}`}
-                      className={cn(
-                        'rounded-xl border border-l-4 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm',
-                        (entry.status === 'done' || entry.status === 'completed') && 'border-l-emerald-500',
-                        entry.status === 'aborted' && 'border-l-red-500',
-                        entry.status !== 'aborted' && entry.status !== 'done' && entry.status !== 'completed' && 'border-l-amber-500',
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{truncateMissionGoal(entry.label, 96)}</p>
-                          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{entry.taskCompletedCount}/{entry.taskCount} tasks</p>
-                        </div>
+            {missionSubTab === "history" ? (
+              <div className="w-full space-y-4">
+                {/* Filter bar */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(["all", "completed", "aborted"] as const).map((filter) => {
+                    const count = filter === "all"
+                      ? historyCards.length
+                      : historyCards.filter((c) =>
+                          filter === "completed"
+                            ? c.status === "done" || c.status === "completed"
+                            : c.status === "aborted"
+                        ).length
+                    return (
+                      <button
+                        key={filter}
+                        type="button"
+                        onClick={() => setHistoryFilter(filter)}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors capitalize",
+                          historyFilter === filter
+                            ? filter === "aborted"
+                              ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
+                              : "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-900/20 dark:text-orange-400"
+                            : "border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                        )}
+                      >
+                        {filter === "completed" && <span>✓</span>}
+                        {filter === "aborted" && <span>✗</span>}
+                        {filter === "all" ? "All" : filter.charAt(0).toUpperCase() + filter.slice(1)}
                         <span className={cn(
-                          'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
-                          (entry.status === 'done' || entry.status === 'completed') && 'bg-emerald-100 text-emerald-700',
-                          entry.status === 'aborted' && 'bg-red-100 text-red-700',
-                          entry.status !== 'aborted' && entry.status !== 'done' && entry.status !== 'completed' && 'bg-amber-100 text-amber-700',
-                        )}>
-                          {(entry.status === 'done' || entry.status === 'completed') ? 'completed' : entry.status}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-neutral-400">{timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}</p>
-                      <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{entry.teamCount} agents · Duration {formatDuration(Math.max(0, (entry.completedAt ?? entry.updatedAt) - entry.startedAt))}</p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {entry.kind === 'report' ? (
-                          <button
-                            type="button"
-                            onClick={() => setMaximizedMissionId(entry.id)}
-                            className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                          >
-                            View Report
-                          </button>
-                        ) : null}
-                        {entry.kind === 'report' ? (
-                          <button
-                            type="button"
-                            onClick={() => setMaximizedMissionId(entry.id)}
-                            className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                          >
-                            Open Full
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => openNewMissionModal({ name: `Rerun: ${truncateMissionGoal(entry.label, 48)}`, goal: entry.goal })}
-                          className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
-                        >
-                          New From Template
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                          "rounded-full px-1.5 py-0.5 text-[9px] font-bold",
+                          historyFilter === filter ? "bg-white/60 text-current" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"
+                        )}>{count}</span>
+                      </button>
+                    )
+                  })}
+                  <div className="ml-auto text-xs text-neutral-400 dark:text-neutral-500">
+                    {historyCards.length} total missions
+                  </div>
                 </div>
-              )
+
+                {/* Cards grid */}
+                {(() => {
+                  const filtered = historyFilter === "all"
+                    ? historyCards
+                    : historyCards.filter((c) =>
+                        historyFilter === "completed"
+                          ? c.status === "done" || c.status === "completed"
+                          : c.status === "aborted"
+                      )
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
+                            {historyFilter === "all" ? "No mission history yet." : `No ${historyFilter} missions.`}
+                          </p>
+                          {historyFilter === "all" && (
+                            <button type="button" onClick={() => openNewMissionModal()}
+                              className="mt-3 rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-600">
+                              Start a Mission
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {filtered.map((entry) => {
+                        const isCompleted = entry.status === "done" || entry.status === "completed"
+                        const isAborted = entry.status === "aborted"
+                        const duration = formatDuration(Math.max(0, (entry.completedAt ?? entry.updatedAt) - entry.startedAt))
+                        const report = entry.kind === "report" ? missionReports.find((r) => r.id === entry.id) : null
+
+                        return (
+                          <div
+                            key={`${entry.kind}-${entry.id}`}
+                            className={cn(
+                              "relative flex flex-col rounded-xl border border-l-[3px] bg-white dark:bg-neutral-900 shadow-sm transition-shadow hover:shadow-md",
+                              isCompleted && "border-neutral-200 dark:border-neutral-700 border-l-emerald-500",
+                              isAborted && "border-neutral-200 dark:border-neutral-700 border-l-red-500",
+                              !isCompleted && !isAborted && "border-neutral-200 dark:border-neutral-700 border-l-amber-500",
+                            )}
+                          >
+                            <div className="flex flex-1 flex-col p-4">
+                              {/* Title row */}
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-neutral-900 dark:text-neutral-100 line-clamp-2">
+                                  {entry.label}
+                                </p>
+                                <span className={cn(
+                                  "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                                  isCompleted && "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800",
+                                  isAborted && "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800",
+                                  !isCompleted && !isAborted && "bg-amber-50 text-amber-700 border border-amber-200",
+                                )}>
+                                  {isCompleted ? "Completed" : isAborted ? "Aborted" : entry.status}
+                                </span>
+                              </div>
+
+                              {/* Meta */}
+                              <div className="mt-2 space-y-0.5">
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                                  {entry.taskCompletedCount}/{entry.taskCount} tasks · {timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}
+                                </p>
+                                <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                                  {entry.teamCount} {entry.teamCount === 1 ? "agent" : "agents"} · {duration}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-2 border-t border-neutral-100 dark:border-neutral-800 px-4 py-3 flex-wrap">
+                              {report ? (
+                                <button
+                                  type="button"
+                                  onClick={() => { setCompletionModalReport(report); setShowCompletionModal(true) }}
+                                  className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                >
+                                  View Report
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => openNewMissionModal({ name: `Rerun: ${entry.label.slice(0, 48)}`, goal: entry.goal })}
+                                className="ml-auto rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
+                              >
+                                ↺ Rerun
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+              </div>
             ) : null}
           </div>
         </div>
