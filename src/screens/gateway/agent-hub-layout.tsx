@@ -5427,7 +5427,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
 
-          <div className="flex w-full overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+          <div className="flex w-full rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800/60">
             {missionSubTabs.map((tab) => {
               const isActive = missionSubTab === tab.id
               return (
@@ -5436,10 +5436,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   type="button"
                   onClick={() => setMissionSubTab(tab.id)}
                   className={cn(
-                    'flex-1 px-4 py-3 text-center text-sm font-medium transition-colors whitespace-nowrap',
+                    'flex-1 rounded-lg py-2 text-center text-sm font-medium transition-colors whitespace-nowrap',
                     isActive
-                      ? 'bg-orange-50 text-orange-600 border-b-2 border-orange-500'
-                      : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800',
+                      ? 'bg-white text-orange-600 shadow-sm font-semibold dark:bg-neutral-900 dark:text-orange-400'
+                      : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300',
                   )}
                 >
                   {tab.label}
@@ -5480,21 +5480,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           <div className="min-h-0 flex-1 overflow-auto">
             {missionSubTab === 'overview' ? (
               <div className="w-full space-y-4">
-                <div className="flex flex-wrap gap-3">
-                  <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Mission State</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <article className="rounded-xl border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                    <p className="text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Mission State</p>
+                    <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
                   </article>
-                  <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Tasks</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
+                  <article className="rounded-xl border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                    <p className="text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Tasks</p>
+                    <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
                   </article>
-                  <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Total Reports</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{totalReportsCount}</p>
+                  <article className="rounded-xl border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                    <p className="text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Total Reports</p>
+                    <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{totalReportsCount}</p>
                   </article>
                 </div>
 
@@ -5546,16 +5543,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     ) : (
                       <div className="mt-2">
                         {recentCompletedMissions.map((entry) => (
-                          <article key={entry.id} className="flex items-center justify-between gap-2 border-b border-neutral-100 py-2.5 last:border-0">
+                          <article key={entry.id} className="flex items-center justify-between border-b border-neutral-100 py-3 dark:border-neutral-800 last:border-0">
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-neutral-800">{entry.title}</p>
-                                <p className="mt-0.5 text-xs text-neutral-400">Duration {entry.duration}</p>
+                                <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{entry.title}</p>
+                                <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">Duration {entry.duration}</p>
                               </div>
                             </div>
                             <span className={cn(
-                              'shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-white',
-                              entry.failed ? 'bg-orange-500' : 'bg-emerald-500',
+                              'shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium',
+                              entry.failed
+                                ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
                             )}>
                               {entry.failed ? 'Aborted' : 'Completed'}
                             </span>
@@ -6315,10 +6314,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               setLiveFeedVisible((v) => !v)
             }}
             className={cn(
-              'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+              'flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
               liveFeedVisible
-                ? 'bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800/50'
-                : 'text-neutral-500 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 hover:text-neutral-800 dark:hover:text-neutral-200',
+                ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/50 dark:bg-orange-900/20 dark:text-orange-400'
+                : 'border-neutral-200 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200',
             )}
           >
             <span aria-hidden>📡</span>

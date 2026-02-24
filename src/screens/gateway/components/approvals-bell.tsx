@@ -94,7 +94,7 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
         type="button"
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          'relative flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all',
+          'relative flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all',
           count > 0
             ? open
               ? 'border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
