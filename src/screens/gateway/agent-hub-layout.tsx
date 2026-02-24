@@ -3904,7 +3904,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       // Reload mission history to pick up any new checkpoints
       setMissionHistory(loadMissionHistory())
       // Mark mission as inactive so the card moves from Running to Review column
-      setMissionActive(false)
+      if (missionStateRef.current !== 'running') setMissionActive(false)
     }
     prevMissionStateRef.current = missionState
   }, [missionState])
@@ -4057,6 +4057,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     sessionActivityRef.current = new Map()
     // ── Auto-switch to Mission tab and show live feed ──────────────────────
     setActiveTab('missions')
+    setMissionSubTab('active')
     setLiveFeedVisible(true)
     setWizardOpen(false)
     emitFeedEvent({
@@ -4087,6 +4088,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   handleCreateMissionRef.current = handleCreateMission
   buildMissionCompletionSnapshotRef.current = buildMissionCompletionSnapshot
 
+  useEffect(() => {
+    if (missionActive && missionState === 'running') {
+      setActiveTab('missions')
+      setMissionSubTab('active')
+    }
+  }, [missionActive, missionState])
 
   const isMissionRunning = missionActive && missionState === 'running'
 
