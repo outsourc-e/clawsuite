@@ -3178,19 +3178,90 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return currentMap
   }, [agentSessionMap, gatewayModelLabelById, spawnAgentSession])
 
+  const runMissionLaunchPreflight = useCallback(async (
+    teamMembers: TeamMember[],
+  ): Promise<Record<string, string> | null> => {
+    const connected = await refreshGatewayStatus()
+    if (!connected) {
+      toast('Gateway is offline. Start or reconnect gateway, then retry mission launch.', {
+        type: 'error',
+      })
+      setWizardOpen(true)
+      goToWizardStep('gateway')
+      return null
+    }
+
+    const modelCatalog = await modelsQuery.refetch()
+    const modelRows = Array.isArray(modelCatalog.data?.models)
+      ? modelCatalog.data.models
+      : null
+    if (!modelRows) {
+      toast('Could not verify gateway models. Check provider keys and retry launch.', {
+        type: 'error',
+      })
+      setActiveTab('configure')
+      setConfigSection('keys')
+      return null
+    }
+
+    const availableModelIds = new Set<string>()
+    modelRows.forEach((entry) => {
+      const provider = typeof entry.provider === 'string' ? entry.provider.trim() : ''
+      const modelId = typeof entry.id === 'string' ? entry.id.trim() : ''
+      if (provider && modelId) {
+        availableModelIds.add(`${provider}/${modelId}`)
+      }
+    })
+
+    const invalidModelMember = teamMembers.find((member) => {
+      const selectedModel = (member.modelId || 'auto').trim() || 'auto'
+      if (selectedModel === 'auto') return false
+      const resolvedModel = resolveGatewayModelId(selectedModel).trim()
+      if (!resolvedModel) return true
+      return !availableModelIds.has(resolvedModel)
+    })
+    if (invalidModelMember) {
+      const resolvedModel = resolveGatewayModelId(invalidModelMember.modelId).trim()
+      const modelLabel =
+        getModelDisplayLabelFromLookup(invalidModelMember.modelId, gatewayModelLabelById)
+      toast(
+        `Invalid model for ${invalidModelMember.name}: ${modelLabel} (${resolvedModel || 'unresolved'}). Update the team model and retry launch.`,
+        { type: 'error' },
+      )
+      setActiveTab('configure')
+      setConfigSection('agents')
+      return null
+    }
+
+    const sessionMap = await ensureAgentSessions(teamMembers)
+    const missingMember = teamMembers.find((member) => !sessionMap[member.id])
+    if (missingMember) {
+      toast(
+        `Mission launch blocked: could not start ${missingMember.name}'s session. Check gateway capacity/provider health and retry.`,
+        { type: 'error' },
+      )
+      setActiveTab('missions')
+      setMissionSubTab('overview')
+      return null
+    }
+
+    return sessionMap
+  }, [ensureAgentSessions, gatewayModelLabelById, modelsQuery, refreshGatewayStatus])
+
   const executeMission = useCallback(async (
     tasks: Array<HubTask>,
     teamMembers: Array<TeamMember>,
     missionGoalValue: string,
     mode: 'sequential' | 'hierarchical' | 'parallel' = 'parallel',
     launchMissionId?: string,
+    prefetchedSessionMap?: Record<string, string>,
   ) => {
     const isStaleLaunch = () =>
       Boolean(launchMissionId) && missionIdRef.current !== launchMissionId
 
     if (isStaleLaunch()) return
     // STEP A: Ensure all agents have isolated gateway sessions
-    const sessionMap = await ensureAgentSessions(teamMembers, launchMissionId)
+    const sessionMap = prefetchedSessionMap ?? await ensureAgentSessions(teamMembers, launchMissionId)
     if (isStaleLaunch()) return
 
     // STEP B: Group tasks by agent
@@ -3230,10 +3301,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       const member = teamMembers.find((entry) => entry.id === agentId)
 
       try {
-        const response = await fetch('/api/sessions/send', {
+        const response = await fetch('/api/agent-dispatch', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionKey, message: messageText }),
+          body: JSON.stringify({
+            missionId: launchMissionId,
+            agentId,
+            sessionKey,
+            message: messageText,
+          }),
         })
 
         if (!response.ok) {
@@ -3642,7 +3718,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     )
   }
 
-  function handleCreateMission() {
+  async function handleCreateMission() {
     if (dispatchingRef.current) return
     if (missionActiveRef.current) {
       toast('Mission already running. Stop the current mission before launching another.', {
@@ -3666,6 +3742,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
 
     dispatchingRef.current = true
+    const preflightSessionMap = await runMissionLaunchPreflight(teamWithRuntimeStatus)
+    if (!preflightSessionMap) {
+      dispatchingRef.current = false
+      return
+    }
 
     // Save initial checkpoint
     const missionId = newMissionId
@@ -3743,6 +3824,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         trimmedGoal,
         processType,
         missionId,
+        preflightSessionMap,
       ).finally(() => {
         if (missionIdRef.current !== missionId) return
         dispatchingRef.current = false

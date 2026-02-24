@@ -80,6 +80,7 @@ import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiAgentSteerRouteImport } from './routes/api/agent-steer'
 import { Route as ApiAgentPauseRouteImport } from './routes/api/agent-pause'
 import { Route as ApiAgentKillRouteImport } from './routes/api/agent-kill'
+import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
 import { Route as ApiAgentActivityRouteImport } from './routes/api/agent-activity'
 import { Route as ApiTasksIndexRouteImport } from './routes/api/tasks/index'
 import { Route as ApiTasksTaskIdRouteImport } from './routes/api/tasks/$taskId'
@@ -464,6 +465,11 @@ const ApiAgentKillRoute = ApiAgentKillRouteImport.update({
   path: '/api/agent-kill',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAgentDispatchRoute = ApiAgentDispatchRouteImport.update({
+  id: '/api/agent-dispatch',
+  path: '/api/agent-dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAgentActivityRoute = ApiAgentActivityRouteImport.update({
   id: '/api/agent-activity',
   path: '/api/agent-activity',
@@ -632,6 +638,7 @@ export interface FileRoutesByFullPath {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
+  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/agent-steer': typeof ApiAgentSteerRoute
@@ -732,6 +739,7 @@ export interface FileRoutesByTo {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
+  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/agent-steer': typeof ApiAgentSteerRoute
@@ -834,6 +842,7 @@ export interface FileRoutesById {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
+  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/agent-steer': typeof ApiAgentSteerRoute
@@ -937,6 +946,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/api/agent-activity'
+    | '/api/agent-dispatch'
     | '/api/agent-kill'
     | '/api/agent-pause'
     | '/api/agent-steer'
@@ -1037,6 +1047,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/api/agent-activity'
+    | '/api/agent-dispatch'
     | '/api/agent-kill'
     | '/api/agent-pause'
     | '/api/agent-steer'
@@ -1138,6 +1149,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/api/agent-activity'
+    | '/api/agent-dispatch'
     | '/api/agent-kill'
     | '/api/agent-pause'
     | '/api/agent-steer'
@@ -1240,6 +1252,7 @@ export interface RootRouteChildren {
   TerminalRoute: typeof TerminalRoute
   UsageRoute: typeof UsageRoute
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
+  ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentKillRoute: typeof ApiAgentKillRoute
   ApiAgentPauseRoute: typeof ApiAgentPauseRoute
   ApiAgentSteerRoute: typeof ApiAgentSteerRoute
@@ -1800,6 +1813,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAgentKillRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/agent-dispatch': {
+      id: '/api/agent-dispatch'
+      path: '/api/agent-dispatch'
+      fullPath: '/api/agent-dispatch'
+      preLoaderRoute: typeof ApiAgentDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/agent-activity': {
       id: '/api/agent-activity'
       path: '/api/agent-activity'
@@ -2104,6 +2124,7 @@ const rootRouteChildren: RootRouteChildren = {
   TerminalRoute: TerminalRoute,
   UsageRoute: UsageRoute,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
+  ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentKillRoute: ApiAgentKillRoute,
   ApiAgentPauseRoute: ApiAgentPauseRoute,
   ApiAgentSteerRoute: ApiAgentSteerRoute,
