@@ -299,9 +299,11 @@ export function LiveFeedPanel() {
 
         <div className="h-full overflow-y-auto px-3 pb-3 pt-8">
           {visibleEvents.length === 0 ? (
-            <p className="py-8 text-center font-mono text-[10px] text-neutral-600 dark:text-neutral-500">
-              {placeholderLabel(activeFilter)}
-            </p>
+            <div className="flex min-h-[220px] items-center justify-center">
+              <p className="text-center font-mono text-[10px] text-neutral-600 dark:text-neutral-500">
+                {placeholderLabel(activeFilter)}
+              </p>
+            </div>
           ) : (
             <div className="space-y-1">
               {visibleEvents.map((event) => {
@@ -316,7 +318,7 @@ export function LiveFeedPanel() {
                   <div
                     key={event.id}
                     className={cn(
-                      'flex items-start gap-2 rounded-md border px-2 py-1.5',
+                      'flex items-start gap-2 rounded-md border px-3 py-2',
                       severityClass(severity),
                     )}
                   >
@@ -332,9 +334,9 @@ export function LiveFeedPanel() {
 
                     {/* Message + agent name */}
                     <div className="min-w-0 flex-1">
-                      <p className={cn('text-[11px] leading-tight', severityTextClass(severity))}>{message}</p>
+                      <p className={cn('truncate text-[11px] leading-tight', severityTextClass(severity))} title={message}>{message}</p>
                       {event.agentName ? (
-                        <p className="mt-0.5 truncate font-mono text-[9px] text-neutral-600 dark:text-neutral-500">
+                        <p className="mt-0.5 truncate font-mono text-[9px] text-neutral-600 dark:text-neutral-500" title={event.agentName}>
                           {event.agentName}
                         </p>
                       ) : null}

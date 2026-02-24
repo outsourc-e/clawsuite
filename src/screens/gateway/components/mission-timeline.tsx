@@ -58,7 +58,7 @@ export function MissionTimeline({
     (missionState === 'stopped' && totalTasks > 0 && completedTasks === totalTasks)
   const missionCompletionLabel = missionCompletedSuccessfully ? 'Mission complete' : 'Mission stopped'
   const missionCardCls =
-    'relative overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm'
+    'relative overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/50'
 
   return (
     <section className={cn('mx-auto w-full max-w-[960px]', missionCardCls)}>
