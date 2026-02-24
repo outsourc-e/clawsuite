@@ -5,7 +5,7 @@ import { TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, typ
 import { TaskBoard as _TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
 import { AgentOutputPanel } from './components/agent-output-panel'
-import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
+import { emitFeedEvent, onFeedEvent, type FeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
 import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
@@ -2225,6 +2225,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const buildMissionCompletionSnapshotRef = useRef<() => MissionReportPayload | null>(() => null)
   // Stable ref for live feed visibility (used in feed-count effect)
   const liveFeedVisibleRef = useRef(liveFeedVisible)
+  const feedEventsRef = useRef<FeedEvent[]>([])
   // Tracks whether the live feed sidebar has ever been opened (keeps it mounted once shown)
   const liveFeedEverOpenedRef = useRef(false)
   // Tracks which agent session keys have sent their 'done' SSE event
@@ -2299,12 +2300,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const teamSnapshot = teamRef.current.map((member) => ({ ...member }))
     const tasksSnapshot = (missionTasks.length > 0 ? missionTasks : boardTasks).map((task) => ({ ...task }))
     const artifactsSnapshot = artifacts.map((artifact) => ({ ...artifact }))
-    const agentSummaries: MissionAgentSummary[] = teamSnapshot.map((member) => ({
-      agentId: member.id,
-      agentName: member.name,
-      modelId: member.modelId,
-      lines: (agentOutputLinesRef.current[member.id] ?? []).slice(-50),
-    }))
+    const agentSummaries: MissionAgentSummary[] = teamSnapshot.map((member) => {
+      const capturedLines = agentOutputLinesRef.current[member.id] ?? []
+      const feedFallback = capturedLines.length === 0
+        ? (feedEventsRef.current
+          ?.filter((ev: { agentName?: string; message?: string }) => (
+            ev.agentName === member.name || ev.message?.includes(member.name)
+          ))
+          .map((ev: { message?: string }) => ev.message ?? '')
+          .filter(Boolean)
+          .slice(-20) ?? [])
+        : []
+
+      return {
+        agentId: member.id,
+        agentName: member.name,
+        modelId: member.modelId,
+        lines: [...capturedLines, ...feedFallback].slice(-50),
+      }
+    })
     const resolvedTemplate = resolveActiveTemplate(teamSnapshot)
     const teamName = resolvedTemplate ? TEMPLATE_DISPLAY_NAMES[resolvedTemplate] : `Custom Team (${teamSnapshot.length})`
 
@@ -2752,6 +2766,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // ── Unread feed count ───────────────────────────────────────────────────────
   // Increment when feed is hidden and a new event arrives; reset when feed opens
   useEffect(() => {
+    const unsubscribe = onFeedEvent((event) => {
+      feedEventsRef.current = [...feedEventsRef.current, event].slice(-500)
+    })
+    return unsubscribe
+  }, [])
+
+  useEffect(() => {
     const unsubscribe = onFeedEvent(() => {
       if (!liveFeedVisibleRef.current) {
         setUnreadFeedCount((prev) => prev + 1)
@@ -2818,7 +2839,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const activeAgentIds = currentTeam
       .filter((m) => {
         const status = agentSessionStatus[m.id]
-        return status && status.status === 'active' && agentSessionMap[m.id]
+        return agentSessionMap[m.id] && (!status || status.status === 'active' || status.status === 'idle')
       })
       .slice(0, MAX_AGENT_STREAMS)
       .map((m) => m.id)
@@ -5761,48 +5782,53 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </div>}
                   </section>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {team.map((member) => {
                       const sessionKey = agentSessionMap[member.id] ?? null
                       const status = agentSessionStatus[member.id]
                       const isActive = status?.status === 'active'
+                      const agentTasks = missionTasks.filter((t) => t.agentId === member.id)
+                      const currentTask = agentTasks.find((t) => t.status === 'in_progress') ?? agentTasks[0] ?? null
+                      const outputLines = _agentOutputLines[member.id] ?? []
                       return (
-                        <section
-                          key={member.id}
-                          className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden"
-                        >
-                          <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={cn(
-                                  'h-2 w-2 rounded-full',
-                                  isActive ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-300 dark:bg-neutral-600',
-                                )}
-                              />
-                              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{member.name}</p>
-                              <span className="text-xs text-neutral-400 dark:text-neutral-500">{member.modelId}</span>
+                        <section key={member.id} className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3 shadow-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={cn("h-2 w-2 shrink-0 rounded-full", isActive ? "bg-emerald-500 animate-pulse" : "bg-neutral-300 dark:bg-neutral-600")} />
+                              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{member.name}</p>
+                              <span className="text-xs text-neutral-400 dark:text-neutral-500 truncate hidden sm:block">{member.modelId}</span>
                             </div>
-                            <span
-                              className={cn(
-                                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                                isActive
-                                  ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400',
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span className={cn(
+                                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                                isActive ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
+                              )}>
+                                {isActive ? "Active" : (status?.status ?? "Waiting")}
+                              </span>
+                              {sessionKey && (
+                                <button type="button" onClick={() => setAgentPopupId(member.id)}
+                                  className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                                  View Output ↗
+                                </button>
                               )}
-                            >
-                              {isActive ? 'Active' : (status?.status ?? 'Waiting')}
-                            </span>
+                            </div>
                           </div>
-                          <div className="max-h-[300px] overflow-y-auto">
-                            <AgentOutputPanel
-                              sessionKey={sessionKey}
-                              agentName={member.name}
-                              tasks={missionTasks.filter((t) => t.agentId === member.id)}
-                              onClose={() => {}}
-                              modelId={member.modelId}
-                              compact={true}
-                            />
-                          </div>
+                          {currentTask && (
+                            <p className="mt-2 truncate text-xs text-neutral-500 dark:text-neutral-400 border-t border-neutral-100 dark:border-neutral-800 pt-2">
+                              <span className="font-medium">Task:</span> {currentTask.title}
+                            </p>
+                          )}
+                          {outputLines.length > 0 && (
+                            <div className="mt-2 max-h-[80px] overflow-y-auto rounded-lg bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2 text-[11px] font-mono text-neutral-600 dark:text-neutral-400 border-t border-neutral-100 dark:border-neutral-800 pt-2">
+                              {outputLines.slice(-4).map((line, i) => (
+                                <p key={i} className="truncate">{line}</p>
+                              ))}
+                            </div>
+                          )}
+                          {isActive && outputLines.length === 0 && (
+                            <p className="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400 animate-pulse border-t border-neutral-100 dark:border-neutral-800 pt-2">● Streaming...</p>
+                          )}
                         </section>
                       )
                     })}
