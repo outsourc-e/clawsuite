@@ -166,7 +166,7 @@ function SessionItemComponent({
           }}
           className={cn(
             'ml-2 inline-flex size-7 items-center justify-center rounded-md text-primary-700',
-            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary-200',
+            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary-200 dark:hover:bg-primary-800',
             'aria-expanded:opacity-100 aria-expanded:bg-primary-200',
           )}
           aria-label="Session options"
@@ -206,7 +206,7 @@ function SessionItemComponent({
               event.stopPropagation()
               onDelete(session)
             }}
-            className="text-red-700 gap-2 hover:bg-red-50/80 data-highlighted:bg-red-50/80"
+            className="text-red-700 gap-2 hover:bg-red-50 dark:hover:bg-red-900/30/80 data-highlighted:bg-red-50/80"
           >
             <HugeiconsIcon icon={Delete01Icon} size={20} strokeWidth={1.5} />{' '}
             Delete

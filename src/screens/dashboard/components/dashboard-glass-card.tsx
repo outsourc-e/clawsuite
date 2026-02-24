@@ -112,14 +112,14 @@ export function DashboardGlassCard({
                 />
               </button>
               {menuOpen ? (
-                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-primary-200 bg-primary-50 py-1 shadow-lg dark:bg-primary-100">
+                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-primary-200 bg-primary-50 py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
                   <button
                     type="button"
                     onClick={() => {
                       onRemove()
                       setMenuOpen(false)
                     }}
-                    className="w-full px-3 py-1.5 text-left text-xs text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-200/50"
+                    className="w-full px-3 py-1.5 text-left text-xs text-primary-600 dark:text-neutral-200 hover:bg-primary-100 dark:hover:bg-primary-800"
                   >
                     Remove from dashboard
                   </button>

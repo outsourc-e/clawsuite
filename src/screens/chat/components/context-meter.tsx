@@ -41,7 +41,7 @@ function ContextMeterComponent({ usedTokens, maxTokens }: ContextMeterProps) {
       <PreviewCardTrigger
         className={cn(
           buttonVariants({ size: 'icon-sm', variant: 'ghost' }),
-          'text-primary-800 hover:bg-primary-100',
+          'text-primary-800 hover:bg-primary-100 dark:hover:bg-primary-800',
         )}
       >
         <div className="size-4 text-primary-200">

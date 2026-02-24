@@ -41,7 +41,7 @@ export function ScheduledJobsWidget({ onRemove }: Props) {
                 key={job.id}
                 type="button"
                 onClick={() => void navigate({ to: '/cron' })}
-                className="flex w-full items-center gap-2 rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2.5 py-1.5 text-left transition-colors hover:border-primary-300 dark:hover:border-neutral-700 hover:bg-primary-100 dark:hover:bg-neutral-900"
+                className="flex w-full items-center gap-2 rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2.5 py-1.5 text-left transition-colors hover:border-primary-300 dark:hover:border-neutral-700 hover:bg-primary-100 dark:hover:bg-primary-800"
               >
                 <span
                   className={cn(

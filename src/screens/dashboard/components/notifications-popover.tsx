@@ -129,8 +129,8 @@ export function NotificationsPopover() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-full z-[9999] mt-2 w-72 rounded-xl border border-primary-200 bg-primary-50 p-3 shadow-xl backdrop-blur-xl dark:bg-primary-100">
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-primary-500">
+        <div className="absolute right-0 top-full z-[9999] mt-2 w-72 rounded-xl border border-primary-200 bg-primary-50 p-3 shadow-xl backdrop-blur-xl dark:border-neutral-700 dark:bg-neutral-900">
+          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-primary-500 dark:text-neutral-400">
             Notifications
           </h3>
 

@@ -311,7 +311,7 @@ export function ProviderWizard({ open, onOpenChange }: ProviderWizardProps) {
                         onClick={function onSelectProvider() {
                           handleSelectProvider(provider.id)
                         }}
-                        className="rounded-2xl border border-primary-200 bg-primary-50/70 p-3 text-left transition-colors hover:border-primary-400 hover:bg-primary-100/70"
+                        className="rounded-2xl border border-primary-200 bg-primary-50/70 p-3 text-left transition-colors hover:border-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800/70"
                       >
                         <div className="flex items-center gap-2.5">
                           <span className="inline-flex size-9 items-center justify-center rounded-xl border border-primary-200 bg-primary-100/70">
@@ -384,7 +384,7 @@ export function ProviderWizard({ open, onOpenChange }: ProviderWizardProps) {
                         className={cn(
                           'rounded-2xl border p-3 text-left transition-colors',
                           supported
-                            ? 'border-primary-200 bg-primary-50/70 hover:border-primary-400 hover:bg-primary-100/80'
+                            ? 'border-primary-200 bg-primary-50/70 hover:border-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800/80'
                             : 'cursor-not-allowed border-primary-200 bg-primary-50/40 opacity-50',
                         )}
                       >

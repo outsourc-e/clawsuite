@@ -67,7 +67,7 @@ export function ChatEmptyState({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onSuggestionClick?.(suggestion.prompt)}
-              className="flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 md:gap-2 md:px-3.5 md:py-2 md:text-sm"
+              className="flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800 md:gap-2 md:px-3.5 md:py-2 md:text-sm"
             >
               <HugeiconsIcon
                 icon={suggestion.icon as any}

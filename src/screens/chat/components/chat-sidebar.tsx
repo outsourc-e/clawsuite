@@ -81,7 +81,7 @@ function ThemeToggleMini() {
         applyTheme(nextTheme)
         updateSettings({ theme: nextTheme })
       }}
-      className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
+      className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-800/70 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={16} strokeWidth={1.5} />
@@ -177,8 +177,8 @@ function NavItem({
     'w-full h-auto min-h-11 gap-2.5 py-2 md:min-h-0',
     isCollapsed ? 'justify-center px-0' : 'justify-start px-3',
     item.active
-      ? 'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15'
-      : 'text-primary-900 hover:bg-primary-200',
+      ? 'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15'
+      : 'text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
   )
 
   const iconEl =
@@ -374,7 +374,7 @@ function SectionLabel({
         <button
           type="button"
           onClick={onToggle}
-          className="ml-auto p-0.5 rounded hover:bg-primary-200 transition-colors"
+          className="ml-auto p-0.5 rounded hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors"
           aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
         >
           <HugeiconsIcon
@@ -1025,9 +1025,9 @@ function ChatSidebarComponent({
             }}
             className={cn(
               buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200',
+              'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
               isNewSessionActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15',
+                'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
             )}
             data-tour="new-session"
           >
@@ -1156,7 +1156,7 @@ function ChatSidebarComponent({
             <MenuTrigger
               data-tour="settings"
               className={cn(
-                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200/70 dark:hover:bg-neutral-800 flex-1 min-w-0',
+                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200 dark:hover:bg-primary-800/70 dark:hover:bg-neutral-800 flex-1 min-w-0',
                 isVisuallyCollapsed ? 'justify-center px-0' : 'px-1.5',
               )}
             >
@@ -1224,7 +1224,7 @@ function ChatSidebarComponent({
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
-                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
+                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-800/70 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
                 aria-label="Settings"
               >
                 <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />

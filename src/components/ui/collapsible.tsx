@@ -15,7 +15,7 @@ function CollapsibleTrigger({
   return (
     <BaseCollapsible.Trigger
       className={cn(
-        'group inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-left text-xs font-medium text-primary-500 transition-colors hover:bg-primary-100 hover:text-primary-700 data-panel-open:text-primary-700',
+        'group inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-left text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 data-panel-open:text-primary-700 dark:data-panel-open:text-neutral-200',
         className,
       )}
       {...props}

@@ -1523,7 +1523,7 @@ function ChatComposerComponent({
               <Button
                 size="icon-sm"
                 variant="ghost"
-                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                className="rounded-lg text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-primary-500"
                 aria-label="Add attachment"
                 disabled={disabled}
                 onClick={handleOpenAttachmentPicker}
@@ -1536,7 +1536,7 @@ function ChatComposerComponent({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  className="rounded-lg text-primary-400 hover:bg-primary-100 hover:text-red-600"
+                  className="rounded-lg text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-red-600"
                   aria-label="Clear draft"
                   onClick={handleClearDraft}
                 >
@@ -1560,7 +1560,7 @@ function ChatComposerComponent({
                   setIsModelMenuOpen((prev) => !prev)
                 }}
                 className={cn(
-                  'inline-flex h-7 max-w-[8rem] items-center gap-0.5 rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 md:gap-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 hover:text-primary-800',
+                  'inline-flex h-7 max-w-[8rem] items-center gap-0.5 rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 md:gap-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-800',
                   isModelSwitcherDisabled &&
                     'cursor-not-allowed opacity-50',
                 )}
@@ -1589,7 +1589,7 @@ function ChatComposerComponent({
                   handleSetDefaultModel()
                 }}
                 className={cn(
-                  'hidden md:inline-flex h-7 items-center rounded-full border border-primary-200 bg-primary-50 px-2 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-100',
+                  'hidden md:inline-flex h-7 items-center rounded-full border border-primary-200 bg-primary-50 px-2 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-100 dark:hover:bg-primary-800',
                   isDefaultModelDisabled && 'cursor-not-allowed opacity-50',
                 )}
                 disabled={isDefaultModelDisabled}
@@ -1620,7 +1620,7 @@ function ChatComposerComponent({
                         handleRetryModelSwitch()
                       }}
                       className={cn(
-                        'rounded px-1 font-medium text-primary-700 hover:bg-primary-100',
+                        'rounded px-1 font-medium text-primary-700 hover:bg-primary-100 dark:hover:bg-primary-800',
                         modelSwitchMutation.isPending &&
                           'cursor-not-allowed opacity-60',
                       )}
@@ -1656,7 +1656,7 @@ function ChatComposerComponent({
                         href="https://docs.openclaw.ai/configuration"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600 hover:bg-accent-500/20 transition-colors"
+                        className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600 hover:bg-accent-50 dark:hover:bg-accent-900/300/20 transition-colors"
                       >
                         Setup Guide →
                       </a>
@@ -1694,7 +1694,7 @@ function ChatComposerComponent({
                                     handleModelSelect(option.value)
                                   }}
                                   className={cn(
-                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50',
+                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white dark:hover:bg-white/10/10',
                                     optionActive &&
                                       'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
                                   )}
@@ -1718,7 +1718,7 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-3 rounded px-1 text-xs leading-none text-accent-500 opacity-80 transition-opacity hover:bg-accent-50 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300"
+                                  className="absolute right-3 rounded px-1 text-xs leading-none text-accent-500 opacity-80 transition-opacity hover:bg-accent-50 dark:hover:bg-accent-900/30 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300"
                                   aria-label={`Unpin ${option.label}`}
                                   title="Unpin"
                                 >
@@ -1751,7 +1751,7 @@ function ChatComposerComponent({
                                   event.stopPropagation()
                                   togglePin(modelId)
                                 }}
-                                className="absolute right-3 rounded px-2 py-0.5 text-[10px] text-red-500 opacity-80 transition-opacity hover:bg-red-50 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-red-300"
+                                className="absolute right-3 rounded px-2 py-0.5 text-[10px] text-red-500 opacity-80 transition-opacity hover:bg-red-50 dark:hover:bg-red-900/30 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-red-300"
                                 aria-label={`Remove unavailable pinned model ${modelId}`}
                                 title="Remove"
                               >
@@ -1786,7 +1786,7 @@ function ChatComposerComponent({
                                     handleModelSelect(option.value)
                                   }}
                                   className={cn(
-                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50',
+                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white dark:hover:bg-white/10/10',
                                     optionActive &&
                                       'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
                                   )}
@@ -1810,7 +1810,7 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 hover:text-accent-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300 group-hover:opacity-100"
+                                  className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 dark:hover:bg-white dark:hover:bg-white/10/10 hover:text-accent-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300 group-hover:opacity-100"
                                   aria-label={`Pin ${option.label}`}
                                   title="Pin"
                                 >
@@ -1873,7 +1873,7 @@ function ChatComposerComponent({
                       ? 'text-red-600 bg-red-100 hover:bg-red-200 animate-pulse'
                       : voiceInput.isListening
                         ? 'text-red-500 bg-red-50 hover:bg-red-100 animate-pulse'
-                        : 'text-primary-500 hover:bg-primary-100 hover:text-primary-700',
+                        : 'text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-primary-700',
                   )}
                   aria-label={
                     voiceRecorder.isRecording
@@ -1937,7 +1937,7 @@ function ChatComposerComponent({
         >
           <button
             type="button"
-            className="absolute right-4 top-4 z-10 inline-flex size-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 active:bg-white/40 transition-colors"
+            className="absolute right-4 top-4 z-10 inline-flex size-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white dark:hover:bg-white/10/30 active:bg-white/40 transition-colors"
             onClick={(e) => { e.stopPropagation(); setPreviewImage(null) }}
             aria-label="Close preview"
           >

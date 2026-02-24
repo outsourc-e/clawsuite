@@ -654,7 +654,7 @@ function MessageItemComponent({
       {/* Narration messages (tool-call activity) — compact collapsible row */}
       {!isUser && (message as any).__isNarration && hasText && (
         <div className="w-full max-w-[900px]">
-          <details className="group/narration rounded-lg border border-primary-200/50 bg-primary-50/30 hover:bg-primary-50/50 transition-colors">
+          <details className="group/narration rounded-lg border border-primary-200/50 bg-primary-50/30 hover:bg-primary-50 dark:hover:bg-primary-800/50 transition-colors">
             <summary className="flex items-center gap-2 cursor-pointer select-none px-3 py-2 list-none [&::-webkit-details-marker]:hidden">
               <span className="size-6 flex items-center justify-center rounded-full bg-accent-500/15 shrink-0">
                 <span className="text-xs">⚡</span>
@@ -816,7 +816,7 @@ function MessageItemComponent({
       {hasToolCalls && (
         <div className="w-full max-w-[900px] mt-2">
           <Collapsible open={toolCallsOpen} onOpenChange={setToolCallsOpen}>
-            <CollapsibleTrigger className="w-full justify-start gap-1.5 bg-transparent hover:bg-primary-50/60 data-panel-open:bg-primary-50/60 px-2 py-1 rounded-md text-xs text-neutral-500 dark:text-neutral-400">
+            <CollapsibleTrigger className="w-full justify-start gap-1.5 bg-transparent hover:bg-primary-50 dark:hover:bg-primary-800/60 data-panel-open:bg-primary-50/60 px-2 py-1 rounded-md text-xs text-neutral-500 dark:text-neutral-400">
               <span className="transition-transform duration-150 group-data-panel-open:rotate-90">▶</span>
               <span className="font-mono">tool result</span>
               {hasToolErrors && (

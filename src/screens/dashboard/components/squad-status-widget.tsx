@@ -145,7 +145,7 @@ export function SquadStatusWidget({ editMode }: SquadStatusWidgetProps) {
       ) : (
         <div className="space-y-1.5">
           {visibleAgents.map((agent) => (
-            <div key={agent.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+            <div key={agent.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-neutral-50 dark:hover:bg-white dark:hover:bg-white/10/10 dark:hover:bg-neutral-800/50">
               <span className={cn('size-2 shrink-0 rounded-full', STATUS_DOT[agent.status])} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{agent.name}</p>

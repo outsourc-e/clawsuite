@@ -148,7 +148,7 @@ export function HeaderAmbientStatus() {
 
   return (
     <div className="hidden text-right sm:block">
-      <div className="inline-flex items-center justify-end gap-2 rounded-full border border-primary-200 bg-primary-100/65 px-3 py-1 text-[11px] text-primary-600 tabular-nums shadow-sm">
+      <div className="inline-flex items-center justify-end gap-2 rounded-full border border-primary-200 bg-primary-100/65 px-3 py-1 text-[11px] text-primary-600 tabular-nums shadow-sm dark:border-neutral-700 dark:bg-neutral-900/80 dark:text-neutral-300">
         <span
           className="cursor-pointer font-medium text-ink transition-colors hover:text-accent-600"
           onClick={handleTimeClick}
@@ -156,14 +156,14 @@ export function HeaderAmbientStatus() {
         >
           {timeStr}
         </span>
-        <span className="text-primary-400">·</span>
-        <span className="text-primary-600">{dateStr}</span>
+        <span className="text-primary-400 dark:text-neutral-500">·</span>
+        <span className="text-primary-600 dark:text-neutral-300">{dateStr}</span>
         {weather ? (
           <>
-            <span className="text-primary-400">·</span>
+            <span className="text-primary-400 dark:text-neutral-500">·</span>
             <span
               ref={weatherRef}
-              className="relative cursor-pointer text-primary-600 transition-colors hover:text-accent-600"
+              className="relative cursor-pointer text-primary-600 dark:text-neutral-300 transition-colors hover:text-accent-600"
               onClick={handleWeatherClick}
               title="Click to edit location"
             >
@@ -174,15 +174,15 @@ export function HeaderAmbientStatus() {
               {showWeatherPopover && (
                 <div
                   ref={popoverRef}
-                  className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-primary-200 bg-white p-3 shadow-lg"
+                  className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-primary-200 bg-white p-3 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="mb-2 text-xs font-medium text-ink">
+                  <div className="mb-2 text-xs font-medium text-ink dark:text-neutral-100">
                     Weather Location
                   </div>
                   <input
                     type="text"
-                    className="w-full rounded border border-primary-200 bg-white px-2 py-1.5 text-xs text-ink outline-none focus:border-accent-400 focus:ring-1 focus:ring-accent-200"
+                    className="w-full rounded border border-primary-200 bg-white px-2 py-1.5 text-xs text-ink outline-none focus:border-accent-400 focus:ring-1 focus:ring-accent-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                     value={locationInput}
                     onChange={(e) => setLocationInput(e.target.value)}
                     onKeyDown={handleLocationKeyDown}

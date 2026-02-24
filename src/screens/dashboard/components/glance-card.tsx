@@ -129,7 +129,7 @@ export function ProviderPill({ name, active, onClick }: ProviderPillProps) {
         'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-all',
         active
           ? 'border-neutral-700 bg-neutral-800 text-white dark:border-neutral-500 dark:bg-neutral-700'
-          : 'border-neutral-200 bg-white/60 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-400 dark:hover:bg-neutral-700',
+          : 'border-neutral-200 bg-white/60 text-neutral-600 hover:bg-neutral-100 dark:hover:bg-white dark:hover:bg-white/10/10 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-400 dark:hover:bg-neutral-700',
       )}
     >
       <span className="text-[9px]">{icon}</span>

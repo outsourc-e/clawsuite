@@ -62,7 +62,7 @@ export function MessageActionsBar({
             <TooltipTrigger
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-red-600 hover:bg-red-50 transition-colors"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
             >
               <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.6} />
               <span className="text-[11px] font-medium">Retry</span>
@@ -98,7 +98,7 @@ export function MessageActionsBar({
             <TooltipTrigger
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-primary-700 hover:bg-primary-100 transition-colors"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-primary-700 hover:bg-primary-100 dark:hover:bg-primary-800 transition-colors"
             >
               <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.6} />
               <span className="text-[11px] font-medium">Retry</span>
@@ -114,7 +114,7 @@ export function MessageActionsBar({
             onClick={() => {
               handleCopy().catch(() => {})
             }}
-            className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 text-primary-700 hover:text-primary-900 hover:bg-primary-100"
+            className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 text-primary-700 hover:text-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800"
           >
             <HugeiconsIcon
               icon={copied ? Tick02Icon : Copy01Icon}

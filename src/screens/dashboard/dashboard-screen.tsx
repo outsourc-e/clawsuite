@@ -690,7 +690,7 @@ export function DashboardScreen() {
                     <button
                       type="button"
                       onClick={() => setDashSettingsOpen(true)}
-                      className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 dark:text-primary-400 transition-colors hover:bg-primary-50 dark:hover:bg-gray-800 hover:text-accent-600 dark:hover:text-accent-400"
+                      className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 dark:text-primary-400 transition-colors hover:bg-primary-50 dark:hover:bg-primary-800 hover:text-accent-600 dark:hover:text-accent-400"
                       aria-label="Settings"
                       title="Settings"
                     >
@@ -740,7 +740,7 @@ export function DashboardScreen() {
                     <button
                       type="button"
                       onClick={() => updateSettings({ theme: nextTheme })}
-                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 active:scale-95"
+                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 dark:hover:bg-primary-800 active:scale-95"
                       aria-label={`Switch theme to ${nextTheme}`}
                       title={`Theme: ${theme} (tap for ${nextTheme})`}
                     >
@@ -753,7 +753,7 @@ export function DashboardScreen() {
                     <button
                       type="button"
                       onClick={() => setDashSettingsOpen(true)}
-                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 active:scale-95"
+                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 dark:hover:bg-primary-800 active:scale-95"
                       aria-label="Dashboard settings"
                       title="Settings"
                     >
@@ -781,7 +781,7 @@ export function DashboardScreen() {
                 <button
                   type="button"
                   onClick={refetch}
-                  className="shrink-0 rounded-md border border-red-200 bg-white/80 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-white"
+                  className="shrink-0 rounded-md border border-red-200 bg-white/80 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-white dark:hover:bg-white/10"
                 >
                   Retry
                 </button>

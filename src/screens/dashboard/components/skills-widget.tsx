@@ -159,7 +159,7 @@ export function SkillsWidget({
 
       <Button
         variant="outline"
-        className="mt-3 w-full justify-between rounded-lg border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 text-primary-800 dark:text-neutral-200 hover:bg-primary-100 dark:hover:bg-neutral-900"
+        className="mt-3 w-full justify-between rounded-lg border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 text-primary-800 dark:text-neutral-200 hover:bg-primary-100 dark:hover:bg-primary-800"
         onClick={function handleOpenSkills() {
           void navigate({ to: '/skills' })
         }}

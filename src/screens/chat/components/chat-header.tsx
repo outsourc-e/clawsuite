@@ -244,7 +244,7 @@ function ChatHeaderComponent({
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    className="mr-2 text-primary-800 hover:bg-primary-100"
+                    className="mr-2 text-primary-800 hover:bg-primary-100 dark:hover:bg-primary-800"
                     aria-label={
                       fileExplorerCollapsed ? 'Show files' : 'Hide files'
                     }

@@ -951,7 +951,7 @@ function ChatMessageListComponent({
                 type="button"
                 onClick={jumpToPreviousMatch}
                 disabled={messageSearchMatches.length === 0}
-                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
+                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
                 aria-label="Previous match"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -968,7 +968,7 @@ function ChatMessageListComponent({
                 type="button"
                 onClick={jumpToNextMatch}
                 disabled={messageSearchMatches.length === 0}
-                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
+                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
                 aria-label="Next match"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -984,7 +984,7 @@ function ChatMessageListComponent({
               <button
                 type="button"
                 onClick={closeMessageSearch}
-                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-700 dark:hover:text-neutral-200"
+                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200"
                 aria-label="Close search"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1031,7 +1031,7 @@ function ChatMessageListComponent({
                     'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
                     expandAllToolSections
                       ? 'border-amber-300 bg-amber-100 text-amber-700 cursor-default'
-                      : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 hover:border-amber-400',
+                      : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 dark:hover:bg-amber-900/30 hover:border-amber-400',
                   )}
                   aria-label={
                     expandAllToolSections

@@ -157,8 +157,8 @@ export function RecentSessionsWidget({
                 className={cn(
                   'group h-auto w-full flex-col items-start rounded-lg border border-primary-200 dark:border-neutral-800 px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:border-primary-300 dark:hover:border-neutral-700',
                   index % 2 === 0
-                    ? 'bg-primary-50 dark:bg-neutral-950 hover:bg-primary-100 dark:hover:bg-neutral-900'
-                    : 'bg-primary-50/80 dark:bg-neutral-950/80 hover:bg-primary-100 dark:hover:bg-neutral-900/90',
+                    ? 'bg-primary-50 dark:bg-neutral-950 hover:bg-primary-100 dark:hover:bg-primary-800'
+                    : 'bg-primary-50/80 dark:bg-neutral-950/80 hover:bg-primary-100 dark:hover:bg-primary-800/90',
                 )}
                 onClick={function onSessionClick() {
                   onOpenSession(session.friendlyId)

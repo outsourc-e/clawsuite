@@ -33,7 +33,7 @@ function MenuContent({
       <Menu.Positioner side={side} align={align}>
         <Menu.Popup
           className={cn(
-            'min-w-[110px] rounded-lg bg-primary-50 p-1 text-sm text-primary-900 shadow-lg outline outline-primary-900/10',
+            'min-w-[110px] rounded-lg bg-primary-50 p-1 text-sm text-primary-900 shadow-lg outline outline-primary-900/10 dark:bg-neutral-900 dark:text-neutral-100 dark:outline-neutral-700',
             className,
           )}
         >
@@ -50,7 +50,7 @@ function MenuItem({ className, ...props }: MenuItemProps) {
   return (
     <Menu.Item
       className={cn(
-        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-primary-900 hover:bg-primary-100 data-highlighted:bg-primary-100',
+        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-primary-900 hover:bg-primary-100 dark:text-neutral-100 dark:hover:bg-primary-800 data-highlighted:bg-primary-100 dark:data-highlighted:bg-primary-800',
         'select-none font-[450]',
         className,
       )}

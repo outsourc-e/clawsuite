@@ -1709,7 +1709,7 @@ export function ChatScreen({
                         onClick={() => {
                           void resolvePendingApproval(approval, 'denied')
                         }}
-                        className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-800/50 dark:bg-red-900/10 dark:text-red-400"
+                        className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 dark:border-red-800/50 dark:bg-red-900/10 dark:text-red-400"
                       >
                         Deny
                       </button>

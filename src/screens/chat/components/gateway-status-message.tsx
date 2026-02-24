@@ -61,7 +61,7 @@ export function GatewayStatusMessage({
           <button
             type="button"
             onClick={onRetry}
-            className="shrink-0 rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-200 transition-colors"
+            className="shrink-0 rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-200 dark:hover:bg-amber-900/30 transition-colors"
           >
             Retry
           </button>

@@ -65,7 +65,7 @@ export function HeroMetricsRow({
       {metrics.map((m) => (
         <div
           key={m.label}
-          className="group flex items-center gap-2 md:gap-3 rounded-xl border border-primary-200 bg-primary-50 px-2.5 py-2 md:px-4 md:py-3.5 shadow-sm transition-transform duration-150 hover:-translate-y-[1px]"
+          className="group flex items-center gap-2 md:gap-3 rounded-xl border border-primary-200 bg-primary-50 px-2.5 py-2 md:px-4 md:py-3.5 shadow-sm transition-transform duration-150 hover:-translate-y-[1px] dark:border-neutral-700 dark:bg-neutral-900"
         >
           <span className="inline-flex size-7 md:size-10 shrink-0 items-center justify-center rounded-lg bg-accent-100/70">
             <HugeiconsIcon
@@ -78,7 +78,7 @@ export function HeroMetricsRow({
           <div className="min-w-0 flex-1">
             {m.isError ? (
               <>
-                <p className="text-xl md:text-2xl font-extrabold font-mono tabular-nums leading-none text-primary-300">
+                <p className="text-xl md:text-2xl font-extrabold font-mono tabular-nums leading-none text-primary-500 dark:text-neutral-200">
                   —
                 </p>
                 <p className="mt-0.5 md:mt-1 text-[10px] md:text-xs font-medium text-red-600 dark:text-red-500">

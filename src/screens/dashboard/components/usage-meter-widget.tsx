@@ -426,7 +426,7 @@ export function UsageMeterWidget({
           <button
             type="button"
             onClick={() => { setTimedOut(false); void usageQuery.refetch() }}
-            className="rounded-md border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2.5 py-1 text-xs font-medium text-primary-800 dark:text-neutral-200 transition-colors hover:bg-primary-100 dark:hover:bg-neutral-900"
+            className="rounded-md border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2.5 py-1 text-xs font-medium text-primary-800 dark:text-neutral-200 transition-colors hover:bg-primary-100 dark:hover:bg-primary-800"
           >
             Retry
           </button>
@@ -441,7 +441,7 @@ export function UsageMeterWidget({
             <button
               type="button"
               onClick={() => void usageQuery.refetch()}
-              className="mt-1 rounded-md border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2.5 py-1 text-xs font-medium text-primary-700 dark:text-neutral-300 transition-colors hover:bg-primary-100 dark:hover:bg-neutral-900"
+              className="mt-1 rounded-md border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2.5 py-1 text-xs font-medium text-primary-700 dark:text-neutral-300 transition-colors hover:bg-primary-100 dark:hover:bg-primary-800"
             >
               Refresh
             </button>
