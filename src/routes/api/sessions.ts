@@ -89,6 +89,9 @@ export const Route = createFileRoute('/api/sessions')({
         }
       },
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
@@ -166,6 +169,9 @@ export const Route = createFileRoute('/api/sessions')({
         }
       },
       PATCH: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
@@ -227,6 +233,9 @@ export const Route = createFileRoute('/api/sessions')({
         }
       },
       DELETE: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const url = new URL(request.url)
           const rawSessionKey = url.searchParams.get('sessionKey') ?? ''
