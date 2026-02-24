@@ -2067,8 +2067,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return cp?.status === 'running' ? cp : null
   })
   const [restoreDismissed, setRestoreDismissed] = useState(false)
-  void restoreCheckpoint
-  void restoreDismissed
 
   // ── Existing state ──────────────────────────────────────────────────────────
   const [isMobileHub, setIsMobileHub] = useState(() =>
@@ -5233,6 +5231,43 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       setMissionWizardStep(0)
     }
 
+    function handleRestoreCheckpoint() {
+      if (!restoreCheckpoint) return
+      setMissionGoal(restoreCheckpoint.label)
+      setProcessType(restoreCheckpoint.processType)
+      setTeam(
+        restoreCheckpoint.team.map((member, index) => ({
+          ...member,
+          avatar: getAgentAvatarForSlot(index),
+          status: 'available',
+        })),
+      )
+      const now = Date.now()
+      setMissionTasks(
+        restoreCheckpoint.tasks.map((task, index) => ({
+          id: task.id,
+          title: task.title,
+          description: '',
+          priority: index === 0 ? 'high' : 'normal',
+          status: (task.status as TaskStatus) || 'inbox',
+          agentId: task.assignedTo,
+          missionId: restoreCheckpoint.id,
+          createdAt: now + index,
+          updatedAt: now + index,
+        })),
+      )
+      setRestoreDismissed(true)
+      setRestoreCheckpoint(null)
+      toast('Recovered checkpoint restored into Mission setup', { type: 'success' })
+    }
+
+    function handleDiscardCheckpoint() {
+      clearMissionCheckpoint()
+      setRestoreDismissed(true)
+      setRestoreCheckpoint(null)
+      toast('Recovered checkpoint discarded', { type: 'success' })
+    }
+
     function handleSaveMissionDraft() {
       const goal = newMissionGoal.trim()
       const name = newMissionName.trim() || 'Untitled mission'
@@ -5292,48 +5327,56 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       { id: 'active', label: 'Active Mission' },
       { id: 'history', label: 'History' },
     ]
-    const historyCards = missionHistory.map((cp) => {
-      const completedTasks = cp.tasks.filter((t) => t.status === 'done' || t.status === 'completed').length
-      const totalTasks = cp.tasks.length
-      const derivedStatus = cp.status === 'aborted'
-        ? 'aborted'
-        : completedTasks >= totalTasks && totalTasks > 0
-          ? 'done'
-          : 'partial'
-      return {
-        id: cp.id,
-        status: derivedStatus,
-        title: truncateMissionGoal(cp.label, 96),
-        goal: cp.label,
-        subtitle: `${completedTasks}/${totalTasks} tasks`,
-        updatedAt: cp.completedAt ?? cp.updatedAt,
-      }
-    })
-    const recentCompletedMissions = [
-      ...missionHistory
-        .filter((cp) => cp.status === 'completed')
-        .map((cp) => {
-          const completedAt = cp.completedAt ?? cp.updatedAt
-          const duration = completedAt > cp.startedAt ? formatDuration(completedAt - cp.startedAt) : 'Unknown duration'
-          return {
-            id: `history-${cp.id}`,
-            title: truncateMissionGoal(cp.label, 72),
-            completedAt,
-            duration,
-          }
-        }),
+    const historyCards = [
       ...missionReports.map((report) => ({
-        id: `report-${report.id}`,
-        title: truncateMissionGoal(report.name || report.goal || 'Mission', 72),
+        id: report.id,
+        kind: 'report' as const,
+        label: report.name || report.goal || 'Mission',
+        goal: report.goal || report.name || 'Mission',
+        status: report.taskStats.failed > 0 ? 'aborted' : 'done',
+        taskCompletedCount: report.taskStats.completed,
+        taskCount: report.taskStats.total,
+        teamCount: report.agents.length,
         completedAt: report.completedAt,
-        duration: formatDuration(report.duration),
+        startedAt: Math.max(0, report.completedAt - report.duration),
+        updatedAt: report.completedAt,
       })),
+      ...missionHistory.map((cp) => {
+        const completedTasks = cp.tasks.filter((t) => t.status === 'done' || t.status === 'completed').length
+        const totalTasks = cp.tasks.length
+        return {
+          id: cp.id,
+          kind: 'checkpoint' as const,
+          label: cp.label,
+          goal: cp.label,
+          status: cp.status,
+          taskCompletedCount: completedTasks,
+          taskCount: totalTasks,
+          teamCount: cp.team.length,
+          completedAt: cp.completedAt,
+          startedAt: cp.startedAt,
+          updatedAt: cp.updatedAt,
+        }
+      }),
     ]
-      .sort((a, b) => b.completedAt - a.completedAt)
-      .slice(0, 3)
+      .sort((a, b) => (b.completedAt ?? b.updatedAt) - (a.completedAt ?? a.updatedAt))
+    const recentCompletedMissions = historyCards
+      .slice(0, 4)
+      .map((entry) => {
+        const status = String(entry.status || '').toLowerCase()
+        const completed = status === 'done' || status === 'completed'
+        const endedAt = entry.completedAt ?? entry.updatedAt
+        const durationMs = endedAt > entry.startedAt ? endedAt - entry.startedAt : 0
+        return {
+          id: `${entry.kind}-${entry.id}`,
+          title: truncateMissionGoal(entry.label || entry.goal || 'Mission', 72),
+          duration: formatDuration(durationMs),
+          failed: !completed,
+        }
+      })
     const doneTaskCount = missionTasks.filter((task) => task.status === 'done').length
     const totalTaskCount = missionTasks.length
-    const totalReportsCount = missionHistory.length || historyCards.length
+    const totalReportsCount = historyCards.length
     const missionCardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm'
     return (
       <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80">
@@ -5365,7 +5408,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex w-full overflow-hidden rounded-xl border border-neutral-200 bg-white">
             {missionSubTabs.map((tab) => {
               const isActive = missionSubTab === tab.id
               return (
@@ -5374,10 +5417,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   type="button"
                   onClick={() => setMissionSubTab(tab.id)}
                   className={cn(
-                    'flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+                    'flex-1 px-4 py-3 text-center text-sm font-medium transition-colors whitespace-nowrap',
                     isActive
-                      ? 'border border-orange-200 bg-orange-50 text-orange-700'
-                      : 'border border-transparent text-neutral-600 hover:bg-neutral-100',
+                      ? 'bg-orange-50 text-orange-600 border-b-2 border-orange-500'
+                      : 'bg-white text-neutral-600 hover:bg-neutral-50',
                   )}
                 >
                   {tab.label}
@@ -5385,6 +5428,35 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               )
             })}
           </div>
+
+          {!missionActive && restoreCheckpoint && !restoreDismissed ? (
+            <div className="relative overflow-hidden rounded-xl border border-orange-200 bg-orange-50 p-4">
+              <div className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-orange-500" />
+              <div className="pl-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-orange-600">Recovered Checkpoint</p>
+                <p className="mt-1 text-sm font-semibold text-orange-800">{restoreCheckpoint.label}</p>
+                <p className="mt-0.5 text-xs text-orange-600">
+                  Updated {timeAgoFromMs(restoreCheckpoint.updatedAt)} · {restoreCheckpoint.team.length} agents
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRestoreCheckpoint}
+                    className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
+                  >
+                    Restore
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDiscardCheckpoint}
+                    className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="min-h-0 flex-1 overflow-auto">
             {missionSubTab === 'overview' ? (
@@ -5421,11 +5493,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </button>
                   </section>
                 ) : (
-                  <section className={cn('flex min-h-[200px] items-center justify-center p-12 text-center', missionCardCls)}>
+                  <section className={cn('flex min-h-[280px] items-center justify-center p-12 text-center', missionCardCls)}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                     <div>
                       <p className="text-base font-semibold text-neutral-900">No active mission</p>
-                      <p className="mt-1 text-sm text-neutral-500">Launch a mission to view live timeline activity.</p>
+                      <p className="mt-1 text-sm text-neutral-500">Start a mission to see inline agent output and timeline progress.</p>
                       <button
                         type="button"
                         onClick={() => openNewMissionModal()}
@@ -5442,21 +5514,32 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Recent Missions</p>
-                      <button type="button" onClick={() => setMissionSubTab('history')} className="text-[11px] font-medium text-orange-600 hover:text-orange-700">Open History</button>
+                      <button
+                        type="button"
+                        onClick={() => setMissionSubTab('history')}
+                        className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
+                      >
+                        Open History
+                      </button>
                     </div>
                     {recentCompletedMissions.length === 0 ? (
                       <p className="mt-3 text-sm text-neutral-500">No completed missions yet.</p>
                     ) : (
-                      <div className="mt-3 space-y-2">
+                      <div className="mt-2">
                         {recentCompletedMissions.map((entry) => (
-                          <article key={entry.id} className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2">
+                          <article key={entry.id} className="flex items-center justify-between gap-2 border-b border-neutral-100 py-2.5 last:border-0">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-neutral-900">{entry.title}</p>
-                              <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-400">Completed</span>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-neutral-800">{entry.title}</p>
+                                <p className="mt-0.5 text-xs text-neutral-400">Duration {entry.duration}</p>
+                              </div>
                             </div>
-                            <p className="mt-1 text-[11px] text-neutral-500">
-                              {entry.duration} · {timeAgoFromMs(entry.completedAt)}
-                            </p>
+                            <span className={cn(
+                              'shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-white',
+                              entry.failed ? 'bg-orange-500' : 'bg-emerald-500',
+                            )}>
+                              {entry.failed ? 'Aborted' : 'Completed'}
+                            </span>
                           </article>
                         ))}
                       </div>
@@ -5474,7 +5557,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             key={`ql-${config.id}`}
                             type="button"
                             onClick={() => openNewMissionModal({ teamConfigId: config.id, name: `Mission with ${config.name}` })}
-                            className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 transition-colors hover:border-orange-500 hover:text-orange-500"
+                            className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700"
                           >
                             {config.icon ?? '👥'} {config.name} · {config.team.length}
                           </button>
@@ -5539,24 +5622,39 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     />
                   </div>
 
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                    <div className="flex items-start justify-between gap-3">
+                  <section className="relative overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+                    <div className="flex items-start justify-between gap-2 px-4 pb-3 pt-4">
                       <div>
-                        <p className="text-base font-bold text-neutral-900">Live Feed</p>
-                        <p className="text-sm text-neutral-500">Last 5 events</p>
+                        <p className="text-sm font-semibold text-neutral-900">Live Feed</p>
+                        <p className="mt-0.5 text-xs text-neutral-500">Last 5 events</p>
                       </div>
-                      <button type="button" className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-600">View All</button>
+                      <button
+                        type="button"
+                        onClick={() => setLiveFeedVisible(true)}
+                        className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
+                      >
+                        View All
+                      </button>
                     </div>
-                    <div className="mt-3 h-56 overflow-hidden rounded-xl border border-neutral-200">
+                    <div className="border-t border-neutral-100">
                       <LiveFeedPanel />
                     </div>
                   </section>
                 </div>
               ) : (
-                <div className={cn('flex h-full min-h-[220px] w-full items-center justify-center text-center', missionCardCls)}>
+                <div className={cn('flex min-h-[280px] w-full items-center justify-center text-center', missionCardCls)}>
                   <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                  <p className="text-sm text-neutral-500">No active mission. Launch one to view live timeline progress.</p>
+                  <div>
+                    <p className="text-base font-semibold text-neutral-900">No active mission</p>
+                    <p className="mt-1 text-sm text-neutral-500">Start a mission to see inline agent output and timeline progress.</p>
+                    <button
+                      type="button"
+                      onClick={() => openNewMissionModal()}
+                      className="mt-4 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+                    >
+                      + New Mission
+                    </button>
+                  </div>
                 </div>
               )
             ) : null}
@@ -5568,32 +5666,60 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   No mission history yet.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {historyCards.map((entry) => (
-                    <div key={entry.id} className={missionCardCls}>
-                      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <div
+                      key={`${entry.kind}-${entry.id}`}
+                      className={cn(
+                        'rounded-xl border border-l-4 border-neutral-200 bg-white p-4 shadow-sm',
+                        (entry.status === 'done' || entry.status === 'completed') && 'border-l-emerald-500',
+                        entry.status === 'aborted' && 'border-l-red-500',
+                        entry.status !== 'aborted' && entry.status !== 'done' && entry.status !== 'completed' && 'border-l-amber-500',
+                      )}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-sm font-semibold text-neutral-900">{entry.title}</p>
-                          <p className="mt-0.5 text-xs text-neutral-500">{entry.subtitle}</p>
+                          <p className="text-sm font-semibold text-neutral-900">{truncateMissionGoal(entry.label, 96)}</p>
+                          <p className="mt-0.5 text-xs text-neutral-500">{entry.taskCompletedCount}/{entry.taskCount} tasks</p>
                         </div>
                         <span className={cn(
                           'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
-                          entry.status === 'done' && 'bg-emerald-100 text-emerald-700',
+                          (entry.status === 'done' || entry.status === 'completed') && 'bg-emerald-100 text-emerald-700',
                           entry.status === 'aborted' && 'bg-red-100 text-red-700',
-                          entry.status === 'partial' && 'bg-amber-100 text-amber-700',
+                          entry.status !== 'aborted' && entry.status !== 'done' && entry.status !== 'completed' && 'bg-amber-100 text-amber-700',
                         )}>
-                          {entry.status}
+                          {(entry.status === 'done' || entry.status === 'completed') ? 'completed' : entry.status}
                         </span>
                       </div>
-                      <p className="mt-2 text-[11px] text-neutral-500">Updated {timeAgoFromMs(entry.updatedAt)}</p>
-                      <button
-                        type="button"
-                        onClick={() => openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal })}
-                        className="mt-3 rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
-                      >
-                        Re-run
-                      </button>
+                      <p className="mt-1 text-xs text-neutral-400">{timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}</p>
+                      <p className="mt-1 text-xs text-neutral-500">{entry.teamCount} agents · Duration {formatDuration(Math.max(0, (entry.completedAt ?? entry.updatedAt) - entry.startedAt))}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {entry.kind === 'report' ? (
+                          <button
+                            type="button"
+                            onClick={() => setMaximizedMissionId(entry.id)}
+                            className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                          >
+                            View Report
+                          </button>
+                        ) : null}
+                        {entry.kind === 'report' ? (
+                          <button
+                            type="button"
+                            onClick={() => setMaximizedMissionId(entry.id)}
+                            className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                          >
+                            Open Full
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => openNewMissionModal({ name: `Rerun: ${truncateMissionGoal(entry.label, 48)}`, goal: entry.goal })}
+                          className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
+                        >
+                          New From Template
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
