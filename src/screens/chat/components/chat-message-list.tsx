@@ -30,10 +30,10 @@ import { cn } from '@/lib/utils'
 const THINKING_GRACE_PERIOD_MS = 400
 
 // Simple thinking label — no cycling, no animation complexity
-function ThinkingStatusText() {
+function ThinkingStatusText({ elapsedSeconds }: { elapsedSeconds: number }) {
   return (
-    <span className="text-xs text-primary-500 font-medium">
-      Thinking…
+    <span className="text-xs text-primary-500 font-medium tabular-nums">
+      Thinking… {elapsedSeconds}s
     </span>
   )
 }
@@ -177,6 +177,7 @@ function ChatMessageListComponent({
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const [expandAllToolSections, setExpandAllToolSections] = useState(false)
+  const [thinkingElapsedSeconds, setThinkingElapsedSeconds] = useState(0)
 
   // Bug 2 fix: grace period — keep thinking indicator alive briefly after
   // waitingForResponse clears so the response message has time to render.
@@ -589,6 +590,25 @@ function ChatMessageListComponent({
     }
     return true
   })()
+
+  const showThinkingTimer =
+    showTypingIndicator &&
+    liveToolActivity.length === 0 &&
+    activeToolCalls.length === 0 &&
+    !(isStreaming && streamingText && streamingText.length > 0)
+
+  useEffect(() => {
+    if (!showThinkingTimer) {
+      setThinkingElapsedSeconds(0)
+      return
+    }
+    setThinkingElapsedSeconds(0)
+    const startedAt = Date.now()
+    const timer = window.setInterval(() => {
+      setThinkingElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
+    }, 250)
+    return () => window.clearInterval(timer)
+  }, [showThinkingTimer])
 
   // Pin the last user+assistant group without adding bottom padding.
   const groupStartIndex = typeof lastUserIndex === 'number' ? lastUserIndex : -1
@@ -1177,7 +1197,7 @@ function ChatMessageListComponent({
                       ariaLabel="Assistant is working"
                       className="!ml-0"
                     />
-                  <ThinkingStatusText />
+                  <ThinkingStatusText elapsedSeconds={thinkingElapsedSeconds} />
                 </div>
               )}
             </div>

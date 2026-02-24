@@ -1579,6 +1579,17 @@ export function ChatScreen({
         ? 'disconnected'
         : 'connecting'
 
+  const activeHeaderToolName =
+    liveToolActivity[0]?.name || activeToolCalls[0]?.name || undefined
+  const headerStatusMode: 'idle' | 'sending' | 'streaming' | 'tool' =
+    activeHeaderToolName
+      ? 'tool'
+      : derivedStreamingInfo.isStreaming
+        ? 'streaming'
+        : sending || waitingForResponse
+          ? 'sending'
+          : 'idle'
+
   // Pull-to-refresh offset removed
 
   const handleOpenAgentDetails = useCallback(() => {
@@ -1654,6 +1665,8 @@ export function ChatScreen({
               agentConnected={mobileHeaderStatus === 'connected'}
               onOpenAgentDetails={handleOpenAgentDetails}
               pullOffset={0}
+              statusMode={headerStatusMode}
+              activeToolName={activeHeaderToolName}
             />
           )}
 
