@@ -15,6 +15,7 @@ type UseRealtimeChatHistoryOptions = {
   historyMessages: Array<GatewayMessage>
   enabled?: boolean
   onUserMessage?: (message: GatewayMessage, source?: string) => void
+  onApprovalRequest?: (approval: Record<string, unknown>) => void
 }
 
 /**
@@ -29,11 +30,14 @@ export function useRealtimeChatHistory({
   historyMessages,
   enabled = true,
   onUserMessage,
+  onApprovalRequest,
 }: UseRealtimeChatHistoryOptions) {
   const queryClient = useQueryClient()
   const [lastCompletedRunAt, setLastCompletedRunAt] = useState<number | null>(
     null,
   )
+  const completedStreamingTextRef = useRef<string>('')
+  const completedStreamingThinkingRef = useRef<string>('')
 
   const { connectionState, lastError, reconnect } = useGatewayChatStream({
     sessionKey: sessionKey === 'new' ? undefined : sessionKey,
@@ -54,6 +58,16 @@ export function useRealtimeChatHistory({
     ),
     onDone: useCallback(
       (_state: string, eventSessionKey: string) => {
+        const currentState = useGatewayChatStore
+          .getState()
+          .streamingState.get(eventSessionKey)
+        if (currentState?.text) {
+          completedStreamingTextRef.current = currentState.text
+        }
+        if (currentState?.thinking) {
+          completedStreamingThinkingRef.current = currentState.thinking
+        }
+
         // Track when generation completes for this session
         if (
           eventSessionKey === sessionKey ||
@@ -71,6 +85,9 @@ export function useRealtimeChatHistory({
 
             // Refetch immediately — done event message is already in realtime store
             queryClient.invalidateQueries({ queryKey: key }).then(() => {
+              completedStreamingTextRef.current = ''
+              completedStreamingThinkingRef.current = ''
+
               // Check for compaction — significant message count drop
               const newData = queryClient.getQueryData(key) as
                 | { messages?: GatewayMessage[] }
@@ -96,6 +113,7 @@ export function useRealtimeChatHistory({
       },
       [sessionKey, friendlyId, queryClient],
     ),
+    onApprovalRequest,
   })
 
   const mergeHistoryMessages = useGatewayChatStore((s) => s.mergeHistoryMessages)
@@ -192,8 +210,7 @@ export function useRealtimeChatHistory({
   }, [])
 
   // Compute streaming UI state
-  const isRealtimeStreaming =
-    streamingState !== null && streamingState.text.length > 0
+  const isRealtimeStreaming = streamingState !== null
   const realtimeStreamingText = streamingState?.text ?? ''
   const realtimeStreamingThinking = streamingState?.thinking ?? ''
 
@@ -205,6 +222,8 @@ export function useRealtimeChatHistory({
     isRealtimeStreaming,
     realtimeStreamingText,
     realtimeStreamingThinking,
+    completedStreamingText: completedStreamingTextRef,
+    completedStreamingThinking: completedStreamingThinkingRef,
     streamingRunId: streamingState?.runId ?? null,
     activeToolCalls: streamingState?.toolCalls ?? EMPTY_TOOL_CALLS,
     lastCompletedRunAt, // Parent watches this to clear waitingForResponse

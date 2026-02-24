@@ -44,11 +44,17 @@ import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
 import { ContextBar } from './components/context-bar'
+import {
+  addApproval,
+  loadApprovals,
+  saveApprovals,
+} from '@/screens/gateway/lib/approvals-store'
 import type {
   ChatComposerAttachment,
   ChatComposerHandle,
   ChatComposerHelpers,
 } from './components/chat-composer'
+import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { GatewayAttachment, GatewayMessage, SessionMeta } from './types'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
@@ -189,6 +195,9 @@ export function ChatScreen({
   const retriedQueuedMessageKeysRef = useRef(new Set<string>())
   const hasSeenGatewayDisconnectRef = useRef(false)
   const hadGatewayErrorRef = useRef(false)
+  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
+    [],
+  )
 
   const pendingStartRef = useRef(false)
   const composerHandleRef = useRef<ChatComposerHandle | null>(null)
@@ -248,6 +257,8 @@ export function ChatScreen({
     isRealtimeStreaming,
     realtimeStreamingText,
     realtimeStreamingThinking,
+    completedStreamingText,
+    completedStreamingThinking,
     activeToolCalls,
   } = useRealtimeChatHistory({
       sessionKey: resolvedSessionKey || activeCanonicalKey,
@@ -259,7 +270,107 @@ export function ChatScreen({
         setWaitingForResponse(true)
         setPendingGeneration(true)
       }, []),
+      onApprovalRequest: useCallback((payload: Record<string, unknown>) => {
+        const gatewayApprovalId =
+          typeof payload.id === 'string'
+            ? payload.id
+            : typeof payload.approvalId === 'string'
+              ? payload.approvalId
+              : typeof payload.gatewayApprovalId === 'string'
+                ? payload.gatewayApprovalId
+                : ''
+
+        const currentApprovals = loadApprovals()
+        if (
+          gatewayApprovalId &&
+          currentApprovals.some((entry) => {
+            return (
+              entry.status === 'pending' &&
+              entry.gatewayApprovalId === gatewayApprovalId
+            )
+          })
+        ) {
+          setPendingApprovals(
+            currentApprovals.filter((entry) => entry.status === 'pending'),
+          )
+          return
+        }
+
+        const actionValue = payload.action ?? payload.tool ?? payload.command
+        const action =
+          typeof actionValue === 'string'
+            ? actionValue
+            : actionValue
+              ? JSON.stringify(actionValue)
+              : 'Tool call requires approval'
+        const contextValue = payload.context ?? payload.input ?? payload.args
+        const context =
+          typeof contextValue === 'string'
+            ? contextValue
+            : contextValue
+              ? JSON.stringify(contextValue)
+              : ''
+        const agentNameValue = payload.agentName ?? payload.agent ?? payload.source
+        const agentName =
+          typeof agentNameValue === 'string' && agentNameValue.trim().length > 0
+            ? agentNameValue
+            : 'Agent'
+        const agentIdValue = payload.agentId ?? payload.sessionKey ?? payload.source
+        const agentId =
+          typeof agentIdValue === 'string' && agentIdValue.trim().length > 0
+            ? agentIdValue
+            : 'gateway'
+
+        addApproval({
+          agentId,
+          agentName,
+          action,
+          context,
+          source: 'gateway',
+          gatewayApprovalId: gatewayApprovalId || undefined,
+        })
+        setPendingApprovals(loadApprovals().filter((entry) => entry.status === 'pending'))
+      }, []),
     })
+
+  useEffect(() => {
+    function checkApprovals() {
+      const all = loadApprovals()
+      setPendingApprovals(all.filter((entry) => entry.status === 'pending'))
+    }
+    checkApprovals()
+    const id = window.setInterval(checkApprovals, 2000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const resolvePendingApproval = useCallback(
+    async (approval: ApprovalRequest, status: 'approved' | 'denied') => {
+      const nextApprovals = loadApprovals().map((entry) => {
+        if (entry.id !== approval.id) return entry
+        return {
+          ...entry,
+          status,
+          resolvedAt: Date.now(),
+        }
+      })
+      saveApprovals(nextApprovals)
+      setPendingApprovals(
+        nextApprovals.filter((entry) => entry.status === 'pending'),
+      )
+      if (!approval.gatewayApprovalId) return
+
+      const endpoint =
+        status === 'approved'
+          ? `/api/approvals/${approval.gatewayApprovalId}/approve`
+          : `/api/approvals/${approval.gatewayApprovalId}/deny`
+      try {
+        await fetch(endpoint, { method: 'POST' })
+      } catch {
+        // Local resolution still succeeds when API endpoint is unavailable.
+      }
+    },
+    [],
+  )
 
   // Use realtime-merged messages for display (SSE + history)
   // Re-apply display filter to realtime messages
@@ -289,14 +400,41 @@ export function ChatScreen({
     })
     // Dedup: SSE + history merge can produce duplicates — remove by role+text
     const seen = new Set<string>()
-    return filtered.filter((msg) => {
+    const deduped = filtered.filter((msg) => {
       const text = textFromMessage(msg)
       const key = `${msg.role}:${text.slice(0, 200)}`
       if (seen.has(key)) return false
       seen.add(key)
       return true
     })
-  }, [realtimeMessages])
+
+    if (!isRealtimeStreaming || activeToolCalls.length === 0) {
+      return deduped
+    }
+
+    const nextMessages = [...deduped]
+    const streamToolCalls = activeToolCalls.map((toolCall) => ({
+      ...toolCall,
+      phase: toolCall.phase,
+    }))
+
+    for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
+      if (nextMessages[index]?.role !== 'assistant') continue
+      nextMessages[index] = {
+        ...nextMessages[index],
+        __streamToolCalls: streamToolCalls,
+      } as GatewayMessage
+      return nextMessages
+    }
+
+    nextMessages.push({
+      role: 'assistant',
+      content: [],
+      __streamingStatus: 'streaming',
+      __streamToolCalls: streamToolCalls,
+    } as GatewayMessage)
+    return nextMessages
+  }, [activeToolCalls, isRealtimeStreaming, realtimeMessages])
 
   // Derive streaming state from realtime SSE state (bug #2 fix)
   const derivedStreamingInfo = useMemo(() => {
@@ -1295,6 +1433,52 @@ export function ChatScreen({
           <ContextBar compact={compact} />
 
           {gatewayNotice && <div className="sticky top-0 z-20 px-4 py-2">{gatewayNotice}</div>}
+          {pendingApprovals.length > 0 && (
+            <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/15">
+              <div className="space-y-2">
+                {pendingApprovals.map((approval) => (
+                  <div
+                    key={approval.id}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                        {'\uD83D\uDD10'} Approval Required - {approval.agentName || 'Agent'}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-amber-600 dark:text-amber-500">
+                        {approval.action}
+                      </p>
+                      {approval.context ? (
+                        <p className="mt-0.5 truncate text-[10px] font-mono text-amber-500 dark:text-amber-600">
+                          {approval.context.slice(0, 100)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void resolvePendingApproval(approval, 'approved')
+                        }}
+                        className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void resolvePendingApproval(approval, 'denied')
+                        }}
+                        className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-800/50 dark:bg-red-900/10 dark:text-red-400"
+                      >
+                        Deny
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {hideUi ? null : (
             <ChatMessageList
@@ -1323,8 +1507,16 @@ export function ChatScreen({
               keyboardInset={mobileKeyboardInset}
               isStreaming={derivedStreamingInfo.isStreaming}
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
-              streamingText={realtimeStreamingText || undefined}
-              streamingThinking={realtimeStreamingThinking || undefined}
+              streamingText={
+                realtimeStreamingText ||
+                completedStreamingText.current ||
+                undefined
+              }
+              streamingThinking={
+                realtimeStreamingThinking ||
+                completedStreamingThinking.current ||
+                undefined
+              }
               hideSystemMessages={isMobile}
               activeToolCalls={activeToolCalls}
             />

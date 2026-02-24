@@ -15,6 +15,8 @@ type UseGatewayChatStreamOptions = {
   onThinking?: (text: string, sessionKey: string) => void
   /** Callback when a generation completes */
   onDone?: (state: string, sessionKey: string) => void
+  /** Callback when a tool approval is requested */
+  onApprovalRequest?: (approval: Record<string, unknown>) => void
 }
 
 export function useGatewayChatStream(
@@ -26,6 +28,7 @@ export function useGatewayChatStream(
     onChunk,
     onThinking,
     onDone,
+    onApprovalRequest,
   } = options
 
   const connectionState = useGatewayChatStore((s) => s.connectionState)
@@ -48,10 +51,12 @@ export function useGatewayChatStream(
   const onChunkRef = useRef(onChunk)
   const onThinkingRef = useRef(onThinking)
   const onDoneRef = useRef(onDone)
+  const onApprovalRequestRef = useRef(onApprovalRequest)
   onUserMessageRef.current = onUserMessage
   onChunkRef.current = onChunk
   onThinkingRef.current = onThinking
   onDoneRef.current = onDone
+  onApprovalRequestRef.current = onApprovalRequest
 
   const clearStreamTimeout = useCallback((sessionKey: string) => {
     const timeoutId = streamTimeoutsRef.current.get(sessionKey)
@@ -192,6 +197,59 @@ export function useGatewayChatStream(
       }
     })
 
+    eventSource.addEventListener('tool_use', (event) => {
+      if (!mountedRef.current) return
+      try {
+        const data = JSON.parse(event.data) as {
+          name?: string
+          id?: string
+          toolCallId?: string
+          args?: unknown
+          arguments?: unknown
+          runId?: string
+          sessionKey: string
+        }
+        processEvent({
+          type: 'tool',
+          phase: 'calling',
+          name: data.name ?? 'tool',
+          toolCallId: data.toolCallId ?? data.id,
+          args: data.args ?? data.arguments,
+          runId: data.runId,
+          sessionKey: data.sessionKey,
+        })
+        touchStreamTimeout(data.sessionKey)
+      } catch {
+        // Ignore parse errors
+      }
+    })
+
+    eventSource.addEventListener('tool_result', (event) => {
+      if (!mountedRef.current) return
+      try {
+        const data = JSON.parse(event.data) as {
+          name?: string
+          id?: string
+          toolCallId?: string
+          runId?: string
+          sessionKey: string
+          isError?: boolean
+          error?: string
+        }
+        processEvent({
+          type: 'tool',
+          phase: data.isError || data.error ? 'error' : 'done',
+          name: data.name ?? 'tool',
+          toolCallId: data.toolCallId ?? data.id,
+          runId: data.runId,
+          sessionKey: data.sessionKey,
+        })
+        touchStreamTimeout(data.sessionKey)
+      } catch {
+        // Ignore parse errors
+      }
+    })
+
     eventSource.addEventListener('user_message', (event) => {
       if (!mountedRef.current) return
       try {
@@ -240,6 +298,16 @@ export function useGatewayChatStream(
 
     eventSource.addEventListener('state', () => {
       // State changes (started, thinking) - used for UI indicators
+    })
+
+    eventSource.addEventListener('approval_request', (event) => {
+      if (!mountedRef.current) return
+      try {
+        const data = JSON.parse(event.data) as Record<string, unknown>
+        onApprovalRequestRef.current?.(data)
+      } catch {
+        // Ignore parse errors
+      }
     })
   }, [
     enabled,

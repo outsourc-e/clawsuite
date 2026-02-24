@@ -97,6 +97,13 @@ function getWordBoundaryIndex(text: string, wordCount: number): number {
 type MessageItemProps = {
   message: GatewayMessage
   toolResultsByCallId?: Map<string, GatewayMessage>
+  toolCalls?: Array<{
+    id: string
+    name: string
+    phase: 'calling' | 'running' | 'done' | 'error'
+    args?: unknown
+    result?: string
+  }>
   onRetryMessage?: (message: GatewayMessage) => void
   forceActionsVisible?: boolean
   wrapperRef?: React.RefObject<HTMLDivElement | null>
@@ -234,6 +241,18 @@ function summarizeToolNames(toolCalls: Array<ToolCallContent>): string {
   return `${uniqueNames.slice(0, 3).join(', ')} +${uniqueNames.length - 3} more`
 }
 
+function normalizeStreamToolPhase(
+  phase: unknown,
+): 'calling' | 'running' | 'done' | 'error' {
+  if (phase === 'calling') return 'calling'
+  if (phase === 'running') return 'running'
+  if (phase === 'done' || phase === 'result') return 'done'
+  if (phase === 'error' || phase === 'failed' || phase === 'failure') {
+    return 'error'
+  }
+  return 'running'
+}
+
 function attachmentSource(attachment: GatewayAttachment | undefined): string {
   if (!attachment) return ''
   const candidates = [attachment.previewUrl, attachment.dataUrl, attachment.url]
@@ -248,6 +267,7 @@ function attachmentSource(attachment: GatewayAttachment | undefined): string {
 function MessageItemComponent({
   message,
   toolResultsByCallId,
+  toolCalls: streamToolCalls = [],
   onRetryMessage,
   forceActionsVisible = false,
   wrapperRef,
@@ -466,6 +486,22 @@ function MessageItemComponent({
   // Get tool calls from this message (for assistant messages)
   const toolCalls = role === 'assistant' ? getToolCallsFromMessage(message) : []
   const hasToolCalls = toolCalls.length > 0
+  const embeddedStreamToolCalls = useMemo(() => {
+    const value = (message as any).__streamToolCalls
+    if (!Array.isArray(value)) return []
+    return value
+      .map((entry: any) => ({
+        id: typeof entry?.id === 'string' ? entry.id : '',
+        name: typeof entry?.name === 'string' ? entry.name : 'tool',
+        phase: normalizeStreamToolPhase(entry?.phase),
+        args: entry?.args,
+        result: typeof entry?.result === 'string' ? entry.result : undefined,
+      }))
+      .filter((entry: any) => entry.id.length > 0)
+  }, [message])
+  const effectiveStreamToolCalls =
+    streamToolCalls.length > 0 ? streamToolCalls : embeddedStreamToolCalls
+  const hasStreamToolCalls = effectiveStreamToolCalls.length > 0
   const toolParts = useMemo(() => {
     return toolCalls.map((toolCall) => {
       const resultMessage = toolCall.id
@@ -670,6 +706,48 @@ function MessageItemComponent({
                   <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:300ms]" />
                 </div>
               )}
+
+              {hasStreamToolCalls && !isUser && (
+                <div className="mt-2 space-y-1.5">
+                  {effectiveStreamToolCalls.map((tc) => (
+                    <div
+                      key={tc.id}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px] font-mono',
+                        tc.phase === 'running' &&
+                          'border-accent-200 bg-accent-50 text-accent-700 dark:border-accent-800/50 dark:bg-accent-900/20 dark:text-accent-400',
+                        tc.phase === 'done' &&
+                          'border-emerald-200 bg-emerald-50/60 text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-400',
+                        tc.phase === 'error' &&
+                          'border-red-200 bg-red-50/60 text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-400',
+                        tc.phase === 'calling' &&
+                          'border-primary-200 bg-primary-50 text-primary-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+                      )}
+                    >
+                      <span aria-hidden>
+                        {tc.phase === 'running'
+                          ? '⟳'
+                          : tc.phase === 'done'
+                            ? '✓'
+                            : tc.phase === 'error'
+                              ? '✗'
+                              : '→'}
+                      </span>
+                      <span className="font-semibold">{tc.name}</span>
+                      {tc.phase === 'running' && (
+                        <span className="ml-auto animate-pulse opacity-60">
+                          running...
+                        </span>
+                      )}
+                      {tc.phase === 'done' && tc.result && (
+                        <span className="ml-1 max-w-[200px] truncate opacity-60">
+                          {tc.result.slice(0, 60)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </Message>
         )}
@@ -742,6 +820,7 @@ function areMessagesEqual(
   }
   if (prevProps.wrapperClassName !== nextProps.wrapperClassName) return false
   if (prevProps.onRetryMessage !== nextProps.onRetryMessage) return false
+  if (prevProps.toolCalls !== nextProps.toolCalls) return false
   if (prevProps.wrapperDataMessageId !== nextProps.wrapperDataMessageId) {
     return false
   }
