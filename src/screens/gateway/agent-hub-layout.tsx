@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query'
 import { TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
 import { TaskBoard as _TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
-import { MissionTimeline } from './components/mission-timeline'
 import { AgentOutputPanel } from './components/agent-output-panel'
 import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
@@ -2200,7 +2199,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const dispatchingRef = useRef(false)
   const artifactDedupRef = useRef<Set<string>>(new Set())
   const agentOutputLinesRef = useRef<Record<string, string[]>>({})
-  const [agentOutputLines, setAgentOutputLines] = useState<Record<string, string[]>>({})
+  const [_agentOutputLines, setAgentOutputLines] = useState<Record<string, string[]>>({})
   const missionCompletionSnapshotRef = useRef<MissionReportPayload | null>(null)
   const prevMissionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
   const lastReportedMissionIdRef = useRef<string>('')
@@ -4266,7 +4265,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               onNewMission={() => openNewMissionModal()}
               onViewOutput={(agentId) => {
                 if (isMissionRunning) {
-                  setMaximizedMissionId('running')
+                  setActiveTab('missions')
+                  setMissionSubTab('active')
                 } else {
                   setSelectedOutputAgentId(agentId)
                   setOutputPanelVisible(true)
@@ -5349,6 +5349,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       )
       setRestoreDismissed(true)
       setRestoreCheckpoint(null)
+      openNewMissionModal()
       toast('Recovered checkpoint restored into Mission setup', { type: 'success' })
     }
 
@@ -5763,20 +5764,51 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </div>
                   </section>
 
-                  <div className="max-h-[420px] overflow-y-auto rounded-xl border border-neutral-200 dark:border-neutral-700">
-                    <MissionTimeline tasks={missionTasks} agentOutputs={new Map(Object.entries(agentOutputLines))}
-                      agentSessionMap={agentSessionMap}
-                      agentStatuses={new Map(
-                        Object.entries(agentSessionStatus).map(([id, s]) => [
-                          id,
-                          { status: s.status, lastSeen: typeof s.lastSeen === 'number' ? s.lastSeen : Date.now() },
-                        ]),
-                      )}
-                      missionState={missionState}
-                      missionGoal={activeMissionGoal || missionGoal || ''}
-                      teamMembers={team}
-                      elapsedTime={missionStartedAtRef.current ? Date.now() - missionStartedAtRef.current : undefined}
-                    />
+                  <div className="space-y-3">
+                    {team.map((member) => {
+                      const sessionKey = agentSessionMap[member.id] ?? null
+                      const status = agentSessionStatus[member.id]
+                      const isActive = status?.status === 'active'
+                      return (
+                        <section
+                          key={member.id}
+                          className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden"
+                        >
+                          <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  'h-2 w-2 rounded-full',
+                                  isActive ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-300 dark:bg-neutral-600',
+                                )}
+                              />
+                              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{member.name}</p>
+                              <span className="text-xs text-neutral-400 dark:text-neutral-500">{member.modelId}</span>
+                            </div>
+                            <span
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                                isActive
+                                  ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400',
+                              )}
+                            >
+                              {isActive ? 'Active' : (status?.status ?? 'Waiting')}
+                            </span>
+                          </div>
+                          <div className="max-h-[300px] overflow-y-auto">
+                            <AgentOutputPanel
+                              sessionKey={sessionKey}
+                              agentName={member.name}
+                              tasks={missionTasks.filter((t) => t.agentId === member.id)}
+                              onClose={() => {}}
+                              modelId={member.modelId}
+                              compact={true}
+                            />
+                          </div>
+                        </section>
+                      )
+                    })}
                   </div>
 
                   <section className="relative overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm">
