@@ -2175,7 +2175,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [agentOutputLines, setAgentOutputLines] = useState<Record<string, string[]>>({})
   const missionCompletionSnapshotRef = useRef<MissionReportPayload | null>(null)
   const prevMissionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
-  const prevMissionActiveRef = useRef(false)
   const lastReportedMissionIdRef = useRef<string>('')
   // Mission ID for checkpointing
   const missionIdRef = useRef<string>('')
@@ -2275,7 +2274,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       agentId: member.id,
       agentName: member.name,
       modelId: member.modelId,
-      lines: (agentOutputLinesRef.current[member.id] ?? []).slice(-4),
+      lines: (agentOutputLinesRef.current[member.id] ?? []).slice(-50),
     }))
     const resolvedTemplate = resolveActiveTemplate(teamSnapshot)
     const teamName = resolvedTemplate ? TEMPLATE_DISPLAY_NAMES[resolvedTemplate] : `Custom Team (${teamSnapshot.length})`
@@ -3901,6 +3900,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           completedAt: snapshot.completedAt,
         }
         setMissionReports(saveStoredMissionReport(record))
+        setCompletionModalReport(record)
+        setShowCompletionModal(true)
         lastReportedMissionIdRef.current = snapshot.missionId
       }
       missionCompletionSnapshotRef.current = null
@@ -4095,18 +4096,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       setMissionSubTab('active')
     }
   }, [missionActive, missionState])
-
-  useEffect(() => {
-    // Detect transition from active -> inactive (mission just ended)
-    if (prevMissionActiveRef.current === true && missionActive === false && missionReports.length > 0) {
-      const latest = missionReports[0] // reports are newest-first
-      if (latest) {
-        setCompletionModalReport(latest)
-        setShowCompletionModal(true)
-      }
-    }
-    prevMissionActiveRef.current = missionActive
-  }, [missionActive, missionReports])
 
   const isMissionRunning = missionActive && missionState === 'running'
 
@@ -5609,7 +5598,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">MISSION GOAL</p>
                         <p className="mt-1 text-base text-neutral-900 dark:text-neutral-100">{activeMissionGoal || missionGoal || ''}</p>
                       </div>
-                      <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-xs text-white">Running</span>
+                      <span className={cn(
+                        "rounded-full px-2.5 py-1 text-xs text-white",
+                        missionState === "paused" ? "bg-amber-500" : "bg-emerald-700"
+                      )}>
+                        {missionState === "paused" ? "⏸ Paused" : "● Running"}
+                      </span>
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -5633,6 +5627,39 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
                     <div className="mt-3 h-1 rounded-full bg-neutral-200">
                       <div className="h-1 rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-4 dark:border-neutral-800">
+                      <button
+                        type="button"
+                        onClick={() => void handleMissionPause(missionState === "running")}
+                        className={cn(
+                          "rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+                          missionState === "paused"
+                            ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                            : "bg-amber-500 text-white hover:bg-amber-600"
+                        )}
+                      >
+                        {missionState === "paused" ? "▶ Resume" : "⏸ Pause"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const firstAgent = team[0]
+                          if (firstAgent) { setSteerAgentId(firstAgent.id); setSteerInput("") }
+                        }}
+                        disabled={team.length === 0}
+                        className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                      >
+                        🎯 Steer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => stopMissionAndCleanup("aborted")}
+                        className="ml-auto rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                      >
+                        ■ Stop Mission
+                      </button>
                     </div>
                   </section>
 
