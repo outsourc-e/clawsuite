@@ -4,6 +4,15 @@ import type { AgentWorkingRow, AgentWorkingStatus } from './agents-working-panel
 import type { ModelPresetId } from './team-panel'
 import { AGENT_ACCENT_COLORS, AgentAvatar } from './agent-avatar'
 
+export type RemoteSession = {
+  sessionKey: string
+  label: string
+  model?: string
+  status: 'active' | 'idle' | 'done'
+  startedAt: number
+  kind: string
+}
+
 export type OfficeViewProps = {
   agentRows: AgentWorkingRow[]
   missionRunning: boolean
@@ -12,6 +21,8 @@ export type OfficeViewProps = {
   selectedOutputAgentId?: string
   activeTemplateName?: string
   processType: 'sequential' | 'hierarchical' | 'parallel'
+  remoteSessions?: RemoteSession[]
+  onViewRemoteOutput?: (sessionKey: string, label: string) => void
   /** Fixed pixel height for the office container (compact mode) */
   containerHeight?: number
 }
@@ -257,6 +268,41 @@ function PlantSVG({ x, y }: { x: number; y: number }) {
   )
 }
 
+function RemoteSessionCard({ session, onClick }: { session: RemoteSession; onClick: () => void }) {
+  const statusColor = session.status === 'active'
+    ? 'bg-emerald-400 animate-pulse'
+    : session.status === 'done'
+      ? 'bg-neutral-300 dark:bg-neutral-600'
+      : 'bg-amber-400'
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex flex-col items-center gap-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-3 text-center hover:border-accent-500 hover:shadow-sm transition-all"
+    >
+      <div className="relative">
+        <div className="h-8 w-8 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg">
+          🤖
+        </div>
+        <span className={cn('absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-neutral-800', statusColor)} />
+      </div>
+      <span className="text-[11px] font-medium text-neutral-800 dark:text-neutral-200 truncate w-full">
+        {session.label}
+      </span>
+      {session.model ? (
+        <span className="text-[9px] text-neutral-400 truncate w-full">
+          {session.model.split('/').pop()}
+        </span>
+      ) : null}
+      <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+        chat agent
+      </span>
+      <span className="text-[9px] text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100">👁 View Output</span>
+    </button>
+  )
+}
+
 export function OfficeView({
   agentRows,
   missionRunning,
@@ -264,12 +310,15 @@ export function OfficeView({
   onNewMission,
   selectedOutputAgentId,
   activeTemplateName: _activeTemplateName,
+  remoteSessions = [],
+  onViewRemoteOutput,
   containerHeight,
 }: OfficeViewProps) {
   // When containerHeight is set, we use compact mode: header only (no footer), SVG fills remaining space
   const compact = Boolean(containerHeight)
   const [tick, setTick] = useState(0)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
+  const [remoteCollapsed, setRemoteCollapsed] = useState(true)
   const [layoutTemplate, setLayoutTemplate] = useState<OfficeLayoutTemplate>(() => {
     if (typeof window === 'undefined') return 'grid'
     const saved = window.localStorage.getItem('clawsuite:office-layout')
@@ -308,6 +357,12 @@ export function OfficeView({
     const timer = window.setInterval(() => setTick((t) => t + 1), 200)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (remoteSessions.length > 0) {
+      setRemoteCollapsed(false)
+    }
+  }, [remoteSessions.length])
 
   if (agentRows.length === 0) {
     return (
@@ -653,6 +708,32 @@ export function OfficeView({
           )
         })}
       </div>
+
+      {remoteSessions.length > 0 ? (
+        <div className="border-t border-neutral-200 dark:border-neutral-700 p-3">
+          <button
+            type="button"
+            onClick={() => setRemoteCollapsed((prev) => !prev)}
+            className="mb-2 flex w-full items-center justify-between px-1 text-left"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+              Remote Sessions
+            </p>
+            <span className="text-[10px] text-neutral-400">{remoteCollapsed ? 'Show' : 'Hide'}</span>
+          </button>
+          {!remoteCollapsed ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {remoteSessions.map((session) => (
+                <RemoteSessionCard
+                  key={session.sessionKey}
+                  session={session}
+                  onClick={() => onViewRemoteOutput?.(session.sessionKey, session.label)}
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Footer — hidden in compact mode */}
       {!compact ? (
