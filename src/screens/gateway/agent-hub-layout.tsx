@@ -1050,7 +1050,53 @@ function parseTokenBudget(value: string): number | null {
   return parsed
 }
 
-function normalizeInsightLine(line: string): string | null {
+const REPORT_META_LINE_PATTERNS = [
+  /\b(prompt|message|context|input|response)\b.{0,40}\b(cut off|cutoff|truncat(?:ed|ion)?|incomplete|missing|too long)\b/i,
+  /\b(please|kindly)\s+(re[-\s]?send|send again|confirm|clarify|provide)\b/i,
+  /\bplease\s+(share|include|paste)\b.{0,50}\b(full|complete)\b.{0,20}\b(task|prompt|list|details|logs?)\b/i,
+  /\b(as an ai|language model|i can adjust the report|i can revise|i['’]ll continue|i will continue|let me know if you want)\b/i,
+] as const
+
+const GOAL_HARDWARE_KEYWORDS = /\b(gpu|cpu|hardware|card|vram|ram|nvidia|amd|chip|accelerator)\b/i
+const HARDWARE_ASSUMPTION_PATTERN =
+  /\b(assum(?:e|ing|ption)|unclear|unknown|missing|not provided|can['’]?t verify)\b.{0,80}\b(gpu|cpu|hardware|card|vram|ram|nvidia|amd|chip|accelerator)\b/i
+
+function tokenizeMissionGoal(goal: string): Set<string> {
+  return new Set(
+    goal
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length >= 4),
+  )
+}
+
+function isMetaReportLine(line: string, missionGoal: string): boolean {
+  if (REPORT_META_LINE_PATTERNS.some((pattern) => pattern.test(line))) return true
+
+  // Drop generic hardware/context assumptions unless mission goal explicitly targets hardware analysis.
+  if (HARDWARE_ASSUMPTION_PATTERN.test(line) && !GOAL_HARDWARE_KEYWORDS.test(missionGoal)) return true
+
+  return false
+}
+
+function scoreInsightLine(line: string, goalTokens: Set<string>): number {
+  let score = 0
+  if (/\b(found|identified|observed|validated|measured|implemented|fixed|completed|reduced|increased)\b/i.test(line)) score += 4
+  if (/\b(recommend|should|next step|decision|propose|action required|prioritize)\b/i.test(line)) score += 3
+  if (/\b(file|artifact|report|dashboard|endpoint|test|coverage|latency|throughput|cost|ms|sec|%|\$)\b/i.test(line)) score += 3
+  if (/\d/.test(line)) score += 2
+
+  const lowered = line.toLowerCase()
+  let goalOverlap = 0
+  goalTokens.forEach((token) => {
+    if (token.length >= 4 && lowered.includes(token)) goalOverlap += 1
+  })
+  score += Math.min(goalOverlap, 3)
+
+  return score
+}
+
+function normalizeInsightLine(line: string, missionGoal = ''): string | null {
   const normalized = line
     .replace(/^\s*[-*+]\s*/, '')
     .replace(/^\s*\d+\s*[.)-]\s*/, '')
@@ -1059,15 +1105,16 @@ function normalizeInsightLine(line: string): string | null {
     .trim()
 
   if (normalized.length < 18) return null
+  if (isMetaReportLine(normalized, missionGoal)) return null
   if (/^(ok|done|working|thinking|status|update|noted)$/i.test(normalized)) return null
   return normalized
 }
 
-function uniqueNormalizedLines(lines: string[]): string[] {
+function uniqueNormalizedLines(lines: string[], missionGoal = ''): string[] {
   const next: string[] = []
   const seen = new Set<string>()
   lines.forEach((line) => {
-    const normalized = normalizeInsightLine(line)
+    const normalized = normalizeInsightLine(line, missionGoal)
     if (!normalized) return
     const key = normalized.toLowerCase()
     if (seen.has(key)) return
@@ -1077,24 +1124,31 @@ function uniqueNormalizedLines(lines: string[]): string[] {
   return next
 }
 
-function pickLinesByPattern(lines: string[], pattern: RegExp, limit = 4): string[] {
-  return uniqueNormalizedLines(lines.filter((line) => pattern.test(line))).slice(0, limit)
+function pickLinesByPattern(lines: string[], pattern: RegExp, missionGoal: string, limit = 4): string[] {
+  const goalTokens = tokenizeMissionGoal(missionGoal)
+  return uniqueNormalizedLines(lines.filter((line) => pattern.test(line)), missionGoal)
+    .map((line) => ({ line, score: scoreInsightLine(line, goalTokens) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((entry) => entry.line)
 }
 
-function pickTopFindings(lines: string[], limit = 3): string[] {
-  const candidates = uniqueNormalizedLines(lines)
+function pickTopFindings(lines: string[], missionGoal: string, limit = 3): string[] {
+  const candidates = uniqueNormalizedLines(lines, missionGoal)
   if (candidates.length === 0) return []
+  const goalTokens = tokenizeMissionGoal(missionGoal)
   const scored = candidates
     .map((line) => {
-      let score = 0
-      if (/\b(found|identified|observed|validated|measured|implemented|fixed|completed)\b/i.test(line)) score += 3
-      if (/\b(issue|risk|blocker|error|regression|latency|cost|coverage|missing)\b/i.test(line)) score += 2
-      if (/\d/.test(line)) score += 1
+      let score = scoreInsightLine(line, goalTokens)
+      if (/\b(issue|risk|blocker|error|regression|coverage|gap|missing)\b/i.test(line)) score += 2
       return { line, score }
     })
     .sort((a, b) => b.score - a.score)
 
-  return scored.slice(0, limit).map((entry) => entry.line)
+  return scored
+    .filter((entry) => entry.score >= 4)
+    .slice(0, limit)
+    .map((entry) => entry.line)
 }
 
 function buildNextActionsChecklist(payload: MissionReportPayload, recommendations: string[], unresolvedRisks: string[]): string[] {
@@ -1118,7 +1172,7 @@ function buildNextActionsChecklist(payload: MissionReportPayload, recommendation
     actions.push('Share this report with stakeholders and confirm acceptance criteria.')
   }
 
-  return uniqueNormalizedLines(actions).slice(0, 6)
+  return uniqueNormalizedLines(actions, payload.goal).slice(0, 6)
 }
 
 function generateMissionReport(payload: MissionReportPayload): string {
@@ -1129,16 +1183,18 @@ function generateMissionReport(payload: MissionReportPayload): string {
   const recommendations = pickLinesByPattern(
     allAgentLines,
     /\b(recommend|should|next step|propose|decision|action required|prioritize)\b/i,
+    payload.goal,
     6,
   )
   const unresolvedRisks = pickLinesByPattern(
     allAgentLines,
     /\b(risk|unknown|uncertain|blocker|open question|tbd|dependency|assumption|gap)\b/i,
+    payload.goal,
     6,
   )
   const nextActions = buildNextActionsChecklist(payload, recommendations, unresolvedRisks)
   const completedRatio = taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0
-  const topFindings = pickTopFindings(allAgentLines, 3)
+  const topFindings = pickTopFindings(allAgentLines, payload.goal, 3)
   const lines: string[] = []
 
   lines.push(`# Mission Report${payload.name ? `: ${payload.name}` : ''}`)
@@ -1149,6 +1205,9 @@ function generateMissionReport(payload: MissionReportPayload): string {
   lines.push(`- Produced ${payload.artifacts.length} artifacts and ${payload.agentSummaries.length} agent contribution streams.`)
   if (topFindings.length > 0) {
     topFindings.forEach((finding) => lines.push(`- Key outcome: ${finding}`))
+  } else {
+    lines.push('- Key outcome: No high-confidence findings extracted from agent output.')
+    lines.push('- Key outcome: Rerun mission with clearer task decomposition to improve report signal.')
   }
   lines.push('')
   lines.push('## Mission Overview')
@@ -1178,9 +1237,9 @@ function generateMissionReport(payload: MissionReportPayload): string {
   } else {
     payload.agentSummaries.forEach((summary) => {
       lines.push(`### ${summary.agentName} (${summary.modelId || 'unknown'})`)
-      const findings = pickTopFindings(summary.lines, 3)
-      const recs = pickLinesByPattern(summary.lines, /\b(recommend|should|next step|propose|decision)\b/i, 2)
-      const risks = pickLinesByPattern(summary.lines, /\b(risk|unknown|blocker|open question|dependency|gap)\b/i, 2)
+      const findings = pickTopFindings(summary.lines, payload.goal, 3)
+      const recs = pickLinesByPattern(summary.lines, /\b(recommend|should|next step|propose|decision)\b/i, payload.goal, 2)
+      const risks = pickLinesByPattern(summary.lines, /\b(risk|unknown|blocker|open question|dependency|gap)\b/i, payload.goal, 2)
       if (summary.lines.length === 0) {
         lines.push('- No output captured')
       } else {
