@@ -177,6 +177,18 @@ function ChatMessageListComponent({
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const [expandAllToolSections, setExpandAllToolSections] = useState(false)
+  const [deletedMessageIds, setDeletedMessageIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+
+  const handleDeleteMessage = useCallback(function handleDeleteMessage(id: string) {
+    if (!id) return
+    setDeletedMessageIds((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }, [])
   // Bug 2 fix: grace period — keep thinking indicator alive briefly after
   // waitingForResponse clears so the response message has time to render.
   const [thinkingGrace, setThinkingGrace] = useState(false)
@@ -305,7 +317,7 @@ function ChatMessageListComponent({
     })
 
     const seenMessageIds = new Set<string>()
-    return filteredMessages.filter((message) => {
+    const deduped = filteredMessages.filter((message) => {
       const messageId =
         (message as any).id ||
         (message as any).messageId ||
@@ -321,7 +333,13 @@ function ChatMessageListComponent({
       seenMessageIds.add(scopedId)
       return true
     })
-  }, [hideSystemMessages, messages])
+    // Remove locally-deleted messages
+    if (deletedMessageIds.size === 0) return deduped
+    return deduped.filter((_message, index) => {
+      const stableId = getStableMessageId(_message, index)
+      return !deletedMessageIds.has(stableId)
+    })
+  }, [deletedMessageIds, hideSystemMessages, messages])
 
   // Bug 2 fix: grace-period effects — placed after displayMessages so they can
   // reference it safely.
@@ -660,6 +678,7 @@ function ChatMessageListComponent({
         key={stableId}
         message={chatMessage}
         onRetryMessage={onRetryMessage}
+        onDeleteMessage={handleDeleteMessage}
         toolResultsByCallId={hasToolCalls ? toolResultsByCallId : undefined}
         forceActionsVisible={forceActionsVisible}
         wrapperClassName={spacingClass}
@@ -1084,6 +1103,7 @@ function ChatMessageListComponent({
                         key={stableId}
                         message={chatMessage}
                         onRetryMessage={onRetryMessage}
+                        onDeleteMessage={handleDeleteMessage}
                         toolResultsByCallId={
                           hasToolCalls ? toolResultsByCallId : undefined
                         }

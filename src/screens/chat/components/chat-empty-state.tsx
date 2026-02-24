@@ -3,7 +3,6 @@ import {
   BrainIcon,
   CodeIcon,
   Edit02Icon,
-  Search01Icon,
 } from '@hugeicons/core-free-icons'
 import { motion } from 'motion/react'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
@@ -19,11 +18,6 @@ const SUGGESTIONS: SuggestionChip[] = [
     label: 'Write code',
     prompt: 'Help me write a function that',
     icon: CodeIcon,
-  },
-  {
-    label: 'Research',
-    prompt: 'Search the web for',
-    icon: Search01Icon,
   },
   {
     label: 'Analyze',
@@ -44,7 +38,7 @@ type ChatEmptyStateProps = {
 
 export function ChatEmptyState({
   onSuggestionClick,
-  compact,
+  compact: _compact,
 }: ChatEmptyStateProps) {
   return (
     <motion.div
@@ -62,23 +56,9 @@ export function ChatEmptyState({
           <OpenClawStudioIcon className="mb-3 size-10 rounded-xl opacity-60 md:mb-4 md:size-12" />
         </motion.div>
 
-        {!compact && (
-          <>
-            <h2 className="mb-1 text-base font-medium text-primary-900 text-balance md:text-lg">
-              How can I help?
-            </h2>
-            <p className="mb-4 max-w-sm px-1 text-xs text-primary-500 text-pretty md:mb-6 md:px-0 md:text-sm">
-              Ask me anything — write code, research topics, analyze data, or
-              automate tasks.
-            </p>
-          </>
-        )}
-
-        {compact && (
-          <p className="mb-3 text-xs text-primary-500 text-pretty md:mb-4 md:text-sm">
-            How can I help?
-          </p>
-        )}
+        <h2 className="mb-4 text-sm font-semibold text-neutral-300">
+          Start a conversation
+        </h2>
 
         <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
           {SUGGESTIONS.map((suggestion) => (

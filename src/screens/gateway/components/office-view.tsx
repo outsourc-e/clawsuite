@@ -11,6 +11,8 @@ export type RemoteSession = {
   status: 'active' | 'idle' | 'done'
   startedAt: number
   kind: string
+  lastMessage?: string
+  tokenCount?: number
 }
 
 export type OfficeViewProps = {
@@ -274,13 +276,17 @@ function PlantSVG({ x, y }: { x: number; y: number }) {
   )
 }
 
-function formatElapsed(startedAt: number): string {
+function formatRuntime(startedAt: number, tokenCount?: number): string {
   const diffMs = Date.now() - startedAt
-  if (diffMs < 60_000) return `${Math.floor(diffMs / 1000)}s ago`
-  const mins = Math.floor(diffMs / 60_000)
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  return `${hrs}h ago`
+  let time: string
+  if (diffMs < 60_000) {
+    time = `${Math.floor(diffMs / 1000)}s`
+  } else {
+    const mins = Math.floor(diffMs / 60_000)
+    time = mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h`
+  }
+  const tokens = typeof tokenCount === 'number' ? tokenCount : 0
+  return `${time} · ${tokens}t`
 }
 
 function kindLabel(kind: string): string {
@@ -303,6 +309,16 @@ function RemoteSessionCard({ session, onClick }: { session: RemoteSession; onCli
       ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
       : 'bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 border-blue-200 dark:border-blue-800'
 
+  const modelDisplay = session.model
+    ? session.model.split('/').pop()?.replace(/:latest$/, '') ?? null
+    : null
+
+  const lastMessageSnippet = session.lastMessage
+    ? session.lastMessage.length > 60
+      ? `${session.lastMessage.slice(0, 60)}…`
+      : session.lastMessage
+    : null
+
   return (
     <button
       type="button"
@@ -318,9 +334,14 @@ function RemoteSessionCard({ session, onClick }: { session: RemoteSession; onCli
       <span className="text-[11px] font-medium text-neutral-800 dark:text-neutral-200 truncate w-full">
         {session.label}
       </span>
-      {session.model ? (
+      {modelDisplay ? (
         <span className="text-[9px] text-neutral-400 truncate w-full">
-          {session.model.split('/').pop()}
+          {modelDisplay}
+        </span>
+      ) : null}
+      {lastMessageSnippet ? (
+        <span className="text-[9px] text-neutral-500 dark:text-neutral-400 truncate w-full italic">
+          {lastMessageSnippet}
         </span>
       ) : null}
       <div className="flex items-center gap-1.5 flex-wrap justify-center">
@@ -329,7 +350,7 @@ function RemoteSessionCard({ session, onClick }: { session: RemoteSession; onCli
         </span>
         {session.startedAt ? (
           <span className="text-[9px] text-neutral-400 tabular-nums">
-            {formatElapsed(session.startedAt)}
+            {formatRuntime(session.startedAt, session.tokenCount)}
           </span>
         ) : null}
       </div>

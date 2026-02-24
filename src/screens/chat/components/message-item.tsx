@@ -1,8 +1,7 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDown01Icon,
   Idea01Icon,
-  Wrench01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -19,7 +18,6 @@ import type {
 import type { ToolPart } from '@/components/prompt-kit/tool'
 import { Message, MessageContent } from '@/components/prompt-kit/message'
 import { AssistantAvatar, UserAvatar } from '@/components/avatars'
-import { Tool } from '@/components/prompt-kit/tool'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -107,6 +105,7 @@ type MessageItemProps = {
   toolResultsByCallId?: Map<string, GatewayMessage>
   toolCalls?: Array<StreamToolCall>
   onRetryMessage?: (message: GatewayMessage) => void
+  onDeleteMessage?: (id: string) => void
   forceActionsVisible?: boolean
   wrapperRef?: React.RefObject<HTMLDivElement | null>
   wrapperClassName?: string
@@ -228,21 +227,6 @@ function thinkingFromMessage(msg: GatewayMessage): string | null {
   return null
 }
 
-function summarizeToolNames(toolCalls: Array<ToolCallContent>): string {
-  const seen = new Set<string>()
-  const uniqueNames: Array<string> = []
-  for (const toolCall of toolCalls) {
-    const normalized = (toolCall.name || '').trim()
-    const name = normalized.length > 0 ? normalized : 'unknown'
-    if (seen.has(name)) continue
-    seen.add(name)
-    uniqueNames.push(name)
-  }
-  if (uniqueNames.length === 0) return 'tools'
-  if (uniqueNames.length <= 3) return uniqueNames.join(', ')
-  return `${uniqueNames.slice(0, 3).join(', ')} +${uniqueNames.length - 3} more`
-}
-
 function normalizeStreamToolPhase(
   phase: unknown,
 ): 'calling' | 'running' | 'done' | 'error' {
@@ -305,6 +289,7 @@ function MessageItemComponent({
   toolResultsByCallId,
   toolCalls: streamToolCalls = [],
   onRetryMessage,
+  onDeleteMessage,
   forceActionsVisible = false,
   wrapperRef,
   wrapperClassName,
@@ -546,17 +531,13 @@ function MessageItemComponent({
       return mapToolCallToToolPart(toolCall, resultMessage)
     })
   }, [toolCalls, toolResultsByCallId])
-  const toolSummary = useMemo(() => {
-    if (!hasToolCalls) return ''
-    const count = toolCalls.length
-    const toolLabel = count === 1 ? 'tool' : 'tools'
-    return `Used: ${summarizeToolNames(toolCalls)} (${count} ${toolLabel})`
-  }, [hasToolCalls, toolCalls])
   const hasToolErrors = useMemo(
     () => toolParts.some((toolPart) => toolPart.state === 'output-error'),
     [toolParts],
   )
   const [toolCallsOpen, setToolCallsOpen] = useState(false)
+  const [copyDone, setCopyDone] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   useEffect(() => {
     if (expandAllToolSections) {
@@ -564,10 +545,48 @@ function MessageItemComponent({
     }
   }, [expandAllToolSections])
 
+  const handleCopy = useCallback(function handleCopy() {
+    void navigator.clipboard.writeText(fullText).then(() => {
+      setCopyDone(true)
+      window.setTimeout(() => setCopyDone(false), 1500)
+    })
+  }, [fullText])
+
+  const handleDelete = useCallback(function handleDelete() {
+    if (!deleteConfirm) {
+      setDeleteConfirm(true)
+      window.setTimeout(() => setDeleteConfirm(false), 3000)
+      return
+    }
+    onDeleteMessage?.(wrapperDataMessageId ?? '')
+  }, [deleteConfirm, onDeleteMessage, wrapperDataMessageId])
+
   // Never show "Queued" — messages are sent instantly to the gateway.
   // The old "sending" status was misleading since the API call takes <100ms.
   const isQueued = false
   const isFailed = message.status === 'error'
+
+  // System message — minimal styled row, no bubble/avatar
+  if (role === 'system') {
+    return (
+      <div
+        ref={wrapperRef}
+        data-chat-message-role={role}
+        data-chat-message-id={wrapperDataMessageId}
+        style={
+          typeof wrapperScrollMarginTop === 'number'
+            ? { scrollMarginTop: `${wrapperScrollMarginTop}px` }
+            : undefined
+        }
+        className={cn(
+          'text-xs text-neutral-500 italic text-center py-1',
+          wrapperClassName,
+        )}
+      >
+        {fullText}
+      </div>
+    )
+  }
 
   return (
     <div
@@ -580,13 +599,68 @@ function MessageItemComponent({
           : undefined
       }
       className={cn(
-        'group flex flex-col',
+        'group relative flex flex-col',
         hasText || hasAttachments ? 'gap-0.5 md:gap-1' : 'gap-0',
         wrapperClassName,
         isUser ? 'items-end' : 'items-start',
         !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',
       )}
     >
+      {/* Hover action bar */}
+      {(hasText || hasAttachments || hasInlineImages) && (
+        <div
+          className={cn(
+            'opacity-0 group-hover:opacity-100 transition-opacity duration-150',
+            'absolute -top-7 right-0 flex gap-1',
+            'bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-sm px-1 py-0.5 z-10',
+          )}
+        >
+          {/* Copy */}
+          <button
+            type="button"
+            title="Copy"
+            onClick={handleCopy}
+            className="rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+          >
+            {copyDone ? (
+              <span className="text-xs font-medium text-emerald-500">✓</span>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-neutral-400 hover:text-neutral-200">
+                <rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M3 11V3a1 1 0 0 1 1-1h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+          {/* Retry — user only */}
+          {isUser && onRetryMessage && (
+            <button
+              type="button"
+              title="Retry"
+              onClick={() => onRetryMessage(message)}
+              className="rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-neutral-400 hover:text-neutral-200">
+                <path d="M2 8a6 6 0 1 1 1.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M2 12V8h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+          {/* Delete */}
+          <button
+            type="button"
+            title={deleteConfirm ? 'Click again to confirm delete' : 'Delete'}
+            onClick={handleDelete}
+            className={cn(
+              'rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700',
+              deleteConfirm && 'bg-red-50 dark:bg-red-950/40',
+            )}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={cn('w-3.5 h-3.5', deleteConfirm ? 'text-red-500' : 'text-neutral-400 hover:text-neutral-200')}>
+              <path d="M3 5h10M6 5V3h4v2M6 8v4M10 8v4M4 5l1 8h6l1-8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+      )}
       {thinking && !hasText && (
         <div className="w-full max-w-[900px]">
           <Collapsible defaultOpen={false}>
@@ -759,40 +833,38 @@ function MessageItemComponent({
           </Message>
         )}
 
-      {/* Render tool calls - only when message is tool-call-only (no text) */}
+      {/* Render tool calls — collapsible ▶ tool result style */}
       {hasToolCalls && !hasText && (
         <div className="w-full max-w-[900px] mt-2">
           <Collapsible open={toolCallsOpen} onOpenChange={setToolCallsOpen}>
-            <CollapsibleTrigger className="w-full justify-between bg-primary-50/50 hover:bg-primary-100/80 data-panel-open:bg-primary-100/80">
-              <span
-                className={cn(
-                  'size-2 shrink-0 rounded-full',
-                  hasToolErrors ? 'bg-red-500' : 'bg-emerald-500',
-                )}
-              />
-              <HugeiconsIcon
-                icon={Wrench01Icon}
-                size={20}
-                strokeWidth={1.5}
-                className="opacity-70"
-              />
-              <span className="flex-1 truncate text-left">{toolSummary}</span>
-              <HugeiconsIcon
-                icon={ArrowDown01Icon}
-                size={20}
-                strokeWidth={1.5}
-                className="text-primary-700 transition-transform duration-150 group-data-panel-open:rotate-180"
-              />
+            <CollapsibleTrigger className="w-full justify-start gap-1.5 bg-transparent hover:bg-primary-50/60 data-panel-open:bg-primary-50/60 px-2 py-1 rounded-md text-xs text-neutral-500 dark:text-neutral-400">
+              <span className="transition-transform duration-150 group-data-panel-open:rotate-90">▶</span>
+              <span className="font-mono">tool result</span>
+              {hasToolErrors && (
+                <span className="ml-1 text-red-400">⚠</span>
+              )}
             </CollapsibleTrigger>
             <CollapsiblePanel>
-              <div className="flex flex-col gap-3 border-l-2 border-primary-200 pl-2">
-                {toolParts.map((toolPart, index) => (
-                  <Tool
-                    key={toolPart.toolCallId || `${toolPart.type}-${index}`}
-                    toolPart={toolPart}
-                    defaultOpen={false}
-                  />
-                ))}
+              <div className="mt-1 flex flex-col gap-2">
+                {toolParts.map((toolPart, index) => {
+                  const resultText = typeof toolPart.output === 'string'
+                    ? toolPart.output
+                    : toolPart.output
+                      ? JSON.stringify(toolPart.output, null, 2)
+                      : ''
+                  return (
+                    <div key={toolPart.toolCallId || `${toolPart.type}-${index}`} className="flex flex-col gap-0.5">
+                      <span className="text-[10px] text-neutral-400 font-mono">{toolPart.type}</span>
+                      {resultText ? (
+                        <pre className="text-xs font-mono bg-neutral-900 dark:bg-neutral-950 text-neutral-200 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words max-h-48">
+                          {resultText}
+                        </pre>
+                      ) : (
+                        <span className="text-xs text-neutral-400 italic">no output</span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </CollapsiblePanel>
           </Collapsible>
@@ -827,6 +899,7 @@ function areMessagesEqual(
   }
   if (prevProps.wrapperClassName !== nextProps.wrapperClassName) return false
   if (prevProps.onRetryMessage !== nextProps.onRetryMessage) return false
+  if (prevProps.onDeleteMessage !== nextProps.onDeleteMessage) return false
   if (prevProps.toolCalls !== nextProps.toolCalls) return false
   if (prevProps.wrapperDataMessageId !== nextProps.wrapperDataMessageId) {
     return false
