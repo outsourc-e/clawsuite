@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { TeamMember } from './team-panel'
 import type { HubTask } from './task-board'
@@ -36,6 +36,24 @@ export function MissionTimeline({
   elapsedTime,
 }: MissionTimelineProps) {
   const [expandedOutputs, setExpandedOutputs] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    const activeIds = teamMembers
+      .map((m) => m.id)
+      .filter((id) => {
+        const s = agentStatuses.get(id)
+        return s?.status === 'active'
+      })
+    if (activeIds.length > 0) {
+      setExpandedOutputs((prev) => {
+        const next = { ...prev }
+        for (const id of activeIds) {
+          if (!next[id]) next[id] = true
+        }
+        return next
+      })
+    }
+  }, [agentStatuses, teamMembers])
+
   const completedTasks = useMemo(
     () => tasks.filter((task) => task.status === 'done' || (task.status as string) === 'completed').length,
     [tasks],
@@ -141,7 +159,7 @@ export function MissionTimeline({
                   {isExpanded ? '▼ Live output' : '▶ Live output'}
                 </button>
 
-                {isExpanded ? (
+                {isExpanded || isActive ? (
                   <div className="mt-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-2">
                     <div className="max-h-[240px] overflow-y-auto rounded-lg bg-neutral-50 dark:bg-neutral-800/50 p-3 font-mono text-xs text-neutral-700 dark:text-neutral-300">
                       {outputLines.length > 0 ? (

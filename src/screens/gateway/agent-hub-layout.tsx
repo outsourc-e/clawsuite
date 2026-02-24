@@ -2268,14 +2268,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean)
-      .slice(-6)
+      .slice(-30)
 
     if (nextLines.length > 0) {
       const current = agentOutputLinesRef.current[agentId] ?? []
-      agentOutputLinesRef.current[agentId] = [...current, ...nextLines].slice(-8)
+      agentOutputLinesRef.current[agentId] = [...current, ...nextLines].slice(-200)
       setAgentOutputLines((prev) => ({
         ...prev,
-        [agentId]: [...(prev[agentId] ?? []), ...nextLines].slice(-8),
+        [agentId]: [...(prev[agentId] ?? []), ...nextLines].slice(-200),
       }))
     }
 
@@ -4257,9 +4257,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 if (isMissionRunning) {
                   setMaximizedMissionId('running')
                 } else {
-                  setActiveTab('configure')
-                  setConfigSection('agents')
-                  setAgentWizardOpenId(agentId)
+                  setSelectedOutputAgentId(agentId)
+                  setOutputPanelVisible(true)
                 }
               }}
               selectedOutputAgentId={selectedOutputAgentId}
