@@ -6,7 +6,6 @@ import {
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { Button } from '@/components/ui/button'
-import { UsageMeter } from '@/components/usage-meter'
 import {
   TooltipContent,
   TooltipProvider,
@@ -341,7 +340,6 @@ function ChatHeaderComponent({
           </TooltipRoot>
         </TooltipProvider>
       ) : null}
-      <UsageMeter />
     </div>
   )
 }

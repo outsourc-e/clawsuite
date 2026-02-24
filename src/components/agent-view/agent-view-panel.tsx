@@ -43,6 +43,7 @@ import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { BrowserSidebarPreview } from '@/components/browser-view/browser-sidebar-preview'
+import { UsageMeterCompact } from '@/components/usage-meter/usage-meter-compact'
 import { cn } from '@/lib/utils'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
@@ -622,6 +623,11 @@ export function AgentViewPanel() {
                 {/* Main Agent Card */}
                 <OrchestratorCard compact={viewMode === 'compact'} />
 
+                {/* Usage meter — compact sidebar widget */}
+                <div className="rounded-xl border border-primary-300/50 bg-primary-100/40 px-2 py-2">
+                  <UsageMeterCompact />
+                </div>
+
                 {/* Swarm — agent cards */}
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
                   {/* Centered Swarm pill */}
@@ -1022,6 +1028,12 @@ export function AgentViewPanel() {
                 {/* Content — same as desktop sidebar */}
                 <div className="space-y-3 p-3">
                   <OrchestratorCard compact={viewMode === 'compact'} />
+
+                  {/* Usage meter — compact sidebar widget */}
+                  <div className="rounded-xl border border-primary-300/50 bg-primary-100/40 px-2 py-2">
+                    <UsageMeterCompact />
+                  </div>
+
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
                     <div className="mb-1 flex justify-center">
                       <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
