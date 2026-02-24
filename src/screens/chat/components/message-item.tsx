@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDown01Icon,
   Idea01Icon,
@@ -534,20 +534,11 @@ function MessageItemComponent({
     [toolParts],
   )
   const [toolCallsOpen, setToolCallsOpen] = useState(false)
-  const [copyDone, setCopyDone] = useState(false)
-
   useEffect(() => {
     if (expandAllToolSections) {
       setToolCallsOpen(true)
     }
   }, [expandAllToolSections])
-
-  const handleCopy = useCallback(function handleCopy() {
-    void navigator.clipboard.writeText(fullText).then(() => {
-      setCopyDone(true)
-      window.setTimeout(() => setCopyDone(false), 1500)
-    })
-  }, [fullText])
 
   // Never show "Queued" — messages are sent instantly to the gateway.
   // The old "sending" status was misleading since the API call takes <100ms.
@@ -594,47 +585,7 @@ function MessageItemComponent({
         !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',
       )}
     >
-      {/* Hover action bar */}
-      {(hasText || hasAttachments || hasInlineImages) && (
-        <div
-          className={cn(
-            'opacity-0 group-hover:opacity-100 transition-opacity duration-150',
-            'absolute -top-7 right-0 flex gap-1',
-            'bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-sm px-1 py-0.5 z-10',
-          )}
-        >
-          {/* Copy */}
-          <button
-            type="button"
-            title="Copy"
-            onClick={handleCopy}
-            className="rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-          >
-            {copyDone ? (
-              <span className="text-xs font-medium text-emerald-500">✓</span>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-neutral-400 hover:text-neutral-200">
-                <rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M3 11V3a1 1 0 0 1 1-1h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
-          {/* Retry — user only */}
-          {isUser && onRetryMessage && (
-            <button
-              type="button"
-              title="Retry"
-              onClick={() => onRetryMessage(message)}
-              className="rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-neutral-400 hover:text-neutral-200">
-                <path d="M2 8a6 6 0 1 1 1.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M2 12V8h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )}
-        </div>
-      )}
+
       {thinking && !hasText && (
         <div className="w-full max-w-[900px]">
           <Collapsible defaultOpen={false}>
