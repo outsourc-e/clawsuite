@@ -47,6 +47,7 @@ import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SettingsDialog } from '@/components/settings-dialog'
 import { DashboardOverflowPanel } from '@/components/dashboard-overflow-panel'
+import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { cn } from '@/lib/utils'
 import { useSettingsStore } from '@/hooks/use-settings'
 import {
@@ -622,7 +623,7 @@ export function DashboardScreen() {
                   >
                     <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
                     {shouldShowLogoTip ? (
-                      <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duratrion-300">
+                      <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duration-300">
                         <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md">
                           <span
                             role="button"
@@ -1020,6 +1021,8 @@ export function DashboardScreen() {
           )}
         </section>
       </main>
+
+      <SystemMetricsFooter />
 
       <SettingsDialog
         open={dashSettingsOpen}

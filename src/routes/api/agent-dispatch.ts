@@ -8,16 +8,23 @@ type DispatchGatewayResponse = {
   runId?: string
 }
 
+type SessionsPatchResponse = {
+  ok?: boolean
+}
+
 async function dispatchViaGateway(payload: {
   sessionKey: string
   message: string
   idempotencyKey: string
 }) {
-  // Mission agent dispatch path:
-  // This endpoint triggers background agent work and should not behave like user chat delivery.
-  return gatewayRpc<DispatchGatewayResponse>('chat.send', {
+  await gatewayRpc<SessionsPatchResponse>('sessions.patch', {
+    key: payload.sessionKey,
+  })
+
+  return gatewayRpc<DispatchGatewayResponse>('sessions.send', {
     sessionKey: payload.sessionKey,
     message: payload.message,
+    lane: 'subagent',
     deliver: false,
     timeoutMs: 120_000,
     idempotencyKey: payload.idempotencyKey,

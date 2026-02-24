@@ -58,6 +58,7 @@ import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usag
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiOpenclawUpdateRouteImport } from './routes/api/openclaw-update'
+import { Route as ApiOllamaHealthRouteImport } from './routes/api/ollama-health'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
@@ -353,6 +354,11 @@ const ApiPathsRoute = ApiPathsRouteImport.update({
 const ApiOpenclawUpdateRoute = ApiOpenclawUpdateRouteImport.update({
   id: '/api/openclaw-update',
   path: '/api/openclaw-update',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOllamaHealthRoute = ApiOllamaHealthRouteImport.update({
+  id: '/api/ollama-health',
+  path: '/api/ollama-health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
@@ -661,6 +667,7 @@ export interface FileRoutesByFullPath {
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
@@ -762,6 +769,7 @@ export interface FileRoutesByTo {
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
@@ -865,6 +873,7 @@ export interface FileRoutesById {
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
@@ -969,6 +978,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/ollama-health'
     | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
@@ -1070,6 +1080,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/ollama-health'
     | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
@@ -1172,6 +1183,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/ollama-health'
     | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
@@ -1275,6 +1287,7 @@ export interface RootRouteChildren {
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
+  ApiOllamaHealthRoute: typeof ApiOllamaHealthRoute
   ApiOpenclawUpdateRoute: typeof ApiOpenclawUpdateRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
@@ -1657,6 +1670,13 @@ declare module '@tanstack/react-router' {
       path: '/api/openclaw-update'
       fullPath: '/api/openclaw-update'
       preLoaderRoute: typeof ApiOpenclawUpdateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ollama-health': {
+      id: '/api/ollama-health'
+      path: '/api/ollama-health'
+      fullPath: '/api/ollama-health'
+      preLoaderRoute: typeof ApiOllamaHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/models': {
@@ -2147,6 +2167,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
+  ApiOllamaHealthRoute: ApiOllamaHealthRoute,
   ApiOpenclawUpdateRoute: ApiOpenclawUpdateRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,

@@ -48,7 +48,7 @@ export function useChatSessions({
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
     queryFn: fetchSessions,
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   })
   const storedTitles = useSessionTitles()
 

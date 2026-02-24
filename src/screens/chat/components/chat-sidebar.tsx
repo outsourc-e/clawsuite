@@ -62,28 +62,24 @@ import {
   MenuItem,
 } from '@/components/ui/menu'
 import { Sun02Icon, Moon02Icon } from '@hugeicons/core-free-icons'
+import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 
 function ThemeToggleMini() {
-  const [mounted, setMounted] = useState(false)
-  const [isDark, setIsDark] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (!mounted) return
-    setIsDark(document.documentElement.classList.contains('dark'))
-  }, [mounted])
+  const theme = useSettingsStore((state) => state.settings.theme)
+  const updateSettings = useSettingsStore((state) => state.updateSettings)
+  const isDark =
+    theme === 'dark' ||
+    (theme === 'system' &&
+      typeof document !== 'undefined' &&
+      document.documentElement.classList.contains('dark'))
 
   return (
     <button
       type="button"
       onClick={() => {
-        const next = !isDark
-        setIsDark(next)
-        document.documentElement.classList.toggle('dark', next)
-        localStorage.setItem('theme', next ? 'dark' : 'light')
+        const nextTheme = isDark ? 'light' : 'dark'
+        applyTheme(nextTheme)
+        updateSettings({ theme: nextTheme })
       }}
       className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}

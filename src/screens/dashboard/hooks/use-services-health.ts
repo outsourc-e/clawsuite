@@ -20,22 +20,30 @@ type GatewayNodesResponse = {
 
 type ServicesHealthProbe = {
   missionControlApi: { status: 'up' | 'down'; latencyMs?: number }
+  clawSuiteUi: { status: 'up' | 'down'; latencyMs?: number }
+  gateway: { status: 'up' | 'down'; latencyMs?: number }
   ollama: { status: 'up' | 'down'; latencyMs?: number }
 }
 
 function nowMs() {
-  return (typeof performance !== 'undefined' ? performance.now() : Date.now())
+  return typeof performance !== 'undefined' ? performance.now() : Date.now()
 }
 
-async function timedJsonFetch<T>(url: string): Promise<{
+async function timedJsonFetch<T>(
+  url: string,
+  timeoutMs = 2500,
+): Promise<{
   ok: boolean
   statusCode: number
   latencyMs: number
   data: T | null
 }> {
   const startedAt = nowMs()
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs)
+
   try {
-    const response = await fetch(url, { method: 'GET' })
+    const response = await fetch(url, { method: 'GET', signal: controller.signal })
     const latencyMs = Math.max(1, Math.round(nowMs() - startedAt))
     let data: T | null = null
     try {
@@ -51,6 +59,8 @@ async function timedJsonFetch<T>(url: string): Promise<{
       latencyMs: Math.max(1, Math.round(nowMs() - startedAt)),
       data: null,
     }
+  } finally {
+    globalThis.clearTimeout(timeout)
   }
 }
 
@@ -65,26 +75,40 @@ function extractNodeCount(value: unknown): number {
 }
 
 async function fetchServicesHealthProbe(): Promise<ServicesHealthProbe> {
-  const [gatewayStatus, gatewayNodes] = await Promise.all([
-    timedJsonFetch<GatewayStatusResponse>('/api/gateway/status'),
-    timedJsonFetch<GatewayNodesResponse>('/api/gateway/nodes'),
+  const [uiProbe, gatewayStatus, gatewayNodes] = await Promise.all([
+    timedJsonFetch<Record<string, unknown>>('/api/ping', 2500),
+    timedJsonFetch<GatewayStatusResponse>('/api/gateway/status', 2500),
+    timedJsonFetch<GatewayNodesResponse>('/api/gateway/nodes', 2500),
   ])
+
+  const clawSuiteUi = uiProbe.ok
+    ? { status: 'up' as const, latencyMs: uiProbe.latencyMs }
+    : { status: 'down' as const, latencyMs: uiProbe.latencyMs }
 
   const missionControlApi =
     gatewayStatus.ok && gatewayStatus.data?.ok === true
       ? { status: 'up' as const, latencyMs: gatewayStatus.latencyMs }
       : { status: 'down' as const, latencyMs: gatewayStatus.latencyMs }
 
+  const gateway = gatewayStatus.ok
+    ? { status: 'up' as const, latencyMs: gatewayStatus.latencyMs }
+    : { status: 'down' as const, latencyMs: gatewayStatus.latencyMs }
+
   const hasOllamaNodes =
     gatewayNodes.ok &&
     gatewayNodes.data?.ok === true &&
     extractNodeCount(gatewayNodes.data.data) > 0
 
-  const ollama = hasOllamaNodes
-    ? { status: 'up' as const, latencyMs: gatewayNodes.latencyMs }
-    : { status: 'down' as const, latencyMs: gatewayNodes.latencyMs }
+  const ollamaProbe = hasOllamaNodes
+    ? await timedJsonFetch<{ ok?: boolean }>('/api/ollama-health', 2500)
+    : null
 
-  return { missionControlApi, ollama }
+  const ollama =
+    hasOllamaNodes && ollamaProbe?.ok && ollamaProbe.data?.ok === true
+      ? { status: 'up' as const, latencyMs: ollamaProbe.latencyMs }
+      : { status: 'down' as const, latencyMs: ollamaProbe?.latencyMs ?? gatewayNodes.latencyMs }
+
+  return { missionControlApi, clawSuiteUi, gateway, ollama }
 }
 
 export function useServicesHealth(gatewayConnected: boolean) {
@@ -107,11 +131,15 @@ export function useServicesHealth(gatewayConnected: boolean) {
       },
       {
         name: 'ClawSuite UI',
-        status: 'up',
+        status: isChecking ? 'checking' : (probe?.clawSuiteUi.status ?? 'down'),
+        latencyMs: probe?.clawSuiteUi.latencyMs,
       },
       {
         name: 'OpenClaw Gateway',
-        status: gatewayConnected ? 'up' : 'down',
+        status: isChecking
+          ? 'checking'
+          : (probe?.gateway.status ?? (gatewayConnected ? 'up' : 'down')),
+        latencyMs: probe?.gateway.latencyMs,
       },
       {
         name: 'Ollama',
@@ -126,4 +154,3 @@ export function useServicesHealth(gatewayConnected: boolean) {
     services,
   }
 }
-

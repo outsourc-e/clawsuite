@@ -91,6 +91,11 @@ export type GatewayModelSwitchResponse = {
   [key: string]: unknown
 }
 
+export type GatewayModelDefaultResponse = {
+  ok?: boolean
+  error?: string
+}
+
 export type GatewayAgentActionResponse = {
   ok?: boolean
   error?: string
@@ -210,6 +215,46 @@ export async function switchModel(
         typeof payload.error === 'string' && payload.error.trim().length > 0
           ? payload.error
           : response.statusText || 'Failed to switch model'
+      throw new Error(message)
+    }
+
+    return payload
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error('Request timed out')
+    }
+    throw error
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
+}
+
+export async function setDefaultModel(
+  model: string,
+): Promise<GatewayModelDefaultResponse> {
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 12000)
+
+  try {
+    const response = await fetch(makeEndpoint('/api/config-patch'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        raw: JSON.stringify({ defaultModel: model }, null, 2),
+        reason: 'Studio: set default model',
+      }),
+      signal: controller.signal,
+    })
+
+    const payload = (await response
+      .json()
+      .catch(() => ({}))) as GatewayModelDefaultResponse
+
+    if (!response.ok || payload.ok === false) {
+      const message =
+        typeof payload.error === 'string' && payload.error.trim().length > 0
+          ? payload.error
+          : response.statusText || 'Failed to persist default model'
       throw new Error(message)
     }
 
