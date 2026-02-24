@@ -325,6 +325,7 @@ export function AgentCard({
         className={cn(
           'group relative overflow-visible rounded-3xl border border-primary-300/80 bg-primary-100/70 shadow-md backdrop-blur-sm',
           'w-full p-3',
+          isCompact ? 'col-span-2' : '',
           className,
         )}
       >

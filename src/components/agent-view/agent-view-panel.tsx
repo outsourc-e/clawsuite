@@ -184,7 +184,14 @@ function OrchestratorCard({
           compact ? 'gap-2' : 'flex-col text-center gap-2',
         )}
       >
-        <OrchestratorAvatar size={compact ? 32 : 52} />
+        <div className="flex flex-col items-center gap-0.5">
+          <OrchestratorAvatar size={compact ? 32 : 52} />
+          {!compact ? (
+            <span className="rounded bg-accent-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent-700">
+              Main Agent
+            </span>
+          ) : null}
+        </div>
 
         <div className="min-w-0 flex-1">
           <div
@@ -212,18 +219,13 @@ function OrchestratorCard({
                 type="button"
                 onClick={startEdit}
                 className={cn(
-                  'font-semibold text-primary-900 hover:text-accent-600 transition-colors',
+                  'font-semibold text-primary-900 transition-colors hover:text-accent-600',
                   compact ? 'text-[11px]' : 'text-xs',
                 )}
                 title="Click to rename"
               >
                 {displayName}
               </button>
-            )}
-            {!compact && (
-              <span className="rounded-full bg-accent-500/15 px-1.5 py-0.5 text-[9px] font-medium text-accent-600">
-                Main Agent
-              </span>
             )}
           </div>
           <p
@@ -234,23 +236,17 @@ function OrchestratorCard({
           >
             {label}
           </p>
-          {!compact && model && (
+          {!compact && model ? (
             <p className="mt-0.5 truncate text-[9px] font-mono text-primary-500">
               {model}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
   )
 }
 
-function getHistoryPillClassName(status: 'success' | 'failed'): string {
-  if (status === 'failed') {
-    return 'border-red-500/50 bg-red-500/10 text-red-300'
-  }
-  return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-}
 
 function getStatusLabel(status: AgentNodeStatus): string {
   if (status === 'failed') return 'failed'
@@ -340,7 +336,7 @@ export function AgentViewPanel() {
     statusLabel: string
   } | null>(null)
   const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
-  const [browserPreviewExpanded, setBrowserPreviewExpanded] = useState(true)
+  const [browserPreviewExpanded, setBrowserPreviewExpanded] = useState(false)
   const cliAgentsQuery = useCliAgents()
   const cliAgents = cliAgentsQuery.data ?? []
   // Auto: expanded avatar when idle, compact when agents are working
@@ -875,32 +871,27 @@ export function AgentViewPanel() {
                         </span>
                       </div>
                       <CollapsiblePanel contentClassName="pt-1">
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="space-y-1">
                           {historyAgents
                             .slice(0, 10)
-                            .map(function renderHistoryPill(item) {
+                            .map(function renderHistoryRow(item) {
                               return (
                                 <button
                                   key={item.id}
                                   type="button"
-                                  className={cn(
-                                    'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tabular-nums',
-                                    getHistoryPillClassName(item.status),
-                                  )}
+                                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
                                   onClick={function handleHistoryView() {
                                     setOpen(false)
                                     navigate({ to: '/agent-swarm' })
                                   }}
                                 >
-                                  <HugeiconsIcon
-                                    icon={Link01Icon}
-                                    size={20}
-                                    strokeWidth={1.5}
-                                  />
-                                  <span className="truncate">{item.name}</span>
-                                  <span className="opacity-80">
-                                    {formatCost(item.cost)}
-                                  </span>
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={1.5} className="shrink-0 text-primary-500" />
+                                    <span className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-200">
+                                      {item.name}
+                                    </span>
+                                  </div>
+                                  <span className="ml-2 shrink-0 text-[10px] text-neutral-500">{formatCost(item.cost)}</span>
                                 </button>
                               )
                             })}
@@ -910,94 +901,91 @@ export function AgentViewPanel() {
                   </section>
                 ) : null}
 
-                <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
-                  <Collapsible
-                    open={cliAgentsExpanded}
-                    onOpenChange={setCliAgentsExpanded}
-                  >
-                    <div className="flex items-center justify-between">
-                      <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
-                        <HugeiconsIcon
-                          icon={
-                            cliAgentsExpanded
-                              ? ArrowDown01Icon
-                              : ArrowRight01Icon
-                          }
-                          size={20}
-                          strokeWidth={1.5}
-                        />
-                        ⚡ CLI Agents
-                      </CollapsibleTrigger>
-                      <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
-                        {cliAgents.length}
-                      </span>
-                    </div>
-                    <CollapsiblePanel contentClassName="pt-1">
-                      <div className="space-y-0.5">
-                        {cliAgentsQuery.isLoading ? (
-                          <p className="px-2 py-1 text-[11px] text-primary-500 tabular-nums">
-                            Scanning...
-                          </p>
-                        ) : null}
-                        {!cliAgentsQuery.isLoading && !cliAgents.length ? (
-                          <p className="px-2 py-1 text-[11px] text-primary-500">
-                            No agents running
-                          </p>
-                        ) : null}
-                        {cliAgents.map(function renderCliAgent(agent) {
-                          const progressPct =
-                            agent.status === 'finished'
-                              ? 100
-                              : Math.min(
-                                  95,
-                                  Math.round(
-                                    (agent.runtimeSeconds / 600) * 100,
-                                  ),
-                                )
-                          return (
-                            <div
-                              key={agent.pid}
-                              className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className={cn(
-                                    'size-1.5 shrink-0 rounded-full',
-                                    agent.status === 'running'
-                                      ? 'bg-emerald-500'
-                                      : 'bg-gray-400',
-                                  )}
-                                />
-                                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800">
-                                  {agent.name}
-                                </span>
-                                <span className="shrink-0 text-[10px] text-primary-500 tabular-nums">
-                                  {formatRuntimeLabel(agent.runtimeSeconds)}
-                                </span>
-                              </div>
-                              {agent.task ? (
-                                <p className="mt-0.5 truncate pl-3 text-[10px] text-primary-500">
-                                  {summarizeTask(agent.task)}
-                                </p>
-                              ) : null}
-                              <div className="mt-1 ml-3 h-1 overflow-hidden rounded-full bg-primary-200">
-                                <div
-                                  className={cn(
-                                    'h-full rounded-full transition-all duration-500',
-                                    agent.status === 'finished'
-                                      ? 'bg-primary-400'
-                                      : 'bg-emerald-400',
-                                  )}
-                                  style={{ width: `${progressPct}%` }}
-                                />
-                              </div>
-                            </div>
-                          )
-                        })}
+                {(cliAgentsQuery.isLoading || cliAgents.length > 0) ? (
+                  <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
+                    <Collapsible
+                      open={cliAgentsExpanded}
+                      onOpenChange={setCliAgentsExpanded}
+                    >
+                      <div className="flex items-center justify-between">
+                        <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
+                          <HugeiconsIcon
+                            icon={
+                              cliAgentsExpanded
+                                ? ArrowDown01Icon
+                                : ArrowRight01Icon
+                            }
+                            size={20}
+                            strokeWidth={1.5}
+                          />
+                          ⚡ CLI Agents
+                        </CollapsibleTrigger>
+                        <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
+                          {cliAgents.length}
+                        </span>
                       </div>
-                    </CollapsiblePanel>
-                  </Collapsible>
-                </section>
+                      <CollapsiblePanel contentClassName="pt-1">
+                        <div className="space-y-0.5">
+                          {cliAgentsQuery.isLoading ? (
+                            <p className="px-2 py-1 text-[11px] text-primary-500 tabular-nums">
+                              Scanning...
+                            </p>
+                          ) : null}
+                          {cliAgents.map(function renderCliAgent(agent) {
+                            const progressPct =
+                              agent.status === 'finished'
+                                ? 100
+                                : Math.min(
+                                    95,
+                                    Math.round(
+                                      (agent.runtimeSeconds / 600) * 100,
+                                    ),
+                                  )
+                            return (
+                              <div
+                                key={agent.pid}
+                                className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={cn(
+                                      'size-1.5 shrink-0 rounded-full',
+                                      agent.status === 'running'
+                                        ? 'bg-emerald-500'
+                                        : 'bg-gray-400',
+                                    )}
+                                  />
+                                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800">
+                                    {agent.name}
+                                  </span>
+                                  <span className="shrink-0 text-[10px] text-primary-500 tabular-nums">
+                                    {formatRuntimeLabel(agent.runtimeSeconds)}
+                                  </span>
+                                </div>
+                                {agent.task ? (
+                                  <p className="mt-0.5 truncate pl-3 text-[10px] text-primary-500">
+                                    {summarizeTask(agent.task)}
+                                  </p>
+                                ) : null}
+                                <div className="mt-1 ml-3 h-1 overflow-hidden rounded-full bg-primary-200">
+                                  <div
+                                    className={cn(
+                                      'h-full rounded-full transition-all duration-500',
+                                      agent.status === 'finished'
+                                        ? 'bg-primary-400'
+                                        : 'bg-emerald-400',
+                                    )}
+                                    style={{ width: `${progressPct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </CollapsiblePanel>
+                    </Collapsible>
+                  </section>
+                ) : null}
 
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
                   <Collapsible
@@ -1015,7 +1003,7 @@ export function AgentViewPanel() {
                           size={20}
                           strokeWidth={1.5}
                         />
-                        🌐 Browser
+                        🌐 Browser {browserPreviewExpanded ? '' : '— inactive'}
                       </CollapsibleTrigger>
                     </div>
                     <CollapsiblePanel contentClassName="pt-1">
