@@ -1057,6 +1057,63 @@ const REPORT_META_LINE_PATTERNS = [
   /^(?:\*\*|__)?\s*⚠️?\s*note:\s*.*\b(truncat(?:ed|ion)?|cut off|context|prompt|message)\b/i,
 ] as const
 
+const REPORT_BOILERPLATE_LINE_PATTERNS = [
+  /^\s*(?:#{1,6}\s*)?task\s*\d+\s*(?:\/|of)\s*\d+\b/i,
+  /^\s*(?:#{1,6}\s*)?missiontask\b/i,
+  /^\s*(?:#{1,6}\s*)?(?:status|state)\s*:\s*(?:queued|running|in[_\s-]?progress|done|completed|pending|failed|blocked)\b/i,
+  /^\s*(?:[-*+]\s*)?(?:✅|✔️|☑️|✓|✔)\s*$/,
+  /^\s*(?:[-*+]\s*)?(?:task|step)\s*(?:status|summary)\b/i,
+] as const
+
+const DEDUP_STOP_WORDS = new Set([
+  'the',
+  'and',
+  'for',
+  'with',
+  'that',
+  'this',
+  'from',
+  'into',
+  'were',
+  'was',
+  'are',
+  'is',
+  'has',
+  'have',
+  'had',
+  'been',
+  'will',
+  'would',
+  'should',
+  'could',
+  'about',
+  'after',
+  'before',
+  'while',
+  'than',
+  'then',
+  'also',
+  'only',
+  'very',
+  'more',
+  'most',
+  'just',
+  'into',
+  'onto',
+  'over',
+  'under',
+  'through',
+  'their',
+  'there',
+  'they',
+  'them',
+  'your',
+  'our',
+  'you',
+  'its',
+  'not',
+])
+
 const GOAL_HARDWARE_KEYWORDS = /\b(gpu|cpu|hardware|card|vram|ram|nvidia|amd|chip|accelerator)\b/i
 const HARDWARE_ASSUMPTION_PATTERN =
   /\b(assum(?:e|ing|ption)|unclear|unknown|missing|not provided|can['’]?t verify)\b.{0,80}\b(gpu|cpu|hardware|card|vram|ram|nvidia|amd|chip|accelerator)\b/i
@@ -1097,7 +1154,22 @@ function scoreInsightLine(line: string, goalTokens: Set<string>): number {
 }
 
 function normalizeInsightLine(line: string, missionGoal = ''): string | null {
-  const normalized = line
+  const withoutMarkdownNoise = line
+    .replace(/^\s*>+\s*/, '')
+    .replace(/^\s*#{1,6}\s+/, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/!\[[^\]]*]\([^)]+\)/g, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/`{1,3}([^`]+)`{1,3}/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/^[\s\-*+|]+/, '')
+    .replace(/\s*(?:\*\*|__|`+|#+)\s*$/g, '')
+    .trim()
+
+  if (REPORT_BOILERPLATE_LINE_PATTERNS.some((pattern) => pattern.test(withoutMarkdownNoise))) return null
+
+  const normalized = withoutMarkdownNoise
     .replace(/^\s*(?:\*\*|__)+\s*/, '')
     .replace(/^\s*[-*+]\s*/, '')
     .replace(/^\s*\d+\s*[.)-]\s*/, '')
@@ -1112,15 +1184,50 @@ function normalizeInsightLine(line: string, missionGoal = ''): string | null {
   return normalized
 }
 
+function canonicalizeInsightLine(line: string): string {
+  return line
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function insightTokenSet(line: string): Set<string> {
+  return new Set(
+    canonicalizeInsightLine(line)
+      .split(' ')
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 3 && !DEDUP_STOP_WORDS.has(token)),
+  )
+}
+
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0
+  let intersection = 0
+  a.forEach((token) => {
+    if (b.has(token)) intersection += 1
+  })
+  const union = new Set([...a, ...b]).size
+  return union > 0 ? intersection / union : 0
+}
+
+function areNearDuplicateLines(a: string, b: string): boolean {
+  const aNormalized = canonicalizeInsightLine(a)
+  const bNormalized = canonicalizeInsightLine(b)
+  if (!aNormalized || !bNormalized) return false
+  if (aNormalized === bNormalized) return true
+  if (aNormalized.length > 24 && bNormalized.length > 24 && (aNormalized.includes(bNormalized) || bNormalized.includes(aNormalized))) {
+    return true
+  }
+  return jaccardSimilarity(insightTokenSet(a), insightTokenSet(b)) >= 0.78
+}
+
 function uniqueNormalizedLines(lines: string[], missionGoal = ''): string[] {
   const next: string[] = []
-  const seen = new Set<string>()
   lines.forEach((line) => {
     const normalized = normalizeInsightLine(line, missionGoal)
     if (!normalized) return
-    const key = normalized.toLowerCase()
-    if (seen.has(key)) return
-    seen.add(key)
+    if (next.some((existing) => areNearDuplicateLines(existing, normalized))) return
     next.push(normalized)
   })
   return next
@@ -1151,6 +1258,51 @@ function pickTopFindings(lines: string[], missionGoal: string, limit = 3): strin
     .filter((entry) => entry.score >= 4)
     .slice(0, limit)
     .map((entry) => entry.line)
+}
+
+function isConcreteOutcomeLine(line: string): boolean {
+  if (/\b(recommend|should|next step|propose|decision|consider)\b/i.test(line)) return false
+  if (/\b(found|identified|observed|validated|measured|implemented|fixed|completed|reduced|increased|shipped|created)\b/i.test(line)) {
+    return true
+  }
+  return /\d/.test(line) && /\b(test|coverage|latency|throughput|cost|artifact|file|endpoint|report)\b/i.test(line)
+}
+
+function filterOutDuplicateInsights(lines: string[], excluded: string[], missionGoal: string, limit: number): string[] {
+  const normalizedExcluded = uniqueNormalizedLines(excluded, missionGoal)
+  const next: string[] = []
+  lines.forEach((line) => {
+    if (next.length >= limit) return
+    if (normalizedExcluded.some((excludedLine) => areNearDuplicateLines(excludedLine, line))) return
+    if (next.some((existing) => areNearDuplicateLines(existing, line))) return
+    next.push(line)
+  })
+  return next
+}
+
+function synthesizeActionableRecommendations(
+  outcomes: string[],
+  payload: MissionReportPayload,
+  limit = 2,
+): string[] {
+  const drafted: string[] = []
+  outcomes.slice(0, 4).forEach((outcome) => {
+    if (drafted.length >= limit) return
+    if (/\b(risk|blocker|unknown|uncertain|gap|missing|error|regression|failed)\b/i.test(outcome)) {
+      drafted.push(`Resolve the identified issue: ${outcome}`)
+      return
+    }
+    drafted.push(`Ship and verify this outcome in the target workflow: ${outcome}`)
+  })
+
+  if (drafted.length < limit) {
+    const incompleteTasks = payload.tasks.filter((task) => !['done', 'completed'].includes(String(task.status).toLowerCase()))
+    incompleteTasks.slice(0, limit - drafted.length).forEach((task) => {
+      drafted.push(`Close remaining task: ${task.title}`)
+    })
+  }
+
+  return uniqueNormalizedLines(drafted, payload.goal).slice(0, limit)
 }
 
 function buildNextActionsChecklist(payload: MissionReportPayload, recommendations: string[], unresolvedRisks: string[]): string[] {
@@ -1186,33 +1338,54 @@ function generateMissionReport(payload: MissionReportPayload): string {
     allAgentLines,
     /\b(recommend|should|next step|propose|decision|action required|prioritize)\b/i,
     payload.goal,
-    6,
+    4,
   )
   const unresolvedRisks = pickLinesByPattern(
     allAgentLines,
     /\b(risk|unknown|uncertain|blocker|open question|tbd|dependency|assumption|gap)\b/i,
     payload.goal,
-    6,
+    4,
   )
-  const topFindings = pickTopFindings(allAgentLines, payload.goal, 3)
-  const hasHighConfidenceOutcomes = topFindings.length > 0
-  const effectiveRecommendations = hasHighConfidenceOutcomes ? recommendations : []
-  const effectiveUnresolvedRisks = hasHighConfidenceOutcomes ? unresolvedRisks : []
-  const nextActions = buildNextActionsChecklist(payload, effectiveRecommendations, effectiveUnresolvedRisks)
+  const topFindings = pickTopFindings(allAgentLines, payload.goal, 4)
+  const concreteOutcomes = topFindings.filter((line) => isConcreteOutcomeLine(line))
+  const keyOutcomes = (concreteOutcomes.length > 0 ? concreteOutcomes : topFindings).slice(0, 3)
+  const explicitRecommendations = uniqueNormalizedLines(recommendations, payload.goal).slice(0, 2)
+  const effectiveRecommendations =
+    explicitRecommendations.length > 0
+      ? explicitRecommendations
+      : synthesizeActionableRecommendations(keyOutcomes, payload, 2)
+  const effectiveUnresolvedRisks = uniqueNormalizedLines(unresolvedRisks, payload.goal).slice(0, 3)
+  const hasHighConfidenceOutcomes = keyOutcomes.length > 0
+  const fallbackRecommendations =
+    effectiveRecommendations.length > 0
+      ? effectiveRecommendations
+      : [`Define owner and deadline to deliver mission goal: ${truncateMissionGoal(payload.goal || 'untitled goal', 120)}`]
+  const nextActions = buildNextActionsChecklist(
+    payload,
+    hasHighConfidenceOutcomes ? fallbackRecommendations : [],
+    hasHighConfidenceOutcomes ? effectiveUnresolvedRisks : [],
+  )
   const completedRatio = taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0
   const lines: string[] = []
 
   lines.push(`# Mission Report${payload.name ? `: ${payload.name}` : ''}`)
   lines.push('')
   lines.push('## Executive Summary')
-  lines.push(`- ${taskStats.completed}/${taskStats.total} tasks completed (${completedRatio}%) in ${formatDuration(durationMs)} with ${payload.team.length} agents.`)
-  lines.push(`- Consumed ${payload.tokenCount.toLocaleString()} tokens (~$${costEstimate.toFixed(2)} estimated cost).`)
-  lines.push(`- Produced ${payload.artifacts.length} artifacts and ${payload.agentSummaries.length} agent contribution streams.`)
-  if (topFindings.length > 0) {
-    topFindings.forEach((finding) => lines.push(`- Key outcome: ${finding}`))
+  const executiveSummary: string[] = [
+    `${taskStats.completed}/${taskStats.total} tasks completed (${completedRatio}%) in ${formatDuration(durationMs)} with ${payload.team.length} agents.`,
+    `Consumed ${payload.tokenCount.toLocaleString()} tokens (~$${costEstimate.toFixed(2)} estimated cost).`,
+    `Produced ${payload.artifacts.length} artifacts and ${payload.agentSummaries.length} agent contribution streams.`,
+  ]
+  if (keyOutcomes.length > 0) executiveSummary.push(`Primary outcome: ${keyOutcomes[0]}`)
+  uniqueNormalizedLines(executiveSummary, payload.goal)
+    .slice(0, 4)
+    .forEach((line) => lines.push(`- ${line}`))
+  lines.push('')
+  lines.push('## Key Outcomes')
+  if (keyOutcomes.length === 0) {
+    lines.push('- No high-confidence outcomes extracted from agent output.')
   } else {
-    lines.push('- Key outcome: No high-confidence findings extracted from agent output.')
-    lines.push('- Key outcome: Rerun mission with clearer task decomposition to improve report signal.')
+    keyOutcomes.slice(0, 3).forEach((finding) => lines.push(`- ${finding}`))
   }
   lines.push('')
   lines.push('## Mission Overview')
@@ -1242,29 +1415,30 @@ function generateMissionReport(payload: MissionReportPayload): string {
   } else {
     payload.agentSummaries.forEach((summary) => {
       lines.push(`### ${summary.agentName} (${summary.modelId || 'unknown'})`)
-      const findings = pickTopFindings(summary.lines, payload.goal, 3)
+      const findings = pickTopFindings(summary.lines, payload.goal, 4)
       const recs = pickLinesByPattern(summary.lines, /\b(recommend|should|next step|propose|decision)\b/i, payload.goal, 2)
       const risks = pickLinesByPattern(summary.lines, /\b(risk|unknown|blocker|open question|dependency|gap)\b/i, payload.goal, 2)
+      const agentFindings = filterOutDuplicateInsights(
+        [...findings, ...recs, ...risks],
+        keyOutcomes,
+        payload.goal,
+        2,
+      )
       if (summary.lines.length === 0) {
         lines.push('- No output captured')
       } else {
-        if (findings.length > 0) findings.forEach((line) => lines.push(`- Finding: ${line}`))
-        if (findings.length > 0 && recs.length > 0) recs.forEach((line) => lines.push(`- Recommendation: ${line}`))
-        if (findings.length > 0 && risks.length > 0) risks.forEach((line) => lines.push(`- Risk/Open question: ${line}`))
-        if (findings.length === 0 && recs.length === 0 && risks.length === 0) {
+        if (agentFindings.length > 0) {
+          agentFindings.forEach((line) => lines.push(`- ${line}`))
+        }
+        if (agentFindings.length === 0) {
           lines.push('- No high-confidence outcomes extracted after filtering.')
         }
-        lines.push(`- Output lines captured: ${summary.lines.length}`)
       }
       lines.push('')
     })
   }
   lines.push('## Decisions And Recommendations')
-  if (effectiveRecommendations.length === 0) {
-    lines.push('- No explicit recommendations were captured. Review per-agent findings for follow-ups.')
-  } else {
-    effectiveRecommendations.forEach((line) => lines.push(`- ${line}`))
-  }
+  fallbackRecommendations.forEach((line) => lines.push(`- ${line}`))
   lines.push('')
   lines.push('## Artifacts And Files Produced')
   if (payload.artifacts.length === 0) {
@@ -6951,14 +7125,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {/* Live output */}
               <div className="min-h-0 flex-1 overflow-hidden px-5 py-3">
                 <div className="grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-                  <div className="min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50/60 dark:border-neutral-700 dark:bg-neutral-950/40">
+                  <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50/60 dark:border-neutral-700 dark:bg-neutral-950/40">
                     <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                         Agent Output
                       </p>
                       <p className="text-[10px] text-neutral-400 dark:text-neutral-500">Live stream</p>
                     </div>
-                    <div className="h-full min-h-[200px]">
+                    <div className="min-h-0 flex-1">
                       {popupSessionKey ? (
                         <AgentOutputPanel
                           sessionKey={popupSessionKey}
@@ -6975,7 +7149,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       )}
                     </div>
                   </div>
-                  <div className="min-h-0 overflow-auto rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+                  <div className="h-full min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                       Quick Edit
                     </p>

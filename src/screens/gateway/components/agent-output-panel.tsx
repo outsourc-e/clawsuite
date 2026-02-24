@@ -348,7 +348,7 @@ export function AgentOutputPanel({
           ref={scrollRef}
           className={cn(
             'overflow-y-auto rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-[11px] leading-relaxed text-neutral-900 dark:text-neutral-100',
-            compact ? 'h-full min-h-[120px]' : 'mt-1 min-h-[300px] flex-1 text-sm leading-6',
+            compact ? 'min-h-0 flex-1' : 'mt-1 min-h-[300px] flex-1 text-sm leading-6',
           )}
         >
           {messages.length === 0 && !sessionEnded ? (
@@ -402,7 +402,7 @@ export function AgentOutputPanel({
         </div>
       ) : (
         // Fallback placeholder when no sessionKey
-        <div className={cn('rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-sm leading-6 text-neutral-900 dark:text-neutral-100', compact ? 'flex-1' : 'mt-1 min-h-[300px]')}>
+        <div className={cn('rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-sm leading-6 text-neutral-900 dark:text-neutral-100', compact ? 'min-h-0 flex-1 overflow-y-auto' : 'mt-1 min-h-[300px]')}>
           {tasks.length === 0 ? (
             <p className="text-neutral-500">No dispatched tasks yet.</p>
           ) : (
