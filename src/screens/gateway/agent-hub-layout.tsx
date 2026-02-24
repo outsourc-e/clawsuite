@@ -5448,6 +5448,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </section>
 
                 <MissionTimeline tasks={missionTasks} agentOutputs={new Map(Object.entries(agentOutputLines))}
+                  agentSessionMap={agentSessionMap}
                   agentStatuses={new Map(
                     Object.entries(agentSessionStatus).map(([id, s]) => [
                       id,

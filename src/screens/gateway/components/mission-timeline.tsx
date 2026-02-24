@@ -2,10 +2,12 @@ import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import type { TeamMember } from './team-panel'
 import type { HubTask } from './task-board'
+import { AgentOutputPanel } from './agent-output-panel'
 
 type MissionTimelineProps = {
   tasks: HubTask[]
   agentOutputs: Map<string, string[]>
+  agentSessionMap?: Record<string, string>
   agentStatuses: Map<string, { status: string; lastSeen: number }>
   missionState: string
   missionGoal: string
@@ -49,6 +51,7 @@ function sessionBadgeClass(status: string): string {
 export function MissionTimeline({
   tasks,
   agentOutputs,
+  agentSessionMap,
   agentStatuses,
   missionState,
   missionGoal,
@@ -151,7 +154,6 @@ export function MissionTimeline({
           {teamMembers.map((member) => {
             const status = agentStatuses.get(member.id)
             const outputs = agentOutputs.get(member.id) ?? []
-            const latestOutput = outputs[outputs.length - 1]
             const doneTasks = doneByAgent.get(member.id) ?? []
             const estTokens = outputs.join(' ').trim().length > 0
               ? Math.ceil(outputs.join(' ').length / 4)
@@ -180,16 +182,21 @@ export function MissionTimeline({
                     </div>
                   ) : null}
 
-                  <details className="mt-2 rounded-lg border border-neutral-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-800" open={Boolean(latestOutput)}>
-                    <summary className="cursor-pointer text-[11px] font-medium text-neutral-700 dark:text-slate-300">Live output</summary>
-                    <div className="mt-2 max-h-36 overflow-auto space-y-1 break-words font-mono text-[11px] text-neutral-600 dark:text-slate-300">
-                      {outputs.length === 0 ? (
-                        <p className="text-neutral-400">No output yet.</p>
-                      ) : (
-                        outputs.slice(-6).map((line, idx) => <p key={`${member.id}-line-${idx}`}>{line}</p>)
-                      )}
+                  {agentSessionMap?.[member.id] ? (
+                    <div className="mt-2 overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+                      <AgentOutputPanel
+                        compact
+                        agentName={member.name}
+                        sessionKey={agentSessionMap[member.id]}
+                        tasks={tasks.filter((t) => t.agentId === member.id)}
+                        onClose={() => {}}
+                      />
                     </div>
-                  </details>
+                  ) : (
+                    <div className="mt-2 rounded-lg border border-neutral-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-800">
+                      <p className="text-[11px] text-neutral-400">Waiting for agent session...</p>
+                    </div>
+                  )}
 
                   {doneTasks.length > 0 ? (
                     <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50/60 px-2.5 py-2 dark:border-blue-900/50 dark:bg-blue-900/20">
