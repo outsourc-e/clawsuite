@@ -492,9 +492,40 @@ export function ChatScreen({
     })
     // Dedup: SSE + history merge can produce duplicates (optimistic + SSE).
     // Prefer stable identifiers (id/messageId/clientId/nonce), then fallback signature.
+    // Bug 1 fix: also normalise clientId so that an optimistic message (key =
+    // "opt-<uuid>") and the server's confirmed copy (key = clientId "<uuid>")
+    // collapse to the same dedup slot, preferring the non-optimistic copy.
+    //
+    // Strategy:
+    //   1. Collect all candidate IDs, including extracting the bare UUID from
+    //      "__optimisticId" (strip the "opt-" prefix).
+    //   2. For each candidate key, mark it seen. The first message wins.
+    //   3. Before filtering, sort so that non-optimistic messages (server
+    //      confirmed, have a real .id) come before optimistic ones — this way
+    //      the server copy wins the dedup race.
+    const sortedForDedup = [...filtered].sort((a, b) => {
+      const aRaw = a as Record<string, unknown>
+      const bRaw = b as Record<string, unknown>
+      const aIsOptimistic =
+        normalizeMessageValue(aRaw.__optimisticId).startsWith('opt-') &&
+        !normalizeMessageValue(aRaw.id)
+      const bIsOptimistic =
+        normalizeMessageValue(bRaw.__optimisticId).startsWith('opt-') &&
+        !normalizeMessageValue(bRaw.id)
+      if (aIsOptimistic && !bIsOptimistic) return 1
+      if (!aIsOptimistic && bIsOptimistic) return -1
+      return 0
+    })
     const seen = new Set<string>()
-    const deduped = filtered.filter((msg) => {
+    const dedupedSet = new Set<GatewayMessage>()
+    for (const msg of sortedForDedup) {
       const raw = msg as Record<string, unknown>
+      const rawOptimisticId = normalizeMessageValue(raw.__optimisticId)
+      // Bare UUID from optimistic id — strips "opt-" prefix so that the
+      // optimistic and confirmed copies share the same dedup key.
+      const bareOptimisticUuid = rawOptimisticId.startsWith('opt-')
+        ? rawOptimisticId.slice(4)
+        : ''
       const idCandidates = [
         normalizeMessageValue(raw.id),
         normalizeMessageValue(raw.messageId),
@@ -502,7 +533,8 @@ export function ChatScreen({
         normalizeMessageValue(raw.client_id),
         normalizeMessageValue(raw.nonce),
         normalizeMessageValue(raw.idempotencyKey),
-        normalizeMessageValue(raw.__optimisticId),
+        bareOptimisticUuid,
+        rawOptimisticId,
       ].filter(Boolean)
 
       const primaryKey =
@@ -510,10 +542,17 @@ export function ChatScreen({
           ? `${msg.role}:id:${idCandidates[0]}`
           : `${msg.role}:fallback:${messageFallbackSignature(msg)}`
 
-      if (seen.has(primaryKey)) return false
+      if (seen.has(primaryKey)) continue
       seen.add(primaryKey)
-      return true
-    })
+      // Register all candidate keys so later messages that share any ID are
+      // collapsed (handles the optimistic-nonce = server-clientId overlap).
+      for (const candidate of idCandidates.slice(1)) {
+        seen.add(`${msg.role}:id:${candidate}`)
+      }
+      dedupedSet.add(msg)
+    }
+    // Restore original order (filtered array order, not sort order).
+    const deduped = filtered.filter((msg) => dedupedSet.has(msg))
 
     if (!isRealtimeStreaming) {
       return deduped

@@ -434,6 +434,53 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           if (histText === rtText) return true
         }
 
+        // Bug 1 fix: treat an optimistic/sending history message with same
+        // role + text content as matching the incoming realtime message, even
+        // when the gateway doesn't echo back clientId (e.g. paste/image sends
+        // where nonce is absent on the SSE event). This prevents the realtime
+        // message from being appended alongside the optimistic copy already in
+        // the history cache.
+        const histRaw = histMsg as Record<string, unknown>
+        const histIsOptimistic =
+          normalizeString(histRaw.status) === 'sending' ||
+          normalizeString(histRaw.__optimisticId).length > 0
+
+        if (histIsOptimistic && histMsg.role === rtMsg.role) {
+          // Text-based match (plain text messages)
+          if (rtText) {
+            const histText = extractTextFromContent(histMsg.content)
+            if (histText === rtText) return true
+          }
+          // Attachment-based match for paste/image messages: compare
+          // attachment names + sizes, which survive round-trip to the gateway.
+          const rtAttachments = Array.isArray((rtMsg as any).attachments)
+            ? (rtMsg as any).attachments as Array<Record<string, unknown>>
+            : []
+          const histAttachments = Array.isArray((histMsg as any).attachments)
+            ? (histMsg as any).attachments as Array<Record<string, unknown>>
+            : []
+          if (
+            rtAttachments.length > 0 &&
+            rtAttachments.length === histAttachments.length
+          ) {
+            const rtSig = rtAttachments
+              .map(
+                (a) =>
+                  `${normalizeString(a.name)}:${String(a.size ?? '')}`,
+              )
+              .sort()
+              .join('|')
+            const histSig = histAttachments
+              .map(
+                (a) =>
+                  `${normalizeString(a.name)}:${String(a.size ?? '')}`,
+              )
+              .sort()
+              .join('|')
+            if (rtSig && rtSig === histSig) return true
+          }
+        }
+
         return (
           rtSignature.length > 0 &&
           rtSignature === messageMultipartSignature(histMsg)
