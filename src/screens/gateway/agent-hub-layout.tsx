@@ -6978,9 +6978,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       </header>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-neutral-50/80 px-2 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+      <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-primary-50/60 px-4 md:px-6 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
         <div className="min-w-0 flex-1 overflow-x-auto">
-          <div className="flex min-w-max items-center">
+          <div className="flex w-full min-w-max items-center">
             {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'configure'
             ? approvals.filter(a => a.status === 'pending').length
@@ -6992,7 +6992,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'relative flex min-w-[108px] flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-all sm:min-w-[120px] sm:px-4',
+                'relative flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-all sm:px-4',
                 isActive
                   ? 'bg-white text-neutral-900 shadow-sm dark:bg-slate-700 dark:text-white'
                   : 'text-neutral-500 hover:bg-white hover:text-neutral-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white',

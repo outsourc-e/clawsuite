@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { cn } from '@/lib/utils'
 
 export type OpenClawStudioIconProps = {
@@ -11,6 +12,11 @@ export function OpenClawStudioIcon({
   animateDots = false,
   dotClassName,
 }: OpenClawStudioIconProps) {
+  // Each instance gets a unique gradient ID to prevent SVG defs collision
+  // when the icon is rendered multiple times on the same page.
+  const uid = useId().replace(/:/g, '')
+  const gradId = `orangeBg-${uid}`
+
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -19,7 +25,7 @@ export function OpenClawStudioIcon({
       className={className}
     >
       <defs>
-        <linearGradient id="orangeBgFinal" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" style={{ stopColor: '#ea580c', stopOpacity: 1 }} />
           <stop offset="50%" style={{ stopColor: '#f97316', stopOpacity: 1 }} />
           <stop
@@ -36,7 +42,7 @@ export function OpenClawStudioIcon({
         width="90"
         height="90"
         rx="16"
-        fill="url(#orangeBgFinal)"
+        fill={`url(#${gradId})`}
       />
 
       {/* Terminal window frame - dark outline, no fill */}
