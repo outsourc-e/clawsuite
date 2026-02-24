@@ -375,8 +375,10 @@ export function AgentCard({
 
         {/* Last output / task preview */}
         <div className="mb-3 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5">
-          <p className="mb-1 text-[10px] font-medium text-primary-600">Task</p>
-          <p className="text-[11px] leading-relaxed text-primary-800 line-clamp-3">{node.task}</p>
+          <p className="mb-1 text-[10px] font-medium text-primary-600">Last message</p>
+          <p className="text-[11px] leading-relaxed text-primary-800">
+            {node.task.length > 80 ? `${node.task.slice(0, 80)}…` : node.task}
+          </p>
         </div>
 
         {/* Compact stats */}

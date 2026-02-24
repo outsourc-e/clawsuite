@@ -407,11 +407,11 @@ function OrchestratorCard({
               type="button"
               onClick={canCycleOc ? cycleOcProvider : undefined}
               className={cn(
-                'flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest transition-colors',
+                'flex items-center gap-1 rounded px-1 text-[9px] font-semibold uppercase tracking-widest transition-colors',
                 canCycleOc
                   ? 'cursor-pointer text-primary-400 hover:text-primary-600'
                   : 'cursor-default text-primary-400',
-                providerFlash && 'text-emerald-500',
+                providerFlash && 'text-emerald-500 ring-1 ring-accent-400',
               )}
               title={canCycleOc ? 'Click to switch provider' : undefined}
             >

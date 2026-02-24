@@ -278,11 +278,11 @@ export function UsageMeterCompact() {
           type="button"
           onClick={canCycle ? cycleProvider : undefined}
           className={cn(
-            'flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest transition-colors',
+            'flex items-center gap-1 rounded px-1 text-[9px] font-semibold uppercase tracking-widest transition-colors',
             canCycle
               ? 'cursor-pointer text-neutral-400 hover:text-neutral-600'
               : 'cursor-default text-neutral-400',
-            providerFlash && 'text-emerald-500',
+            providerFlash && 'text-emerald-500 ring-1 ring-accent-400',
           )}
           title={canCycle ? 'Click to switch provider' : undefined}
           aria-label={canCycle ? 'Cycle provider' : undefined}
