@@ -2067,6 +2067,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return cp?.status === 'running' ? cp : null
   })
   const [restoreDismissed, setRestoreDismissed] = useState(false)
+  void restoreCheckpoint
+  void restoreDismissed
 
   // ── Existing state ──────────────────────────────────────────────────────────
   const [isMobileHub, setIsMobileHub] = useState(() =>
@@ -2076,7 +2078,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [missionGoal, setMissionGoal] = useState('')
   const [activeMissionName, setActiveMissionName] = useState('')
   const [activeMissionGoal, setActiveMissionGoal] = useState('')
-  const [missionBoardDrafts, setMissionBoardDrafts] = useState<MissionBoardDraft[]>([])
+  const [, setMissionBoardDrafts] = useState<MissionBoardDraft[]>([])
   const [missionBoardModalOpen, setMissionBoardModalOpen] = useState(false)
   const [missionWizardStep, setMissionWizardStep] = useState(0)
   const [newMissionName, setNewMissionName] = useState('')
@@ -3406,6 +3408,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     },
     [gatewayModelLabelById, spawnAgentSession],
   )
+  void handleRetrySpawn
 
   // ── Approval handlers ──────────────────────────────────────────────────────
   const handleApprove = useCallback((id: string) => {
@@ -5289,7 +5292,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       { id: 'active', label: 'Active Mission' },
       { id: 'history', label: 'History' },
     ]
-    const missionSubTabIndex = missionSubTabs.findIndex((t) => t.id === missionSubTab)
     const historyCards = missionHistory.map((cp) => {
       const completedTasks = cp.tasks.filter((t) => t.status === 'done' || t.status === 'completed').length
       const totalTasks = cp.tasks.length
@@ -5338,52 +5340,37 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const doneTaskCount = missionTasks.filter((task) => task.status === 'done').length
     const totalTaskCount = missionTasks.length
     const totalReportsCount = missionHistory.length || historyCards.length
-    const savedDraftCount = missionBoardDrafts.length
-    const hasRecoveredCheckpoint = Boolean(restoreCheckpoint && !restoreDismissed)
-
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 p-3 pb-24 sm:p-4 sm:pb-4 dark:bg-[var(--theme-bg,#0b0e14)]">
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
-        <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/90">
+      <div className="flex h-full min-h-0 flex-col bg-[#F5F5F0] p-3 pb-24 sm:p-4 sm:pb-4">
+        <div className="mx-auto flex w-full max-w-[960px] min-h-0 flex-1 flex-col gap-4">
+          <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-3 rounded-xl border border-[#E0E0E0] bg-white px-4 py-3">
             <div>
-              <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Mission Control</h2>
-              <p className="text-[11px] text-neutral-500 dark:text-slate-400">
-                Track active runs, review history, and launch new missions
-                {savedDraftCount > 0 ? ` · ${savedDraftCount} draft${savedDraftCount === 1 ? '' : 's'}` : ''}
-                {hasRecoveredCheckpoint ? ' · restore available' : ''}
-              </p>
+              <h2 className="text-2xl font-bold text-neutral-900">Mission Control</h2>
+              <p className="text-sm text-[#777]">Track active runs, review history, and launch new missions</p>
             </div>
             <div className="flex items-center gap-2">
               {missionActive ? (
                 <button
                   type="button"
                   onClick={() => stopMissionAndCleanup('aborted')}
-                  className="min-h-11 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 shadow-sm hover:bg-red-100"
+                  className="min-h-11 rounded-lg border border-[#E0E0E0] bg-white px-3 py-2 text-sm font-medium text-[#E8552E]"
                 >
+                  <span className="mr-2 text-[10px]">■</span>
                   Stop Mission
                 </button>
               ) : null}
               <button
                 type="button"
                 onClick={() => openNewMissionModal()}
-                className="min-h-11 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600"
+                className="min-h-11 rounded-lg bg-[#F57C00] px-3 py-2 text-sm font-semibold text-white hover:bg-[#E56B00]"
               >
                 New Mission
               </button>
             </div>
           </div>
 
-          <div className="-mx-1 overflow-x-auto px-1 pb-1">
-            <div className="relative flex min-w-[420px] items-center gap-2 rounded-xl border border-neutral-200 bg-white/80 p-1 dark:border-slate-700 dark:bg-slate-900/40">
-              <span
-                aria-hidden
-                className="pointer-events-none absolute bottom-1 h-[2px] rounded-full bg-orange-500 transition-transform duration-300 ease-out"
-                style={{
-                  width: 'calc((100% - 1rem) / 3)',
-                  transform: `translateX(calc(${Math.max(0, missionSubTabIndex)} * 100% + ${Math.max(0, missionSubTabIndex)} * 0.5rem))`,
-                }}
-              />
+          <div className="mx-auto -mx-1 w-full max-w-[960px] overflow-x-auto px-1 pb-1">
+            <div className="flex min-w-[420px] items-center gap-2 rounded-xl border border-[#E0E0E0] bg-white p-1">
               {missionSubTabs.map((tab) => {
                 const isActive = missionSubTab === tab.id
                 return (
@@ -5392,10 +5379,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     type="button"
                     onClick={() => setMissionSubTab(tab.id)}
                     className={cn(
-                      'relative z-10 flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+                      'relative z-10 flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full px-4 py-1.5 text-sm whitespace-nowrap',
                       isActive
-                        ? 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300'
-                        : 'text-neutral-600 hover:bg-neutral-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                        ? 'border border-[#F57C00] font-medium text-[#F57C00]'
+                        : 'border border-transparent font-normal text-[#333] hover:bg-[#F7F7F2]',
                     )}
                   >
                     {tab.label}
@@ -5407,58 +5394,67 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           <div className="min-h-0 flex-1 overflow-auto">
             {missionSubTab === 'overview' ? (
-              <div className="space-y-4">
+              <div className="mx-auto w-full max-w-[960px] space-y-4">
                 <div className="flex flex-wrap gap-3">
-                  <article className="min-w-[180px] flex-1 rounded-xl border border-neutral-200 bg-white p-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Mission State</p>
-                    <p className="mt-1 text-lg font-semibold text-neutral-900">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
+                  <article className="min-w-[180px] flex-1 rounded-xl border border-[#E0E0E0] bg-white p-4">
+                    <p className="text-[10px] uppercase tracking-wide text-[#888]">Mission State</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
                   </article>
-                  <article className="min-w-[180px] flex-1 rounded-xl border border-neutral-200 bg-white p-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Tasks</p>
-                    <p className="mt-1 text-lg font-semibold text-neutral-900">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
+                  <article className="min-w-[180px] flex-1 rounded-xl border border-[#E0E0E0] bg-white p-4">
+                    <p className="text-[10px] uppercase tracking-wide text-[#888]">Tasks</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
                   </article>
-                  <article className="min-w-[180px] flex-1 rounded-xl border border-neutral-200 bg-white p-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Total Reports</p>
-                    <p className="mt-1 text-lg font-semibold text-neutral-900">{totalReportsCount}</p>
+                  <article className="min-w-[180px] flex-1 rounded-xl border border-[#E0E0E0] bg-white p-4">
+                    <p className="text-[10px] uppercase tracking-wide text-[#888]">Total Reports</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900">{totalReportsCount}</p>
                   </article>
                 </div>
 
                 {missionActive ? (
-                  <section className="rounded-xl border border-neutral-200 bg-white p-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">Active Mission</p>
+                  <section className="rounded-xl border border-[#E0E0E0] bg-white p-5">
+                    <p className="text-[10px] uppercase tracking-wide text-[#888]">Active Mission</p>
                     <p className="mt-1 text-base font-semibold text-neutral-900">{activeMissionGoal || missionGoal || 'Untitled mission'}</p>
                     <button
                       type="button"
                       onClick={() => setMissionSubTab('active')}
-                      className="mt-4 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-semibold text-orange-700 hover:bg-orange-100"
+                      className="mt-4 rounded-lg border border-[#E0E0E0] bg-white px-3 py-1.5 text-sm font-medium text-[#E8552E]"
                     >
                       View Active Mission →
                     </button>
                   </section>
                 ) : (
-                  <section className="rounded-xl border border-neutral-200 bg-white p-12 text-center">
-                    <p className="text-base font-semibold text-neutral-900">No active mission</p>
-                    <p className="mt-1 text-sm text-neutral-400">Launch a mission to view live timeline activity.</p>
+                  <section className="flex min-h-[200px] items-center justify-center rounded-xl border border-[#E0E0E0] bg-white p-12 text-center">
+                    <div>
+                      <p className="text-base font-semibold text-neutral-900">No active mission</p>
+                      <p className="mt-1 text-sm text-[#777]">Launch a mission to view live timeline activity.</p>
+                      <button
+                        type="button"
+                        onClick={() => openNewMissionModal()}
+                        className="mt-4 rounded-lg bg-[#F57C00] px-3 py-2 text-sm font-semibold text-white hover:bg-[#E56B00]"
+                      >
+                        + New Mission
+                      </button>
+                    </div>
                   </section>
                 )}
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                  <section className="rounded-xl border border-[#E0E0E0] bg-white p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Recent Missions</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">Recent Missions</p>
                       <button type="button" onClick={() => setMissionSubTab('history')} className="text-[11px] font-medium text-orange-600 hover:text-orange-700">Open History</button>
                     </div>
                     {recentCompletedMissions.length === 0 ? (
-                      <p className="mt-3 text-sm text-neutral-500">No completed missions yet.</p>
+                      <p className="mt-3 text-sm text-[#777]">No completed missions yet.</p>
                     ) : (
                       <div className="mt-3 space-y-2">
                         {recentCompletedMissions.map((entry) => (
-                          <article key={entry.id} className="rounded-lg border border-neutral-100 bg-neutral-50/70 px-3 py-2">
+                          <article key={entry.id} className="rounded-lg border border-[#E0E0E0] bg-white px-3 py-2">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-neutral-900 dark:text-white">{entry.title}</p>
-                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Completed</span>
+                              <p className="text-sm font-semibold text-neutral-900">{entry.title}</p>
+                              <span className="rounded-full border border-[#E0E0E0] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#888]">Completed</span>
                             </div>
-                            <p className="mt-1 text-[11px] text-neutral-500 dark:text-slate-400">
+                            <p className="mt-1 text-[11px] text-[#777]">
                               {entry.duration} · {timeAgoFromMs(entry.completedAt)}
                             </p>
                           </article>
@@ -5466,10 +5462,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       </div>
                     )}
                   </section>
-                  <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Quick Launch Teams</p>
+                  <section className="rounded-xl border border-[#E0E0E0] bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">Quick Launch Teams</p>
                     {teamConfigs.length === 0 ? (
-                      <p className="mt-3 text-sm text-neutral-500 dark:text-slate-400">Save a team config in Configure to quick-launch missions here.</p>
+                      <p className="mt-3 text-sm text-[#777]">Save a team config in Configure to quick-launch missions here.</p>
                     ) : (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {teamConfigs.slice(0, 6).map((config) => (
@@ -5477,7 +5473,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             key={`ql-${config.id}`}
                             type="button"
                             onClick={() => openNewMissionModal({ teamConfigId: config.id, name: `Mission with ${config.name}` })}
-                            className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                            className="min-h-11 rounded-lg border border-[#E0E0E0] bg-white px-3 py-1.5 text-xs font-medium text-[#333] transition-colors hover:border-[#F57C00] hover:text-[#F57C00]"
                           >
                             {config.icon ?? '👥'} {config.name} · {config.team.length}
                           </button>
@@ -5491,18 +5487,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
             {missionSubTab === 'active' ? (
               missionActive ? (
-                <div className="space-y-4">
-                  <section className="mx-auto w-full max-w-5xl rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                <div className="mx-auto w-full max-w-[960px] space-y-4">
+                  <section className="mx-auto w-full max-w-[960px] rounded-xl border border-[#E0E0E0] bg-white p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">MISSION GOAL</p>
-                        <p className="mt-1 text-base font-semibold text-neutral-900 dark:text-white">{activeMissionGoal || missionGoal || ''}</p>
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-[#888]">MISSION GOAL</p>
+                        <p className="mt-1 text-base text-neutral-900">{activeMissionGoal || missionGoal || ''}</p>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Running</span>
-                        <button type="button" onClick={() => void handleMissionPause(false)} className="rounded-md bg-emerald-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-600">Start</button>
-                        <button type="button" onClick={() => void handleMissionPause(true)} className="rounded-md bg-amber-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-600">Pause</button>
-                      </div>
+                      <span className="rounded-full bg-[#00875A] px-2.5 py-1 text-xs text-white">Running</span>
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -5519,34 +5511,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           )
                         })}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-neutral-500 dark:text-slate-400">
-                        <span>{runningTaskStats.completed}/{runningTaskStats.total} tasks</span>
-                        <span>{runningElapsed}</span>
+                      <div className="flex items-center gap-3 text-sm text-[#777]">
+                        <span>{runningTaskStats.completed} / {runningTaskStats.total} tasks · {runningElapsed} elapsed</span>
                       </div>
                     </div>
 
-                    <div className="mt-3 h-1.5 rounded-full bg-neutral-100 dark:bg-slate-800">
-                      <div className="h-1.5 rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
+                    <div className="mt-3 h-1 rounded-full bg-[#E5E5E5]">
+                      <div className="h-1 rounded-full bg-[#F57C00] transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
                     </div>
                   </section>
 
-                  <section className="mx-auto w-full max-w-5xl rounded-xl border border-neutral-200 bg-white p-3.5 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
-                    <p className="text-xs font-semibold">Mission Progress</p>
-                    <p className="text-[11px] text-neutral-500 dark:text-slate-400">{runningTaskStats.completed}/{runningTaskStats.total} tasks complete</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {agentWorkingRows.map((agent) => (
-                        <span
-                          key={agent.id}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-2 py-1 text-[11px] text-neutral-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                        >
-                          <span className={cn('size-2 rounded-full', agent.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-400')} />
-                          {agent.name}
-                        </span>
-                      ))}
-                    </div>
-                  </section>
-
-                  <div className="mx-auto w-full max-w-5xl">
+                  <div className="mx-auto w-full max-w-[960px]">
                     <MissionTimeline tasks={missionTasks} agentOutputs={new Map(Object.entries(agentOutputLines))}
                       agentSessionMap={agentSessionMap}
                       agentStatuses={new Map(
@@ -5562,45 +5537,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     />
                   </div>
 
-                  <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Live Feed</p>
-                    <div className="mt-3 h-56 overflow-hidden rounded-xl border border-neutral-200">
-                      <LiveFeedPanel />
+                  <section className="rounded-xl border border-[#E0E0E0] bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-base font-bold text-neutral-900">Live Feed</p>
+                        <p className="text-sm text-[#777]">Last 5 events</p>
+                      </div>
+                      <button type="button" className="rounded-lg border border-[#E0E0E0] bg-white px-3 py-1.5 text-sm text-[#555]">View All</button>
                     </div>
-                  </section>
-
-                  <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Controls</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {agentWorkingRows.map((row) => (
-                        <div key={`controls-${row.id}`} className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => { setSteerAgentId(row.id); setSteerInput('') }}
-                            className="rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
-                          >
-                            Steer {row.name}
-                          </button>
-                          {row.status === 'error' ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const member = team.find((m) => m.id === row.id)
-                                if (member) void handleRetrySpawn(member)
-                              }}
-                              className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
-                            >
-                              Retry
-                            </button>
-                          ) : null}
-                        </div>
-                      ))}
+                    <div className="mt-3 h-56 overflow-hidden rounded-xl border border-[#E0E0E0]">
+                      <LiveFeedPanel />
                     </div>
                   </section>
                 </div>
               ) : (
-                <div className="flex h-full min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/70 text-center dark:border-slate-700 dark:bg-slate-900/30">
-                  <p className="text-sm text-neutral-500 dark:text-slate-400">No active mission. Launch one to view live timeline progress.</p>
+                <div className="mx-auto flex h-full min-h-[220px] w-full max-w-[960px] items-center justify-center rounded-xl border border-[#E0E0E0] bg-white text-center">
+                  <p className="text-sm text-[#777]">No active mission. Launch one to view live timeline progress.</p>
                 </div>
               )
             ) : null}
