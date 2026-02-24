@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
   DialogClose,
   DialogContent,
@@ -24,8 +25,16 @@ export function SessionRenameDialog({
   onSave,
   onCancel,
 }: SessionRenameDialogProps) {
+  const [renameValue, setRenameValue] = useState(sessionTitle)
+
+  // Keep controlled value in sync when the dialog opens with a new session
+  function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen) setRenameValue(sessionTitle)
+    onOpenChange(nextOpen)
+  }
+
   return (
-    <DialogRoot open={open} onOpenChange={onOpenChange}>
+    <DialogRoot open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <div className="p-4">
           <DialogTitle className="mb-1">Rename</DialogTitle>
@@ -34,11 +43,12 @@ export function SessionRenameDialog({
           </DialogDescription>
           <input
             type="text"
-            defaultValue={sessionTitle}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
-                onSave(e.currentTarget.value)
+                onSave(renameValue)
               }
             }}
             className="w-full rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-900 outline-none focus:border-primary-400"
@@ -47,15 +57,7 @@ export function SessionRenameDialog({
           />
           <div className="mt-4 flex justify-end gap-2">
             <DialogClose onClick={onCancel}>Cancel</DialogClose>
-            <Button
-              onClick={(e) => {
-                const input = e.currentTarget.parentElement
-                  ?.previousElementSibling as HTMLInputElement
-                onSave(input.value)
-              }}
-            >
-              Save
-            </Button>
+            <Button onClick={() => onSave(renameValue)}>Save</Button>
           </div>
         </div>
       </DialogContent>

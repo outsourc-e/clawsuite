@@ -280,7 +280,7 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
             )
             continue
           }
-          if (currentEvent === 'event') {
+          if (currentEvent === 'data') {
             const textChunk =
               payload?.payload?.data ??
               payload?.payload?.text ??

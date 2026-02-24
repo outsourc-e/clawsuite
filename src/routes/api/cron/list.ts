@@ -1,11 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../../server/auth-middleware'
 import { gatewayCronRpc, normalizeCronJobs } from '@/server/cron'
 
 export const Route = createFileRoute('/api/cron/list')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const payload = await gatewayCronRpc(
             ['cron.list', 'cron.jobs.list', 'scheduler.jobs.list'],

@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
+import type { ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -39,6 +40,143 @@ import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 export const Route = createFileRoute('/settings/')({
   component: SettingsRoute,
 })
+
+// ── Enterprise Theme Picker (P1-2) ─────────────────────────────────────
+
+const ENTERPRISE_THEMES_PAGE = [
+  {
+    id: 'paper-light' as ThemeId,
+    label: 'Clean',
+    icon: '☀️',
+    desc: 'Warm gray canvas with white cards',
+    preview: { bg: '#f5f5f5', panel: '#ffffff', border: '#e5e5e5', accent: '#f97316', text: '#1a1a1a' },
+  },
+  {
+    id: 'ops-dark' as ThemeId,
+    label: 'Slate',
+    icon: '🖥️',
+    desc: 'Deep slate with teal secondary glow',
+    preview: { bg: '#1e1e2e', panel: '#2a2a3e', border: '#3a3a4e', accent: '#14b8a6', text: '#e5e5e5' },
+  },
+  {
+    id: 'premium-dark' as ThemeId,
+    label: 'Midnight',
+    icon: '✨',
+    desc: 'OLED true black with high contrast',
+    preview: { bg: '#000000', panel: '#0a0a0a', border: '#1a1a1a', accent: '#f97316', text: '#f5f5f5' },
+  },
+  {
+    id: 'sunset-brand' as ThemeId,
+    label: 'Sunset',
+    icon: '🌇',
+    desc: 'Warm brown brand immersion',
+    preview: { bg: '#1a0e05', panel: '#2a1a0e', border: '#6b3c1b', accent: '#f59e0b', text: '#ffe7d1' },
+  },
+] as const
+
+const DARK_ENTERPRISE_SET = new Set<ThemeId>(['ops-dark', 'premium-dark', 'sunset-brand'])
+
+function PageThemeSwatch({
+  colors,
+}: {
+  colors: (typeof ENTERPRISE_THEMES_PAGE)[number]['preview']
+}) {
+  return (
+    <div
+      className="flex h-10 w-full overflow-hidden rounded-md border"
+      style={{ borderColor: colors.border, backgroundColor: colors.bg }}
+    >
+      <div
+        className="flex h-full w-4 flex-col gap-0.5 p-0.5"
+        style={{ backgroundColor: colors.panel }}
+      >
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-1.5 w-full rounded-sm"
+            style={{ backgroundColor: colors.border }}
+          />
+        ))}
+      </div>
+      <div className="flex flex-1 flex-col gap-0.5 p-1">
+        <div
+          className="h-1.5 w-3/4 rounded"
+          style={{ backgroundColor: colors.text, opacity: 0.8 }}
+        />
+        <div
+          className="h-1 w-1/2 rounded"
+          style={{ backgroundColor: colors.text, opacity: 0.3 }}
+        />
+        <div
+          className="mt-0.5 h-1.5 w-6 rounded-full"
+          style={{ backgroundColor: colors.accent }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function EnterpriseThemePickerPage() {
+  const { updateSettings } = useSettings()
+  const [current, setCurrent] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'paper-light'
+    const stored = localStorage.getItem('clawsuite-theme')
+    return ENTERPRISE_THEMES_PAGE.some((t) => t.id === stored) ? (stored as string) : 'paper-light'
+  })
+
+  function applyEnterpriseTheme(id: ThemeId) {
+    const html = document.documentElement
+    html.setAttribute('data-theme', id)
+    if (DARK_ENTERPRISE_SET.has(id)) {
+      html.classList.add('dark')
+      html.classList.remove('light')
+      updateSettings({ theme: 'dark' })
+    } else {
+      html.classList.add('light')
+      html.classList.remove('dark')
+      updateSettings({ theme: 'light' })
+    }
+    localStorage.setItem('clawsuite-theme', id)
+    setCurrent(id)
+  }
+
+  return (
+    <div className="grid w-full grid-cols-2 gap-2">
+      {ENTERPRISE_THEMES_PAGE.map((t) => {
+        const isActive = current === t.id
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => applyEnterpriseTheme(t.id)}
+            className={cn(
+              'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors',
+              isActive
+                ? 'border-accent-500 bg-accent-50 text-accent-700'
+                : 'border-primary-200 bg-primary-50/80 hover:bg-primary-100',
+            )}
+          >
+            <PageThemeSwatch colors={t.preview} />
+            <div className="flex items-center gap-1">
+              <span className="text-xs">{t.icon}</span>
+              <span className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+                {t.label}
+              </span>
+              {isActive && (
+                <span className="ml-auto text-[9px] font-bold uppercase tracking-wide text-accent-600">
+                  Active
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] leading-tight text-primary-500 dark:text-neutral-400">
+              {t.desc}
+            </p>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 type SectionProps = {
   title: string
@@ -191,10 +329,34 @@ function SettingsRoute() {
     updateSettings({ gatewayUrl: value.trim() })
   }
 
+  const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
+    'ops-dark',
+    'premium-dark',
+    'sunset-brand',
+  ])
+
   function handleThemeChange(value: string) {
     const theme = value as SettingsThemeMode
     applyTheme(theme)
     updateSettings({ theme })
+
+    // P1-1: Persist enterprise theme to localStorage, mirroring settings-dialog behaviour
+    const currentEnterpriseTheme = localStorage.getItem('clawsuite-theme')
+    if (
+      theme === 'light' &&
+      currentEnterpriseTheme &&
+      DARK_ENTERPRISE_THEMES.has(currentEnterpriseTheme as ThemeId)
+    ) {
+      document.documentElement.setAttribute('data-theme', 'paper-light')
+      localStorage.setItem('clawsuite-theme', 'paper-light')
+    } else if (
+      theme === 'dark' &&
+      (!currentEnterpriseTheme ||
+        !DARK_ENTERPRISE_THEMES.has(currentEnterpriseTheme as ThemeId))
+    ) {
+      document.documentElement.setAttribute('data-theme', 'ops-dark')
+      localStorage.setItem('clawsuite-theme', 'ops-dark')
+    }
   }
 
   function getAccentBadgeClass(color: AccentColor): string {
@@ -352,6 +514,16 @@ function SettingsRoute() {
                         )
                       },
                     )}
+                  </div>
+                </SettingsRow>
+
+                {/* P1-2: Enterprise theme picker — mobile-only settings UI needs this */}
+                <SettingsRow
+                  label="Enterprise theme"
+                  description="Full brand theme presets with custom color palettes."
+                >
+                  <div className="w-full">
+                    <EnterpriseThemePickerPage />
                   </div>
                 </SettingsRow>
               </SettingsSection>
