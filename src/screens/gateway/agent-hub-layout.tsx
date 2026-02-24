@@ -2063,6 +2063,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [agentWizardOpenId, setAgentWizardOpenId] = useState<string | null>(null)
   const [teamWizardOpenId, setTeamWizardOpenId] = useState<string | null>(null)
   const [showAddTeamModal, setShowAddTeamModal] = useState(false)
+  const [switchTeamModalOpen, setSwitchTeamModalOpen] = useState(false)
   const [providerEditModalProvider, setProviderEditModalProvider] = useState<string | null>(null)
   const [showAddProviderModal, setShowAddProviderModal] = useState(false)
   const [newAgentDraft, setNewAgentDraft] = useState<(TeamMember & { backstory: string; roleDescription: string }) | null>(null)
@@ -4281,7 +4282,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Active Team</h2>
                 <button
                   type="button"
-                  onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
+                  onClick={() => setSwitchTeamModalOpen(true)}
                   className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400 hover:border-neutral-300 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
                 >
                   Switch Team
@@ -4813,9 +4814,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                           </button>
                           <div className="flex flex-col items-center px-3 pt-5 pb-3 text-center">
-                            <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl shadow-sm">{config.icon ?? '👥'}</div>
+                            <div className="mb-2 flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700 text-2xl shadow-sm ring-2 ring-white dark:ring-neutral-900">
+                              {config.icon ?? '👥'}
+                            </div>
                             <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">{config.name}</p>
                             <p className="mt-0.5 text-[10px] text-neutral-400">{config.team.length} agents</p>
+                            {config.description && (
+                              <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500 italic leading-tight line-clamp-2 px-1">
+                                {config.description}
+                              </p>
+                            )}
                             <div className="mt-2 flex flex-wrap justify-center gap-1">
                               {config.team.slice(0, 3).map((m) => <span key={m.id} className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-500 dark:text-neutral-400">{m.name}</span>)}
                               {config.team.length > 3 ? <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-400">+{config.team.length - 3}</span> : null}
@@ -5878,7 +5886,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   }
 
                   return (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="space-y-2">
                       {filtered.map((entry) => {
                         const isCompleted = entry.status === "done" || entry.status === "completed"
                         const isAborted = entry.status === "aborted"
@@ -5886,21 +5894,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         const report = entry.kind === "report" ? missionReports.find((r) => r.id === entry.id) : null
 
                         return (
-                          <div
-                            key={`${entry.kind}-${entry.id}`}
+                          <div key={`${entry.kind}-${entry.id}`}
                             className={cn(
-                              "relative flex flex-col rounded-xl border border-l-[3px] bg-white dark:bg-neutral-900 shadow-sm transition-shadow hover:shadow-md",
+                              "flex items-center gap-4 rounded-xl border border-l-[3px] bg-white dark:bg-neutral-900 px-4 py-3 shadow-sm hover:shadow-md transition-shadow",
                               isCompleted && "border-neutral-200 dark:border-neutral-700 border-l-emerald-500",
                               isAborted && "border-neutral-200 dark:border-neutral-700 border-l-red-500",
                               !isCompleted && !isAborted && "border-neutral-200 dark:border-neutral-700 border-l-amber-500",
-                            )}
-                          >
-                            <div className="flex flex-1 flex-col p-4">
-                              {/* Title row */}
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-neutral-900 dark:text-neutral-100 line-clamp-2">
-                                  {entry.label}
-                                </p>
+                            )}>
+                            {/* Main info */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{entry.label}</p>
                                 <span className={cn(
                                   "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
                                   isCompleted && "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800",
@@ -5910,34 +5914,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                   {isCompleted ? "Completed" : isAborted ? "Aborted" : entry.status}
                                 </span>
                               </div>
-
-                              {/* Meta */}
-                              <div className="mt-2 space-y-0.5">
-                                <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                                  {entry.taskCompletedCount}/{entry.taskCount} tasks · {timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}
-                                </p>
-                                <p className="text-xs text-neutral-400 dark:text-neutral-500">
-                                  {entry.teamCount} {entry.teamCount === 1 ? "agent" : "agents"} · {duration}
-                                </p>
-                              </div>
+                              <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
+                                {entry.taskCompletedCount}/{entry.taskCount} tasks · {entry.teamCount} {entry.teamCount === 1 ? "agent" : "agents"} · {duration} · {timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}
+                              </p>
                             </div>
-
-                            {/* Action buttons */}
-                            <div className="flex items-center gap-2 border-t border-neutral-100 dark:border-neutral-800 px-4 py-3 flex-wrap">
+                            {/* Actions */}
+                            <div className="flex shrink-0 items-center gap-2">
                               {report ? (
-                                <button
-                                  type="button"
+                                <button type="button"
                                   onClick={() => { setCompletionModalReport(report); setShowCompletionModal(true) }}
-                                  className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                                >
+                                  className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800">
                                   View Report
                                 </button>
                               ) : null}
-                              <button
-                                type="button"
+                              <button type="button"
                                 onClick={() => openNewMissionModal({ name: `Rerun: ${entry.label.slice(0, 48)}`, goal: entry.goal })}
-                                className="ml-auto rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
-                              >
+                                className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600">
                                 ↺ Rerun
                               </button>
                             </div>
@@ -5951,6 +5943,49 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             ) : null}
           </div>
         </div>
+        {switchTeamModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setSwitchTeamModalOpen(false)}>
+            <div className="w-full max-w-2xl rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
+                <div>
+                  <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Switch Team</p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Select a team to activate for your next mission</p>
+                </div>
+                <button type="button" onClick={() => setSwitchTeamModalOpen(false)}
+                  className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800">✕</button>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto p-5">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {teamConfigs.map((config) => {
+                    const isActive = selectedTeamConfigId === config.id
+                    return (
+                      <button key={config.id} type="button"
+                        onClick={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id); setSwitchTeamModalOpen(false) }}
+                        className={cn(
+                          "flex flex-col items-center rounded-xl border-2 p-4 text-center transition-all hover:shadow-md",
+                          isActive
+                            ? "border-orange-400 bg-orange-50/50 dark:bg-orange-900/10"
+                            : "border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:border-orange-300"
+                        )}>
+                        <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-2xl">
+                          {config.icon ?? "👥"}
+                        </div>
+                        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{config.name}</p>
+                        {config.description && (
+                          <p className="mt-0.5 text-[10px] text-neutral-400 line-clamp-2">{config.description}</p>
+                        )}
+                        <p className="mt-1 text-[10px] text-neutral-500">{config.team.length} agents</p>
+                        {isActive && <span className="mt-2 rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-bold text-white">Active</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {missionBoardModalOpen ? (
           <div
             className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-900/35 px-4 py-6 backdrop-blur-[1px]"
