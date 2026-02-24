@@ -6928,7 +6928,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <header className="relative z-20 shrink-0 mx-3 mt-3 mb-2 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm md:px-5 md:py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+      <header className="relative z-20 shrink-0 mx-4 mt-3 mb-2 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm md:mx-6 md:mb-5 md:px-5 md:py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
