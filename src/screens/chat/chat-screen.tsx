@@ -1073,6 +1073,21 @@ export function ChatScreen({
       id: attachment.id ?? crypto.randomUUID(),
     }))
 
+    // Inject text/file attachment content directly into the message body.
+    // Gateways reliably forward text in the message body; file attachments
+    // may be silently dropped for non-image types.
+    const textBlocks = normalizedAttachments
+      .filter((a) => {
+        const mime = normalizeMimeType(a.contentType ?? '') || readDataUrlMimeType(a.dataUrl ?? '')
+        return !isImageMimeType(mime) && (a.dataUrl ?? '').length > 0
+      })
+      .map((a) => {
+        const raw = a.dataUrl ?? ''
+        const content = raw.startsWith('data:') ? atob(raw.split(',')[1] ?? '') : raw
+        return `\n\n<attachment name="${a.name ?? 'file'}">\n${content}\n</attachment>`
+      })
+    const enrichedBody = body + textBlocks.join('')
+
     let optimisticClientId = existingClientId
     if (!skipOptimistic) {
       const { clientId, optimisticMessage } = createOptimisticMessage(
@@ -1151,7 +1166,7 @@ export function ChatScreen({
       body: JSON.stringify({
         sessionKey,
         friendlyId,
-        message: body,
+        message: enrichedBody,
         attachments:
           payloadAttachments.length > 0 ? payloadAttachments : undefined,
         thinking: 'low',
