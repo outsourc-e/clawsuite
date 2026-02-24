@@ -4501,7 +4501,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
-              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Active Team</h2>
                 <button
@@ -4574,7 +4574,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
             {/* ─── Card 2: Recent Missions ─────────────────────────────── */}
             <article className={cardCls}>
-              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Recent Missions</h2>
                 <button
@@ -4651,7 +4651,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
             {/* ─── Card 3: Cost Summary ────────────────────────────────── */}
             <article className={cardCls}>
-              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Usage &amp; Cost</h2>
                 <span className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
@@ -5684,8 +5684,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const totalReportsCount = historyCards.length
     const missionCardCls = 'relative overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900'
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80">
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white" />
+      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-neutral-950">
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
         <div className="relative flex w-full min-h-0 flex-1 flex-col gap-4 py-3 pb-24 sm:py-4 sm:pb-4">
           <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3">
             <div>
@@ -5713,7 +5713,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
 
-          <div className="flex w-full rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800/60">
+          <div className="flex w-full rounded-xl bg-neutral-100 p-1 dark:bg-neutral-900/80 dark:border dark:border-neutral-700/50">
             {missionSubTabs.map((tab) => {
               const isActive = missionSubTab === tab.id
               return (
@@ -5735,12 +5735,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
 
           {!missionActive && restoreCheckpoint && !restoreDismissed ? (
-            <div className="relative overflow-hidden rounded-xl border border-accent-200 bg-accent-50 p-4">
+            <div className="relative overflow-hidden rounded-xl border border-accent-200 bg-accent-50 dark:border-accent-700/40 dark:bg-accent-900/15 p-4">
               <div className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-accent-500" />
               <div className="pl-3">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-accent-600">Recovered Checkpoint</p>
-                <p className="mt-1 text-sm font-semibold text-accent-800">{restoreCheckpoint.label}</p>
-                <p className="mt-0.5 text-xs text-accent-600">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-accent-600 dark:text-accent-400">Recovered Checkpoint</p>
+                <p className="mt-1 text-sm font-semibold text-accent-800 dark:text-accent-200">{restoreCheckpoint.label}</p>
+                <p className="mt-0.5 text-xs text-accent-600 dark:text-accent-400">
                   Updated {timeAgoFromMs(restoreCheckpoint.updatedAt)} · {restoreCheckpoint.team.length} agents
                 </p>
                 <div className="mt-3 flex gap-2">
@@ -5783,7 +5783,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
                 {missionActive ? (
                   <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                     <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Active Mission</p>
                     <p className="mt-1 text-base font-semibold text-neutral-900 dark:text-neutral-100">{activeMissionGoal || missionGoal || 'Untitled mission'}</p>
                     <button
@@ -5796,7 +5796,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </section>
                 ) : (
                   <section className={cn('flex min-h-[220px] items-center justify-center text-center', missionCardCls)}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                     <div>
                       <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">No active mission</p>
                       <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Start a mission to see inline agent output and timeline progress.</p>
@@ -5813,7 +5813,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Recent Missions</p>
                       <button
@@ -5848,7 +5848,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     )}
                   </section>
                   <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                       <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Quick Launch Teams</p>
                     {teamConfigs.length === 0 ? (
                       <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">Save a team config in Configure to quick-launch missions here.</p>
@@ -5907,7 +5907,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </section>
 
                   <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">MISSION GOAL</p>
@@ -6067,7 +6067,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </div>
               ) : (
                 <div className={cn('flex min-h-[220px] w-full items-center justify-center text-center', missionCardCls)}>
-                  <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                  <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                   <div>
                     <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">No active mission</p>
                     <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Start a mission to see inline agent output and timeline progress.</p>
