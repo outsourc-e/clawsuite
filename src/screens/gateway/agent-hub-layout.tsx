@@ -2191,6 +2191,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const missionActiveRef = useRef(missionActive)
   const missionStateRef = useRef(missionState)
   const handleCreateMissionRef = useRef<() => void>(() => {})
+  const handleSoftPauseRef = useRef<(pause: boolean) => Promise<void>>(async () => {})
   // Stable ref for buildMissionCompletionSnapshot — kept in sync each render so
   // SSE closures (which can't list missionTasks etc. in their own deps) can call it.
   const buildMissionCompletionSnapshotRef = useRef<() => MissionReportPayload | null>(() => null)
@@ -3010,7 +3011,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         if (isTypingTarget) return
         if (!missionActiveRef.current) return
         event.preventDefault()
-        void handleMissionPause(missionStateRef.current === 'running')
+        void handleSoftPauseRef.current(missionStateRef.current === 'running')
         return
       }
 
@@ -3343,6 +3344,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         setMissionState(previousMissionState)
       })
   }, [team, agentSessionMap, _handleSetAgentPaused])
+  void handleMissionPause
 
   const handleKillAgent = useCallback(async (agentId: string) => {
     const sessionKey = agentSessionMap[agentId]
@@ -3360,6 +3362,40 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       toast(e instanceof Error ? e.message : 'Kill failed', { type: 'error' })
     }
   }, [agentSessionMap, team])
+
+  const handleSoftPause = useCallback(async (pause: boolean) => {
+    try {
+      setMissionState(pause ? 'paused' : 'running')
+      const directive = pause
+        ? 'Hold — please pause your current work and await further instructions.'
+        : 'Resume your work — continue from where you left off.'
+      await Promise.all(
+        team
+          .filter((m) => agentSessionMap[m.id])
+          .map(async (m) => {
+            const sessionKey = agentSessionMap[m.id]
+            if (!sessionKey) return
+            try {
+              await steerAgent(sessionKey, directive)
+            } catch {
+              // best-effort — steer may fail for idle agents
+            }
+          }),
+      )
+      emitFeedEvent({
+        type: 'system',
+        message: pause
+          ? '⏸ Mission paused — agents notified to hold'
+          : '▶ Mission resumed — agents notified to continue',
+      })
+      toast(pause ? 'Mission paused' : 'Mission resumed', { type: 'success' })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Pause failed', { type: 'error' })
+      setMissionState(pause ? 'running' : 'paused')
+    }
+  }, [team, agentSessionMap, emitFeedEvent])
+
+  handleSoftPauseRef.current = handleSoftPause
 
   const handleSteerAgent = useCallback(
     async (agentId: string, message: string) => {
@@ -5631,7 +5667,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-4 dark:border-neutral-800">
                       <button
                         type="button"
-                        onClick={() => void handleMissionPause(missionState === "running")}
+                        onClick={() => void handleSoftPause(missionState === "running")}
                         className={cn(
                           "rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
                           missionState === "paused"
@@ -6460,7 +6496,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <div className="mt-2 grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
-                      onClick={() => void handleMissionPause(false)}
+                      onClick={() => void handleSoftPause(false)}
                       className={cn(
                         'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
                         missionState === 'running'
@@ -6472,7 +6508,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => void handleMissionPause(true)}
+                      onClick={() => void handleSoftPause(true)}
                       className={cn(
                         'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
                         missionState === 'paused'
