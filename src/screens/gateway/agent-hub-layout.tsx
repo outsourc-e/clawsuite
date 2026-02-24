@@ -2204,6 +2204,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [_agentOutputLines, setAgentOutputLines] = useState<Record<string, string[]>>({})
   const missionCompletionSnapshotRef = useRef<MissionReportPayload | null>(null)
   const prevMissionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
+  const completionSessionKeysRef = useRef<Record<string, string>>({})
   const lastReportedMissionIdRef = useRef<string>('')
   // Mission ID for checkpointing
   const missionIdRef = useRef<string>('')
@@ -2997,6 +2998,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         if (expected > 0 && doneCount >= expected) {
           window.setTimeout(() => {
             // Capture snapshot BEFORE changing state (uses fresh ref to avoid stale closure)
+            completionSessionKeysRef.current = { ...agentSessionMap }
             missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
             setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
             emitFeedEvent({
@@ -3237,6 +3239,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (!allTerminal) return
     const timer = window.setTimeout(() => {
       // Capture snapshot BEFORE changing state (uses fresh ref to avoid stale closure)
+      completionSessionKeysRef.current = { ...agentSessionMap }
       missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
       setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
       emitFeedEvent({ type: 'system', message: '✓ All agents reached terminal state — mission complete' })
@@ -3990,38 +3993,70 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (previous === 'running' && missionState === 'stopped') {
       const snapshot = missionCompletionSnapshotRef.current
       if (snapshot && lastReportedMissionIdRef.current !== snapshot.missionId) {
-        const reportText = generateMissionReport(snapshot)
-        const taskStats = computeMissionTaskStats(snapshot.tasks)
-        const duration = Math.max(0, snapshot.completedAt - snapshot.startedAt)
-        const costEstimate = estimateMissionCost(snapshot.tokenCount)
-        const record: StoredMissionReport = {
-          id: snapshot.missionId,
-          name: snapshot.name,
-          goal: snapshot.goal,
-          teamName: snapshot.teamName,
-          agents: snapshot.team.map((member) => ({
-            id: member.id,
-            name: member.name,
-            modelId: member.modelId,
-          })),
-          taskStats,
-          duration,
-          tokenCount: snapshot.tokenCount,
-          costEstimate,
-          artifacts: snapshot.artifacts,
-          report: reportText,
-          completedAt: snapshot.completedAt,
+        // Fetch real agent output from session history before building report
+        const sessionKeys = completionSessionKeysRef.current
+        const fetchAndReport = async () => {
+          for (const member of snapshot.team) {
+            const sessionKey = sessionKeys[member.id]
+            if (!sessionKey) continue
+            try {
+              const res = await fetch(`/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=50`)
+              if (!res.ok) continue
+              const data = await res.json() as { messages?: Array<{ role: string; content: string | Array<{ type: string; text?: string }> }> }
+              const messages = data.messages ?? []
+              const lines: string[] = []
+              for (const msg of messages) {
+                if (msg.role !== 'assistant') continue
+                let text = ''
+                if (typeof msg.content === 'string') text = msg.content
+                else if (Array.isArray(msg.content)) text = msg.content.filter((c) => c.type === 'text').map((c) => c.text ?? '').join('')
+                if (text.trim()) lines.push(...text.split('\n').filter(Boolean))
+              }
+              if (lines.length > 0) {
+                agentOutputLinesRef.current[member.id] = lines.slice(-200)
+              }
+            } catch { /* best-effort */ }
+          }
+          // Rebuild snapshot with fetched output
+          const enrichedSnapshot = buildMissionCompletionSnapshotRef.current()
+          const usedSnapshot = enrichedSnapshot ?? snapshot
+          const reportText = generateMissionReport(usedSnapshot)
+          const taskStats = computeMissionTaskStats(usedSnapshot.tasks)
+          const duration = Math.max(0, usedSnapshot.completedAt - usedSnapshot.startedAt)
+          const costEstimate = estimateMissionCost(usedSnapshot.tokenCount)
+          const record: StoredMissionReport = {
+            id: usedSnapshot.missionId,
+            name: usedSnapshot.name,
+            goal: usedSnapshot.goal,
+            teamName: usedSnapshot.teamName,
+            agents: usedSnapshot.team.map((m) => ({
+              id: m.id,
+              name: m.name,
+              modelId: m.modelId,
+            })),
+            taskStats,
+            duration,
+            tokenCount: usedSnapshot.tokenCount,
+            costEstimate,
+            artifacts: usedSnapshot.artifacts,
+            report: reportText,
+            completedAt: usedSnapshot.completedAt,
+          }
+          setMissionReports(saveStoredMissionReport(record))
+          setCompletionModalReport(record)
+          setShowCompletionModal(true)
+          lastReportedMissionIdRef.current = usedSnapshot.missionId
         }
-        setMissionReports(saveStoredMissionReport(record))
-        setCompletionModalReport(record)
-        setShowCompletionModal(true)
-        lastReportedMissionIdRef.current = snapshot.missionId
+        missionCompletionSnapshotRef.current = null
+        setMissionHistory(loadMissionHistory())
+        if (missionStateRef.current !== 'running') setMissionActive(false)
+        void fetchAndReport()
       }
-      missionCompletionSnapshotRef.current = null
-      // Reload mission history to pick up any new checkpoints
-      setMissionHistory(loadMissionHistory())
-      // Mark mission as inactive so the card moves from Running to Review column
-      if (missionStateRef.current !== 'running') setMissionActive(false)
+      if (!snapshot || lastReportedMissionIdRef.current === snapshot.missionId) {
+        missionCompletionSnapshotRef.current = null
+        setMissionHistory(loadMissionHistory())
+        if (missionStateRef.current !== 'running') setMissionActive(false)
+      }
     }
     prevMissionStateRef.current = missionState
   }, [missionState])
