@@ -899,6 +899,21 @@ export function DashboardScreen() {
                 sessionPercent={dashboardData.usage.contextPercent ?? undefined}
                 providers={dashboardData.cost.byProvider}
                 currentModel={dashboardData.model.current}
+                actions={
+                  <>
+                    <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
+                    <button
+                      type="button"
+                      onClick={handleResetLayout}
+                      className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-accent-200 hover:text-accent-600 dark:border-gray-700 dark:bg-gray-800 dark:text-primary-400 dark:hover:border-accent-600 dark:hover:text-accent-400"
+                      aria-label="Reset Layout"
+                      title="Reset Layout"
+                    >
+                      <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.5} />
+                      <span>Reset</span>
+                    </button>
+                  </>
+                }
               />
 
               {/* 2. Alert chips */}
@@ -952,21 +967,6 @@ export function DashboardScreen() {
               {desktopLayout.showScheduledJobs ? (
                 <ScheduledJobsWidget onRemove={() => removeWidget('scheduled-jobs')} />
               ) : null}
-
-              {/* D1: Widget edit controls — inline row above widgets */}
-              <div className="flex items-center justify-end gap-2">
-                <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
-                <button
-                  type="button"
-                  onClick={handleResetLayout}
-                  className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-accent-200 hover:text-accent-600 dark:border-gray-700 dark:bg-gray-800 dark:text-primary-400 dark:hover:border-accent-600 dark:hover:text-accent-400"
-                  aria-label="Reset Layout"
-                  title="Reset Layout"
-                >
-                  <HugeiconsIcon icon={RefreshIcon} size={20} strokeWidth={1.5} />
-                  <span>Reset</span>
-                </button>
-              </div>
 
               {/* 3. Two-up: Usage Today + Squad Status */}
               {(desktopLayout.showUsage || desktopLayout.showSquad) && (

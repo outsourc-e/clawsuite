@@ -80,7 +80,7 @@ const HEALTH_LABELS: Record<HealthStatus, string> = {
   offline: 'OFFLINE',
 }
 
-export function HealthBadge({ status }: { status: HealthStatus }) {
+export function HealthBadge({ status, syncing }: { status: HealthStatus; syncing?: boolean }) {
   return (
     <span
       className={cn(
@@ -97,7 +97,7 @@ export function HealthBadge({ status }: { status: HealthStatus }) {
           status === 'offline' && 'bg-neutral-400',
         )}
       />
-      {HEALTH_LABELS[status]}
+      {syncing ? 'Syncing' : HEALTH_LABELS[status]}
     </span>
   )
 }

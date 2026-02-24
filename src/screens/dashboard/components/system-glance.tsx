@@ -15,6 +15,8 @@ type SystemGlanceProps = {
   currentModel?: string
   /** Compact single-row layout for mobile */
   compact?: boolean
+  /** Optional controls rendered at the bottom of the card (e.g. widget edit buttons) */
+  actions?: React.ReactNode
 }
 
 // ─── Compact mobile variant ───────────────────────────────────────────────────
@@ -62,10 +64,11 @@ export function SystemGlance(props: SystemGlanceProps) {
     uptimeFormatted,
     updatedAgo,
     healthStatus,
-    gatewayConnected: gatewayConnected,
-    sessionPercent: sessionPercent,
-    currentModel: currentModel,
+    gatewayConnected,
+    sessionPercent,
+    currentModel,
     compact = false,
+    actions,
   } = props
 
   if (compact) {
@@ -74,7 +77,7 @@ export function SystemGlance(props: SystemGlanceProps) {
 
   return (
     <GlanceCard className="space-y-4">
-      {/* Row 1: Updated timestamp + model badge | Syncing + health badge */}
+      {/* Row 1: Updated timestamp + model badge | Single merged status badge */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-neutral-500 dark:text-neutral-400">
@@ -86,52 +89,57 @@ export function SystemGlance(props: SystemGlanceProps) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {gatewayConnected && (
-            <span className="flex items-center gap-1 text-[10px] text-emerald-500">
-              <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-              Syncing…
-            </span>
-          )}
-          <HealthBadge status={healthStatus} />
+        {/* Single merged badge — no more duplicate HEALTHY */}
+        <HealthBadge
+          status={healthStatus}
+          syncing={gatewayConnected}
+        />
+      </div>
+
+      {/* Row 2: Bordered stat blocks — Memory ring | Cost | Model */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-primary-200 bg-primary-50/80 py-3 px-2 dark:border-neutral-700/60 dark:bg-neutral-800/40">
+          <StatBlock
+            label="MEMORY"
+            value=""
+            percent={sessionPercent}
+            sublabel="of context window"
+          />
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-xl border border-primary-200 bg-primary-50/80 py-3 px-2 dark:border-neutral-700/60 dark:bg-neutral-800/40">
+          <StatBlock
+            label="COST"
+            value={costToday}
+            sublabel="today"
+          />
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-xl border border-primary-200 bg-primary-50/80 py-3 px-2 dark:border-neutral-700/60 dark:bg-neutral-800/40">
+          <StatBlock
+            label="MODEL"
+            value={currentModel || '—'}
+            sublabel="active"
+          />
         </div>
       </div>
 
-      {/* Row 2: Three stat blocks — Memory ring | Cost | Model */}
-      {/* Note: Agents & Uptime are shown with detail in the metric cards row below */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatBlock
-          label="MEMORY"
-          value=""
-          percent={sessionPercent}
-          sublabel="of context window"
-        />
-        <StatBlock
-          label="COST"
-          value={costToday}
-          sublabel="today"
-        />
-        <StatBlock
-          label="MODEL"
-          value={currentModel || '—'}
-          sublabel="active"
-        />
-      </div>
-
-      {/* Row 3: Uptime bar */}
+      {/* Row 3: Uptime bar — HealthBadge intentionally removed here (shown top-right) */}
       <div className="rounded-xl border border-neutral-200/50 bg-neutral-50/50 p-3 dark:border-neutral-700/50 dark:bg-neutral-800/50">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400">
-              UPTIME
-            </span>
-            <HealthBadge status={gatewayConnected ? 'healthy' : 'offline'} />
-          </div>
+          <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400">
+            UPTIME
+          </span>
           <span className="text-lg font-bold tabular-nums text-neutral-900 dark:text-neutral-50">
             {uptimeFormatted}
           </span>
         </div>
       </div>
+
+      {/* Row 4: Optional widget controls slot */}
+      {actions ? (
+        <div className="flex items-center justify-end gap-2 border-t border-neutral-200/60 pt-3 dark:border-neutral-700/40">
+          {actions}
+        </div>
+      ) : null}
     </GlanceCard>
   )
 }
