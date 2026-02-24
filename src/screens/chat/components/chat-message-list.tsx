@@ -1060,7 +1060,9 @@ function ChatMessageListComponent({
               ) : null}
             </>
           )}
-          {showTypingIndicator || (isStreaming && activeToolCalls.length > 0) ? (
+          {showTypingIndicator ||
+          (isStreaming && !streamingText) ||
+          (isStreaming && activeToolCalls.length > 0) ? (
             <div
               className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
               role="status"

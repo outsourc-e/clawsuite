@@ -40,6 +40,7 @@ import {
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
+import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
@@ -332,6 +333,12 @@ export function ChatScreen({
         setPendingApprovals(loadApprovals().filter((entry) => entry.status === 'pending'))
       }, []),
     })
+
+  // Apply smooth character-reveal animation to the raw SSE text
+  const smoothRealtimeStreamingText = useSmoothStreamingText(
+    realtimeStreamingText,
+    isRealtimeStreaming,
+  )
 
   useEffect(() => {
     function checkApprovals() {
@@ -1508,7 +1515,7 @@ export function ChatScreen({
               isStreaming={derivedStreamingInfo.isStreaming}
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
               streamingText={
-                realtimeStreamingText ||
+                smoothRealtimeStreamingText ||
                 completedStreamingText.current ||
                 undefined
               }
