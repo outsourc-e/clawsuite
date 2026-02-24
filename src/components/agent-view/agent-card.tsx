@@ -343,7 +343,7 @@ export function AgentCard({
             Back
           </Button>
           <div className="min-w-0 flex-1">
-            <h4 className="truncate text-sm font-medium text-primary-900">
+            <h4 className="truncate text-sm font-medium text-primary-900" title={node.name}>
               {node.name}
             </h4>
             <p className="mt-0.5 text-[11px] font-mono text-primary-700">
@@ -494,7 +494,7 @@ export function AgentCard({
 
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-2">
-                <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-primary-900">
+                <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-primary-900" title={node.name}>
                   {node.name}
                 </h4>
                 {renderWardenMenu('size-6 shrink-0 rounded-md')}
@@ -627,7 +627,7 @@ export function AgentCard({
           {/* Right: Text content */}
           <div className="flex-1 min-w-0 pt-0.5">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h4 className="truncate font-medium text-primary-900 text-xs">
+              <h4 className="truncate font-medium text-primary-900 text-xs" title={node.name}>
                 {node.name}
               </h4>
               <span
