@@ -252,8 +252,8 @@ type ActiveTab = 'overview' | 'missions' | 'history' | 'configure'
 type ConfigSection = 'agents' | 'teams' | 'keys'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
-  { id: 'overview', icon: '🏢', label: 'Office' },
-  { id: 'missions', icon: '🚀', label: 'Active Mission' },
+  { id: 'overview', icon: '🏠', label: 'Overview' },
+  { id: 'missions', icon: '🚀', label: 'Missions' },
   { id: 'history', icon: '📋', label: 'History' },
   { id: 'configure', icon: '⚙️', label: 'Configure' },
 ]
@@ -4161,7 +4161,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="relative flex min-h-0 flex-col gap-4 bg-neutral-50/80 px-4 pb-8 pt-4 dark:bg-[var(--theme-bg,#0b0e14)] md:px-6">
+      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
         <div className="relative flex w-full min-h-0 flex-1 flex-col">
