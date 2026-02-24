@@ -5300,15 +5300,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         : completedTasks >= totalTasks && totalTasks > 0
           ? 'done'
           : 'partial'
-      const statusClassName = derivedStatus === 'done'
-        ? 'border-emerald-400'
-        : derivedStatus === 'aborted'
-          ? 'border-red-400'
-          : 'border-amber-400'
       return {
         id: cp.id,
         status: derivedStatus,
-        statusClassName,
         title: truncateMissionGoal(cp.label, 96),
         goal: cp.label,
         subtitle: `${completedTasks}/${totalTasks} tasks`,
@@ -5340,20 +5334,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const doneTaskCount = missionTasks.filter((task) => task.status === 'done').length
     const totalTaskCount = missionTasks.length
     const totalReportsCount = missionHistory.length || historyCards.length
+    const missionCardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm'
     return (
-      <div className="flex h-full min-h-0 flex-col bg-[#F5F5F0] p-3 pb-24 sm:p-4 sm:pb-4">
-        <div className="mx-auto flex w-full max-w-[960px] min-h-0 flex-1 flex-col gap-4">
-          <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-3 rounded-xl border border-[#E0E0E0] bg-white px-4 py-3">
+      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80">
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white" />
+        <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3">
             <div>
-              <h2 className="text-2xl font-bold text-neutral-900">Mission Control</h2>
-              <p className="text-sm text-[#777]">Track active runs, review history, and launch new missions</p>
+              <h2 className="text-lg font-bold text-neutral-900">Mission Control</h2>
+              <p className="text-xs text-neutral-500">Track active runs, review history, and launch new missions</p>
             </div>
             <div className="flex items-center gap-2">
               {missionActive ? (
                 <button
                   type="button"
                   onClick={() => stopMissionAndCleanup('aborted')}
-                  className="min-h-11 rounded-lg border border-[#E0E0E0] bg-white px-3 py-2 text-sm font-medium text-[#E8552E]"
+                  className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-red-600"
                 >
                   <span className="mr-2 text-[10px]">■</span>
                   Stop Mission
@@ -5362,75 +5358,78 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <button
                 type="button"
                 onClick={() => openNewMissionModal()}
-                className="min-h-11 rounded-lg bg-[#F57C00] px-3 py-2 text-sm font-semibold text-white hover:bg-[#E56B00]"
+                className="min-h-11 rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600"
               >
                 New Mission
               </button>
             </div>
           </div>
 
-          <div className="mx-auto -mx-1 w-full max-w-[960px] overflow-x-auto px-1 pb-1">
-            <div className="flex min-w-[420px] items-center gap-2 rounded-xl border border-[#E0E0E0] bg-white p-1">
-              {missionSubTabs.map((tab) => {
-                const isActive = missionSubTab === tab.id
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setMissionSubTab(tab.id)}
-                    className={cn(
-                      'relative z-10 flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full px-4 py-1.5 text-sm whitespace-nowrap',
-                      isActive
-                        ? 'border border-[#F57C00] font-medium text-[#F57C00]'
-                        : 'border border-transparent font-normal text-[#333] hover:bg-[#F7F7F2]',
-                    )}
-                  >
-                    {tab.label}
-                  </button>
-                )
-              })}
-            </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {missionSubTabs.map((tab) => {
+              const isActive = missionSubTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setMissionSubTab(tab.id)}
+                  className={cn(
+                    'flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+                    isActive
+                      ? 'border border-orange-200 bg-orange-50 text-orange-700'
+                      : 'border border-transparent text-neutral-600 hover:bg-neutral-100',
+                  )}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
           </div>
 
           <div className="min-h-0 flex-1 overflow-auto">
             {missionSubTab === 'overview' ? (
-              <div className="mx-auto w-full max-w-[960px] space-y-4">
+              <div className="w-full space-y-4">
                 <div className="flex flex-wrap gap-3">
-                  <article className="min-w-[180px] flex-1 rounded-xl border border-[#E0E0E0] bg-white p-4">
-                    <p className="text-[10px] uppercase tracking-wide text-[#888]">Mission State</p>
+                  <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Mission State</p>
                     <p className="mt-1 text-lg font-bold text-neutral-900">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
                   </article>
-                  <article className="min-w-[180px] flex-1 rounded-xl border border-[#E0E0E0] bg-white p-4">
-                    <p className="text-[10px] uppercase tracking-wide text-[#888]">Tasks</p>
+                  <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Tasks</p>
                     <p className="mt-1 text-lg font-bold text-neutral-900">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
                   </article>
-                  <article className="min-w-[180px] flex-1 rounded-xl border border-[#E0E0E0] bg-white p-4">
-                    <p className="text-[10px] uppercase tracking-wide text-[#888]">Total Reports</p>
+                  <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Total Reports</p>
                     <p className="mt-1 text-lg font-bold text-neutral-900">{totalReportsCount}</p>
                   </article>
                 </div>
 
                 {missionActive ? (
-                  <section className="rounded-xl border border-[#E0E0E0] bg-white p-5">
-                    <p className="text-[10px] uppercase tracking-wide text-[#888]">Active Mission</p>
+                  <section className={missionCardCls}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Active Mission</p>
                     <p className="mt-1 text-base font-semibold text-neutral-900">{activeMissionGoal || missionGoal || 'Untitled mission'}</p>
                     <button
                       type="button"
                       onClick={() => setMissionSubTab('active')}
-                      className="mt-4 rounded-lg border border-[#E0E0E0] bg-white px-3 py-1.5 text-sm font-medium text-[#E8552E]"
+                      className="mt-4 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600"
                     >
                       View Active Mission →
                     </button>
                   </section>
                 ) : (
-                  <section className="flex min-h-[200px] items-center justify-center rounded-xl border border-[#E0E0E0] bg-white p-12 text-center">
+                  <section className={cn('flex min-h-[200px] items-center justify-center p-12 text-center', missionCardCls)}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                     <div>
                       <p className="text-base font-semibold text-neutral-900">No active mission</p>
-                      <p className="mt-1 text-sm text-[#777]">Launch a mission to view live timeline activity.</p>
+                      <p className="mt-1 text-sm text-neutral-500">Launch a mission to view live timeline activity.</p>
                       <button
                         type="button"
                         onClick={() => openNewMissionModal()}
-                        className="mt-4 rounded-lg bg-[#F57C00] px-3 py-2 text-sm font-semibold text-white hover:bg-[#E56B00]"
+                        className="mt-4 rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600"
                       >
                         + New Mission
                       </button>
@@ -5439,22 +5438,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 )}
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <section className="rounded-xl border border-[#E0E0E0] bg-white p-4">
+                  <section className={missionCardCls}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">Recent Missions</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Recent Missions</p>
                       <button type="button" onClick={() => setMissionSubTab('history')} className="text-[11px] font-medium text-orange-600 hover:text-orange-700">Open History</button>
                     </div>
                     {recentCompletedMissions.length === 0 ? (
-                      <p className="mt-3 text-sm text-[#777]">No completed missions yet.</p>
+                      <p className="mt-3 text-sm text-neutral-500">No completed missions yet.</p>
                     ) : (
                       <div className="mt-3 space-y-2">
                         {recentCompletedMissions.map((entry) => (
-                          <article key={entry.id} className="rounded-lg border border-[#E0E0E0] bg-white px-3 py-2">
+                          <article key={entry.id} className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2">
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-semibold text-neutral-900">{entry.title}</p>
-                              <span className="rounded-full border border-[#E0E0E0] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#888]">Completed</span>
+                              <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-400">Completed</span>
                             </div>
-                            <p className="mt-1 text-[11px] text-[#777]">
+                            <p className="mt-1 text-[11px] text-neutral-500">
                               {entry.duration} · {timeAgoFromMs(entry.completedAt)}
                             </p>
                           </article>
@@ -5462,10 +5462,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       </div>
                     )}
                   </section>
-                  <section className="rounded-xl border border-[#E0E0E0] bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">Quick Launch Teams</p>
+                  <section className={missionCardCls}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Quick Launch Teams</p>
                     {teamConfigs.length === 0 ? (
-                      <p className="mt-3 text-sm text-[#777]">Save a team config in Configure to quick-launch missions here.</p>
+                      <p className="mt-3 text-sm text-neutral-500">Save a team config in Configure to quick-launch missions here.</p>
                     ) : (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {teamConfigs.slice(0, 6).map((config) => (
@@ -5473,7 +5474,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             key={`ql-${config.id}`}
                             type="button"
                             onClick={() => openNewMissionModal({ teamConfigId: config.id, name: `Mission with ${config.name}` })}
-                            className="min-h-11 rounded-lg border border-[#E0E0E0] bg-white px-3 py-1.5 text-xs font-medium text-[#333] transition-colors hover:border-[#F57C00] hover:text-[#F57C00]"
+                            className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 transition-colors hover:border-orange-500 hover:text-orange-500"
                           >
                             {config.icon ?? '👥'} {config.name} · {config.team.length}
                           </button>
@@ -5487,14 +5488,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
             {missionSubTab === 'active' ? (
               missionActive ? (
-                <div className="mx-auto w-full max-w-[960px] space-y-4">
-                  <section className="mx-auto w-full max-w-[960px] rounded-xl border border-[#E0E0E0] bg-white p-5">
+                <div className="w-full space-y-4">
+                  <section className={missionCardCls}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-medium uppercase tracking-wide text-[#888]">MISSION GOAL</p>
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">MISSION GOAL</p>
                         <p className="mt-1 text-base text-neutral-900">{activeMissionGoal || missionGoal || ''}</p>
                       </div>
-                      <span className="rounded-full bg-[#00875A] px-2.5 py-1 text-xs text-white">Running</span>
+                      <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-xs text-white">Running</span>
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -5511,17 +5513,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           )
                         })}
                       </div>
-                      <div className="flex items-center gap-3 text-sm text-[#777]">
+                      <div className="flex items-center gap-3 text-sm text-neutral-500">
                         <span>{runningTaskStats.completed} / {runningTaskStats.total} tasks · {runningElapsed} elapsed</span>
                       </div>
                     </div>
 
-                    <div className="mt-3 h-1 rounded-full bg-[#E5E5E5]">
-                      <div className="h-1 rounded-full bg-[#F57C00] transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
+                    <div className="mt-3 h-1 rounded-full bg-neutral-200">
+                      <div className="h-1 rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
                     </div>
                   </section>
 
-                  <div className="mx-auto w-full max-w-[960px]">
+                  <div className="w-full">
                     <MissionTimeline tasks={missionTasks} agentOutputs={new Map(Object.entries(agentOutputLines))}
                       agentSessionMap={agentSessionMap}
                       agentStatuses={new Map(
@@ -5537,42 +5539,43 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     />
                   </div>
 
-                  <section className="rounded-xl border border-[#E0E0E0] bg-white p-4">
+                  <section className={missionCardCls}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-base font-bold text-neutral-900">Live Feed</p>
-                        <p className="text-sm text-[#777]">Last 5 events</p>
+                        <p className="text-sm text-neutral-500">Last 5 events</p>
                       </div>
-                      <button type="button" className="rounded-lg border border-[#E0E0E0] bg-white px-3 py-1.5 text-sm text-[#555]">View All</button>
+                      <button type="button" className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-600">View All</button>
                     </div>
-                    <div className="mt-3 h-56 overflow-hidden rounded-xl border border-[#E0E0E0]">
+                    <div className="mt-3 h-56 overflow-hidden rounded-xl border border-neutral-200">
                       <LiveFeedPanel />
                     </div>
                   </section>
                 </div>
               ) : (
-                <div className="mx-auto flex h-full min-h-[220px] w-full max-w-[960px] items-center justify-center rounded-xl border border-[#E0E0E0] bg-white text-center">
-                  <p className="text-sm text-[#777]">No active mission. Launch one to view live timeline progress.</p>
+                <div className={cn('flex h-full min-h-[220px] w-full items-center justify-center text-center', missionCardCls)}>
+                  <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                  <p className="text-sm text-neutral-500">No active mission. Launch one to view live timeline progress.</p>
                 </div>
               )
             ) : null}
 
             {missionSubTab === 'history' ? (
               historyCards.length === 0 ? (
-                <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/70 text-sm text-neutral-500 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-400">
+                <div className={cn('flex h-40 items-center justify-center text-sm text-neutral-500', missionCardCls)}>
+                  <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                   No mission history yet.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {historyCards.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className={cn('rounded-xl border border-l-4 border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]', entry.statusClassName)}
-                    >
+                    <div key={entry.id} className={missionCardCls}>
+                      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-sm font-semibold text-neutral-900 dark:text-white">{entry.title}</p>
-                          <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{entry.subtitle}</p>
+                          <p className="text-sm font-semibold text-neutral-900">{entry.title}</p>
+                          <p className="mt-0.5 text-xs text-neutral-500">{entry.subtitle}</p>
                         </div>
                         <span className={cn(
                           'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
@@ -5583,7 +5586,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           {entry.status}
                         </span>
                       </div>
-                      <p className="mt-2 text-[11px] text-neutral-500 dark:text-slate-400">Updated {timeAgoFromMs(entry.updatedAt)}</p>
+                      <p className="mt-2 text-[11px] text-neutral-500">Updated {timeAgoFromMs(entry.updatedAt)}</p>
                       <button
                         type="button"
                         onClick={() => openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal })}
@@ -5604,7 +5607,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             onClick={() => setMissionBoardModalOpen(false)}
           >
             <div
-              className="flex w-full max-w-2xl flex-col rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]"
+              className="flex w-full max-w-2xl flex-col rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
               onClick={(event) => event.stopPropagation()}
             >
               {/* Wizard Step Indicator */}
