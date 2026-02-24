@@ -2069,6 +2069,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [providerWizardSelected, setProviderWizardSelected] = useState('')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardStepIndex, setWizardStepIndex] = useState(0)
@@ -2218,6 +2219,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const pendingMissionBudgetLimitRef = useRef('')
   const missionActiveRef = useRef(missionActive)
   const missionStateRef = useRef(missionState)
+  const openNewMissionModalRef = useRef<(prefill?: Partial<MissionBoardDraft>) => void>(() => {})
+  const prevAutoNameRef = useRef('')
   const handleCreateMissionRef = useRef<() => void>(() => {})
   const handleSoftPauseRef = useRef<(pause: boolean) => Promise<void>>(async () => {})
   // Stable ref for buildMissionCompletionSnapshot — kept in sync each render so
@@ -2225,6 +2228,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const buildMissionCompletionSnapshotRef = useRef<() => MissionReportPayload | null>(() => null)
   // Stable ref for live feed visibility (used in feed-count effect)
   const liveFeedVisibleRef = useRef(liveFeedVisible)
+  const shortcutsModalOpenRef = useRef(shortcutsModalOpen)
   const feedEventsRef = useRef<FeedEvent[]>([])
   // Tracks whether the live feed sidebar has ever been opened (keeps it mounted once shown)
   const liveFeedEverOpenedRef = useRef(false)
@@ -2238,6 +2242,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   missionActiveRef.current = missionActive
   missionStateRef.current = missionState
   liveFeedVisibleRef.current = liveFeedVisible
+  shortcutsModalOpenRef.current = shortcutsModalOpen
 
   const appendArtifacts = useCallback((nextArtifacts: MissionArtifact[]) => {
     if (nextArtifacts.length === 0) return
@@ -2938,6 +2943,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         markStreamAlive()
         // Track this session as done
         agentSessionsDoneRef.current.add(sessionKey)
+        const memberName = teamRef.current.find((m) => agentSessionMap[m.id] === sessionKey)?.name ?? 'Agent'
+        toast(`${memberName} completed`, { type: 'success', duration: 3000 })
+        emitFeedEvent({ type: 'agent', agentName: memberName, message: `${memberName} finished their tasks` })
 
         // Mark agent status as idle
         setAgentSessionStatus((prev) => ({
@@ -3064,10 +3072,26 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         return
       }
 
+      if (!isTypingTarget && !missionActiveRef.current && (event.key === 'n' || event.key === 'N')) {
+        event.preventDefault()
+        openNewMissionModalRef.current()
+        return
+      }
+
+      if (!isTypingTarget && (event.key === '?' || event.key === '/')) {
+        event.preventDefault()
+        setShortcutsModalOpen((prev) => !prev)
+        return
+      }
+
       // Escape: Close output panel → deselect agent
       if (event.key === 'Escape') {
         // Don't interfere when user is typing in an input/textarea
         if (isTypingTarget) return
+        if (shortcutsModalOpenRef.current) {
+          setShortcutsModalOpen(false)
+          return
+        }
         setSelectedOutputAgentId((prev) => {
           if (prev) return undefined
           setSelectedAgentId(undefined)
@@ -4185,6 +4209,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const isMissionRunning = missionActive && missionState === 'running'
 
   function openNewMissionModal(prefill?: Partial<MissionBoardDraft>) {
+    prevAutoNameRef.current = ''
     setNewMissionName(prefill?.name ?? '')
     setNewMissionGoal(prefill?.goal ?? missionGoal)
     setNewMissionTeamConfigId(prefill?.teamConfigId ?? '__current__')
@@ -4193,6 +4218,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionBoardModalOpen(true)
     setMissionWizardStep(0)
   }
+  openNewMissionModalRef.current = openNewMissionModal
 
   // ── Mission tab content ────────────────────────────────────────────────────
 
@@ -5865,24 +5891,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     })}
                   </div>
 
-                  <section className="relative overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm">
-                    <div className="flex items-start justify-between gap-2 px-4 pb-3 pt-4">
-                      <div>
-                        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Live Feed</p>
-                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Last 5 events</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setLiveFeedVisible(true)}
-                        className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                      >
-                        View All
-                      </button>
-                    </div>
-                    <div className="border-t border-neutral-100">
-                      <LiveFeedPanel />
-                    </div>
-                  </section>
+                  {/* Live Feed removed from active mission — accessible via Live View button in header */}
                 </div>
               ) : (
                 <div className={cn('flex min-h-[220px] w-full items-center justify-center text-center', missionCardCls)}>
@@ -6085,7 +6094,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 {missionWizardStep === 0 ? (
                   <div className="space-y-4">
                     <label className="block">
-                      <span className="text-xs font-medium text-neutral-700">Mission Name</span>
+                      <span className="text-xs font-medium text-neutral-700">
+                        Mission Name
+                        {newMissionName && newMissionName === prevAutoNameRef.current ? (
+                          <span className="ml-1 text-[11px] font-normal text-neutral-400">(auto)</span>
+                        ) : null}
+                      </span>
                       <input
                         value={newMissionName}
                         onChange={(event) => setNewMissionName(event.target.value)}
@@ -6097,7 +6111,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       <span className="text-xs font-medium text-neutral-700">Goal</span>
                       <textarea
                         value={newMissionGoal}
-                        onChange={(event) => setNewMissionGoal(event.target.value)}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setNewMissionGoal(value)
+                          // Auto-suggest name from first 6 words of goal
+                          setNewMissionName((prev) => {
+                            const prevAutoName = prevAutoNameRef.current
+                            const autoName = value.trim().split(/\s+/).slice(0, 6).join(' ')
+                            // Only auto-fill if field is empty or was previously auto-filled
+                            if (!prev || prev === prevAutoName) {
+                              prevAutoNameRef.current = autoName
+                              return autoName
+                            }
+                            return prev
+                          })
+                        }}
                         rows={6}
                         placeholder="Describe the mission goal, output format, and constraints..."
                         className="mt-1.5 w-full resize-y rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
@@ -6252,7 +6280,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </button>
                 <div className="flex gap-2">
                   {missionWizardStep === 3 ? (
-                    <>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="rounded-lg bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 px-3 py-2.5 text-xs text-neutral-500 dark:text-neutral-400">
+                        <span className="font-medium text-neutral-700 dark:text-neutral-300">Est. cost:</span>{' '}
+                        {team.length === 0 ? 'Select a team to estimate' : `$${(team.length * 0.05).toFixed(2)}–$${(team.length * 0.50).toFixed(2)} for a typical mission`}
+                        {' · '}
+                        {team.length} agent{team.length !== 1 ? 's' : ''} × typical 50k–500k tokens
+                      </div>
+                      <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => { handleSaveMissionDraft(); setMissionWizardStep(0) }}
@@ -6269,7 +6304,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       >
                         🚀 Launch Mission
                       </button>
-                    </>
+                      </div>
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -6573,6 +6609,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 {unreadFeedCount > 99 ? '99+' : unreadFeedCount}
               </span>
             ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShortcutsModalOpen(true)}
+            className="min-h-9 rounded-lg border border-neutral-200 dark:border-neutral-700 px-2.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+          >
+            ?
           </button>
         </div>
       </div>
