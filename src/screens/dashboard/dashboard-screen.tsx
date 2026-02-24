@@ -905,11 +905,11 @@ export function DashboardScreen() {
                     <button
                       type="button"
                       onClick={handleResetLayout}
-                      className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-accent-200 hover:text-accent-600 dark:border-gray-700 dark:bg-gray-800 dark:text-primary-400 dark:hover:border-accent-600 dark:hover:text-accent-400"
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
                       aria-label="Reset Layout"
                       title="Reset Layout"
                     >
-                      <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.5} />
+                      <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.5} />
                       <span>Reset</span>
                     </button>
                   </>
