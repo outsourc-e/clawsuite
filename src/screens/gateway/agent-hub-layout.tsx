@@ -1049,13 +1049,106 @@ function parseTokenBudget(value: string): number | null {
   return parsed
 }
 
+function normalizeInsightLine(line: string): string | null {
+  const normalized = line
+    .replace(/^\s*[-*+]\s*/, '')
+    .replace(/^\s*\d+\s*[.)-]\s*/, '')
+    .replace(/^`+|`+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (normalized.length < 18) return null
+  if (/^(ok|done|working|thinking|status|update|noted)$/i.test(normalized)) return null
+  return normalized
+}
+
+function uniqueNormalizedLines(lines: string[]): string[] {
+  const next: string[] = []
+  const seen = new Set<string>()
+  lines.forEach((line) => {
+    const normalized = normalizeInsightLine(line)
+    if (!normalized) return
+    const key = normalized.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    next.push(normalized)
+  })
+  return next
+}
+
+function pickLinesByPattern(lines: string[], pattern: RegExp, limit = 4): string[] {
+  return uniqueNormalizedLines(lines.filter((line) => pattern.test(line))).slice(0, limit)
+}
+
+function pickTopFindings(lines: string[], limit = 3): string[] {
+  const candidates = uniqueNormalizedLines(lines)
+  if (candidates.length === 0) return []
+  const scored = candidates
+    .map((line) => {
+      let score = 0
+      if (/\b(found|identified|observed|validated|measured|implemented|fixed|completed)\b/i.test(line)) score += 3
+      if (/\b(issue|risk|blocker|error|regression|latency|cost|coverage|missing)\b/i.test(line)) score += 2
+      if (/\d/.test(line)) score += 1
+      return { line, score }
+    })
+    .sort((a, b) => b.score - a.score)
+
+  return scored.slice(0, limit).map((entry) => entry.line)
+}
+
+function buildNextActionsChecklist(payload: MissionReportPayload, recommendations: string[], unresolvedRisks: string[]): string[] {
+  const blockedTasks = payload.tasks.filter((task) => String(task.status).toLowerCase() === 'blocked')
+  const incompleteTasks = payload.tasks.filter((task) => !['done', 'completed'].includes(String(task.status).toLowerCase()))
+  const actions: string[] = []
+
+  blockedTasks.slice(0, 3).forEach((task) => {
+    actions.push(`Resolve blocker: ${task.title}`)
+  })
+  recommendations.slice(0, 3).forEach((line) => {
+    actions.push(line)
+  })
+  unresolvedRisks.slice(0, 2).forEach((line) => {
+    actions.push(`Mitigate risk: ${line}`)
+  })
+  incompleteTasks.slice(0, 2).forEach((task) => {
+    actions.push(`Close remaining task: ${task.title}`)
+  })
+  if (actions.length === 0) {
+    actions.push('Share this report with stakeholders and confirm acceptance criteria.')
+  }
+
+  return uniqueNormalizedLines(actions).slice(0, 6)
+}
+
 function generateMissionReport(payload: MissionReportPayload): string {
   const durationMs = Math.max(0, payload.completedAt - payload.startedAt)
   const taskStats = computeMissionTaskStats(payload.tasks)
   const costEstimate = estimateMissionCost(payload.tokenCount)
+  const allAgentLines = payload.agentSummaries.flatMap((summary) => summary.lines)
+  const recommendations = pickLinesByPattern(
+    allAgentLines,
+    /\b(recommend|should|next step|propose|decision|action required|prioritize)\b/i,
+    6,
+  )
+  const unresolvedRisks = pickLinesByPattern(
+    allAgentLines,
+    /\b(risk|unknown|uncertain|blocker|open question|tbd|dependency|assumption|gap)\b/i,
+    6,
+  )
+  const nextActions = buildNextActionsChecklist(payload, recommendations, unresolvedRisks)
+  const completedRatio = taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0
+  const topFindings = pickTopFindings(allAgentLines, 3)
   const lines: string[] = []
 
   lines.push(`# Mission Report${payload.name ? `: ${payload.name}` : ''}`)
+  lines.push('')
+  lines.push('## Executive Summary')
+  lines.push(`- ${taskStats.completed}/${taskStats.total} tasks completed (${completedRatio}%) in ${formatDuration(durationMs)} with ${payload.team.length} agents.`)
+  lines.push(`- Consumed ${payload.tokenCount.toLocaleString()} tokens (~$${costEstimate.toFixed(2)} estimated cost).`)
+  lines.push(`- Produced ${payload.artifacts.length} artifacts and ${payload.agentSummaries.length} agent contribution streams.`)
+  if (topFindings.length > 0) {
+    topFindings.forEach((finding) => lines.push(`- Key outcome: ${finding}`))
+  }
   lines.push('')
   lines.push('## Mission Overview')
   lines.push(`- **Goal:** ${payload.goal || 'Untitled mission'}`)
@@ -1078,30 +1171,51 @@ function generateMissionReport(payload: MissionReportPayload): string {
   lines.push(`- **Completed:** ${taskStats.completed}`)
   lines.push(`- **Failed:** ${taskStats.failed}`)
   lines.push('')
-  lines.push('## Per-Agent Summary')
+  lines.push('## Per-Agent Key Findings')
   if (payload.agentSummaries.length === 0) {
     lines.push('- No agent output captured')
   } else {
     payload.agentSummaries.forEach((summary) => {
       lines.push(`### ${summary.agentName} (${summary.modelId || 'unknown'})`)
+      const findings = pickTopFindings(summary.lines, 3)
+      const recs = pickLinesByPattern(summary.lines, /\b(recommend|should|next step|propose|decision)\b/i, 2)
+      const risks = pickLinesByPattern(summary.lines, /\b(risk|unknown|blocker|open question|dependency|gap)\b/i, 2)
       if (summary.lines.length === 0) {
         lines.push('- No output captured')
       } else {
-        summary.lines.forEach((line) => {
-          lines.push(`- ${line}`)
-        })
+        if (findings.length > 0) findings.forEach((line) => lines.push(`- Finding: ${line}`))
+        if (recs.length > 0) recs.forEach((line) => lines.push(`- Recommendation: ${line}`))
+        if (risks.length > 0) risks.forEach((line) => lines.push(`- Risk/Open question: ${line}`))
+        lines.push(`- Output lines captured: ${summary.lines.length}`)
       }
       lines.push('')
     })
   }
-  lines.push('## Artifacts')
+  lines.push('## Decisions And Recommendations')
+  if (recommendations.length === 0) {
+    lines.push('- No explicit recommendations were captured. Review per-agent findings for follow-ups.')
+  } else {
+    recommendations.forEach((line) => lines.push(`- ${line}`))
+  }
+  lines.push('')
+  lines.push('## Artifacts And Files Produced')
   if (payload.artifacts.length === 0) {
     lines.push('- None')
   } else {
     payload.artifacts.forEach((artifact) => {
-      lines.push(`- **${artifact.title}** [${artifact.type}] by ${artifact.agentName}`)
+      lines.push(`- **${artifact.title}** [${artifact.type}] by ${artifact.agentName} at ${new Date(artifact.timestamp).toLocaleTimeString()}`)
     })
   }
+  lines.push('')
+  lines.push('## Unresolved Risks And Open Questions')
+  if (unresolvedRisks.length === 0) {
+    lines.push('- No unresolved risks captured from agent output.')
+  } else {
+    unresolvedRisks.forEach((line) => lines.push(`- ${line}`))
+  }
+  lines.push('')
+  lines.push('## Next Actions Checklist')
+  nextActions.forEach((action) => lines.push(`- [ ] ${action}`))
   lines.push('')
   lines.push('## Cost Estimate')
   lines.push(`- **Tokens:** ${payload.tokenCount.toLocaleString()}`)
@@ -1570,7 +1684,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [newMissionBudgetLimit, setNewMissionBudgetLimit] = useState('120000')
   const [maximizedMissionId, setMaximizedMissionId] = useState<string | null>(null)
   const [_view, setView] = useState<'board' | 'timeline'>('board')
-  const [missionSubTab, setMissionSubTab] = useState<'overview' | 'active' | 'history'>('overview')
+  const [missionSubTab, setMissionSubTab] = useState<'active' | 'history'>('active')
   const [missionState, setMissionState] = useState<'running' | 'paused' | 'stopped'>(
     'stopped',
   )
@@ -1679,6 +1793,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const missionActiveRef = useRef(missionActive)
   const missionStateRef = useRef(missionState)
   const openNewMissionModalRef = useRef<(prefill?: Partial<MissionBoardDraft>) => void>(() => {})
+  const missionWizardOriginTabRef = useRef<ActiveTab>('missions')
   const prevAutoNameRef = useRef('')
   const goalTextareaRef = useRef<HTMLTextAreaElement>(null)
   const goalMentionContainerRef = useRef<HTMLDivElement>(null)
@@ -2887,7 +3002,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     async (agentId: string, pause: boolean): Promise<boolean> => {
       const sessionKey = agentSessionMap[agentId]
       if (!sessionKey) {
-        toast('No active session to control', { type: 'error' })
+        toast(`Cannot ${pause ? 'pause' : 'resume'} ${agentId}: no active session. Re-launch the mission and retry.`, { type: 'error' })
         return false
       }
 
@@ -2912,8 +3027,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         setPausedByAgentId((prev) => ({ ...prev, [agentId]: previousPaused }))
         toast(
           error instanceof Error
-            ? error.message
-            : `Failed to ${pause ? 'pause' : 'resume'} ${agentName}`,
+            ? `Failed to ${pause ? 'pause' : 'resume'} ${agentName}: ${error.message}`
+            : `Failed to ${pause ? 'pause' : 'resume'} ${agentName}. Check gateway status and retry.`,
           { type: 'error' },
         )
         return false
@@ -2960,14 +3075,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   }, [agentSessionMap, team])
 
   const handleSoftPause = useCallback(async (pause: boolean) => {
+    if (!missionActiveRef.current) {
+      toast('No active mission to control. Start a mission, then retry.', { type: 'error' })
+      return
+    }
+    const controllableAgents = team.filter((member) => agentSessionMap[member.id])
+    if (controllableAgents.length === 0) {
+      toast('Mission control unavailable: no active agent sessions. Re-launch the mission and retry.', { type: 'error' })
+      return
+    }
     try {
       setMissionState(pause ? 'paused' : 'running')
       const directive = pause
         ? 'Hold — please pause your current work and await further instructions.'
         : 'Resume your work — continue from where you left off.'
       await Promise.all(
-        team
-          .filter((m) => agentSessionMap[m.id])
+        controllableAgents
           .map(async (m) => {
             const sessionKey = agentSessionMap[m.id]
             if (!sessionKey) return
@@ -2984,12 +3107,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           ? '⏸ Mission paused — agents notified to hold'
           : '▶ Mission resumed — agents notified to continue',
       })
-      toast(pause ? 'Mission paused' : 'Mission resumed', { type: 'success' })
+      toast(
+        pause
+          ? `Mission paused. ${controllableAgents.length} agent${controllableAgents.length === 1 ? '' : 's'} notified.`
+          : `Mission resumed. ${controllableAgents.length} agent${controllableAgents.length === 1 ? '' : 's'} notified.`,
+        { type: 'success' },
+      )
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Pause failed', { type: 'error' })
+      toast(
+        err instanceof Error
+          ? `Mission control failed: ${err.message}. Verify gateway connectivity and retry.`
+          : 'Mission control failed. Verify gateway connectivity and retry.',
+        { type: 'error' },
+      )
       setMissionState(pause ? 'running' : 'paused')
     }
-  }, [team, agentSessionMap, emitFeedEvent])
+  }, [team, agentSessionMap])
 
   handleSoftPauseRef.current = handleSoftPause
 
@@ -3240,8 +3373,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         `Mission launch blocked: could not start ${missingMember.name}'s session. Check gateway capacity/provider health and retry.`,
         { type: 'error' },
       )
-      setActiveTab('missions')
-      setMissionSubTab('overview')
+      openMissionsView('active')
       return null
     }
 
@@ -3827,9 +3959,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setSelectedOutputAgentId(firstAssignedAgentId)
     setPausedByAgentId({})
     sessionActivityRef.current = new Map()
-    // ── Auto-switch to Mission tab and show live feed ──────────────────────
-    setActiveTab('missions')
-    setMissionSubTab('active')
+    if (missionWizardOriginTabRef.current === 'overview') {
+      setActiveTab('overview')
+    } else {
+      setActiveTab('missions')
+      setMissionSubTab('active')
+    }
     setWizardOpen(false)
     emitFeedEvent({
       type: 'mission_started',
@@ -3861,11 +3996,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   buildMissionCompletionSnapshotRef.current = buildMissionCompletionSnapshot
 
   useEffect(() => {
-    if (missionActive && missionState === 'running') {
-      setActiveTab('missions')
+    if (missionActive && missionState === 'running' && activeTab === 'missions') {
       setMissionSubTab('active')
     }
-  }, [missionActive, missionState])
+  }, [activeTab, missionActive, missionState])
 
   useEffect(() => {
     if (!prevMissionActiveRef.current && missionActive) {
@@ -3928,8 +4062,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   function openNewMissionModal(prefill?: Partial<MissionBoardDraft>) {
     prevAutoNameRef.current = ''
-    setActiveTab('missions')
-    setMissionSubTab('overview')
+    missionWizardOriginTabRef.current = activeTab
     setNewMissionName(prefill?.name ?? '')
     setNewMissionGoal(prefill?.goal ?? missionGoal)
     closeMentionMenu()
@@ -3940,6 +4073,90 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionWizardStep(0)
   }
   openNewMissionModalRef.current = openNewMissionModal
+
+  function openMissionsView(view?: 'active' | 'history') {
+    setActiveTab('missions')
+    setMissionSubTab(view ?? (missionActive ? 'active' : 'history'))
+  }
+
+  const currentTeamLabel = `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · ${team.length} agents`
+  const missionTeamOptions = [
+    { id: '__current__', label: currentTeamLabel, team },
+    ...teamConfigs.map((config) => ({
+      id: config.id,
+      label: `${config.name} · ${config.team.length} agents`,
+      team: config.team,
+    })),
+  ]
+  const selectedMissionTeamOption =
+    missionTeamOptions.find((option) => option.id === newMissionTeamConfigId)
+    ?? missionTeamOptions[0]
+  const selectedMissionTeamMembers = selectedMissionTeamOption?.team ?? []
+  const selectedBudgetTokens = parseTokenBudget(newMissionBudgetLimit)
+  const selectedTotalBudgetCost = selectedBudgetTokens ? estimateMissionCost(selectedBudgetTokens) : null
+
+  function getTeamBudgetSummary(members: TeamMember[]) {
+    const totalCost = selectedBudgetTokens ? estimateMissionCost(selectedBudgetTokens) : null
+    const avgCost =
+      totalCost !== null && members.length > 0
+        ? Number((totalCost / members.length).toFixed(2))
+        : null
+    return { totalCost, avgCost }
+  }
+
+  function handleSaveMissionDraft() {
+    const goal = newMissionGoal.trim()
+    const name = newMissionName.trim() || 'Untitled mission'
+    if (!goal) return
+    const selectedConfig = newMissionTeamConfigId === '__current__'
+      ? null
+      : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
+    const teamName = selectedConfig ? `${selectedConfig.name} · ${selectedConfig.team.length} agents` : currentTeamLabel
+    const id = `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    setMissionBoardDrafts((prev) => [
+      {
+        id,
+        name,
+        goal,
+        teamConfigId: newMissionTeamConfigId,
+        teamName,
+        processType: newMissionProcessType,
+        budgetLimit: newMissionBudgetLimit.trim(),
+        createdAt: Date.now(),
+      },
+      ...prev,
+    ])
+    setMissionBoardModalOpen(false)
+    toast(`Saved draft: ${name}`, { type: 'success' })
+  }
+
+  function handleLaunchMissionFromModal() {
+    const goal = newMissionGoal.trim()
+    if (!goal) return
+    const selectedConfig = newMissionTeamConfigId === '__current__'
+      ? null
+      : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
+
+    if (selectedConfig) {
+      setTeam(selectedConfig.team.map((member, index) => ({
+        ...member,
+        avatar: member.avatar ?? getAgentAvatarForSlot(index),
+      })))
+      setSelectedTeamConfigId(selectedConfig.id)
+    }
+
+    pendingMissionNameRef.current = newMissionName.trim()
+    pendingMissionBudgetLimitRef.current = newMissionBudgetLimit.trim()
+    setMissionGoal(goal)
+    setProcessType(newMissionProcessType)
+    setBudgetLimit(newMissionBudgetLimit.trim())
+    setMissionBoardModalOpen(false)
+    setRestoreDismissed(true)
+
+    window.setTimeout(() => {
+      handleCreateMissionRef.current()
+    }, 0)
+  }
 
   // ── Mission tab content ────────────────────────────────────────────────────
 
@@ -4129,8 +4346,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveTab('missions')
-                    setMissionSubTab('overview')
+                    openMissionsView()
                   }}
                   className="text-[10px] font-medium text-accent-500 hover:text-accent-600 transition-colors"
                 >
@@ -4168,7 +4384,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     onClick={() => openNewMissionModal()}
                     className="mt-1 rounded-lg bg-accent-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-accent-600 transition-colors"
                   >
-                    + New Mission
+                    Start Mission
                   </button>
                 </div>
               ) : (
@@ -4297,7 +4513,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setActiveTab('missions')}
+              onClick={() => openMissionsView()}
               className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
             >
               ← Back
@@ -5057,36 +5273,379 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     )
   }
 
+  function renderMissionWizardOverlay() {
+    if (!missionBoardModalOpen) return null
+
+    return (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-neutral-900/35 px-4 py-6 backdrop-blur-[1px]"
+        onClick={() => setMissionBoardModalOpen(false)}
+      >
+        <div
+          className="flex w-full max-w-2xl flex-col rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="border-b border-neutral-200 px-6 pt-5 pb-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-base font-semibold text-neutral-900 dark:text-white">New Mission</h3>
+              <button
+                type="button"
+                onClick={() => { setMissionBoardModalOpen(false); setMissionWizardStep(0) }}
+                className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-[11px] text-neutral-600 hover:bg-neutral-50"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mt-3 flex items-center gap-1">
+              {['Scope', 'Team', 'Settings', 'Review'].map((stepLabel, stepIdx) => (
+                <div key={stepLabel} className="flex flex-1 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMissionWizardStep(stepIdx)}
+                    className={cn(
+                      'flex size-7 items-center justify-center rounded-full text-[11px] font-semibold transition-colors',
+                      stepIdx === missionWizardStep
+                        ? 'bg-accent-500 text-white'
+                        : stepIdx < missionWizardStep
+                          ? 'bg-accent-100 text-accent-700'
+                          : 'bg-neutral-100 text-neutral-400',
+                    )}
+                  >
+                    {stepIdx < missionWizardStep ? '✓' : stepIdx + 1}
+                  </button>
+                  <span className={cn(
+                    'text-[11px] font-medium',
+                    stepIdx === missionWizardStep ? 'text-neutral-900 dark:text-white' : 'text-neutral-400',
+                  )}>
+                    {stepLabel}
+                  </span>
+                  {stepIdx < 3 ? <div className="mx-1 h-px flex-1 bg-neutral-200" /> : null}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="min-h-[320px] px-6 py-5">
+            {missionWizardStep === 0 ? (
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="text-xs font-medium text-neutral-700">
+                    Mission Name
+                    {newMissionName && newMissionName === prevAutoNameRef.current ? (
+                      <span className="ml-1 text-[11px] font-normal text-neutral-400">(auto)</span>
+                    ) : null}
+                  </span>
+                  <input
+                    value={newMissionName}
+                    onChange={(event) => setNewMissionName(event.target.value)}
+                    placeholder="e.g. Q1 competitor analysis"
+                    className="mt-1.5 h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
+                  />
+                </label>
+                <label className="block">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-neutral-700">Goal</span>
+                    <button
+                      type="button"
+                      onClick={() => setTemplatesModalOpen(true)}
+                      className="rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-neutral-600 transition-colors hover:border-accent-300 hover:bg-accent-50 hover:text-accent-700"
+                    >
+                      Templates
+                    </button>
+                  </div>
+                  <div ref={goalMentionContainerRef} className="relative mt-1.5">
+                    {mentionQuery !== null && mentionSuggestions.length > 0 ? (
+                      <div
+                        className={cn(
+                          'absolute left-0 z-50 w-64 rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800',
+                          mentionOpenAbove ? 'bottom-full mb-1' : 'top-full mt-1',
+                        )}
+                      >
+                        {mentionSuggestions.map((member, index) => {
+                          const teamIndex = team.findIndex((entry) => entry.id === member.id)
+                          const accent = AGENT_ACCENT_COLORS[(teamIndex >= 0 ? teamIndex : index) % AGENT_ACCENT_COLORS.length]
+                          const memberRole = (
+                            member as TeamMember & { role?: string; roleDescription?: string }
+                          ).role ?? member.roleDescription ?? 'Agent'
+                          return (
+                            <button
+                              key={member.id}
+                              type="button"
+                              onMouseDown={(event) => {
+                                event.preventDefault()
+                                insertMention(member)
+                              }}
+                              className={cn(
+                                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50 dark:hover:bg-slate-700',
+                                index === mentionActiveIndex ? 'bg-neutral-50 dark:bg-slate-700' : '',
+                              )}
+                            >
+                              <span className={cn('flex size-6 items-center justify-center rounded-full text-xs font-semibold', accent.avatar, accent.text)}>
+                                {member.name.charAt(0).toUpperCase()}
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate font-medium text-neutral-900 dark:text-white">{member.name}</span>
+                                <span className="block truncate text-xs text-neutral-500 dark:text-slate-400">{memberRole}</span>
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                    <textarea
+                      ref={goalTextareaRef}
+                      value={newMissionGoal}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        const cursor = event.target.selectionStart ?? value.length
+                        setNewMissionGoal(value)
+                        const mention = resolveMentionAtCursor(value, cursor)
+                        if (mention) {
+                          setMentionQuery(mention.query)
+                          setMentionAnchor({ start: mention.start, end: mention.end })
+                          updateMentionPlacement()
+                        } else {
+                          closeMentionMenu()
+                        }
+                        setNewMissionName((prev) => {
+                          const prevAutoName = prevAutoNameRef.current
+                          const autoName = value.trim().split(/\s+/).slice(0, 6).join(' ')
+                          if (!prev || prev === prevAutoName) {
+                            prevAutoNameRef.current = autoName
+                            return autoName
+                          }
+                          return prev
+                        })
+                      }}
+                      onKeyDown={(event) => {
+                        if (mentionQuery === null) return
+                        if (event.key === 'Escape') {
+                          event.preventDefault()
+                          closeMentionMenu()
+                          return
+                        }
+                        if (mentionSuggestions.length === 0) return
+                        if (event.key === 'ArrowDown') {
+                          event.preventDefault()
+                          setMentionActiveIndex((prev) => (prev + 1) % mentionSuggestions.length)
+                          return
+                        }
+                        if (event.key === 'ArrowUp') {
+                          event.preventDefault()
+                          setMentionActiveIndex((prev) => (prev - 1 + mentionSuggestions.length) % mentionSuggestions.length)
+                          return
+                        }
+                        if (event.key === 'Enter' || event.key === 'Tab') {
+                          event.preventDefault()
+                          const selected = mentionSuggestions[mentionActiveIndex] ?? mentionSuggestions[0]
+                          if (selected) {
+                            insertMention(selected)
+                          }
+                        }
+                      }}
+                      onFocus={() => {
+                        if (mentionQuery !== null) {
+                          updateMentionPlacement()
+                        }
+                      }}
+                      rows={6}
+                      placeholder="Describe the mission goal, output format, and constraints..."
+                      className="w-full resize-y rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1 dark:border-slate-700 dark:bg-slate-800"
+                    />
+                  </div>
+                </label>
+              </div>
+            ) : null}
+
+            {missionWizardStep === 1 ? (
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-neutral-700">Select a team for this mission</p>
+                <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
+                  {missionTeamOptions.map((option) => {
+                    const teamBudget = getTeamBudgetSummary(option.team)
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setNewMissionTeamConfigId(option.id)}
+                        className={cn(
+                          'w-full rounded-xl border p-3 text-left transition-colors',
+                          newMissionTeamConfigId === option.id
+                            ? 'border-accent-300 bg-accent-50/70'
+                            : 'border-neutral-200 bg-white hover:border-neutral-300',
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{option.label}</p>
+                            <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-slate-400">
+                              {option.team.length} agents
+                              {teamBudget.avgCost !== null ? ` · ~$${teamBudget.avgCost.toFixed(2)}/agent` : ''}
+                            </p>
+                          </div>
+                          {teamBudget.totalCost !== null ? (
+                            <span className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] font-semibold text-neutral-700">
+                              ~${teamBudget.totalCost.toFixed(2)}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {option.team.map((member) => (
+                            <span key={member.id} className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] text-neutral-600 dark:text-slate-400">
+                              {member.name} · {getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}
+                            </span>
+                          ))}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {missionWizardStep === 2 ? (
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="text-xs font-medium text-neutral-700">Process Type</span>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {(['sequential', 'hierarchical', 'parallel'] as const).map((pt) => (
+                      <button
+                        key={pt}
+                        type="button"
+                        onClick={() => setNewMissionProcessType(pt)}
+                        className={cn(
+                          'rounded-lg border px-3 py-3 text-center transition-colors',
+                          newMissionProcessType === pt
+                            ? 'border-accent-300 bg-accent-50 text-accent-700'
+                            : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300',
+                        )}
+                      >
+                        <p className="text-xs font-semibold capitalize">{pt}</p>
+                        <p className="mt-0.5 text-[10px] text-neutral-500 dark:text-slate-400">
+                          {pt === 'sequential' ? 'One at a time' : pt === 'hierarchical' ? 'Manager delegates' : 'All at once'}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-neutral-700">Token Budget (max)</span>
+                  <input
+                    value={newMissionBudgetLimit}
+                    onChange={(event) => setNewMissionBudgetLimit(event.target.value.replace(/[^\d]/g, ''))}
+                    inputMode="numeric"
+                    placeholder="120000"
+                    className="mt-1.5 h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
+                  />
+                  <p className="mt-1 text-[11px] text-neutral-400">
+                    {selectedBudgetTokens ? `~$${(selectedTotalBudgetCost ?? 0).toFixed(2)} estimated cost` : 'No budget limit'}
+                  </p>
+                </label>
+              </div>
+            ) : null}
+
+            {missionWizardStep === 3 ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Launch Summary</h4>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-600 dark:text-slate-400">Mission</span>
+                      <span className="font-medium text-neutral-900 dark:text-white">{newMissionName || 'Untitled'}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-600 dark:text-slate-400">Team</span>
+                      <span className="font-medium text-neutral-900 dark:text-white">{selectedMissionTeamMembers.length} agents</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-600 dark:text-slate-400">Process</span>
+                      <span className="font-medium capitalize text-neutral-900 dark:text-white">{newMissionProcessType}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-600 dark:text-slate-400">Budget</span>
+                      <span className="font-medium text-neutral-900 dark:text-white">{selectedBudgetTokens ? `${selectedBudgetTokens.toLocaleString()} tokens (~$${(selectedTotalBudgetCost ?? 0).toFixed(2)})` : 'Unlimited'}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Goal</p>
+                  <p className="mt-1 text-xs text-neutral-700">{newMissionGoal || 'No goal set'}</p>
+                </div>
+                <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Team Lineup</p>
+                  <div className="mt-2 space-y-1">
+                    {selectedMissionTeamMembers.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between rounded-md bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1.5">
+                        <span className="text-xs font-medium text-neutral-800">{member.name}</span>
+                        <span className="text-[10px] text-neutral-500 dark:text-slate-400">{getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex items-center justify-between border-t border-neutral-200 px-6 py-4">
+            <button
+              type="button"
+              onClick={() => {
+                if (missionWizardStep === 0) { setMissionBoardModalOpen(false); setMissionWizardStep(0) }
+                else setMissionWizardStep((s) => Math.max(0, s - 1))
+              }}
+              className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+            >
+              {missionWizardStep === 0 ? 'Cancel' : 'Back'}
+            </button>
+            <div className="flex gap-2">
+              {missionWizardStep === 3 ? (
+                <div className="flex flex-col items-end gap-2">
+                  <div className="rounded-lg bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 px-3 py-2.5 text-xs text-neutral-500 dark:text-neutral-400">
+                    <span className="font-medium text-neutral-700 dark:text-neutral-300">Est. cost:</span>{' '}
+                    {team.length === 0 ? 'Select a team to estimate' : `$${(team.length * 0.05).toFixed(2)}-$${(team.length * 0.50).toFixed(2)} for a typical mission`}
+                    {' · '}
+                    {team.length} agent{team.length !== 1 ? 's' : ''} x typical 50k-500k tokens
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { handleSaveMissionDraft(); setMissionWizardStep(0) }}
+                      disabled={!newMissionGoal.trim()}
+                      className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+                    >
+                      Save Draft
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { handleLaunchMissionFromModal(); setMissionWizardStep(0) }}
+                      disabled={!newMissionGoal.trim()}
+                      className="rounded-lg bg-accent-500 px-5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600 disabled:opacity-50"
+                    >
+                      Launch Mission
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMissionWizardStep((s) => Math.min(3, s + 1))}
+                  className="rounded-lg bg-accent-500 px-5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600"
+                >
+                  Next
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderMissionsTabContent() {
-    const currentTeamLabel = `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · ${team.length} agents`
     const missionTasksForBoard = missionTasks.length > 0 ? missionTasks : boardTasks
     const runningTaskStats = computeMissionTaskStats(missionTasksForBoard)
     const runningElapsed = missionStartedAtRef.current ? formatDuration(Date.now() - missionStartedAtRef.current) : '0s'
     const runningProgressPct = runningTaskStats.total > 0 ? Math.round((runningTaskStats.completed / runningTaskStats.total) * 100) : 0
-    const missionTeamOptions = [
-      { id: '__current__', label: currentTeamLabel, team },
-      ...teamConfigs.map((config) => ({
-        id: config.id,
-        label: `${config.name} · ${config.team.length} agents`,
-        team: config.team,
-      })),
-    ]
-    const selectedMissionTeamOption =
-      missionTeamOptions.find((option) => option.id === newMissionTeamConfigId)
-      ?? missionTeamOptions[0]
-    const selectedMissionTeamMembers = selectedMissionTeamOption?.team ?? []
-    const selectedBudgetTokens = parseTokenBudget(newMissionBudgetLimit)
-    const selectedTotalBudgetCost = selectedBudgetTokens ? estimateMissionCost(selectedBudgetTokens) : null
-    // (budget cost per agent — reserved for future budget display)
-
-    function getTeamBudgetSummary(members: TeamMember[]) {
-      const totalCost = selectedBudgetTokens ? estimateMissionCost(selectedBudgetTokens) : null
-      const avgCost =
-        totalCost !== null && members.length > 0
-          ? Number((totalCost / members.length).toFixed(2))
-          : null
-      return { totalCost, avgCost }
-    }
 
     function handleRestoreCheckpoint() {
       if (!restoreCheckpoint) return
@@ -5126,62 +5685,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       toast('Recovered checkpoint discarded', { type: 'success' })
     }
 
-    function handleSaveMissionDraft() {
-      const goal = newMissionGoal.trim()
-      const name = newMissionName.trim() || 'Untitled mission'
-      if (!goal) return
-      const selectedConfig = newMissionTeamConfigId === '__current__'
-        ? null
-        : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
-      const teamName = selectedConfig ? `${selectedConfig.name} · ${selectedConfig.team.length} agents` : currentTeamLabel
-      const id = `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-      setMissionBoardDrafts((prev) => [
-        {
-          id,
-          name,
-          goal,
-          teamConfigId: newMissionTeamConfigId,
-          teamName,
-          processType: newMissionProcessType,
-          budgetLimit: newMissionBudgetLimit.trim(),
-          createdAt: Date.now(),
-        },
-        ...prev,
-      ])
-      setMissionBoardModalOpen(false)
-      toast(`Saved draft: ${name}`, { type: 'success' })
-    }
-
-    function handleLaunchMissionFromModal() {
-      const goal = newMissionGoal.trim()
-      if (!goal) return
-      const selectedConfig = newMissionTeamConfigId === '__current__'
-        ? null
-        : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
-
-      if (selectedConfig) {
-        setTeam(selectedConfig.team.map((member, index) => ({
-          ...member,
-          avatar: member.avatar ?? getAgentAvatarForSlot(index),
-        })))
-        setSelectedTeamConfigId(selectedConfig.id)
-      }
-
-      pendingMissionNameRef.current = newMissionName.trim()
-      pendingMissionBudgetLimitRef.current = newMissionBudgetLimit.trim()
-      setMissionGoal(goal)
-      setProcessType(newMissionProcessType)
-      setBudgetLimit(newMissionBudgetLimit.trim())
-      setMissionBoardModalOpen(false)
-      setRestoreDismissed(true)
-
-      window.setTimeout(() => {
-        handleCreateMissionRef.current()
-      }, 0)
-    }
-
-    const missionSubTabs: Array<{ id: 'overview' | 'active' | 'history'; label: string }> = [
-      { id: 'overview', label: 'Overview' },
+    const missionSubTabs: Array<{ id: 'active' | 'history'; label: string }> = [
       { id: 'active', label: 'Active Mission' },
       { id: 'history', label: 'History' },
     ]
@@ -5218,22 +5722,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       }),
     ]
       .sort((a, b) => (b.completedAt ?? b.updatedAt) - (a.completedAt ?? a.updatedAt))
-    const recentCompletedMissions = historyCards
-      .slice(0, 4)
-      .map((entry) => {
-        const status = String(entry.status || '').toLowerCase()
-        const endedAt = entry.completedAt ?? entry.updatedAt
-        const durationMs = endedAt > entry.startedAt ? endedAt - entry.startedAt : 0
-        return {
-          id: `${entry.kind}-${entry.id}`,
-          title: truncateMissionGoal(entry.label || entry.goal || 'Mission', 72),
-          duration: formatDuration(durationMs),
-          failed: status === 'failed' || status === 'error',
-        }
-      })
-    const doneTaskCount = missionTasks.filter((task) => task.status === 'done').length
-    const totalTaskCount = missionTasks.length
-    const totalReportsCount = historyCards.length
     const missionCardCls = 'relative overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900'
     return (
       <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-neutral-950">
@@ -5260,7 +5748,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 onClick={() => openNewMissionModal()}
                 className="min-h-11 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white hover:bg-accent-600"
               >
-                New Mission
+                Start Mission
               </button>
             </div>
           </div>
@@ -5316,113 +5804,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           ) : null}
 
           <div className="min-h-0 flex-1 overflow-auto">
-            {missionSubTab === 'overview' ? (
-              <div className="w-full space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  <article className="rounded-xl border border-neutral-200 bg-white px-4 py-4 dark:border-neutral-700 dark:bg-neutral-900">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Mission State</p>
-                    <p className="mt-1 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
-                  </article>
-                  <article className="rounded-xl border border-neutral-200 bg-white px-4 py-4 dark:border-neutral-700 dark:bg-neutral-900">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Tasks</p>
-                    <p className="mt-1 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
-                  </article>
-                  <article className="rounded-xl border border-neutral-200 bg-white px-4 py-4 dark:border-neutral-700 dark:bg-neutral-900">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Total Reports</p>
-                    <p className="mt-1 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{totalReportsCount}</p>
-                  </article>
-                </div>
-
-                {missionActive ? (
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Active Mission</p>
-                    <p className="mt-1 text-base font-semibold text-neutral-900 dark:text-neutral-100">{activeMissionGoal || missionGoal || 'Untitled mission'}</p>
-                    <button
-                      type="button"
-                      onClick={() => setMissionSubTab('active')}
-                      className="mt-4 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-medium text-red-600"
-                    >
-                      View Active Mission →
-                    </button>
-                  </section>
-                ) : (
-                  <section className={cn('flex min-h-[220px] items-center justify-center text-center', missionCardCls)}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <div>
-                      <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">No active mission</p>
-                      <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Start a mission to see inline agent output and timeline progress.</p>
-                      <button
-                        type="button"
-                        onClick={() => openNewMissionModal()}
-                        className="mt-4 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white hover:bg-accent-600"
-                      >
-                        + New Mission
-                      </button>
-                    </div>
-                  </section>
-                )}
-
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Recent Missions</p>
-                      <button
-                        type="button"
-                        onClick={() => setMissionSubTab('history')}
-                        className="rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-600"
-                      >
-                        Open History
-                      </button>
-                    </div>
-                    {recentCompletedMissions.length === 0 ? (
-                      <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">No completed missions yet.</p>
-                    ) : (
-                      <div className="mt-2">
-                        {recentCompletedMissions.map((entry) => (
-                          <article key={entry.id} className="flex items-center justify-between gap-3 border-b border-neutral-100 py-3 dark:border-neutral-800 last:border-0">
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{entry.title}</p>
-                              <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">Duration {entry.duration}</p>
-                            </div>
-                            <span className={cn(
-                              'shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium',
-                              entry.failed
-                                ? 'border-accent-200 bg-accent-50 text-accent-700 dark:border-accent-800 dark:bg-accent-900/30 dark:text-accent-400'
-                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-                            )}>
-                              {entry.failed ? 'Failed' : 'Completed'}
-                            </span>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Quick Launch Teams</p>
-                    {teamConfigs.length === 0 ? (
-                      <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">Save a team config in Configure to quick-launch missions here.</p>
-                    ) : (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {teamConfigs.slice(0, 6).map((config) => (
-                          <button
-                            key={`ql-${config.id}`}
-                            type="button"
-                            onClick={() => openNewMissionModal({ teamConfigId: config.id, name: `Mission with ${config.name}` })}
-                            className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:border-accent-300 hover:bg-accent-50 hover:text-accent-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
-                          >
-                            {config.icon ?? '👥'} {config.name} · {config.team.length}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                </div>
-              </div>
-            ) : null}
-
             {missionSubTab === 'active' ? (
               (missionActive || showCompletionModal) ? (
                 <div className="flex w-full flex-col gap-4 overflow-y-auto pb-4 pr-1" style={{ maxHeight: 'calc(100vh - 220px)' }}>
@@ -5628,7 +6009,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       onClick={() => openNewMissionModal()}
                       className="mt-4 rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-600"
                     >
-                      + New Mission
+                      Start Mission
                     </button>
                   </div>
                 </div>
@@ -5762,379 +6143,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             ) : null}
           </div>
         </div>
-        {missionBoardModalOpen ? (
-          <div
-            className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-900/35 px-4 py-6 backdrop-blur-[1px]"
-            onClick={() => setMissionBoardModalOpen(false)}
-          >
-            <div
-              className="flex w-full max-w-2xl flex-col rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {/* Wizard Step Indicator */}
-              <div className="border-b border-neutral-200 px-6 pt-5 pb-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-base font-semibold text-neutral-900 dark:text-white">New Mission</h3>
-                  <button
-                    type="button"
-                    onClick={() => { setMissionBoardModalOpen(false); setMissionWizardStep(0) }}
-                    className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-[11px] text-neutral-600 hover:bg-neutral-50"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="mt-3 flex items-center gap-1">
-                  {['Scope', 'Team', 'Settings', 'Review'].map((stepLabel, stepIdx) => (
-                    <div key={stepLabel} className="flex flex-1 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setMissionWizardStep(stepIdx)}
-                        className={cn(
-                          'flex size-7 items-center justify-center rounded-full text-[11px] font-semibold transition-colors',
-                          stepIdx === missionWizardStep
-                            ? 'bg-accent-500 text-white'
-                            : stepIdx < missionWizardStep
-                              ? 'bg-accent-100 text-accent-700'
-                              : 'bg-neutral-100 text-neutral-400',
-                        )}
-                      >
-                        {stepIdx < missionWizardStep ? '✓' : stepIdx + 1}
-                      </button>
-                      <span className={cn(
-                        'text-[11px] font-medium',
-                        stepIdx === missionWizardStep ? 'text-neutral-900 dark:text-white' : 'text-neutral-400',
-                      )}>
-                        {stepLabel}
-                      </span>
-                      {stepIdx < 3 ? <div className="mx-1 h-px flex-1 bg-neutral-200" /> : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Step Content */}
-              <div className="min-h-[320px] px-6 py-5">
-                {/* Step 0: Scope */}
-                {missionWizardStep === 0 ? (
-                  <div className="space-y-4">
-                    <label className="block">
-                      <span className="text-xs font-medium text-neutral-700">
-                        Mission Name
-                        {newMissionName && newMissionName === prevAutoNameRef.current ? (
-                          <span className="ml-1 text-[11px] font-normal text-neutral-400">(auto)</span>
-                        ) : null}
-                      </span>
-                      <input
-                        value={newMissionName}
-                        onChange={(event) => setNewMissionName(event.target.value)}
-                        placeholder="e.g. Q1 competitor analysis"
-                        className="mt-1.5 h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
-                      />
-                    </label>
-                    <label className="block">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-neutral-700">Goal</span>
-                        <button
-                          type="button"
-                          onClick={() => setTemplatesModalOpen(true)}
-                          className="rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-neutral-600 transition-colors hover:border-accent-300 hover:bg-accent-50 hover:text-accent-700"
-                        >
-                          Templates
-                        </button>
-                      </div>
-                      <div ref={goalMentionContainerRef} className="relative mt-1.5">
-                        {mentionQuery !== null && mentionSuggestions.length > 0 ? (
-                          <div
-                            className={cn(
-                              'absolute left-0 z-50 w-64 rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800',
-                              mentionOpenAbove ? 'bottom-full mb-1' : 'top-full mt-1',
-                            )}
-                          >
-                            {mentionSuggestions.map((member, index) => {
-                              const teamIndex = team.findIndex((entry) => entry.id === member.id)
-                              const accent = AGENT_ACCENT_COLORS[(teamIndex >= 0 ? teamIndex : index) % AGENT_ACCENT_COLORS.length]
-                              const memberRole = (
-                                member as TeamMember & { role?: string; roleDescription?: string }
-                              ).role ?? member.roleDescription ?? 'Agent'
-                              return (
-                                <button
-                                  key={member.id}
-                                  type="button"
-                                  onMouseDown={(event) => {
-                                    event.preventDefault()
-                                    insertMention(member)
-                                  }}
-                                  className={cn(
-                                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50 dark:hover:bg-slate-700',
-                                    index === mentionActiveIndex ? 'bg-neutral-50 dark:bg-slate-700' : '',
-                                  )}
-                                >
-                                  <span className={cn('flex size-6 items-center justify-center rounded-full text-xs font-semibold', accent.avatar, accent.text)}>
-                                    {member.name.charAt(0).toUpperCase()}
-                                  </span>
-                                  <span className="min-w-0">
-                                    <span className="block truncate font-medium text-neutral-900 dark:text-white">{member.name}</span>
-                                    <span className="block truncate text-xs text-neutral-500 dark:text-slate-400">{memberRole}</span>
-                                  </span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        ) : null}
-                        <textarea
-                          ref={goalTextareaRef}
-                          value={newMissionGoal}
-                          onChange={(event) => {
-                            const value = event.target.value
-                            const cursor = event.target.selectionStart ?? value.length
-                            setNewMissionGoal(value)
-                            const mention = resolveMentionAtCursor(value, cursor)
-                            if (mention) {
-                              setMentionQuery(mention.query)
-                              setMentionAnchor({ start: mention.start, end: mention.end })
-                              updateMentionPlacement()
-                            } else {
-                              closeMentionMenu()
-                            }
-                            // Auto-suggest name from first 6 words of goal
-                            setNewMissionName((prev) => {
-                              const prevAutoName = prevAutoNameRef.current
-                              const autoName = value.trim().split(/\s+/).slice(0, 6).join(' ')
-                              // Only auto-fill if field is empty or was previously auto-filled
-                              if (!prev || prev === prevAutoName) {
-                                prevAutoNameRef.current = autoName
-                                return autoName
-                              }
-                              return prev
-                            })
-                          }}
-                          onKeyDown={(event) => {
-                            if (mentionQuery === null) return
-                            if (event.key === 'Escape') {
-                              event.preventDefault()
-                              closeMentionMenu()
-                              return
-                            }
-                            if (mentionSuggestions.length === 0) return
-                            if (event.key === 'ArrowDown') {
-                              event.preventDefault()
-                              setMentionActiveIndex((prev) => (prev + 1) % mentionSuggestions.length)
-                              return
-                            }
-                            if (event.key === 'ArrowUp') {
-                              event.preventDefault()
-                              setMentionActiveIndex((prev) => (prev - 1 + mentionSuggestions.length) % mentionSuggestions.length)
-                              return
-                            }
-                            if (event.key === 'Enter' || event.key === 'Tab') {
-                              event.preventDefault()
-                              const selected = mentionSuggestions[mentionActiveIndex] ?? mentionSuggestions[0]
-                              if (selected) {
-                                insertMention(selected)
-                              }
-                            }
-                          }}
-                          onFocus={() => {
-                            if (mentionQuery !== null) {
-                              updateMentionPlacement()
-                            }
-                          }}
-                          rows={6}
-                          placeholder="Describe the mission goal, output format, and constraints..."
-                          className="w-full resize-y rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1 dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                    </label>
-                  </div>
-                ) : null}
-
-                {/* Step 1: Team */}
-                {missionWizardStep === 1 ? (
-                  <div className="space-y-3">
-                    <p className="text-xs font-medium text-neutral-700">Select a team for this mission</p>
-                    <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
-                      {missionTeamOptions.map((option) => {
-                        const teamBudget = getTeamBudgetSummary(option.team)
-                        return (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => setNewMissionTeamConfigId(option.id)}
-                            className={cn(
-                              'w-full rounded-xl border p-3 text-left transition-colors',
-                              newMissionTeamConfigId === option.id
-                                ? 'border-accent-300 bg-accent-50/70'
-                                : 'border-neutral-200 bg-white hover:border-neutral-300',
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{option.label}</p>
-                                <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-slate-400">
-                                  {option.team.length} agents
-                                  {teamBudget.avgCost !== null ? ` · ~$${teamBudget.avgCost.toFixed(2)}/agent` : ''}
-                                </p>
-                              </div>
-                              {teamBudget.totalCost !== null ? (
-                                <span className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] font-semibold text-neutral-700">
-                                  ~${teamBudget.totalCost.toFixed(2)}
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {option.team.map((member) => (
-                                <span key={member.id} className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] text-neutral-600 dark:text-slate-400">
-                                  {member.name} · {getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}
-                                </span>
-                              ))}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Step 2: Settings */}
-                {missionWizardStep === 2 ? (
-                  <div className="space-y-4">
-                    <label className="block">
-                      <span className="text-xs font-medium text-neutral-700">Process Type</span>
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        {(['sequential', 'hierarchical', 'parallel'] as const).map((pt) => (
-                          <button
-                            key={pt}
-                            type="button"
-                            onClick={() => setNewMissionProcessType(pt)}
-                            className={cn(
-                              'rounded-lg border px-3 py-3 text-center transition-colors',
-                              newMissionProcessType === pt
-                                ? 'border-accent-300 bg-accent-50 text-accent-700'
-                                : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300',
-                            )}
-                          >
-                            <p className="text-xs font-semibold capitalize">{pt}</p>
-                            <p className="mt-0.5 text-[10px] text-neutral-500 dark:text-slate-400">
-                              {pt === 'sequential' ? 'One at a time' : pt === 'hierarchical' ? 'Manager delegates' : 'All at once'}
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                    </label>
-                    <label className="block">
-                      <span className="text-xs font-medium text-neutral-700">Token Budget (max)</span>
-                      <input
-                        value={newMissionBudgetLimit}
-                        onChange={(event) => setNewMissionBudgetLimit(event.target.value.replace(/[^\d]/g, ''))}
-                        inputMode="numeric"
-                        placeholder="120000"
-                        className="mt-1.5 h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
-                      />
-                      <p className="mt-1 text-[11px] text-neutral-400">
-                        {selectedBudgetTokens ? `~$${(selectedTotalBudgetCost ?? 0).toFixed(2)} estimated cost` : 'No budget limit'}
-                      </p>
-                    </label>
-                  </div>
-                ) : null}
-
-                {/* Step 3: Review & Launch */}
-                {missionWizardStep === 3 ? (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 p-4">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Launch Summary</h4>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600 dark:text-slate-400">Mission</span>
-                          <span className="font-medium text-neutral-900 dark:text-white">{newMissionName || 'Untitled'}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600 dark:text-slate-400">Team</span>
-                          <span className="font-medium text-neutral-900 dark:text-white">{selectedMissionTeamMembers.length} agents</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600 dark:text-slate-400">Process</span>
-                          <span className="font-medium capitalize text-neutral-900 dark:text-white">{newMissionProcessType}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600 dark:text-slate-400">Budget</span>
-                          <span className="font-medium text-neutral-900 dark:text-white">{selectedBudgetTokens ? `${selectedBudgetTokens.toLocaleString()} tokens (~$${(selectedTotalBudgetCost ?? 0).toFixed(2)})` : 'Unlimited'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Goal</p>
-                      <p className="mt-1 text-xs text-neutral-700">{newMissionGoal || 'No goal set'}</p>
-                    </div>
-                    <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Team Lineup</p>
-                      <div className="mt-2 space-y-1">
-                        {selectedMissionTeamMembers.map((member) => (
-                          <div key={member.id} className="flex items-center justify-between rounded-md bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1.5">
-                            <span className="text-xs font-medium text-neutral-800">{member.name}</span>
-                            <span className="text-[10px] text-neutral-500 dark:text-slate-400">{getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Wizard Footer */}
-              <div className="flex items-center justify-between border-t border-neutral-200 px-6 py-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (missionWizardStep === 0) { setMissionBoardModalOpen(false); setMissionWizardStep(0) }
-                    else setMissionWizardStep((s) => Math.max(0, s - 1))
-                  }}
-                  className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
-                >
-                  {missionWizardStep === 0 ? 'Cancel' : '← Back'}
-                </button>
-                <div className="flex gap-2">
-                  {missionWizardStep === 3 ? (
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="rounded-lg bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 px-3 py-2.5 text-xs text-neutral-500 dark:text-neutral-400">
-                        <span className="font-medium text-neutral-700 dark:text-neutral-300">Est. cost:</span>{' '}
-                        {team.length === 0 ? 'Select a team to estimate' : `$${(team.length * 0.05).toFixed(2)}–$${(team.length * 0.50).toFixed(2)} for a typical mission`}
-                        {' · '}
-                        {team.length} agent{team.length !== 1 ? 's' : ''} × typical 50k–500k tokens
-                      </div>
-                      <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { handleSaveMissionDraft(); setMissionWizardStep(0) }}
-                        disabled={!newMissionGoal.trim()}
-                        className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50"
-                      >
-                        Save Draft
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { handleLaunchMissionFromModal(); setMissionWizardStep(0) }}
-                        disabled={!newMissionGoal.trim()}
-                        className="rounded-lg bg-accent-500 px-5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600 disabled:opacity-50"
-                      >
-                        🚀 Launch Mission
-                      </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setMissionWizardStep((s) => Math.min(3, s + 1))}
-                      className="rounded-lg bg-accent-500 px-5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600"
-                    >
-                      Next →
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
       {shortcutsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShortcutsModalOpen(false)}>
           <div className="w-full max-w-sm rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-xl" onClick={e => e.stopPropagation()}>
@@ -6491,6 +6499,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {activeTab === 'overview' && missionActive ? (
+              <button
+                type="button"
+                onClick={() => openMissionsView('active')}
+                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                title="Open active mission"
+              >
+                <span className="relative flex size-2">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                </span>
+                Active Mission
+              </button>
+            ) : null}
             <ApprovalsBell
               approvals={approvals}
               onApprove={handleApprove}
@@ -6543,7 +6565,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                if (tab.id === 'missions') {
+                  openMissionsView()
+                  return
+                }
+                setActiveTab(tab.id)
+              }}
               className={cn(
                 'relative flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-all sm:px-4',
                 isActive
@@ -6665,26 +6693,29 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <button
                       type="button"
                       onClick={() => void handleSoftPause(false)}
+                      disabled={missionState === 'running'}
                       className={cn(
-                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
+                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                         missionState === 'running'
                           ? 'bg-emerald-500 text-white'
                           : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
                       )}
                     >
-                      Start<span className="ml-1 text-[9px] opacity-50">Space</span>
+                      {missionState === 'running' ? 'Running' : 'Resume'}
+                      <span className="ml-1 text-[9px] opacity-50">Space</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleSoftPause(true)}
+                      disabled={missionState === 'paused'}
                       className={cn(
-                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
+                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                         missionState === 'paused'
                           ? 'bg-amber-500 text-white'
                           : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
                       )}
                     >
-                      Pause
+                      Pause Mission
                     </button>
                     <button
                       type="button"
@@ -6865,7 +6896,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <div className="flex shrink-0 items-center gap-2 border-t border-neutral-100 px-5 py-3 dark:border-neutral-800">
                   <button
                     type="button"
-                    onClick={() => { setAgentPopupId(null); setActiveTab('missions'); setMissionSubTab('active') }}
+                    onClick={() => { setAgentPopupId(null); openMissionsView('active') }}
                     className="rounded-lg border border-neutral-200 px-4 py-2 text-xs font-medium text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
                   >
                     View Active Mission →
@@ -7222,6 +7253,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
       ) : null}
 
+      {renderMissionWizardOverlay()}
+
       {artifactPreview ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div
@@ -7407,7 +7440,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </button>
                 <button type="button" onClick={() => { setShowCompletionModal(false); openNewMissionModal() }}
                   className="rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-600">
-                  New Mission
+                  Start Mission
                 </button>
               </div>
             </div>
@@ -7468,7 +7501,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  if (tab.id === 'missions') {
+                    openMissionsView()
+                    return
+                  }
+                  setActiveTab(tab.id)
+                }}
                 className={cn(
                   'relative flex flex-1 flex-col items-center justify-center py-2.5 text-[10px] font-medium transition-colors',
                   activeTab === tab.id
