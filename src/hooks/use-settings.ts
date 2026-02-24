@@ -102,6 +102,19 @@ export function applyTheme(theme: SettingsThemeMode) {
   if (theme === 'system' && media.matches) {
     root.classList.add('dark')
   }
+
+  // Sync data-theme so CSS variable overrides don't fight Tailwind dark: classes.
+  // paper-light CSS has !important overrides that win over dark: variants unless data-theme is correct.
+  const resolvedDark =
+    theme === 'dark' || (theme === 'system' && media.matches)
+  if (resolvedDark) {
+    // Preserve user's enterprise dark theme if set, otherwise default to ops-dark
+    const stored = localStorage.getItem('clawsuite-theme')
+    const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand']
+    root.setAttribute('data-theme', darkThemes.includes(stored ?? '') ? (stored as string) : 'ops-dark')
+  } else {
+    root.setAttribute('data-theme', 'paper-light')
+  }
 }
 
 function applySettingsAppearance(settings: StudioSettings) {
