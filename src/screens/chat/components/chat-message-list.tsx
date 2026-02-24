@@ -24,6 +24,11 @@ import {
 import { LoadingIndicator } from '@/components/loading-indicator'
 import { cn } from '@/lib/utils'
 
+/** Duration (ms) the thinking indicator stays visible after waitingForResponse
+ *  clears, giving the first response message time to render before the
+ *  indicator disappears — prevents a flash of blank space (Bug 2 fix). */
+const THINKING_GRACE_PERIOD_MS = 400
+
 // Simple thinking label — no cycling, no animation complexity
 function ThinkingStatusText() {
   return (
@@ -172,6 +177,10 @@ function ChatMessageListComponent({
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const [expandAllToolSections, setExpandAllToolSections] = useState(false)
+  // Bug 2 fix: grace period — keep thinking indicator alive briefly after
+  // waitingForResponse clears so the response message has time to render.
+  const [thinkingGrace, setThinkingGrace] = useState(false)
+  const thinkingGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false)
   const [messageSearchValue, setMessageSearchValue] = useState('')
   const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(0)
@@ -195,6 +204,11 @@ function ChatMessageListComponent({
     media.addEventListener('change', updateIsMobile)
     return () => media.removeEventListener('change', updateIsMobile)
   }, [])
+
+  // Bug 2 fix: refs used by grace-period effects (declared here so hooks run in
+  // consistent order; actual logic is after displayMessages useMemo below).
+  const prevWaitingRef = useRef(waitingForResponse)
+  const assistantMessageCountRef = useRef(0)
 
   // Pull-to-refresh handlers removed
 
@@ -308,6 +322,49 @@ function ChatMessageListComponent({
       return true
     })
   }, [hideSystemMessages, messages])
+
+  // Bug 2 fix: grace-period effects — placed after displayMessages so they can
+  // reference it safely.
+  useEffect(() => {
+    const currentAssistantCount = displayMessages.filter(
+      (m) => m.role === 'assistant',
+    ).length
+
+    // Cancel grace period early when a new assistant message appears
+    if (thinkingGrace && currentAssistantCount > assistantMessageCountRef.current) {
+      if (thinkingGraceTimerRef.current) {
+        clearTimeout(thinkingGraceTimerRef.current)
+        thinkingGraceTimerRef.current = null
+      }
+      setThinkingGrace(false)
+    }
+
+    assistantMessageCountRef.current = currentAssistantCount
+  }, [messages, thinkingGrace])
+
+  useEffect(() => {
+    const wasWaiting = prevWaitingRef.current
+    prevWaitingRef.current = waitingForResponse
+
+    if (wasWaiting && !waitingForResponse) {
+      // Snapshot assistant count at the moment waiting cleared
+      assistantMessageCountRef.current = displayMessages.filter(
+        (m) => m.role === 'assistant',
+      ).length
+      setThinkingGrace(true)
+      if (thinkingGraceTimerRef.current) clearTimeout(thinkingGraceTimerRef.current)
+      thinkingGraceTimerRef.current = setTimeout(() => {
+        thinkingGraceTimerRef.current = null
+        setThinkingGrace(false)
+      }, THINKING_GRACE_PERIOD_MS)
+    }
+
+    return () => {
+      if (thinkingGraceTimerRef.current) {
+        clearTimeout(thinkingGraceTimerRef.current)
+      }
+    }
+  }, [waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const normalizedMessageSearch = useMemo(
     function getNormalizedMessageSearch() {
@@ -509,9 +566,13 @@ function ChatMessageListComponent({
     .filter(({ message }) => message.role === 'user')
     .map(({ index }) => index)
     .pop()
-  // Show typing indicator when waiting for response and no visible text yet
+  // Show typing indicator when waiting for response and no visible text yet.
+  // Bug 2 fix: also show during grace period (thinkingGrace) so there's no
+  // blank-space flash between waitingForResponse clearing and the response
+  // message actually rendering.
   const showTypingIndicator = (() => {
-    if (!waitingForResponse) return false
+    const effectivelyWaiting = waitingForResponse || thinkingGrace
+    if (!effectivelyWaiting) return false
     // If streaming has visible text, hide indicator
     if (isStreaming && streamingText && streamingText.length > 0) return false
     const lastMessage = displayMessages[displayMessages.length - 1]
