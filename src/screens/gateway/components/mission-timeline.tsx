@@ -112,7 +112,7 @@ export function MissionTimeline({
         {teamMembers.map((member) => {
           const status = agentStatuses.get(member.id)
           const assignedTaskCount = tasks.filter((task) => task.agentId === member.id).length
-          const outputLines = agentOutputs.get(member.id) ?? []
+          const outputLines = agentOutputs.get(member.id) ?? agentOutputs.get(member.name) ?? []
           const agentStatus = (status?.status ?? '').toLowerCase()
           const isActive = agentStatus === 'active'
           const inactiveLabel =
@@ -159,7 +159,7 @@ export function MissionTimeline({
                   {isExpanded ? '▼ Live output' : '▶ Live output'}
                 </button>
 
-                {isExpanded || isActive ? (
+                {(isExpanded || isActive || outputLines.length > 0) ? (
                   <div className="mt-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-2">
                     <div className="max-h-[240px] overflow-y-auto rounded-lg bg-neutral-50 dark:bg-neutral-800/50 p-3 font-mono text-xs text-neutral-700 dark:text-neutral-300">
                       {outputLines.length > 0 ? (

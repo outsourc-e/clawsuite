@@ -2063,7 +2063,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [agentWizardOpenId, setAgentWizardOpenId] = useState<string | null>(null)
   const [teamWizardOpenId, setTeamWizardOpenId] = useState<string | null>(null)
   const [showAddTeamModal, setShowAddTeamModal] = useState(false)
-  const [switchTeamModalOpen, setSwitchTeamModalOpen] = useState(false)
   const [providerEditModalProvider, setProviderEditModalProvider] = useState<string | null>(null)
   const [showAddProviderModal, setShowAddProviderModal] = useState(false)
   const [newAgentDraft, setNewAgentDraft] = useState<(TeamMember & { backstory: string; roleDescription: string }) | null>(null)
@@ -4293,7 +4292,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Active Team</h2>
                 <button
                   type="button"
-                  onClick={() => setSwitchTeamModalOpen(true)}
+                  onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
                   className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400 hover:border-neutral-300 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
                 >
                   Switch Team
@@ -5659,7 +5658,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
             {missionSubTab === 'active' ? (
               missionActive ? (
-                <div className="w-full space-y-4 pb-4">
+                <div className="flex w-full flex-col gap-4 overflow-y-auto pb-4 pr-1" style={{ maxHeight: 'calc(100vh - 220px)' }}>
                   <section className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-5 py-4 shadow-sm">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -5944,49 +5943,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             ) : null}
           </div>
         </div>
-        {switchTeamModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onClick={() => setSwitchTeamModalOpen(false)}>
-            <div className="w-full max-w-2xl rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-xl"
-              onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
-                <div>
-                  <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Switch Team</p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Select a team to activate for your next mission</p>
-                </div>
-                <button type="button" onClick={() => setSwitchTeamModalOpen(false)}
-                  className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800">✕</button>
-              </div>
-              <div className="max-h-[60vh] overflow-y-auto p-5">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {teamConfigs.map((config) => {
-                    const isActive = selectedTeamConfigId === config.id
-                    return (
-                      <button key={config.id} type="button"
-                        onClick={() => { setSelectedTeamConfigId(config.id); loadTeamConfig(config.id); setSwitchTeamModalOpen(false) }}
-                        className={cn(
-                          "flex flex-col items-center rounded-xl border-2 p-4 text-center transition-all hover:shadow-md",
-                          isActive
-                            ? "border-orange-400 bg-orange-50/50 dark:bg-orange-900/10"
-                            : "border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:border-orange-300"
-                        )}>
-                        <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-2xl">
-                          {config.icon ?? "👥"}
-                        </div>
-                        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{config.name}</p>
-                        {config.description && (
-                          <p className="mt-0.5 text-[10px] text-neutral-400 line-clamp-2">{config.description}</p>
-                        )}
-                        <p className="mt-1 text-[10px] text-neutral-500">{config.team.length} agents</p>
-                        {isActive && <span className="mt-2 rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-bold text-white">Active</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         {missionBoardModalOpen ? (
           <div
             className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-900/35 px-4 py-6 backdrop-blur-[1px]"
