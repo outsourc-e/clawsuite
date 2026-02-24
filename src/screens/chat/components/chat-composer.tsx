@@ -53,8 +53,9 @@ type ChatComposerAttachment = {
   name: string
   contentType: string
   size: number
-  dataUrl: string
-  previewUrl: string
+  dataUrl?: string
+  previewUrl?: string
+  kind?: 'image' | 'file' | 'audio'
 }
 
 type ChatComposerProps = {
@@ -101,8 +102,8 @@ type ModelSwitchNotice = {
   retryModel?: string
 }
 
-/** Maximum image file size accepted from picker/drop before processing (25MB). */
-const MAX_ATTACHMENT_FILE_SIZE = 25 * 1024 * 1024
+/** Maximum file size accepted from picker/drop before processing (50MB). */
+const MAX_ATTACHMENT_FILE_SIZE = 50 * 1024 * 1024
 /** Longest side target for resized images. */
 const MAX_IMAGE_DIMENSION = 1920
 /** Initial JPEG compression quality (0-1). */
@@ -125,6 +126,17 @@ const IMAGE_EXTENSION_TO_MIME: Record<string, string> = {
   tiff: 'image/tiff',
 }
 
+const TEXT_EXTENSION_TO_MIME: Record<string, string> = {
+  md: 'text/markdown',
+  txt: 'text/plain',
+  json: 'application/json',
+  csv: 'text/csv',
+  ts: 'text/plain',
+  tsx: 'text/plain',
+  js: 'text/plain',
+  py: 'text/plain',
+}
+
 function normalizeMimeType(value: string): string {
   return value.trim().toLowerCase()
 }
@@ -134,15 +146,31 @@ function isImageMimeType(value: string): boolean {
   return normalized.startsWith('image/')
 }
 
-function inferMimeTypeFromFileName(name: string): string {
+function inferImageMimeTypeFromFileName(name: string): string {
   const match = /\.([a-z0-9]+)$/i.exec(name.trim())
   if (!match?.[1]) return ''
   return IMAGE_EXTENSION_TO_MIME[match[1].toLowerCase()] || ''
 }
 
+function inferTextMimeTypeFromFileName(name: string): string {
+  const match = /\.([a-z0-9]+)$/i.exec(name.trim())
+  if (!match?.[1]) return ''
+  return TEXT_EXTENSION_TO_MIME[match[1].toLowerCase()] || ''
+}
+
+function isTextMimeType(value: string): boolean {
+  const normalized = normalizeMimeType(value)
+  return normalized.startsWith('text/') || normalized === 'application/json'
+}
+
 function isImageFile(file: File): boolean {
   if (isImageMimeType(file.type)) return true
-  return inferMimeTypeFromFileName(file.name).length > 0
+  return inferImageMimeTypeFromFileName(file.name).length > 0
+}
+
+function isTextFile(file: File): boolean {
+  if (isTextMimeType(file.type)) return true
+  return inferTextMimeTypeFromFileName(file.name).length > 0
 }
 
 function formatFileSize(size: number): string {
@@ -158,20 +186,20 @@ function formatFileSize(size: number): string {
   return `${value.toFixed(precision)} ${units[unitIndex]}`
 }
 
-function hasImageData(dt: DataTransfer | null): boolean {
+function hasAttachableData(dt: DataTransfer | null): boolean {
   if (!dt) return false
   const items = Array.from(dt.items)
   if (
     items.some(
       (item) =>
         item.kind === 'file' &&
-        (isImageMimeType(item.type) || item.type.trim().length === 0),
+        (isImageMimeType(item.type) || isTextMimeType(item.type) || item.type.trim().length === 0),
     )
   )
     return true
   const files = Array.from(dt.files)
   return files.some(
-    (file) => isImageFile(file) || file.type.trim().length === 0,
+    (file) => isImageFile(file) || isTextFile(file) || file.type.trim().length === 0,
   )
 }
 
@@ -208,6 +236,17 @@ async function readFileAsDataUrl(file: File): Promise<string | null> {
     }
     reader.onerror = () => resolve(null)
     reader.readAsDataURL(file)
+  })
+}
+
+async function readFileAsText(file: File): Promise<string | null> {
+  return await new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      resolve(typeof reader.result === 'string' ? reader.result : null)
+    }
+    reader.onerror = () => resolve(null)
+    reader.readAsText(file)
   })
 }
 
@@ -879,19 +918,41 @@ function ChatComposerComponent({
       if (disabled) return
 
       const timestamp = Date.now()
-      const sizeLimitLabel = formatFileSize(MAX_TRANSPORT_IMAGE_SIZE)
       const prepared = await Promise.all(
         files.map(async (file, index): Promise<ChatComposerAttachment | null> => {
-          // Some clipboard/drop sources omit MIME and filename; keep them for probing.
-          if (!isImageFile(file) && file.type.trim().length > 0) {
+          const imageFile = isImageFile(file)
+          const textFile = isTextFile(file)
+          if (!imageFile && !textFile && file.type.trim().length > 0) {
             return null
           }
+
           if (file.size > MAX_ATTACHMENT_FILE_SIZE) {
             toast(
-              `“${file.name || 'image'}” is ${formatFileSize(file.size)}. Max upload input size is ${formatFileSize(MAX_ATTACHMENT_FILE_SIZE)} before compression.`,
+              `“${file.name || 'file'}” is ${formatFileSize(file.size)}. Max upload input size is ${formatFileSize(MAX_ATTACHMENT_FILE_SIZE)}.`,
               { type: 'warning' },
             )
             return null
+          }
+
+          if (textFile) {
+            const textContent = await readFileAsText(file)
+            if (textContent === null) return null
+            const name =
+              file.name && file.name.trim().length > 0
+                ? file.name.trim()
+                : `pasted-text-${timestamp}-${index + 1}.txt`
+            const textBytes = new TextEncoder().encode(textContent).length
+            return {
+              id: crypto.randomUUID(),
+              name,
+              contentType:
+                (isTextMimeType(file.type) ? normalizeMimeType(file.type) : '') ||
+                inferTextMimeTypeFromFileName(name) ||
+                'text/plain',
+              size: textBytes,
+              dataUrl: textContent,
+              kind: 'file',
+            }
           }
 
           const compressedDataUrl = await compressImageToDataUrl(file).catch(() => null)
@@ -906,7 +967,7 @@ function ChatComposerComponent({
           const transportBytes = estimateDataUrlBytes(dataUrl)
           if (transportBytes > MAX_TRANSPORT_IMAGE_SIZE) {
             toast(
-              `“${file.name || 'image'}” is still ${formatFileSize(transportBytes)} after compression. Chat limit is ${sizeLimitLabel}. Try a smaller image.`,
+              `Image compressed to ${(transportBytes / (1024 * 1024)).toFixed(2)}mb — still over the 1mb limit. Try a smaller screenshot.`,
               { type: 'warning' },
             )
             return null
@@ -919,7 +980,7 @@ function ChatComposerComponent({
           const detectedMimeType =
             dataUrlMimeType ||
             (isImageMimeType(file.type) ? normalizeMimeType(file.type) : '') ||
-            inferMimeTypeFromFileName(name) ||
+            inferImageMimeTypeFromFileName(name) ||
             'image/jpeg'
           return {
             id: crypto.randomUUID(),
@@ -928,6 +989,7 @@ function ChatComposerComponent({
             size: transportBytes,
             dataUrl,
             previewUrl: dataUrl,
+            kind: 'image',
           }
         }),
       )
@@ -940,8 +1002,8 @@ function ChatComposerComponent({
       if (skippedCount > 0) {
         toast(
           skippedCount === 1
-            ? `1 image could not be attached. Allowed size: ${sizeLimitLabel} after compression.`
-            : `${skippedCount} images could not be attached. Allowed size: ${sizeLimitLabel} after compression.`,
+            ? '1 file could not be attached.'
+            : `${skippedCount} files could not be attached.`,
           { type: 'warning' },
         )
       }
@@ -972,7 +1034,7 @@ function ChatComposerComponent({
   const handleDragEnter = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       if (disabled) return
-      if (!hasImageData(event.dataTransfer)) return
+      if (!hasAttachableData(event.dataTransfer)) return
       event.preventDefault()
       dragCounterRef.current += 1
       setIsDraggingOver(true)
@@ -997,7 +1059,7 @@ function ChatComposerComponent({
     (event: React.DragEvent<HTMLDivElement>) => {
       if (disabled) return
       event.preventDefault()
-      if (hasImageData(event.dataTransfer)) {
+      if (hasAttachableData(event.dataTransfer)) {
         event.dataTransfer.dropEffect = 'copy'
       }
     },
@@ -1283,7 +1345,7 @@ function ChatComposerComponent({
       <input
         ref={attachmentInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.md,.txt,.json,.csv,.ts,.tsx,.js,.py"
         multiple
         className="hidden"
         onChange={handleAttachmentInputChange}
@@ -1316,51 +1378,75 @@ function ChatComposerComponent({
 
         {isDraggingOver ? (
           <div className="pointer-events-none absolute inset-1 z-20 flex items-center justify-center rounded-[18px] border-2 border-dashed border-primary-400 bg-primary-50/90 text-sm font-medium text-primary-700">
-            Drop images to attach
+            Drop files to attach
           </div>
         ) : null}
 
         {attachments.length > 0 ? (
           <div className="px-3">
             <div className="flex flex-wrap gap-3">
-              {attachments.map((attachment) => (
-                <div key={attachment.id} className="group relative w-28">
-                  <button
-                    type="button"
-                    className="aspect-square w-full overflow-hidden rounded-xl border border-primary-200 bg-primary-50"
-                    onClick={() => setPreviewImage({ url: attachment.previewUrl, name: attachment.name || 'Attached image' })}
-                    aria-label={`Preview ${attachment.name || 'image'}`}
+              {attachments.map((attachment) => {
+                const isImageAttachment =
+                  Boolean(attachment.previewUrl) &&
+                  isImageMimeType(attachment.contentType)
+
+                return (
+                  <div
+                    key={attachment.id}
+                    className={cn(
+                      'group relative',
+                      isImageAttachment ? 'w-28' : 'w-auto max-w-[16rem]',
+                    )}
                   >
-                    <img
-                      src={attachment.previewUrl}
-                      alt={attachment.name || 'Attached image'}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Remove image attachment"
-                    onClick={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      handleRemoveAttachment(attachment.id)
-                    }}
-                    className="absolute right-1 top-1 z-10 inline-flex size-6 items-center justify-center rounded-full bg-primary-900/80 text-primary-50 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100 focus-visible:opacity-100"
-                  >
-                    <HugeiconsIcon
-                      icon={Cancel01Icon}
-                      size={20}
-                      strokeWidth={1.5}
-                    />
-                  </button>
-                  <div className="mt-1 truncate text-xs font-medium text-primary-700">
-                    {attachment.name}
+                    {isImageAttachment ? (
+                      <button
+                        type="button"
+                        className="aspect-square w-full overflow-hidden rounded-xl border border-primary-200 bg-primary-50"
+                        onClick={() =>
+                          setPreviewImage({
+                            url: attachment.previewUrl || '',
+                            name: attachment.name || 'Attached image',
+                          })
+                        }
+                        aria-label={`Preview ${attachment.name || 'image'}`}
+                      >
+                        <img
+                          src={attachment.previewUrl}
+                          alt={attachment.name || 'Attached image'}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    ) : (
+                      <div className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700">
+                        <span className="mr-1">📄</span>
+                        <span className="truncate">{attachment.name}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Remove attachment"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        handleRemoveAttachment(attachment.id)
+                      }}
+                      className="absolute right-1 top-1 z-10 inline-flex size-6 items-center justify-center rounded-full bg-primary-900/80 text-primary-50 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100 focus-visible:opacity-100"
+                    >
+                      <HugeiconsIcon
+                        icon={Cancel01Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                    </button>
+                    <div className="mt-1 truncate text-xs font-medium text-primary-700">
+                      {attachment.name}
+                    </div>
+                    <div className="text-[11px] text-primary-400">
+                      {formatFileSize(attachment.size)}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-primary-400">
-                    {formatFileSize(attachment.size)}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ) : null}
