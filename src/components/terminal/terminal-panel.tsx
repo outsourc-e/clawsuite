@@ -282,10 +282,10 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
           }
           if (currentEvent === 'data') {
             const textChunk =
-              payload?.payload?.data ??
-              payload?.payload?.text ??
-              payload?.payload?.chunk ??
-              payload?.payload?.output
+              payload?.data ??
+              payload?.text ??
+              payload?.chunk ??
+              payload?.output
             if (typeof textChunk === 'string') {
               terminal.write(textChunk)
               const currentLog = logBufferRef.current.get(tabId) ?? ''

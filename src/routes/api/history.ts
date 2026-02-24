@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
+import { isAuthenticated } from '@/server/auth-middleware'
 
 type ChatHistoryResponse = {
   sessionKey: string
@@ -18,6 +19,9 @@ export const Route = createFileRoute('/api/history')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const url = new URL(request.url)
           const limit = Number(url.searchParams.get('limit') || '200')

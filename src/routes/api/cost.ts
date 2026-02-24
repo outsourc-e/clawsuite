@@ -5,6 +5,7 @@ import {
   buildCostSummary,
   isGatewayMethodUnavailable,
 } from '../../server/usage-cost'
+import { isAuthenticated } from '@/server/auth-middleware'
 
 const UNAVAILABLE_MESSAGE = 'Unavailable on this Gateway version'
 
@@ -18,7 +19,10 @@ function readErrorMessage(error: unknown): string {
 export const Route = createFileRoute('/api/cost')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const payload = await gatewayRpc('usage.cost', { days: 30 })
           const cost = buildCostSummary(payload)

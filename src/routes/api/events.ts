@@ -5,6 +5,7 @@ import {
 } from '../../server/activity-stream'
 import { offEvent, onEvent } from '../../server/activity-events'
 import type { ActivityEvent } from '../../types/activity-event'
+import { isAuthenticated } from '@/server/auth-middleware'
 
 const HEARTBEAT_INTERVAL_MS = 20_000
 
@@ -12,6 +13,12 @@ export const Route = createFileRoute('/api/events')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
         void ensureActivityStreamStarted().catch(function ignoreStartError() {
           // stream stays available even when gateway is offline
         })

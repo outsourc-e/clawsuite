@@ -12,7 +12,6 @@ import { fetchUsage } from '../components/usage-meter-widget'
 import { formatModelName, formatMoney, formatRelativeTime, formatTokens, formatUptime } from '../lib/formatters'
 import { chatQueryKeys, fetchGatewayStatus, fetchSessions } from '@/screens/chat/chat-queries'
 import { fetchCronJobs } from '@/lib/cron-api'
-import { toast } from '@/components/ui/toast'
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -139,16 +138,11 @@ type SessionStatusPayload = {
 }
 
 async function fetchSessionStatus(): Promise<SessionStatusPayload> {
-  try {
-    const res = await fetch('/api/session-status')
-    if (!res.ok) {
-      throw new Error(`Failed to fetch session status (HTTP ${res.status})`)
-    }
-    return res.json() as Promise<SessionStatusPayload>
-  } catch (error) {
-    toast('Failed to fetch session status', { type: 'error' })
-    throw error instanceof Error ? error : new Error('Failed to fetch session status')
+  const res = await fetch('/api/session-status')
+  if (!res.ok) {
+    throw new Error(`Failed to fetch session status (HTTP ${res.status})`)
   }
+  return res.json() as Promise<SessionStatusPayload>
 }
 
 type CostPoint = { date: string; amount: number }

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
+import { isAuthenticated } from '@/server/auth-middleware'
 
 const SESSION_STATUS_METHODS = [
   'sessions.usage',
@@ -46,7 +47,10 @@ function getContextWindow(model: string): number {
 export const Route = createFileRoute('/api/session-status')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           // Fetch both status and usage data in parallel
           const [statusResult, usageResult] = await Promise.allSettled([

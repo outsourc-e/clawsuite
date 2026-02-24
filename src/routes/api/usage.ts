@@ -6,6 +6,7 @@ import {
   buildUsageSummary,
   isGatewayMethodUnavailable,
 } from '../../server/usage-cost'
+import { isAuthenticated } from '@/server/auth-middleware'
 
 const UNAVAILABLE_MESSAGE = 'Unavailable on this Gateway version'
 const REQUEST_TIMEOUT_MS = 5000 // 5 second timeout
@@ -37,7 +38,10 @@ async function withTimeout<T>(
 export const Route = createFileRoute('/api/usage')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const configuredProviders = getConfiguredProviderNames()
 

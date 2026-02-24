@@ -2,6 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { HubTask } from './task-board'
 
+function formatRelativeTime(ts: number): string {
+  const diffMs = Math.max(0, Date.now() - ts)
+  const seconds = Math.floor(diffMs / 1000)
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
 // Presets shown in Agent Hub. 'auto' uses gateway default.
 // Additional models from gateway providers show in the chat model switcher.
 export const MODEL_PRESETS = [
@@ -309,6 +320,11 @@ export function TeamPanel({
                         {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
                       </span>
                     </div>
+                    {agentSessionEntry?.lastSeen ? (
+                      <p className="mt-0.5 text-[10px] text-neutral-500 dark:text-neutral-400">
+                        {formatRelativeTime(agentSessionEntry.lastSeen)}
+                      </p>
+                    ) : null}
                     {agentModelNotApplied?.[agent.id] ? (
                       <p className="mt-0.5 text-[9px] text-neutral-400 dark:text-neutral-500">
                         Gateway used default model

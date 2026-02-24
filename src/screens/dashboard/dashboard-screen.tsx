@@ -43,6 +43,7 @@ import { NotificationsPopover } from './components/notifications-popover'
 import { useVisibleWidgets } from './hooks/use-visible-widgets'
 import { useDashboardData, buildUsageSummaryText } from './hooks/use-dashboard-data'
 import { formatMoney, formatRelativeTime } from './lib/formatters'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SettingsDialog } from '@/components/settings-dialog'
@@ -383,10 +384,12 @@ export function DashboardScreen() {
                   summary={dashboardData.connection.connected ? 'Gateway connected' : 'Gateway disconnected'}
                   defaultOpen={false}
                 >
-                  <ServicesHealthWidget
-                    gatewayConnected={dashboardData.connection.connected}
-                    onRemove={() => removeWidget('services-health')}
-                  />
+                  <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                    <ServicesHealthWidget
+                      gatewayConnected={dashboardData.connection.connected}
+                      onRemove={() => removeWidget('services-health')}
+                    />
+                  </ErrorBoundary>
                 </CollapsibleWidget>
               </div>
             ),
@@ -401,7 +404,9 @@ export function DashboardScreen() {
             label: 'Scheduled',
             content: (
               <div className="w-full">
-                <ScheduledJobsWidget onRemove={() => removeWidget('scheduled-jobs')} />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ScheduledJobsWidget onRemove={() => removeWidget('scheduled-jobs')} />
+                </ErrorBoundary>
               </div>
             ),
           })
@@ -415,7 +420,9 @@ export function DashboardScreen() {
             label: 'Activity',
             content: (
               <div className="w-full">
-                <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+                </ErrorBoundary>
               </div>
             ),
           })
@@ -429,7 +436,9 @@ export function DashboardScreen() {
             label: 'Agents',
             content: (
               <div className="w-full">
-                <SquadStatusWidget />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <SquadStatusWidget />
+                </ErrorBoundary>
               </div>
             ),
           })
@@ -443,15 +452,17 @@ export function DashboardScreen() {
             label: 'Sessions',
             content: (
               <div className="w-full">
-                <RecentSessionsWidget
-                  onOpenSession={(sessionKey) =>
-                    navigate({
-                      to: '/chat/$sessionKey',
-                      params: { sessionKey },
-                    })
-                  }
-                  onRemove={() => removeWidget('recent-sessions')}
-                />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <RecentSessionsWidget
+                    onOpenSession={(sessionKey) =>
+                      navigate({
+                        to: '/chat/$sessionKey',
+                        params: { sessionKey },
+                      })
+                    }
+                    onRemove={() => removeWidget('recent-sessions')}
+                  />
+                </ErrorBoundary>
               </div>
             ),
           })
@@ -470,7 +481,9 @@ export function DashboardScreen() {
                   summary={`Tasks: ${dashboardData.cron.inProgress} in progress • ${dashboardData.cron.done} done`}
                   defaultOpen
                 >
-                  <TasksWidget onRemove={() => removeWidget('tasks')} />
+                  <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                    <TasksWidget onRemove={() => removeWidget('tasks')} />
+                  </ErrorBoundary>
                 </CollapsibleWidget>
               </div>
             ),
@@ -490,7 +503,9 @@ export function DashboardScreen() {
                   summary={`Skills: ${dashboardData.skills.enabled} enabled`}
                   defaultOpen={false}
                 >
-                  <SkillsWidget onRemove={() => removeWidget('skills')} />
+                  <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                    <SkillsWidget onRemove={() => removeWidget('skills')} />
+                  </ErrorBoundary>
                 </CollapsibleWidget>
               </div>
             ),
@@ -533,7 +548,9 @@ export function DashboardScreen() {
                       </button>
                     </div>
                   ) : (
-                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
+                    </ErrorBoundary>
                   )}
                 </CollapsibleWidget>
               </div>
@@ -842,7 +859,9 @@ export function DashboardScreen() {
                 className="bg-primary-50/70"
                 contentClassName="pt-2"
               >
-                <TokenUsageHero data={dashboardData} />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <TokenUsageHero data={dashboardData} />
+                </ErrorBoundary>
               </CollapsibleWidget>
 
               {/* MetricCards intentionally omitted on mobile — SystemGlance above is the canonical hero */}
@@ -889,33 +908,35 @@ export function DashboardScreen() {
             /* ── Desktop enterprise layout (C2) ─────────────────────────────── */
             <div className="flex flex-col gap-4">
               {/* 1. SystemGlance */}
-              <SystemGlance
-                sessions={dashboardData.sessions.total}
-                activeAgents={dashboardData.agents.active || dashboardData.agents.total}
-                costToday={costTodayDisplay}
-                uptimeFormatted={uptimeDisplay}
-                updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
-                healthStatus={healthStatus}
-                gatewayConnected={dashboardData.connection.connected}
-                sessionPercent={dashboardData.usage.contextPercent ?? undefined}
-                providers={dashboardData.cost.byProvider}
-                currentModel={dashboardData.model.current}
-                actions={
-                  <>
-                    <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
-                    <button
-                      type="button"
-                      onClick={handleResetLayout}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
-                      aria-label="Reset Layout"
-                      title="Reset Layout"
-                    >
-                      <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.5} />
-                      <span>Reset</span>
-                    </button>
-                  </>
-                }
-              />
+              <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                <SystemGlance
+                  sessions={dashboardData.sessions.total}
+                  activeAgents={dashboardData.agents.active || dashboardData.agents.total}
+                  costToday={costTodayDisplay}
+                  uptimeFormatted={uptimeDisplay}
+                  updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
+                  healthStatus={healthStatus}
+                  gatewayConnected={dashboardData.connection.connected}
+                  sessionPercent={dashboardData.usage.contextPercent ?? undefined}
+                  providers={dashboardData.cost.byProvider}
+                  currentModel={dashboardData.model.current}
+                  actions={
+                    <>
+                      <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
+                      <button
+                        type="button"
+                        onClick={handleResetLayout}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
+                        aria-label="Reset Layout"
+                        title="Reset Layout"
+                      >
+                        <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.5} />
+                        <span>Reset</span>
+                      </button>
+                    </>
+                  }
+                />
+              </ErrorBoundary>
 
               {/* 2. Alert chips */}
               {visibleAlerts.length > 0 ? (

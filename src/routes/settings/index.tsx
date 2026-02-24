@@ -329,33 +329,20 @@ function SettingsRoute() {
     updateSettings({ gatewayUrl: value.trim() })
   }
 
-  const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
-    'ops-dark',
-    'premium-dark',
-    'sunset-brand',
-  ])
-
   function handleThemeChange(value: string) {
     const theme = value as SettingsThemeMode
     applyTheme(theme)
     updateSettings({ theme })
 
     // P1-1: Persist enterprise theme to localStorage, mirroring settings-dialog behaviour
-    const currentEnterpriseTheme = localStorage.getItem('clawsuite-theme')
-    if (
-      theme === 'light' &&
-      currentEnterpriseTheme &&
-      DARK_ENTERPRISE_THEMES.has(currentEnterpriseTheme as ThemeId)
-    ) {
-      document.documentElement.setAttribute('data-theme', 'paper-light')
+    if (theme === 'light') {
       localStorage.setItem('clawsuite-theme', 'paper-light')
-    } else if (
-      theme === 'dark' &&
-      (!currentEnterpriseTheme ||
-        !DARK_ENTERPRISE_THEMES.has(currentEnterpriseTheme as ThemeId))
-    ) {
-      document.documentElement.setAttribute('data-theme', 'ops-dark')
-      localStorage.setItem('clawsuite-theme', 'ops-dark')
+    } else if (theme === 'dark') {
+      const current = localStorage.getItem('clawsuite-theme')
+      const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand']
+      if (!darkThemes.includes(current ?? '')) {
+        localStorage.setItem('clawsuite-theme', 'ops-dark')
+      }
     }
   }
 
