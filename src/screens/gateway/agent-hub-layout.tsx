@@ -30,6 +30,33 @@ import {
   type ApprovalRequest,
 } from './lib/approvals-store'
 
+function renderMarkdown(text: string): string {
+  return text
+    // Code blocks
+    .replace(/```(\w*)\n?([\s\S]*?)```/g, (_, _lang, code) =>
+      `<pre class="bg-neutral-100 dark:bg-neutral-800 rounded-lg p-3 overflow-x-auto text-xs font-mono my-2 whitespace-pre-wrap"><code>${code.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`,
+    )
+    // Bold
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Headers h3
+    .replace(/^### (.+)$/gm, '<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mt-4 mb-1">$1</h3>')
+    // Headers h2
+    .replace(
+      /^## (.+)$/gm,
+      '<h2 class="text-base font-bold text-neutral-900 dark:text-neutral-100 mt-5 mb-2 border-b border-neutral-200 dark:border-neutral-700 pb-1">$1</h2>',
+    )
+    // Headers h1
+    .replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold text-neutral-900 dark:text-neutral-100 mt-4 mb-2">$1</h1>')
+    // Bullet points
+    .replace(/^[•\-\*] (.+)$/gm, '<li class="ml-4 text-sm text-neutral-700 dark:text-neutral-300 list-disc">$1</li>')
+    // Wrap consecutive <li> in <ul>
+    .replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) => `<ul class="my-2 space-y-0.5">${match}</ul>`)
+    // Paragraphs (double newline)
+    .replace(/\n\n/g, '<br/><br/>')
+    // Single newline in text
+    .replace(/\n/g, '<br/>')
+}
+
 type AgentHubLayoutProps = {
   agents: Array<{
     id: string
@@ -1018,28 +1045,28 @@ function generateMissionReport(payload: MissionReportPayload): string {
   const costEstimate = estimateMissionCost(payload.tokenCount)
   const lines: string[] = []
 
-  lines.push('# Mission Report')
+  lines.push(`# Mission Report${payload.name ? `: ${payload.name}` : ''}`)
   lines.push('')
-  lines.push(`## Mission`)
-  lines.push(`- Goal: ${payload.goal || 'Untitled mission'}`)
-  lines.push(`- Team: ${payload.teamName}`)
-  lines.push(`- Started: ${new Date(payload.startedAt).toLocaleString()}`)
-  lines.push(`- Completed: ${new Date(payload.completedAt).toLocaleString()}`)
-  lines.push(`- Duration: ${formatDuration(durationMs)}`)
+  lines.push('## Mission Overview')
+  lines.push(`- **Goal:** ${payload.goal || 'Untitled mission'}`)
+  lines.push(`- **Team:** ${payload.teamName}`)
+  lines.push(`- **Started:** ${new Date(payload.startedAt).toLocaleString()}`)
+  lines.push(`- **Completed:** ${new Date(payload.completedAt).toLocaleString()}`)
+  lines.push(`- **Duration:** ${formatDuration(durationMs)}`)
   lines.push('')
   lines.push('## Team')
   if (payload.team.length === 0) {
     lines.push('- No agents')
   } else {
     payload.team.forEach((member) => {
-      lines.push(`- ${member.name} (${member.modelId})`)
+      lines.push(`- **${member.name}** (${member.modelId})`)
     })
   }
   lines.push('')
-  lines.push('## Tasks')
-  lines.push(`- Total: ${taskStats.total}`)
-  lines.push(`- Completed: ${taskStats.completed}`)
-  lines.push(`- Failed: ${taskStats.failed}`)
+  lines.push('## Task Summary')
+  lines.push(`- **Total:** ${taskStats.total}`)
+  lines.push(`- **Completed:** ${taskStats.completed}`)
+  lines.push(`- **Failed:** ${taskStats.failed}`)
   lines.push('')
   lines.push('## Per-Agent Summary')
   if (payload.agentSummaries.length === 0) {
@@ -1062,13 +1089,13 @@ function generateMissionReport(payload: MissionReportPayload): string {
     lines.push('- None')
   } else {
     payload.artifacts.forEach((artifact) => {
-      lines.push(`- ${artifact.title} [${artifact.type}] by ${artifact.agentName}`)
+      lines.push(`- **${artifact.title}** [${artifact.type}] by ${artifact.agentName}`)
     })
   }
   lines.push('')
   lines.push('## Cost Estimate')
-  lines.push(`- Tokens: ${payload.tokenCount.toLocaleString()}`)
-  lines.push(`- Estimated Cost: $${costEstimate.toFixed(2)} (rough)`)
+  lines.push(`- **Tokens:** ${payload.tokenCount.toLocaleString()}`)
+  lines.push(`- **Estimated Cost:** $${costEstimate.toFixed(2)} (rough)`)
   lines.push('')
 
   return lines.join('\n')
@@ -7071,57 +7098,89 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       {showCompletionModal && completionModalReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-xl">
-            <div className="flex items-start justify-between gap-3 border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Mission Complete</p>
-                <p className="mt-0.5 text-base font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2">
-                  {completionModalReport.name}
+          <div className="flex w-full max-w-2xl flex-col rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-xl" style={{ maxHeight: '85vh' }}>
+            {/* Header */}
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">✓ Mission Complete</span>
+                </div>
+                <p className="mt-1.5 truncate text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                  {completionModalReport.name || completionModalReport.goal}
                 </p>
+                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2">{completionModalReport.goal}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowCompletionModal(false)}
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              >
+              <button type="button" onClick={() => setShowCompletionModal(false)}
+                className="shrink-0 rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800">
                 ✕
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-px border-b border-neutral-100 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800">
+            {/* Stats row */}
+            <div className="grid shrink-0 grid-cols-4 gap-px border-b border-neutral-100 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800">
               {[
                 { label: 'Tasks', value: `${completionModalReport.taskStats.completed}/${completionModalReport.taskStats.total}` },
                 { label: 'Duration', value: formatDuration(completionModalReport.duration) },
                 { label: 'Tokens', value: completionModalReport.tokenCount.toLocaleString() },
+                { label: 'Est. Cost', value: `$${completionModalReport.costEstimate.toFixed(3)}` },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-white dark:bg-neutral-900 px-4 py-3 text-center">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">{label}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">{label}</p>
                   <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{value}</p>
                 </div>
               ))}
             </div>
-            {completionModalReport.report && (
-              <div className="max-h-48 overflow-y-auto px-6 py-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">Report</p>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap leading-relaxed">
-                  {completionModalReport.report}
-                </p>
-              </div>
-            )}
-            <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
-              <button
-                type="button"
-                onClick={() => { setShowCompletionModal(false); setMissionSubTab('history') }}
-                className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-              >
+            {/* Report body - scrollable */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              {completionModalReport.report ? (
+                <div
+                  className="prose-sm max-w-none text-sm text-neutral-700 dark:text-neutral-300"
+                  // eslint-disable-next-line react/no-danger
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(completionModalReport.report) }}
+                />
+              ) : (
+                <p className="text-sm text-neutral-400 dark:text-neutral-500">No report generated for this mission.</p>
+              )}
+              {completionModalReport.artifacts.length > 0 && (
+                <div className="mt-6 border-t border-neutral-100 dark:border-neutral-800 pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-3">Artifacts</p>
+                  <div className="space-y-2">
+                    {completionModalReport.artifacts.map((artifact, i) => (
+                      <div key={i} className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2.5">
+                        <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">{artifact.title || `Artifact ${i + 1}`}</p>
+                        {'description' in artifact && typeof artifact.description === 'string' && artifact.description && (
+                          <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">{artifact.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Actions */}
+            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <button type="button" onClick={() => { setShowCompletionModal(false); setMissionSubTab('history') }}
+                className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800">
                 View History
               </button>
-              <button
-                type="button"
-                onClick={() => { setShowCompletionModal(false); setMissionBoardModalOpen(true); setMissionWizardStep(0) }}
-                className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-              >
-                New Mission
-              </button>
+              <div className="flex items-center gap-2">
+                <button type="button"
+                  onClick={() => {
+                    const blob = new Blob([completionModalReport.report], { type: 'text/markdown' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `mission-report-${completionModalReport.id}.md`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }}
+                  className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                  ↓ Download
+                </button>
+                <button type="button" onClick={() => { setShowCompletionModal(false); setMissionBoardModalOpen(true); setMissionWizardStep(0) }}
+                  className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600">
+                  New Mission
+                </button>
+              </div>
             </div>
           </div>
         </div>
