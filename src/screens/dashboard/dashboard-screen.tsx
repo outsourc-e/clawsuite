@@ -938,10 +938,6 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
-              <QuickActionsRow />
-
-              <TokenUsageHero data={dashboardData} />
-
               {/* 3. Metric cards row — Sessions · Active Agents · Cost Today · Uptime */}
               {/* These complement SystemGlance: they add micro charts, trend pills & time-range selectors */}
               <WidgetGrid items={metricItems} className="gap-4" />

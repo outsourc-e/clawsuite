@@ -303,13 +303,13 @@ export function ActivityLogWidget({
       title="Activity Log"
       icon={Activity01Icon}
       action={
-        <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 font-mono text-[11px] text-neutral-200 tabular-nums">
+        <span className="inline-flex items-center rounded-full border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2 py-0.5 font-mono text-[11px] text-primary-800 dark:text-neutral-200 tabular-nums">
           {Math.max(previewRows.length, mobileRows.length)}
         </span>
       }
       onRemove={onRemove}
       editMode={editMode}
-      className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
+      className="h-full rounded-xl border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500"
     >
       <div className="mb-2">
         <span
@@ -331,11 +331,11 @@ export function ActivityLogWidget({
       </div>
 
       {isLoading && mobileRows.length === 0 ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-3 text-sm text-neutral-400">
+        <div className="rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-3 text-sm text-primary-500 dark:text-neutral-400">
           Loading activity…
         </div>
       ) : mobileRows.length === 0 ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-3 text-sm text-neutral-400">
+        <div className="rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-3 text-sm text-primary-500 dark:text-neutral-400">
           No activity events yet
         </div>
       ) : (
@@ -345,7 +345,7 @@ export function ActivityLogWidget({
               return (
                 <article
                   key={row.id}
-                  className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2"
+                  className="flex items-center gap-2 rounded-xl border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-2"
                 >
                   <span
                     className={cn(
@@ -354,14 +354,14 @@ export function ActivityLogWidget({
                     )}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-neutral-100">
+                    <p className="truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
                       {row.title}
                     </p>
-                    <p className="truncate text-xs text-neutral-400">
+                    <p className="truncate text-xs text-primary-500 dark:text-neutral-400">
                       {row.subtitle}
                     </p>
                   </div>
-                  <span className="shrink-0 text-[10px] text-neutral-500">
+                  <span className="shrink-0 text-[10px] text-primary-400 dark:text-neutral-500">
                     {row.timeAgo}
                   </span>
                 </article>
@@ -374,19 +374,19 @@ export function ActivityLogWidget({
               return (
                 <article
                   key={row.id}
-                  className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2"
+                  className="rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-2"
                 >
                   <div className="flex items-start gap-2">
                     <span className={cn('mt-0.5 text-xs', row.iconClassName)}>
                       {row.icon}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-sm text-neutral-300">
-                        <span className="font-semibold text-neutral-100">{row.sourceLabel}</span>{' '}
+                      <p className="line-clamp-2 text-sm text-primary-700 dark:text-neutral-300">
+                        <span className="font-semibold text-primary-900 dark:text-neutral-100">{row.sourceLabel}</span>{' '}
                         <span>{row.summary}</span>
                       </p>
                     </div>
-                    <span className="shrink-0 text-[10px] text-neutral-500">
+                    <span className="shrink-0 text-[10px] text-primary-400 dark:text-neutral-500">
                       {formatRelativeTime(row.timestamp)}
                     </span>
                   </div>
@@ -401,7 +401,7 @@ export function ActivityLogWidget({
         <button
           type="button"
           onClick={() => void navigate({ to: '/activity' })}
-          className="inline-flex items-center gap-1 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-300"
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-primary-700 dark:hover:text-neutral-300"
         >
           View all →
         </button>
