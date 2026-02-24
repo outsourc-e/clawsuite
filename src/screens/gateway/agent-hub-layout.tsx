@@ -5623,7 +5623,39 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
             {missionSubTab === 'active' ? (
               missionActive ? (
-                <div className="w-full space-y-4">
+                <div className="w-full space-y-4 pb-4">
+                  <section className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-5 py-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Mission Progress</p>
+                        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                          {runningTaskStats.completed}/{runningTaskStats.total} tasks complete ({runningProgressPct}%)
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-neutral-200 dark:border-neutral-700 px-3 py-1 text-xs text-neutral-500 dark:text-neutral-400">
+                        Running for {runningElapsed}
+                      </span>
+                    </div>
+                    {team.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {team.map((member) => (
+                          <span key={member.id} className={cn(
+                            "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+                            agentSessionStatus[member.id]?.status === "active"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
+                              : "border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400"
+                          )}>
+                            <span className={cn(
+                              "h-1.5 w-1.5 rounded-full",
+                              agentSessionStatus[member.id]?.status === "active" ? "bg-emerald-500" : "bg-neutral-400"
+                            )} />
+                            <span className="max-w-[16rem] truncate">{member.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
                   <section className={missionCardCls}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -5696,7 +5728,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </div>
                   </section>
 
-                  <div className="w-full">
+                  <div className="max-h-[420px] overflow-y-auto rounded-xl border border-neutral-200 dark:border-neutral-700">
                     <MissionTimeline tasks={missionTasks} agentOutputs={new Map(Object.entries(agentOutputLines))}
                       agentSessionMap={agentSessionMap}
                       agentStatuses={new Map(

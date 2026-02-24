@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { TeamMember } from './team-panel'
 import type { HubTask } from './task-board'
-import { AgentOutputPanel } from './agent-output-panel'
 
 type MissionTimelineProps = {
   tasks: HubTask[]
@@ -28,7 +27,7 @@ function formatElapsed(ms?: number): string {
 
 export function MissionTimeline({
   tasks,
-  agentOutputs: _agentOutputs,
+  agentOutputs,
   agentSessionMap,
   agentStatuses,
   missionState,
@@ -95,6 +94,7 @@ export function MissionTimeline({
         {teamMembers.map((member) => {
           const status = agentStatuses.get(member.id)
           const assignedTaskCount = tasks.filter((task) => task.agentId === member.id).length
+          const outputLines = agentOutputs.get(member.id) ?? []
           const agentStatus = (status?.status ?? '').toLowerCase()
           const isActive = agentStatus === 'active'
           const inactiveLabel =
@@ -125,9 +125,9 @@ export function MissionTimeline({
                 <p className="mt-1 text-sm text-neutral-500">Assigned tasks: {assignedTaskCount}</p>
 
                 {isActive ? (
-                  <div className="mt-2 rounded-r-lg border-l-4 border-emerald-500 bg-emerald-50 px-3 py-2">
+                  <div className="mt-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 max-w-full">
                     <p className="text-sm font-semibold text-emerald-800">Agent working</p>
-                    <p className="mt-0.5 text-xs text-emerald-600">
+                    <p className="mt-0.5 break-words text-xs text-emerald-600">
                       Live stream is active{status?.lastSeen ? ` · last seen ${new Date(status.lastSeen).toLocaleTimeString()}` : ''}
                     </p>
                   </div>
@@ -142,21 +142,24 @@ export function MissionTimeline({
                 </button>
 
                 {isExpanded ? (
-                  agentSessionMap?.[member.id] ? (
-                    <div className="mt-2 overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
-                      <AgentOutputPanel
-                        compact
-                        agentName={member.name}
-                        sessionKey={agentSessionMap[member.id]}
-                        tasks={tasks.filter((t) => t.agentId === member.id)}
-                        onClose={() => {}}
-                      />
+                  <div className="mt-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-2">
+                    <div className="max-h-[240px] overflow-y-auto rounded-lg bg-neutral-50 dark:bg-neutral-800/50 p-3 font-mono text-xs text-neutral-700 dark:text-neutral-300">
+                      {outputLines.length > 0 ? (
+                        <div className="space-y-1">
+                          {outputLines.map((line, index) => (
+                            <p key={`${member.id}-${index}`} className="break-words whitespace-pre-wrap">
+                              {line}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="break-words text-[11px] text-neutral-400">
+                          {agentSessionMap?.[member.id] ? 'Live output will appear here shortly...' : 'Waiting for agent session...'}
+                        </p>
+                      )}
+                      {isActive ? <p className="mt-2 text-emerald-600 animate-pulse">● streaming…</p> : null}
                     </div>
-                  ) : (
-                    <div className="mt-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-2">
-                      <p className="text-[11px] text-neutral-400">Waiting for agent session...</p>
-                    </div>
-                  )
+                  </div>
                 ) : null}
               </div>
             </li>
