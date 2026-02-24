@@ -234,6 +234,15 @@ const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
   },
 ]
 
+const MISSION_TEMPLATES = [
+  { icon: '🔍', name: 'Research', goal: 'Research [topic] and provide a comprehensive summary with key findings, sources, and actionable insights.' },
+  { icon: '💻', name: 'Code Review', goal: 'Review the codebase at [path] for bugs, performance issues, and best practice violations. Provide specific recommendations.' },
+  { icon: '📊', name: 'Competitive Analysis', goal: 'Analyze competitors of [company/product] including pricing, features, strengths, weaknesses, and market positioning.' },
+  { icon: '✍️', name: 'Content Draft', goal: 'Write a [type] about [topic] that is [tone] and targets [audience]. Include key points and a call to action.' },
+  { icon: '🐛', name: 'Debug', goal: 'Debug the issue: [describe issue]. Check logs, trace the root cause, and provide a specific fix with explanation.' },
+  { icon: '📋', name: 'Plan', goal: 'Create a detailed implementation plan for [feature/project] including steps, timeline, risks, and success criteria.' },
+] as const
+
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
 
@@ -2108,6 +2117,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [missionWizardStep, setMissionWizardStep] = useState(0)
   const [newMissionName, setNewMissionName] = useState('')
   const [newMissionGoal, setNewMissionGoal] = useState('')
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionAnchor, setMentionAnchor] = useState({ start: 0, end: 0 })
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0)
+  const [mentionOpenAbove, setMentionOpenAbove] = useState(true)
+  const [templatesModalOpen, setTemplatesModalOpen] = useState(false)
   const [newMissionTeamConfigId, setNewMissionTeamConfigId] = useState('__current__')
   const [newMissionProcessType, setNewMissionProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
   const [newMissionBudgetLimit, setNewMissionBudgetLimit] = useState('120000')
@@ -2183,6 +2197,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [pausedByAgentId, setPausedByAgentId] = useState<Record<string, boolean>>({})
   const [steerAgentId, setSteerAgentId] = useState<string | null>(null)
   const [steerInput, setSteerInput] = useState('')
+  const [confirmAction, setConfirmAction] = useState<{ kind: 'stop' | 'kill'; agentId?: string; label: string } | null>(null)
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const stored = readStoredTeam()
     if (stored.length > 0) return stored
@@ -2222,6 +2237,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const missionStateRef = useRef(missionState)
   const openNewMissionModalRef = useRef<(prefill?: Partial<MissionBoardDraft>) => void>(() => {})
   const prevAutoNameRef = useRef('')
+  const goalTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const goalMentionContainerRef = useRef<HTMLDivElement>(null)
   const handleCreateMissionRef = useRef<() => void>(() => {})
   const handleSoftPauseRef = useRef<(pause: boolean) => Promise<void>>(async () => {})
   // Stable ref for buildMissionCompletionSnapshot — kept in sync each render so
@@ -2237,6 +2254,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const agentSessionsDoneRef = useRef<Set<string>>(new Set())
   // Tracks the number of agents expected to complete for the current mission
   const expectedAgentCountRef = useRef(0)
+  const budgetWarnedRef = useRef(false)
+  const prevMissionActiveRef = useRef(missionActive)
 
   teamRef.current = team
   missionGoalRef.current = missionGoal
@@ -2244,6 +2263,60 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   missionStateRef.current = missionState
   liveFeedVisibleRef.current = liveFeedVisible
   shortcutsModalOpenRef.current = shortcutsModalOpen
+
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) return []
+    const normalizedQuery = mentionQuery.toLowerCase()
+    return team
+      .filter((member) => member.name.toLowerCase().includes(normalizedQuery))
+      .slice(0, 6)
+  }, [mentionQuery, team])
+
+  function closeMentionMenu() {
+    setMentionQuery(null)
+    setMentionAnchor({ start: 0, end: 0 })
+    setMentionActiveIndex(0)
+  }
+
+  function resolveMentionAtCursor(value: string, cursor: number): { query: string; start: number; end: number } | null {
+    const uptoCursor = value.slice(0, cursor)
+    const match = uptoCursor.match(/(^|\s)@([^\s@]*)$/)
+    if (!match) return null
+    const query = match[2] ?? ''
+    const start = cursor - query.length - 1
+    if (start < 0) return null
+    return { query, start, end: cursor }
+  }
+
+  function updateMentionPlacement() {
+    if (typeof window === 'undefined') return
+    const textarea = goalTextareaRef.current
+    if (!textarea) return
+    const rect = textarea.getBoundingClientRect()
+    const spaceAbove = rect.top
+    const spaceBelow = window.innerHeight - rect.bottom
+    setMentionOpenAbove(spaceAbove >= spaceBelow || spaceBelow < 220)
+  }
+
+  function insertMention(member: TeamMember) {
+    const { start, end } = mentionAnchor
+    setNewMissionGoal((prev) => {
+      const before = prev.slice(0, start)
+      const after = prev.slice(end)
+      const needsTrailingSpace = after.length > 0 && !after.startsWith(' ')
+      const mentionText = `@${member.name}${needsTrailingSpace ? ' ' : ''}`
+      const nextValue = `${before}${mentionText}${after}`
+      const nextCursor = (before + mentionText).length
+      requestAnimationFrame(() => {
+        const textarea = goalTextareaRef.current
+        if (!textarea) return
+        textarea.focus()
+        textarea.setSelectionRange(nextCursor, nextCursor)
+      })
+      return nextValue
+    })
+    closeMentionMenu()
+  }
 
   const appendArtifacts = useCallback((nextArtifacts: MissionArtifact[]) => {
     if (nextArtifacts.length === 0) return
@@ -4245,12 +4318,70 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     }
   }, [missionActive, missionState])
 
+  useEffect(() => {
+    if (!prevMissionActiveRef.current && missionActive) {
+      budgetWarnedRef.current = false
+    }
+    prevMissionActiveRef.current = missionActive
+  }, [missionActive])
+
+  useEffect(() => {
+    if (!missionActive || !budgetLimit || missionState !== 'running') return
+    const parsedBudget = parseTokenBudget(budgetLimit)
+    if (!parsedBudget || parsedBudget <= 0) return
+    const used = missionTokenCount
+    const pct = (used / parsedBudget) * 100
+    if (pct >= 100) {
+      budgetWarnedRef.current = true
+      void handleSoftPause(true)
+      toast('Budget limit reached — mission paused', { type: 'warning' })
+      emitFeedEvent({ type: 'system', message: `⚠️ Budget limit (${parsedBudget.toLocaleString()} tokens) reached — mission paused` })
+    } else if (pct >= 80 && !budgetWarnedRef.current) {
+      budgetWarnedRef.current = true
+      toast(`Budget 80% used (${used.toLocaleString()}/${parsedBudget.toLocaleString()} tokens)`, { type: 'info' })
+    }
+  }, [missionTokenCount, budgetLimit, missionActive, missionState, handleSoftPause])
+
+  useEffect(() => {
+    if (mentionQuery === null) return
+    setMentionActiveIndex(0)
+  }, [mentionQuery])
+
+  useEffect(() => {
+    if (mentionSuggestions.length === 0 && mentionQuery !== null) {
+      setMentionActiveIndex(0)
+      return
+    }
+    setMentionActiveIndex((prev) => Math.min(prev, Math.max(mentionSuggestions.length - 1, 0)))
+  }, [mentionSuggestions.length, mentionQuery])
+
+  useEffect(() => {
+    if (mentionQuery === null) return
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (goalMentionContainerRef.current?.contains(target)) return
+      closeMentionMenu()
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [mentionQuery])
+
+  useEffect(() => {
+    if (!missionBoardModalOpen || missionWizardStep !== 0) {
+      closeMentionMenu()
+    }
+  }, [missionBoardModalOpen, missionWizardStep])
+
   const isMissionRunning = missionActive && missionState === 'running'
 
   function openNewMissionModal(prefill?: Partial<MissionBoardDraft>) {
     prevAutoNameRef.current = ''
     setNewMissionName(prefill?.name ?? '')
     setNewMissionGoal(prefill?.goal ?? missionGoal)
+    closeMentionMenu()
     setNewMissionTeamConfigId(prefill?.teamConfigId ?? '__current__')
     setNewMissionProcessType(prefill?.processType ?? processType)
     setNewMissionBudgetLimit(prefill?.budgetLimit ?? budgetLimit)
@@ -5563,7 +5694,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {missionActive ? (
                 <button
                   type="button"
-                  onClick={() => stopMissionAndCleanup('aborted')}
+                  onClick={() => setConfirmAction({ kind: 'stop', label: 'Stop Mission' })}
                   className="min-h-11 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm font-medium text-red-600"
                 >
                   <span className="mr-2 text-[10px]">■</span>
@@ -5839,7 +5970,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => stopMissionAndCleanup("aborted")}
+                        onClick={() => setConfirmAction({ kind: 'stop', label: 'Stop Mission' })}
                         className="ml-auto rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
                       >
                         ■ Stop Mission
@@ -6147,28 +6278,118 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-xs font-medium text-neutral-700">Goal</span>
-                      <textarea
-                        value={newMissionGoal}
-                        onChange={(event) => {
-                          const value = event.target.value
-                          setNewMissionGoal(value)
-                          // Auto-suggest name from first 6 words of goal
-                          setNewMissionName((prev) => {
-                            const prevAutoName = prevAutoNameRef.current
-                            const autoName = value.trim().split(/\s+/).slice(0, 6).join(' ')
-                            // Only auto-fill if field is empty or was previously auto-filled
-                            if (!prev || prev === prevAutoName) {
-                              prevAutoNameRef.current = autoName
-                              return autoName
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-neutral-700">Goal</span>
+                        <button
+                          type="button"
+                          onClick={() => setTemplatesModalOpen(true)}
+                          className="rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-neutral-600 transition-colors hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700"
+                        >
+                          Templates
+                        </button>
+                      </div>
+                      <div ref={goalMentionContainerRef} className="relative mt-1.5">
+                        {mentionQuery !== null && mentionSuggestions.length > 0 ? (
+                          <div
+                            className={cn(
+                              'absolute left-0 z-50 w-64 rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800',
+                              mentionOpenAbove ? 'bottom-full mb-1' : 'top-full mt-1',
+                            )}
+                          >
+                            {mentionSuggestions.map((member, index) => {
+                              const teamIndex = team.findIndex((entry) => entry.id === member.id)
+                              const accent = AGENT_ACCENT_COLORS[(teamIndex >= 0 ? teamIndex : index) % AGENT_ACCENT_COLORS.length]
+                              const memberRole = (
+                                member as TeamMember & { role?: string; roleDescription?: string }
+                              ).role ?? member.roleDescription ?? 'Agent'
+                              return (
+                                <button
+                                  key={member.id}
+                                  type="button"
+                                  onMouseDown={(event) => {
+                                    event.preventDefault()
+                                    insertMention(member)
+                                  }}
+                                  className={cn(
+                                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50 dark:hover:bg-slate-700',
+                                    index === mentionActiveIndex ? 'bg-neutral-50 dark:bg-slate-700' : '',
+                                  )}
+                                >
+                                  <span className={cn('flex size-6 items-center justify-center rounded-full text-xs font-semibold', accent.avatar, accent.text)}>
+                                    {member.name.charAt(0).toUpperCase()}
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className="block truncate font-medium text-neutral-900 dark:text-white">{member.name}</span>
+                                    <span className="block truncate text-xs text-neutral-500 dark:text-slate-400">{memberRole}</span>
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : null}
+                        <textarea
+                          ref={goalTextareaRef}
+                          value={newMissionGoal}
+                          onChange={(event) => {
+                            const value = event.target.value
+                            const cursor = event.target.selectionStart ?? value.length
+                            setNewMissionGoal(value)
+                            const mention = resolveMentionAtCursor(value, cursor)
+                            if (mention) {
+                              setMentionQuery(mention.query)
+                              setMentionAnchor({ start: mention.start, end: mention.end })
+                              updateMentionPlacement()
+                            } else {
+                              closeMentionMenu()
                             }
-                            return prev
-                          })
-                        }}
-                        rows={6}
-                        placeholder="Describe the mission goal, output format, and constraints..."
-                        className="mt-1.5 w-full resize-y rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                      />
+                            // Auto-suggest name from first 6 words of goal
+                            setNewMissionName((prev) => {
+                              const prevAutoName = prevAutoNameRef.current
+                              const autoName = value.trim().split(/\s+/).slice(0, 6).join(' ')
+                              // Only auto-fill if field is empty or was previously auto-filled
+                              if (!prev || prev === prevAutoName) {
+                                prevAutoNameRef.current = autoName
+                                return autoName
+                              }
+                              return prev
+                            })
+                          }}
+                          onKeyDown={(event) => {
+                            if (mentionQuery === null) return
+                            if (event.key === 'Escape') {
+                              event.preventDefault()
+                              closeMentionMenu()
+                              return
+                            }
+                            if (mentionSuggestions.length === 0) return
+                            if (event.key === 'ArrowDown') {
+                              event.preventDefault()
+                              setMentionActiveIndex((prev) => (prev + 1) % mentionSuggestions.length)
+                              return
+                            }
+                            if (event.key === 'ArrowUp') {
+                              event.preventDefault()
+                              setMentionActiveIndex((prev) => (prev - 1 + mentionSuggestions.length) % mentionSuggestions.length)
+                              return
+                            }
+                            if (event.key === 'Enter' || event.key === 'Tab') {
+                              event.preventDefault()
+                              const selected = mentionSuggestions[mentionActiveIndex] ?? mentionSuggestions[0]
+                              if (selected) {
+                                insertMention(selected)
+                              }
+                            }
+                          }}
+                          onFocus={() => {
+                            if (mentionQuery !== null) {
+                              updateMentionPlacement()
+                            }
+                          }}
+                          rows={6}
+                          placeholder="Describe the mission goal, output format, and constraints..."
+                          className="w-full resize-y rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-orange-400 focus:ring-1 dark:border-slate-700 dark:bg-slate-800"
+                        />
+                      </div>
                     </label>
                   </div>
                 ) : null}
@@ -6385,6 +6606,81 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
       )}
 
+      {templatesModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setTemplatesModalOpen(false)}>
+          <div
+            className="w-full max-w-3xl rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Mission Templates</p>
+              <button
+                type="button"
+                onClick={() => setTemplatesModalOpen(false)}
+                className="rounded-md border border-neutral-200 px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+              Select a template to pre-fill the mission goal, then replace placeholder values.
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {MISSION_TEMPLATES.map((template) => (
+                <button
+                  key={template.name}
+                  type="button"
+                  onClick={() => {
+                    setNewMissionGoal(template.goal)
+                    setTemplatesModalOpen(false)
+                  }}
+                  className="rounded-xl border border-neutral-200 bg-white p-3 text-left transition-colors hover:border-orange-300 hover:bg-orange-50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-orange-700 dark:hover:bg-orange-900/20"
+                >
+                  <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    <span className="mr-2">{template.icon}</span>
+                    {template.name}
+                  </p>
+                  <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">{template.goal}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
+            <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Confirm: {confirmAction.label}</p>
+            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+              {confirmAction.kind === 'stop'
+                ? 'This will stop all agents and end the mission. Agent progress will be saved to history.'
+                : 'This will forcefully terminate this agent. Any in-progress work will be lost.'}
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirmAction.kind === 'stop') stopMissionAndCleanup('aborted')
+                  else if (confirmAction.kind === 'kill' && confirmAction.agentId) void handleKillAgent(confirmAction.agentId)
+                  setConfirmAction(null)
+                }}
+                className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600"
+              >
+                {confirmAction.label}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Steer Agent Modal ────────────────────────────────────────────── */}
       {steerAgentId ? (() => {
         const steerMember = team.find((m) => m.id === steerAgentId)
@@ -6542,7 +6838,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             {agentSessionMap[row.id] ? (
                               <button
                                 type="button"
-                                onClick={() => { void handleKillAgent(row.id); setMaximizedMissionId(null) }}
+                                onClick={() => { setConfirmAction({ kind: 'kill', agentId: row.id, label: `Kill ${row.name}` }); setMaximizedMissionId(null) }}
                                 className="flex size-7 items-center justify-center rounded-lg border border-red-200 dark:border-red-900 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors text-sm"
                                 title="Kill agent"
                               >
@@ -6837,7 +7133,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => stopMissionAndCleanup('aborted')}
+                      onClick={() => setConfirmAction({ kind: 'stop', label: 'Stop Mission' })}
                       className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
                     >
                       Stop
