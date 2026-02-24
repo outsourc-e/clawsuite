@@ -101,19 +101,14 @@ type ModelSwitchNotice = {
   retryModel?: string
 }
 
-/** Maximum image file size allowed before processing (10MB). */
-const MAX_ATTACHMENT_FILE_SIZE = 10 * 1024 * 1024
-/** Maximum dimension (width or height) for resized images. */
-const MAX_IMAGE_DIMENSION = 1280
+/** Maximum image file size accepted from picker/drop before processing (25MB). */
+const MAX_ATTACHMENT_FILE_SIZE = 25 * 1024 * 1024
+/** Longest side target for resized images. */
+const MAX_IMAGE_DIMENSION = 1920
 /** Initial JPEG compression quality (0-1). */
-const IMAGE_QUALITY = 0.75
-/**
- * Target compressed image size in bytes (~300KB).
- * Base64 adds overhead, so this keeps websocket payloads under gateway limits.
- */
-const TARGET_IMAGE_SIZE = 300 * 1024
-/** Hard attachment payload guard after encoding (base64 decoded size). */
-const MAX_TRANSPORT_IMAGE_SIZE = 450 * 1024
+const IMAGE_QUALITY = 0.85
+/** Gateway-safe image attachment limit after processing (1MB). */
+const MAX_TRANSPORT_IMAGE_SIZE = 1 * 1024 * 1024
 
 const IMAGE_EXTENSION_TO_MIME: Record<string, string> = {
   png: 'image/png',
@@ -281,17 +276,14 @@ async function compressImageToDataUrl(file: File): Promise<string> {
 
         context.drawImage(image, 0, 0, width, height)
 
-        const outputType =
-          file.type === 'image/png' ? 'image/png' : 'image/jpeg'
         let quality = IMAGE_QUALITY
-        let dataUrl = canvas.toDataURL(outputType, quality)
+        let dataUrl = canvas.toDataURL('image/jpeg', quality)
+        let bytes = estimateDataUrlBytes(dataUrl)
 
-        if (outputType === 'image/jpeg') {
-          const targetDataUrlLength = TARGET_IMAGE_SIZE * 1.37
-          while (dataUrl.length > targetDataUrlLength && quality > 0.3) {
-            quality -= 0.1
-            dataUrl = canvas.toDataURL(outputType, quality)
-          }
+        while (bytes > MAX_TRANSPORT_IMAGE_SIZE && quality > 0.4) {
+          quality -= 0.08
+          dataUrl = canvas.toDataURL('image/jpeg', quality)
+          bytes = estimateDataUrlBytes(dataUrl)
         }
 
         cleanup()
@@ -887,60 +879,69 @@ function ChatComposerComponent({
       if (disabled) return
 
       const timestamp = Date.now()
+      const sizeLimitLabel = formatFileSize(MAX_TRANSPORT_IMAGE_SIZE)
       const prepared = await Promise.all(
-        files.map(
-          async (file, index): Promise<ChatComposerAttachment | null> => {
-            // Some clipboard/drop sources omit MIME and filename; keep them for probing.
-            if (!isImageFile(file) && file.type.trim().length > 0) {
-              return null
-            }
-            if (file.size > MAX_ATTACHMENT_FILE_SIZE) {
-              return null
-            }
-            const dataUrl =
-              (await compressImageToDataUrl(file).catch(() => null)) ||
-              (await readFileAsDataUrl(file))
-            if (!dataUrl) return null
-            const dataUrlMimeType = readDataUrlMimeType(dataUrl)
-            if (!isImageMimeType(dataUrlMimeType || '')) {
-              return null
-            }
-            const transportBytes = estimateDataUrlBytes(dataUrl)
-            if (transportBytes > MAX_TRANSPORT_IMAGE_SIZE) {
-              return null
-            }
-            const name =
-              file.name && file.name.trim().length > 0
-                ? file.name.trim()
-                : `pasted-image-${timestamp}-${index + 1}.png`
-            const detectedMimeType =
-              dataUrlMimeType ||
-              (isImageMimeType(file.type) ? normalizeMimeType(file.type) : '') ||
-              inferMimeTypeFromFileName(name) ||
-              'image/jpeg'
-            return {
-              id: crypto.randomUUID(),
-              name,
-              contentType: detectedMimeType,
-              size: file.size,
-              dataUrl,
-              previewUrl: dataUrl,
-            }
-          },
-        ),
+        files.map(async (file, index): Promise<ChatComposerAttachment | null> => {
+          // Some clipboard/drop sources omit MIME and filename; keep them for probing.
+          if (!isImageFile(file) && file.type.trim().length > 0) {
+            return null
+          }
+          if (file.size > MAX_ATTACHMENT_FILE_SIZE) {
+            toast(
+              `“${file.name || 'image'}” is ${formatFileSize(file.size)}. Max upload input size is ${formatFileSize(MAX_ATTACHMENT_FILE_SIZE)} before compression.`,
+              { type: 'warning' },
+            )
+            return null
+          }
+
+          const compressedDataUrl = await compressImageToDataUrl(file).catch(() => null)
+          const dataUrl = compressedDataUrl || (await readFileAsDataUrl(file))
+          if (!dataUrl) return null
+
+          const dataUrlMimeType = readDataUrlMimeType(dataUrl)
+          if (!isImageMimeType(dataUrlMimeType || '')) {
+            return null
+          }
+
+          const transportBytes = estimateDataUrlBytes(dataUrl)
+          if (transportBytes > MAX_TRANSPORT_IMAGE_SIZE) {
+            toast(
+              `“${file.name || 'image'}” is still ${formatFileSize(transportBytes)} after compression. Chat limit is ${sizeLimitLabel}. Try a smaller image.`,
+              { type: 'warning' },
+            )
+            return null
+          }
+
+          const name =
+            file.name && file.name.trim().length > 0
+              ? file.name.trim()
+              : `pasted-image-${timestamp}-${index + 1}.jpg`
+          const detectedMimeType =
+            dataUrlMimeType ||
+            (isImageMimeType(file.type) ? normalizeMimeType(file.type) : '') ||
+            inferMimeTypeFromFileName(name) ||
+            'image/jpeg'
+          return {
+            id: crypto.randomUUID(),
+            name,
+            contentType: detectedMimeType,
+            size: transportBytes,
+            dataUrl,
+            previewUrl: dataUrl,
+          }
+        }),
       )
 
       const valid = prepared.filter(
-        (attachment): attachment is ChatComposerAttachment =>
-          attachment !== null,
+        (attachment): attachment is ChatComposerAttachment => attachment !== null,
       )
 
       const skippedCount = prepared.length - valid.length
       if (skippedCount > 0) {
         toast(
           skippedCount === 1
-            ? '1 image could not be attached (unsupported or too large).'
-            : `${skippedCount} images could not be attached (unsupported or too large).`,
+            ? `1 image could not be attached. Allowed size: ${sizeLimitLabel} after compression.`
+            : `${skippedCount} images could not be attached. Allowed size: ${sizeLimitLabel} after compression.`,
           { type: 'warning' },
         )
       }

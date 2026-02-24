@@ -405,13 +405,27 @@ export function ChatScreen({
       }
       return false
     })
-    // Dedup: SSE + history merge can produce duplicates — remove by role+text
+    // Dedup: SSE + history merge can produce duplicates (optimistic + SSE).
+    // Prefer stable identifiers (id/messageId/clientId/nonce), then fallback signature.
     const seen = new Set<string>()
     const deduped = filtered.filter((msg) => {
-      const text = textFromMessage(msg)
-      const key = `${msg.role}:${text.slice(0, 200)}`
-      if (seen.has(key)) return false
-      seen.add(key)
+      const raw = msg as Record<string, unknown>
+      const idCandidates = [
+        normalizeMessageValue(raw.id),
+        normalizeMessageValue(raw.messageId),
+        normalizeMessageValue(raw.clientId),
+        normalizeMessageValue(raw.client_id),
+        normalizeMessageValue(raw.nonce),
+        normalizeMessageValue(raw.__optimisticId),
+      ].filter(Boolean)
+
+      const primaryKey =
+        idCandidates.length > 0
+          ? `${msg.role}:id:${idCandidates[0]}`
+          : `${msg.role}:fallback:${normalizeMessageValue(typeof raw.timestamp === 'number' ? String(raw.timestamp) : raw.timestamp)}:${textFromMessage(msg).trim()}`
+
+      if (seen.has(primaryKey)) return false
+      seen.add(primaryKey)
       return true
     })
 

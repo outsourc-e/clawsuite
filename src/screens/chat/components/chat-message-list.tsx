@@ -288,19 +288,21 @@ function ChatMessageListComponent({
       return true
     })
 
-    const seenUserIds = new Set<string>()
+    const seenMessageIds = new Set<string>()
     return filteredMessages.filter((message) => {
-      if (message.role !== 'user') return true
-
       const messageId =
         (message as any).id ||
         (message as any).messageId ||
-        (message as any).clientId
+        (message as any).clientId ||
+        (message as any).client_id ||
+        (message as any).nonce ||
+        (message as any).__optimisticId
       if (typeof messageId !== 'string' || messageId.trim().length === 0) {
         return true
       }
-      if (seenUserIds.has(messageId)) return false
-      seenUserIds.add(messageId)
+      const scopedId = `${message.role}:${messageId.trim()}`
+      if (seenMessageIds.has(scopedId)) return false
+      seenMessageIds.add(scopedId)
       return true
     })
   }, [hideSystemMessages, messages])
