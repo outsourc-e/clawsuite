@@ -6,7 +6,6 @@ import {
   ArrowRight01Icon,
   BotIcon,
   Cancel01Icon,
-  Link01Icon,
 } from '@hugeicons/core-free-icons'
 import { useNavigate } from '@tanstack/react-router'
 import {
@@ -843,59 +842,6 @@ export function AgentViewPanel() {
                     )}
                   </LayoutGroup>
                 </section>
-
-                {/* History — only show when there are entries */}
-                {historyAgents.length > 0 ? (
-                  <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
-                    <Collapsible
-                      open={historyOpen}
-                      onOpenChange={setHistoryOpen}
-                    >
-                      <div className="flex items-center justify-between">
-                        <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
-                          <HugeiconsIcon
-                            icon={
-                              historyOpen ? ArrowDown01Icon : ArrowRight01Icon
-                            }
-                            size={20}
-                            strokeWidth={1.5}
-                          />
-                          History
-                        </CollapsibleTrigger>
-                        <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
-                          {historyAgents.length}
-                        </span>
-                      </div>
-                      <CollapsiblePanel contentClassName="pt-1">
-                        <div className="space-y-1">
-                          {historyAgents
-                            .slice(0, 10)
-                            .map(function renderHistoryRow(item) {
-                              return (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                                  onClick={function handleHistoryView() {
-                                    setOpen(false)
-                                    navigate({ to: '/agent-swarm' })
-                                  }}
-                                >
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={1.5} className="shrink-0 text-primary-500" />
-                                    <span className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-200">
-                                      {item.name}
-                                    </span>
-                                  </div>
-                                  <span className="ml-2 shrink-0 text-[10px] text-neutral-500">{formatCost(item.cost)}</span>
-                                </button>
-                              )
-                            })}
-                        </div>
-                      </CollapsiblePanel>
-                    </Collapsible>
-                  </section>
-                ) : null}
 
                 {(cliAgentsQuery.isLoading || cliAgents.length > 0) ? (
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
