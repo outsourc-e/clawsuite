@@ -34,7 +34,7 @@ export function QuickActionsRow({ className }: QuickActionsRowProps) {
             onClick={() => void navigate({ to: action.to as any })}
             className={cn(
               'flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 transition-colors',
-              'text-neutral-600 hover:bg-neutral-100 dark:hover:bg-white dark:hover:bg-white/10/10 active:bg-neutral-200',
+              'text-neutral-600 hover:bg-neutral-100 dark:hover:bg-white/10 active:bg-neutral-200',
               'dark:text-neutral-400 dark:hover:bg-neutral-800 dark:active:bg-neutral-700',
             )}
           >

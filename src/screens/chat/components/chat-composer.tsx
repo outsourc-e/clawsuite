@@ -1170,7 +1170,7 @@ function ChatComposerComponent({
   const hasDraft = value.trim().length > 0 || attachments.length > 0
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
-    : 'Ask anything... (⌘↵ to send · ⌘⇧M to switch model)'
+    : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
   const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
   const isSlashMenuOpen =
     slashCommandQuery !== null && !disabled && !isSlashMenuDismissed
@@ -1323,23 +1323,37 @@ function ChatComposerComponent({
 
   const handlePromptKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (!isSlashMenuOpen) return
-      if (event.key === 'ArrowDown') {
-        event.preventDefault()
-        slashMenuRef.current?.moveSelection(1)
-        return
+      // Slash menu navigation takes priority
+      if (isSlashMenuOpen) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault()
+          slashMenuRef.current?.moveSelection(1)
+          return
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault()
+          slashMenuRef.current?.moveSelection(-1)
+          return
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          handleDismissSlashMenu()
+          return
+        }
       }
-      if (event.key === 'ArrowUp') {
+      // Enter to send (Shift+Enter inserts newline — default textarea behavior)
+      if (
+        event.key === 'Enter' &&
+        !event.shiftKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.nativeEvent.isComposing
+      ) {
         event.preventDefault()
-        slashMenuRef.current?.moveSelection(-1)
-        return
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        handleDismissSlashMenu()
+        handleSubmit()
       }
     },
-    [handleDismissSlashMenu, isSlashMenuOpen],
+    [handleDismissSlashMenu, handleSubmit, isSlashMenuOpen],
   )
 
   // Combine internal ref with external wrapperRef
@@ -1694,7 +1708,7 @@ function ChatComposerComponent({
                                     handleModelSelect(option.value)
                                   }}
                                   className={cn(
-                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white dark:hover:bg-white/10/10',
+                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10',
                                     optionActive &&
                                       'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
                                   )}
@@ -1786,7 +1800,7 @@ function ChatComposerComponent({
                                     handleModelSelect(option.value)
                                   }}
                                   className={cn(
-                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white dark:hover:bg-white/10/10',
+                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10',
                                     optionActive &&
                                       'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
                                   )}
@@ -1810,7 +1824,7 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 dark:hover:bg-white dark:hover:bg-white/10/10 hover:text-accent-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300 group-hover:opacity-100"
+                                  className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 dark:hover:bg-white/10 hover:text-accent-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300 group-hover:opacity-100"
                                   aria-label={`Pin ${option.label}`}
                                   title="Pin"
                                 >

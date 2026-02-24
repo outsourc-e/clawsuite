@@ -108,8 +108,10 @@ import { Route as ApiBrowserTabsRouteImport } from './routes/api/browser/tabs'
 import { Route as ApiBrowserStatusRouteImport } from './routes/api/browser/status'
 import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
 import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/navigate'
+import { Route as ApiGatewayApprovalsIndexRouteImport } from './routes/api/gateway/approvals/index'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
+import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
 const UsageRoute = UsageRouteImport.update({
   id: '/usage',
@@ -606,6 +608,12 @@ const ApiBrowserNavigateRoute = ApiBrowserNavigateRouteImport.update({
   path: '/navigate',
   getParentRoute: () => ApiBrowserRoute,
 } as any)
+const ApiGatewayApprovalsIndexRoute =
+  ApiGatewayApprovalsIndexRouteImport.update({
+    id: '/api/gateway/approvals/',
+    path: '/api/gateway/approvals/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -617,6 +625,12 @@ const ApiCronRunsJobIdRoute = ApiCronRunsJobIdRouteImport.update({
   path: '/runs/$jobId',
   getParentRoute: () => ApiCronRoute,
 } as any)
+const ApiGatewayApprovalsApprovalIdActionRoute =
+  ApiGatewayApprovalsApprovalIdActionRouteImport.update({
+    id: '/api/gateway/approvals/$approvalId/$action',
+    path: '/api/gateway/approvals/$approvalId/$action',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -720,6 +734,8 @@ export interface FileRoutesByFullPath {
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
+  '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -822,6 +838,8 @@ export interface FileRoutesByTo {
   '/api/tasks': typeof ApiTasksIndexRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/gateway/approvals': typeof ApiGatewayApprovalsIndexRoute
+  '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -926,6 +944,8 @@ export interface FileRoutesById {
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
+  '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1031,6 +1051,8 @@ export interface FileRouteTypes {
     | '/api/tasks/'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
+    | '/api/gateway/approvals/'
+    | '/api/gateway/approvals/$approvalId/$action'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1133,6 +1155,8 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
+    | '/api/gateway/approvals'
+    | '/api/gateway/approvals/$approvalId/$action'
   id:
     | '__root__'
     | '/'
@@ -1236,6 +1260,8 @@ export interface FileRouteTypes {
     | '/api/tasks/'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
+    | '/api/gateway/approvals/'
+    | '/api/gateway/approvals/$approvalId/$action'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1325,6 +1351,8 @@ export interface RootRouteChildren {
   ApiMemoryWriteRoute: typeof ApiMemoryWriteRoute
   ApiTasksTaskIdRoute: typeof ApiTasksTaskIdRoute
   ApiTasksIndexRoute: typeof ApiTasksIndexRoute
+  ApiGatewayApprovalsIndexRoute: typeof ApiGatewayApprovalsIndexRoute
+  ApiGatewayApprovalsApprovalIdActionRoute: typeof ApiGatewayApprovalsApprovalIdActionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2022,6 +2050,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBrowserNavigateRouteImport
       parentRoute: typeof ApiBrowserRoute
     }
+    '/api/gateway/approvals/': {
+      id: '/api/gateway/approvals/'
+      path: '/api/gateway/approvals'
+      fullPath: '/api/gateway/approvals/'
+      preLoaderRoute: typeof ApiGatewayApprovalsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -2035,6 +2070,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/cron/runs/$jobId'
       preLoaderRoute: typeof ApiCronRunsJobIdRouteImport
       parentRoute: typeof ApiCronRoute
+    }
+    '/api/gateway/approvals/$approvalId/$action': {
+      id: '/api/gateway/approvals/$approvalId/$action'
+      path: '/api/gateway/approvals/$approvalId/$action'
+      fullPath: '/api/gateway/approvals/$approvalId/$action'
+      preLoaderRoute: typeof ApiGatewayApprovalsApprovalIdActionRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -2205,6 +2247,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMemoryWriteRoute: ApiMemoryWriteRoute,
   ApiTasksTaskIdRoute: ApiTasksTaskIdRoute,
   ApiTasksIndexRoute: ApiTasksIndexRoute,
+  ApiGatewayApprovalsIndexRoute: ApiGatewayApprovalsIndexRoute,
+  ApiGatewayApprovalsApprovalIdActionRoute:
+    ApiGatewayApprovalsApprovalIdActionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

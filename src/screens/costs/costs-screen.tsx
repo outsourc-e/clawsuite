@@ -14,6 +14,7 @@ import {
   YAxis,
 } from 'recharts'
 import { cn } from '@/lib/utils'
+import { useSettingsStore } from '@/hooks/use-settings'
 import { useCostAnalytics } from './use-cost-analytics'
 
 type SessionSortKey = 'costUsd' | 'totalTokens' | 'lastActiveAt'
@@ -95,6 +96,17 @@ export function CostsScreen() {
     useCostAnalytics()
   const [sortKey, setSortKey] = useState<SessionSortKey>('costUsd')
   const [sortDir, setSortDir] = useState<SessionSortDir>('desc')
+
+  const theme = useSettingsStore((s) => s.settings.theme)
+  const isDark =
+    theme === 'dark' ||
+    (theme === 'system' &&
+      typeof document !== 'undefined' &&
+      document.documentElement.classList.contains('dark'))
+
+  const chartColors = isDark
+    ? { grid: '#262626', tick: '#a3a3a3', axis: '#404040', tooltip: { bg: '#171717', border: '#262626', text: '#e5e5e5' }, cursor: 'rgba(255,255,255,0.03)' }
+    : { grid: '#e5e7eb', tick: '#6b7280', axis: '#d1d5db', tooltip: { bg: '#ffffff', border: '#e5e7eb', text: '#111827' }, cursor: 'rgba(0,0,0,0.04)' }
 
   const modelMaxTokens = useMemo(
     () => Math.max(1, ...analytics.models.map((m) => m.totalTokens)),
@@ -281,28 +293,28 @@ export function CostsScreen() {
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={analytics.daily}>
-                      <CartesianGrid stroke="#262626" vertical={false} />
+                      <CartesianGrid stroke={chartColors.grid} vertical={false} />
                       <XAxis
                         dataKey="label"
-                        tick={{ fill: '#a3a3a3', fontSize: 11 }}
+                        tick={{ fill: chartColors.tick, fontSize: 11 }}
                         tickLine={false}
-                        axisLine={{ stroke: '#404040' }}
+                        axisLine={{ stroke: chartColors.axis }}
                         interval={4}
                       />
                       <YAxis
-                        tick={{ fill: '#a3a3a3', fontSize: 11 }}
+                        tick={{ fill: chartColors.tick, fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
                         tickFormatter={(v: number | string) => `$${v}`}
                         width={44}
                       />
                       <Tooltip
-                        cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                        cursor={{ fill: chartColors.cursor }}
                         contentStyle={{
-                          background: '#171717',
-                          border: '1px solid #262626',
+                          background: chartColors.tooltip.bg,
+                          border: `1px solid ${chartColors.tooltip.border}`,
                           borderRadius: '0.75rem',
-                          color: '#e5e5e5',
+                          color: chartColors.tooltip.text,
                         }}
                       />
                       <Bar
