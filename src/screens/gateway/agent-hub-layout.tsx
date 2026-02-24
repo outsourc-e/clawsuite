@@ -4164,6 +4164,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   const isMissionRunning = missionActive && missionState === 'running'
 
+  function openNewMissionModal(prefill?: Partial<MissionBoardDraft>) {
+    setNewMissionName(prefill?.name ?? '')
+    setNewMissionGoal(prefill?.goal ?? missionGoal)
+    setNewMissionTeamConfigId(prefill?.teamConfigId ?? '__current__')
+    setNewMissionProcessType(prefill?.processType ?? processType)
+    setNewMissionBudgetLimit(prefill?.budgetLimit ?? budgetLimit)
+    setMissionBoardModalOpen(true)
+    setMissionWizardStep(0)
+  }
+
   // ── Mission tab content ────────────────────────────────────────────────────
 
 
@@ -4254,6 +4264,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
+              onNewMission={() => openNewMissionModal()}
               onViewOutput={(agentId) => {
                 if (isMissionRunning) {
                   setMaximizedMissionId('running')
@@ -5310,16 +5321,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           ? Number((totalCost / members.length).toFixed(2))
           : null
       return { totalCost, avgCost }
-    }
-
-    function openNewMissionModal(prefill?: Partial<MissionBoardDraft>) {
-      setNewMissionName(prefill?.name ?? '')
-      setNewMissionGoal(prefill?.goal ?? missionGoal)
-      setNewMissionTeamConfigId(prefill?.teamConfigId ?? '__current__')
-      setNewMissionProcessType(prefill?.processType ?? processType)
-      setNewMissionBudgetLimit(prefill?.budgetLimit ?? budgetLimit)
-      setMissionBoardModalOpen(true)
-      setMissionWizardStep(0)
     }
 
     function handleRestoreCheckpoint() {

@@ -8,6 +8,7 @@ export type OfficeViewProps = {
   agentRows: AgentWorkingRow[]
   missionRunning: boolean
   onViewOutput: (agentId: string) => void
+  onNewMission?: () => void
   selectedOutputAgentId?: string
   activeTemplateName?: string
   processType: 'sequential' | 'hierarchical' | 'parallel'
@@ -205,9 +206,9 @@ export function OfficeView({
   agentRows,
   missionRunning,
   onViewOutput,
+  onNewMission,
   selectedOutputAgentId,
   activeTemplateName: _activeTemplateName,
-  processType,
   containerHeight,
 }: OfficeViewProps) {
   // When containerHeight is set, we use compact mode: header only (no footer), SVG fills remaining space
@@ -298,7 +299,13 @@ export function OfficeView({
               Mission Live
             </span>
           ) : null}
-          <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[10px] font-semibold uppercase text-neutral-600 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">{processType}</span>
+          <button
+            type="button"
+            onClick={() => onNewMission?.()}
+            className="rounded-full border border-orange-200 bg-orange-50 dark:border-orange-800/50 dark:bg-orange-900/20 px-3 py-1 text-[10px] font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+          >
+            + New Mission
+          </button>
         </div>
       </div>
 
