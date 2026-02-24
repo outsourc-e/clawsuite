@@ -751,9 +751,7 @@ export function AgentViewPanel() {
                             }}
                             className={cn(
                               'grid gap-1.5 items-start',
-                              viewMode === 'compact'
-                                ? 'grid-cols-2'
-                                : 'grid-cols-1',
+                              'grid-cols-1',
                             )}
                           >
                             <AnimatePresence mode="popLayout" initial={false}>
@@ -809,9 +807,7 @@ export function AgentViewPanel() {
                               layout
                               className={cn(
                                 'grid gap-1.5 items-start',
-                                viewMode === 'compact'
-                                  ? 'grid-cols-2'
-                                  : 'grid-cols-1',
+                                'grid-cols-1',
                               )}
                             >
                               {queuedNodes.map(function renderQueuedNode(node) {

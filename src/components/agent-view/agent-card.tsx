@@ -482,30 +482,33 @@ export function AgentCard({
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <h4 className="flex-1 truncate text-[11px] font-medium text-primary-900">
+                <h4 className="flex-1 truncate text-xs font-medium text-primary-900">
                   {node.name}
                 </h4>
+                <span className="size-2 shrink-0 rounded-full bg-emerald-500" />
+                {renderWardenMenu('size-6 rounded-md')}
+              </div>
+
+              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] tabular-nums text-primary-600">
                 <span
-                  className={cn(
-                    'inline-block max-w-[120px] truncate rounded px-1.5 py-0.5 text-[10px] font-mono whitespace-nowrap',
-                    'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200',
-                  )}
+                  className="inline-block max-w-[110px] truncate rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                  title={node.model}
                 >
                   {node.model}
                 </span>
-                <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
-                {renderWardenMenu('size-6 rounded-md')}
+                <span className="shrink-0">·</span>
+                <span className="shrink-0">{formatRuntime(node.runtimeSeconds)}</span>
+                <span className="shrink-0">·</span>
+                <span className="shrink-0">${node.cost.toFixed(2)}</span>
               </div>
-              <p className="mt-0.5 truncate text-[10px] tabular-nums text-primary-600">
-                {node.model} · {formatRuntime(node.runtimeSeconds)} · ${node.cost.toFixed(2)}
-              </p>
+
               {showActions ? (
-                <div className="mt-1.5 flex items-center gap-1.5">
+                <div className="mt-1.5 flex items-center gap-1">
                   {onChat ? (
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="h-7 flex-1 justify-center text-[10px]"
+                      className="h-7 min-w-0 flex-1 justify-center px-2 text-[11px]"
                       onClick={function handleChatClick() {
                         onChat(node.id)
                       }}
@@ -514,11 +517,11 @@ export function AgentCard({
                       Chat
                     </Button>
                   ) : null}
-                  {(onView || useInlineDetail) ? (
+                  {onView || useInlineDetail ? (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-7 flex-1 justify-center text-[10px]"
+                      className="h-7 min-w-0 flex-1 justify-center px-2 text-[11px]"
                       onClick={handleViewClick}
                     >
                       <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={1.5} />
