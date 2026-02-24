@@ -4163,8 +4163,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="relative flex flex-col h-full min-h-0 bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — same gutter as widget cards ── */}
-        <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-7xl flex-shrink-0 px-3 sm:px-4">
-          <div className="min-h-[480px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
+        <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-7xl px-3 sm:px-4">
+          <div className="h-[520px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
@@ -4182,7 +4182,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined
               }
               processType={processType}
-              containerHeight={600}
+              containerHeight={520}
             />
           </div>
         </div>
