@@ -248,12 +248,12 @@ const MISSION_TEMPLATES = [
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
 
-type ActiveTab = 'overview' | 'configure' | 'missions'
+type ActiveTab = 'missions' | 'history' | 'configure'
 type ConfigSection = 'agents' | 'teams' | 'keys'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
-  { id: 'overview', icon: '🏠', label: 'Overview' },
-  { id: 'missions', icon: '🚀', label: 'Missions' },
+  { id: 'missions', icon: '🚀', label: 'Active Mission' },
+  { id: 'history', icon: '📋', label: 'History' },
   { id: 'configure', icon: '⚙️', label: 'Configure' },
 ]
 
@@ -2067,7 +2067,7 @@ void HistoryView
 
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // ── Tab + sidebar state ────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('missions')
   const [configSection, setConfigSection] = useState<ConfigSection>('agents')
   const [avatarPickerOpenId, setAvatarPickerOpenId] = useState<string | null>(null)
   const [agentWizardOpenId, setAgentWizardOpenId] = useState<string | null>(null)
@@ -4745,7 +4745,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setActiveTab('overview')}
+              onClick={() => setActiveTab('missions')}
               className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
             >
               ← Back
@@ -7030,24 +7030,34 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* ── Tab content area ── */}
-        <div className="min-w-0 flex-1 overflow-hidden">
-          {activeTab === 'overview' && (
-            <div className="h-full min-h-0 bg-white">
-              {renderOverviewContent()}
-            </div>
-          )}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {/* Always-visible office view (compact header) */}
+          <div className="shrink-0 overflow-hidden bg-white dark:bg-[var(--theme-panel,#111520)]" style={{ maxHeight: '340px' }}>
+            {renderOverviewContent()}
+          </div>
 
-          {activeTab === 'configure' && (
-            <div className="h-full min-h-0 bg-white">
-              {renderConfigureContent()}
-            </div>
-          )}
+          {/* Tab content below office view */}
+          <div className="flex min-h-0 flex-1 overflow-hidden border-t border-neutral-200 dark:border-slate-700">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              {activeTab === 'configure' && (
+                <div className="h-full min-h-0 bg-white dark:bg-[var(--theme-panel,#111520)]">
+                  {renderConfigureContent()}
+                </div>
+              )}
 
-          {activeTab === 'missions' && (
-            <div className="h-full min-h-0 bg-white">
-              {renderMissionsTabContent()}
+              {activeTab === 'missions' && (
+                <div className="h-full min-h-0 bg-white dark:bg-[var(--theme-panel,#111520)]">
+                  {renderMissionsTabContent()}
+                </div>
+              )}
+
+              {activeTab === 'history' && (
+                <div className="h-full min-h-0 overflow-y-auto bg-white dark:bg-[var(--theme-panel,#111520)]">
+                  <HistoryView />
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* ── Collapsible Live Feed + Approvals + Mission Controls sidebar ── */}

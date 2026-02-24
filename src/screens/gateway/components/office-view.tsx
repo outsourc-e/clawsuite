@@ -269,6 +269,7 @@ export function OfficeView({
   // When containerHeight is set, we use compact mode: header only (no footer), SVG fills remaining space
   const compact = Boolean(containerHeight)
   const [tick, setTick] = useState(0)
+  const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [layoutTemplate, setLayoutTemplate] = useState<OfficeLayoutTemplate>(() => {
     if (typeof window === 'undefined') return 'grid'
     const saved = window.localStorage.getItem('clawsuite:office-layout')
@@ -289,6 +290,19 @@ export function OfficeView({
       window.localStorage.setItem('clawsuite:office-layout', nextTemplate)
     }
   }
+
+  // Close layout picker on outside click
+  useEffect(() => {
+    if (!layoutPickerOpen) return
+    function onDown(e: MouseEvent) {
+      const target = e.target as Element
+      if (!target.closest('[data-layout-picker]')) {
+        setLayoutPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [layoutPickerOpen])
 
   useEffect(() => {
     const timer = window.setInterval(() => setTick((t) => t + 1), 200)
@@ -416,27 +430,39 @@ export function OfficeView({
         </div>
       </div>
 
-      {/* Desktop office canvas */}
+      {/* Desktop office canvas — layout picker (pencil icon) */}
       <div className="hidden shrink-0 justify-end px-3 pb-1 pt-2 md:flex">
-        <div className="ml-auto mb-2 flex w-fit gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-slate-800">
-          {LAYOUT_TEMPLATE_OPTIONS.map((template) => {
-            const active = template.key === layoutTemplate
-            return (
-              <button
-                key={template.key}
-                type="button"
-                onClick={() => changeLayout(template.key)}
-                className={cn(
-                  'rounded-md px-3 py-1 text-[11px] font-medium transition-colors',
-                  active
-                    ? 'bg-accent-500 text-white'
-                    : 'border border-neutral-200 bg-white text-neutral-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300',
-                )}
-              >
-                {template.label}
-              </button>
-            )
-          })}
+        <div className="relative" data-layout-picker>
+          <button
+            type="button"
+            onClick={() => setLayoutPickerOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+            title="Change office layout"
+          >
+            <span>✏️</span>
+            <span className="hidden text-[10px] sm:inline">
+              {layoutTemplate === 'grid' ? 'Grid' : layoutTemplate === 'roundtable' ? 'Roundtable' : 'War Room'}
+            </span>
+          </button>
+          {layoutPickerOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1 min-w-[120px] overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              {LAYOUT_TEMPLATE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => { changeLayout(opt.key); setLayoutPickerOpen(false) }}
+                  className={cn(
+                    'w-full px-3 py-2 text-left text-[12px] transition-colors hover:bg-neutral-50 dark:hover:bg-slate-800',
+                    layoutTemplate === opt.key
+                      ? 'font-medium text-accent-600'
+                      : 'text-neutral-700 dark:text-slate-300',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div className={cn('relative hidden flex-1 overflow-hidden md:flex', !compact && 'min-h-[440px]')}>
