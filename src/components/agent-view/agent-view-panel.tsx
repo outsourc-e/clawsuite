@@ -7,6 +7,8 @@ import {
   BotIcon,
   Cancel01Icon,
   Link01Icon,
+  ViewIcon,
+  ViewOffIcon,
 } from '@hugeicons/core-free-icons'
 import { useNavigate } from '@tanstack/react-router'
 import {
@@ -337,6 +339,37 @@ export function AgentViewPanel() {
   } | null>(null)
   const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
   const [browserPreviewExpanded, setBrowserPreviewExpanded] = useState(false)
+
+  // Visibility toggles for History and Browser sections (persisted to localStorage)
+  const [historyVisible, setHistoryVisible] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('clawsuite:sidebar-history-visible')
+      return stored === null ? true : stored !== 'false'
+    } catch {
+      return true
+    }
+  })
+  const [browserVisible, setBrowserVisible] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('clawsuite:sidebar-browser-visible')
+      return stored === null ? true : stored !== 'false'
+    } catch {
+      return true
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('clawsuite:sidebar-history-visible', String(historyVisible))
+    } catch { /* ignore */ }
+  }, [historyVisible])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('clawsuite:sidebar-browser-visible', String(browserVisible))
+    } catch { /* ignore */ }
+  }, [browserVisible])
+
   const cliAgentsQuery = useCliAgents()
   const cliAgents = cliAgentsQuery.data ?? []
   // Auto: expanded avatar when idle, compact when agents are working
@@ -848,51 +881,70 @@ export function AgentViewPanel() {
                 {historyAgents.length > 0 ? (
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
                     <Collapsible
-                      open={historyOpen}
+                      open={historyOpen && historyVisible}
                       onOpenChange={setHistoryOpen}
                     >
                       <div className="flex items-center justify-between">
                         <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
                           <HugeiconsIcon
                             icon={
-                              historyOpen ? ArrowDown01Icon : ArrowRight01Icon
+                              historyOpen && historyVisible ? ArrowDown01Icon : ArrowRight01Icon
                             }
                             size={20}
                             strokeWidth={1.5}
                           />
                           History
                         </CollapsibleTrigger>
-                        <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
-                          {historyAgents.length}
-                        </span>
-                      </div>
-                      <CollapsiblePanel contentClassName="pt-1">
-                        <div className="space-y-1">
-                          {historyAgents
-                            .slice(0, 10)
-                            .map(function renderHistoryRow(item) {
-                              return (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                                  onClick={function handleHistoryView() {
-                                    setOpen(false)
-                                    navigate({ to: '/agent-swarm' })
-                                  }}
-                                >
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={1.5} className="shrink-0 text-primary-500" />
-                                    <span className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-200">
-                                      {item.name}
-                                    </span>
-                                  </div>
-                                  <span className="ml-2 shrink-0 text-[10px] text-neutral-500">{formatCost(item.cost)}</span>
-                                </button>
-                              )
-                            })}
+                        <div className="flex items-center gap-1">
+                          <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
+                            {historyAgents.length}
+                          </span>
+                          <button
+                            type="button"
+                            title={historyVisible ? 'Hide section' : 'Show section'}
+                            className="flex h-6 w-6 items-center justify-center rounded text-primary-500 hover:bg-primary-300/50 hover:text-primary-800"
+                            onClick={() => setHistoryVisible(v => !v)}
+                          >
+                            <HugeiconsIcon
+                              icon={historyVisible ? ViewIcon : ViewOffIcon}
+                              size={14}
+                              strokeWidth={1.5}
+                            />
+                          </button>
                         </div>
-                      </CollapsiblePanel>
+                      </div>
+                      {historyVisible && (
+                        <CollapsiblePanel contentClassName="pt-1">
+                          <div className="space-y-1">
+                            {historyAgents
+                              .slice(0, 10)
+                              .map(function renderHistoryRow(item) {
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                    onClick={function handleHistoryView() {
+                                      setOpen(false)
+                                      navigate({ to: '/agent-swarm' })
+                                    }}
+                                  >
+                                    <div className="flex min-w-0 items-center gap-2">
+                                      <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={1.5} className="shrink-0 text-primary-500" />
+                                      <span className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-200">
+                                        {item.name}
+                                      </span>
+                                    </div>
+                                    <span className="ml-2 shrink-0 text-[10px] text-neutral-500">{formatCost(item.cost)}</span>
+                                  </button>
+                                )
+                              })}
+                          </div>
+                        </CollapsiblePanel>
+                      )}
+                      {!historyVisible && (
+                        <p className="mt-1 px-2 text-[10px] italic text-primary-400">hidden</p>
+                      )}
                     </Collapsible>
                   </section>
                 ) : null}
@@ -985,26 +1037,43 @@ export function AgentViewPanel() {
 
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
                   <Collapsible
-                    open={browserPreviewExpanded}
+                    open={browserPreviewExpanded && browserVisible}
                     onOpenChange={setBrowserPreviewExpanded}
                   >
                     <div className="flex items-center justify-between">
                       <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
                         <HugeiconsIcon
                           icon={
-                            browserPreviewExpanded
+                            browserPreviewExpanded && browserVisible
                               ? ArrowDown01Icon
                               : ArrowRight01Icon
                           }
                           size={20}
                           strokeWidth={1.5}
                         />
-                        🌐 Browser {browserPreviewExpanded ? '' : '— inactive'}
+                        🌐 Browser {browserPreviewExpanded && browserVisible ? '' : '— inactive'}
                       </CollapsibleTrigger>
+                      <button
+                        type="button"
+                        title={browserVisible ? 'Hide section' : 'Show section'}
+                        className="flex h-6 w-6 items-center justify-center rounded text-primary-500 hover:bg-primary-300/50 hover:text-primary-800"
+                        onClick={() => setBrowserVisible(v => !v)}
+                      >
+                        <HugeiconsIcon
+                          icon={browserVisible ? ViewIcon : ViewOffIcon}
+                          size={14}
+                          strokeWidth={1.5}
+                        />
+                      </button>
                     </div>
-                    <CollapsiblePanel contentClassName="pt-1">
-                      <BrowserSidebarPreview />
-                    </CollapsiblePanel>
+                    {browserVisible && (
+                      <CollapsiblePanel contentClassName="pt-1">
+                        <BrowserSidebarPreview />
+                      </CollapsiblePanel>
+                    )}
+                    {!browserVisible && (
+                      <p className="mt-1 px-2 text-[10px] italic text-primary-400">hidden</p>
+                    )}
                   </Collapsible>
                 </section>
               </div>
