@@ -2123,6 +2123,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [selectedAgentId, setSelectedAgentId] = useState<string>()
   const [selectedOutputAgentId, setSelectedOutputAgentId] = useState<string>()
   const [outputPanelVisible, setOutputPanelVisible] = useState(false)
+  const [agentPopupId, setAgentPopupId] = useState<string | null>(null)
   const [boardTasks, _setBoardTasks] = useState<Array<HubTask>>([])
   const [missionTasks, setMissionTasks] = useState<Array<HubTask>>([])
   const [dispatchedTaskIdsByAgent, setDispatchedTaskIdsByAgent] = useState<Record<string, Array<string>>>({})
@@ -4264,13 +4265,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               missionRunning={isMissionRunning}
               onNewMission={() => openNewMissionModal()}
               onViewOutput={(agentId) => {
-                if (isMissionRunning) {
-                  setActiveTab('missions')
-                  setMissionSubTab('active')
-                } else {
-                  setSelectedOutputAgentId(agentId)
-                  setOutputPanelVisible(true)
-                }
+                setAgentPopupId(agentId)
               }}
               selectedOutputAgentId={selectedOutputAgentId}
               activeTemplateName={
@@ -5349,7 +5344,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       )
       setRestoreDismissed(true)
       setRestoreCheckpoint(null)
-      openNewMissionModal()
+      openNewMissionModal({ goal: restoreCheckpoint.label, name: restoreCheckpoint.label })
       toast('Recovered checkpoint restored into Mission setup', { type: 'success' })
     }
 
@@ -6753,6 +6748,124 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
         )}
       </div>
+
+      {agentPopupId && (() => {
+        const popupMember = team.find((m) => m.id === agentPopupId)
+        if (!popupMember) return null
+        const popupSessionKey = agentSessionMap[agentPopupId] ?? null
+        const popupStatus = agentSessionStatus[agentPopupId]
+        const isPopupActive = popupStatus?.status === 'active'
+        const agentTasks = missionTasks.filter((t) => t.agentId === agentPopupId)
+        const currentTask = agentTasks.find((t) => t.status === 'in_progress') ?? agentTasks[0] ?? null
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setAgentPopupId(null)}
+          >
+            <div
+              className="flex w-full max-w-lg flex-col rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
+              style={{ maxHeight: '80vh' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-100 px-5 py-4 dark:border-neutral-800">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xl font-semibold text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                    {popupMember.name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-base font-bold text-neutral-900 dark:text-neutral-100">{popupMember.name}</p>
+                      <span className={cn(
+                        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                        isPopupActive
+                          ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                          : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400',
+                      )}>
+                        {isPopupActive ? '● Active' : (popupStatus?.status ?? 'Idle')}
+                      </span>
+                    </div>
+                    <p className="truncate text-xs text-neutral-400 dark:text-neutral-500">{popupMember.modelId}</p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {/* Edit pencil */}
+                  <button
+                    type="button"
+                    title="Edit agent config"
+                    onClick={() => { setAgentPopupId(null); setActiveTab('configure'); setConfigSection('teams') }}
+                    className="rounded-lg border border-neutral-200 p-2 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700 dark:border-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAgentPopupId(null)}
+                    className="rounded-lg p-2 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Current task */}
+              {currentTask && (
+                <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-neutral-800">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Current Task</p>
+                  <p className="mt-0.5 line-clamp-2 text-sm text-neutral-700 dark:text-neutral-300">{currentTask.title}</p>
+                  <span className={cn(
+                    'mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    currentTask.status === 'in_progress' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                      : currentTask.status === 'done' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400',
+                  )}>
+                    {currentTask.status}
+                  </span>
+                </div>
+              )}
+
+              {/* Live output */}
+              <div className="min-h-0 flex-1 overflow-hidden">
+                {popupSessionKey ? (
+                  <AgentOutputPanel
+                    sessionKey={popupSessionKey}
+                    agentName={popupMember.name}
+                    tasks={agentTasks}
+                    onClose={() => setAgentPopupId(null)}
+                    modelId={popupMember.modelId}
+                    compact={true}
+                  />
+                ) : (
+                  <div className="flex h-32 items-center justify-center text-sm text-neutral-400 dark:text-neutral-500">
+                    {missionActive ? 'Waiting for agent session to start...' : 'No active session — start a mission to see live output.'}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              {missionActive && (
+                <div className="flex shrink-0 items-center gap-2 border-t border-neutral-100 px-5 py-3 dark:border-neutral-800">
+                  <button
+                    type="button"
+                    onClick={() => { setAgentPopupId(null); setActiveTab('missions'); setMissionSubTab('active') }}
+                    className="rounded-lg border border-neutral-200 px-4 py-2 text-xs font-medium text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                  >
+                    View Active Mission →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAgentPopupId(null); setSteerAgentId(agentPopupId); setSteerInput('') }}
+                    className="rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-600"
+                  >
+                    🎯 Steer Agent
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Launch wizard ─────────────────────────────────────────────────── */}
       {wizardOpen ? (
