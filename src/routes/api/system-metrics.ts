@@ -44,6 +44,9 @@ function readCpuPercent(): number {
   return Math.max(0, Math.min(100, Number(usage.toFixed(1))))
 }
 
+// Eagerly initialize so the first real HTTP call returns a non-zero reading
+lastCpuSnapshot = readCpuSnapshot()
+
 function readDiskPercent(): number {
   try {
     const output = execSync('df -k /', {

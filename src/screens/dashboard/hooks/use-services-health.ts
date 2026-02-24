@@ -125,11 +125,6 @@ export function useServicesHealth(gatewayConnected: boolean) {
 
     return [
       {
-        name: 'Mission Control API',
-        status: isChecking ? 'checking' : (probe?.missionControlApi.status ?? 'down'),
-        latencyMs: probe?.missionControlApi.latencyMs,
-      },
-      {
         name: 'ClawSuite UI',
         status: isChecking ? 'checking' : (probe?.clawSuiteUi.status ?? 'down'),
         latencyMs: probe?.clawSuiteUi.latencyMs,

@@ -977,27 +977,37 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
-              <TokenUsageHero data={dashboardData} />
+              <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                <TokenUsageHero data={dashboardData} />
+              </ErrorBoundary>
 
               {desktopLayout.showServices ? (
-                <ServicesHealthWidget
-                  gatewayConnected={dashboardData.connection.connected}
-                  onRemove={() => removeWidget('services-health')}
-                />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ServicesHealthWidget
+                    gatewayConnected={dashboardData.connection.connected}
+                    onRemove={() => removeWidget('services-health')}
+                  />
+                </ErrorBoundary>
               ) : null}
 
               {desktopLayout.showScheduledJobs ? (
-                <ScheduledJobsWidget onRemove={() => removeWidget('scheduled-jobs')} />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ScheduledJobsWidget onRemove={() => removeWidget('scheduled-jobs')} />
+                </ErrorBoundary>
               ) : null}
 
               {/* 3. Two-up: Usage Today + Squad Status */}
               {(desktopLayout.showUsage || desktopLayout.showSquad) && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {desktopLayout.showUsage && (
-                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
+                    </ErrorBoundary>
                   )}
                   {desktopLayout.showSquad && (
-                    <SquadStatusWidget />
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <SquadStatusWidget />
+                    </ErrorBoundary>
                   )}
                 </div>
               )}
@@ -1006,35 +1016,45 @@ export function DashboardScreen() {
               {(desktopLayout.showSessions || desktopLayout.showTasks) && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {desktopLayout.showSessions && (
-                    <RecentSessionsWidget
-                      onOpenSession={(sessionKey) =>
-                        navigate({
-                          to: '/chat/$sessionKey',
-                          params: { sessionKey },
-                        })
-                      }
-                      onRemove={() => removeWidget('recent-sessions')}
-                    />
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <RecentSessionsWidget
+                        onOpenSession={(sessionKey) =>
+                          navigate({
+                            to: '/chat/$sessionKey',
+                            params: { sessionKey },
+                          })
+                        }
+                        onRemove={() => removeWidget('recent-sessions')}
+                      />
+                    </ErrorBoundary>
                   )}
                   {desktopLayout.showTasks && (
-                    <TasksWidget onRemove={() => removeWidget('tasks')} />
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <TasksWidget onRemove={() => removeWidget('tasks')} />
+                    </ErrorBoundary>
                   )}
                 </div>
               )}
 
               {/* 5. Full-width: Activity Log */}
               {desktopLayout.showActivity && (
-                <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+                </ErrorBoundary>
               )}
 
               {/* 6. Skills + Notifications */}
               {(desktopLayout.showSkills || desktopLayout.showNotifications) && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {desktopLayout.showSkills && (
-                    <SkillsWidget onRemove={() => removeWidget('skills')} />
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <SkillsWidget onRemove={() => removeWidget('skills')} />
+                    </ErrorBoundary>
                   )}
                   {desktopLayout.showNotifications && (
-                    <NotificationsWidget onRemove={() => removeWidget('notifications')} />
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <NotificationsWidget onRemove={() => removeWidget('notifications')} />
+                    </ErrorBoundary>
                   )}
                 </div>
               )}

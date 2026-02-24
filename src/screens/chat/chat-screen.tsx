@@ -1765,7 +1765,7 @@ export function ChatScreen({
           {showComposer ? (
             <ChatComposer
               onSubmit={send}
-              isLoading={sending}
+              isLoading={sending || waitingForResponse}
               disabled={sending || hideUi}
               sessionKey={
                 isNewChat

@@ -80,8 +80,8 @@ function KpiCard({
           className={cn(
             'mt-2 inline-flex rounded-md px-2 py-1 text-xs font-medium',
             delta.value <= 0
-              ? 'bg-emerald-500/15 text-emerald-300'
-              : 'bg-red-500/15 text-red-300',
+              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+              : 'bg-red-500/15 text-red-600 dark:text-red-400',
           )}
         >
           {delta.text}
