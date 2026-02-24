@@ -1,13 +1,20 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  fetchGatewayApprovals,
+  resolveGatewayApproval,
+  type GatewayApprovalEntry,
+} from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
 import type { ApprovalRequest } from '../lib/approvals-store'
 
 type ApprovalsPanelProps = {
-  approvals: ApprovalRequest[]
-  onApprove: (id: string) => void
-  onDeny: (id: string) => void
+  visible: boolean
+  fallbackApprovals?: ApprovalRequest[]
+  onPendingCountChange?: (count: number) => void
 }
 
-function timeAgo(ms: number): string {
+function timeAgo(ms?: number): string {
+  if (!ms || !Number.isFinite(ms)) return 'unknown'
   const delta = Math.max(0, Date.now() - ms)
   const seconds = Math.floor(delta / 1000)
   if (seconds < 60) return `${seconds}s ago`
@@ -37,8 +44,139 @@ function agentBadgeClass(agentName: string): string {
   return AGENT_BADGE_COLORS[Math.abs(hash) % AGENT_BADGE_COLORS.length]!
 }
 
-export function ApprovalsPanel({ approvals, onApprove, onDeny }: ApprovalsPanelProps) {
-  const pendingCount = approvals.filter(a => a.status === 'pending').length
+function approvalActionText(approval: GatewayApprovalEntry): string {
+  if (typeof approval.action === 'string' && approval.action.trim().length > 0) {
+    return approval.action
+  }
+  if (typeof approval.tool === 'string' && approval.tool.trim().length > 0) {
+    return approval.tool
+  }
+  if (approval.input !== undefined) {
+    try {
+      return JSON.stringify(approval.input)
+    } catch {
+      return 'Approval requested'
+    }
+  }
+  return 'Approval requested'
+}
+
+function approvalContextText(approval: GatewayApprovalEntry): string {
+  if (typeof approval.context === 'string' && approval.context.trim().length > 0) {
+    return approval.context
+  }
+  if (approval.input !== undefined) {
+    try {
+      return JSON.stringify(approval.input, null, 2)
+    } catch {
+      return ''
+    }
+  }
+  return ''
+}
+
+type HistoryEntry = {
+  id: string
+  agentName: string
+  action: string
+  status: 'approved' | 'denied' | 'pending'
+  timestamp: number
+}
+
+export function ApprovalsPanel({
+  visible,
+  fallbackApprovals = [],
+  onPendingCountChange,
+}: ApprovalsPanelProps) {
+  const [pending, setPending] = useState<GatewayApprovalEntry[]>([])
+  const [history, setHistory] = useState<GatewayApprovalEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [resolvingIds, setResolvingIds] = useState<Record<string, boolean>>({})
+
+  const refreshPending = useCallback(async () => {
+    const response = await fetchGatewayApprovals()
+    const rows = response.pending ?? response.approvals ?? []
+    const normalized = rows.filter((entry) => (entry.status ?? 'pending') === 'pending')
+    setPending(normalized)
+    onPendingCountChange?.(normalized.length)
+    return normalized
+  }, [onPendingCountChange])
+
+  const refreshHistory = useCallback(async () => {
+    const response = await fetchGatewayApprovals()
+    const rows = response.approvals ?? response.pending ?? []
+    setHistory(rows.filter((entry) => (entry.status ?? 'pending') !== 'pending'))
+  }, [])
+
+  const refreshAll = useCallback(async () => {
+    try {
+      setError(null)
+      await Promise.all([refreshPending(), refreshHistory()])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }, [refreshPending, refreshHistory])
+
+  useEffect(() => {
+    if (!visible) return
+    void refreshAll()
+    const interval = window.setInterval(() => {
+      void refreshPending()
+    }, 3_000)
+    return () => window.clearInterval(interval)
+  }, [refreshAll, refreshPending, visible])
+
+  const localHistory = useMemo<HistoryEntry[]>(() => {
+    return fallbackApprovals
+      .filter((entry) => entry.status !== 'pending')
+      .map((entry) => ({
+        id: entry.id,
+        agentName: entry.agentName,
+        action: entry.action,
+        status: entry.status === 'approved' ? 'approved' : 'denied',
+        timestamp: entry.resolvedAt ?? entry.requestedAt,
+      }))
+  }, [fallbackApprovals])
+
+  const mergedHistory = useMemo<HistoryEntry[]>(() => {
+    const remote: HistoryEntry[] = history.map((entry) => ({
+      id: entry.id,
+      agentName: entry.agentName ?? entry.sessionKey ?? 'Gateway',
+      action: approvalActionText(entry),
+      status: entry.status === 'approved'
+        ? 'approved'
+        : entry.status === 'denied'
+          ? 'denied'
+          : 'pending',
+      timestamp: entry.requestedAt ?? Date.now(),
+    }))
+
+    return [...remote, ...localHistory]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 100)
+  }, [history, localHistory])
+
+  async function handleResolve(id: string, action: 'approve' | 'deny') {
+    setResolvingIds((current) => ({ ...current, [id]: true }))
+    try {
+      const result = await resolveGatewayApproval(id, action)
+      if (!result.ok) throw new Error('Failed to submit approval response')
+      await Promise.all([refreshPending(), refreshHistory()])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setResolvingIds((current) => {
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+    }
+  }
+
+  const pendingCount = pending.length
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -64,8 +202,21 @@ export function ApprovalsPanel({ approvals, onApprove, onDeny }: ApprovalsPanelP
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {approvals.length === 0 ? (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {error ? (
+          <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {loading && pending.length === 0 ? (
+            <div className="flex h-full items-center justify-center p-8">
+              <p className="text-sm text-neutral-500">Loading approvals...</p>
+            </div>
+          ) : null}
+
+          {!loading && pending.length === 0 ? (
           <div className="flex h-full items-center justify-center p-8">
             <div className="text-center">
               <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-neutral-800">
@@ -79,18 +230,73 @@ export function ApprovalsPanel({ approvals, onApprove, onDeny }: ApprovalsPanelP
               </p>
             </div>
           </div>
-        ) : (
-          <div className="space-y-2 p-4">
-            {approvals.map((approval) => (
+          ) : null}
+
+          {pending.length > 0 ? (
+            <div className="space-y-2 p-4">
+              {pending.map((approval) => (
               <ApprovalCard
                 key={approval.id}
                 approval={approval}
-                onApprove={onApprove}
-                onDeny={onDeny}
+                disabled={Boolean(resolvingIds[approval.id])}
+                onApprove={() => void handleResolve(approval.id, 'approve')}
+                onDeny={() => void handleResolve(approval.id, 'deny')}
               />
             ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="min-h-0 max-h-64 shrink-0 border-t border-neutral-200 bg-neutral-50/70 dark:border-neutral-800 dark:bg-neutral-900/40">
+          <div className="flex items-center justify-between px-4 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+              History
+            </p>
+            <span className="text-[10px] text-neutral-400">
+              {mergedHistory.length} recent
+            </span>
           </div>
-        )}
+          <div className="max-h-52 overflow-y-auto px-4 pb-3">
+            {mergedHistory.length === 0 ? (
+              <p className="py-4 text-center text-xs text-neutral-400">
+                No approval history yet
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {mergedHistory.map((entry) => (
+                  <div
+                    key={`${entry.id}-${entry.timestamp}`}
+                    className="rounded-lg border border-neutral-200 bg-white px-2.5 py-2 dark:border-neutral-800 dark:bg-neutral-900"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-[11px] font-medium text-neutral-800 dark:text-neutral-200">
+                        {entry.agentName}
+                      </p>
+                      <span
+                        className={cn(
+                          'rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase',
+                          entry.status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                            : entry.status === 'denied'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+                        )}
+                      >
+                        {entry.status}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-600 dark:text-neutral-400">
+                      {entry.action}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-neutral-400">
+                      {timeAgo(entry.timestamp)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -98,14 +304,19 @@ export function ApprovalsPanel({ approvals, onApprove, onDeny }: ApprovalsPanelP
 
 function ApprovalCard({
   approval,
+  disabled,
   onApprove,
   onDeny,
 }: {
-  approval: ApprovalRequest
-  onApprove: (id: string) => void
-  onDeny: (id: string) => void
+  approval: GatewayApprovalEntry
+  disabled: boolean
+  onApprove: () => void
+  onDeny: () => void
 }) {
-  const isPending = approval.status === 'pending'
+  const isPending = (approval.status ?? 'pending') === 'pending'
+  const agentName = approval.agentName ?? approval.sessionKey ?? 'Gateway'
+  const action = approvalActionText(approval)
+  const context = approvalContextText(approval)
 
   return (
     <div
@@ -122,10 +333,10 @@ function ApprovalCard({
           <span
             className={cn(
               'rounded-md px-2 py-0.5 text-[10px] font-semibold',
-              agentBadgeClass(approval.agentName),
+              agentBadgeClass(agentName),
             )}
           >
-            {approval.agentName}
+            {agentName}
           </span>
           <span className="shrink-0 font-mono text-[10px] text-neutral-400">
             {timeAgo(approval.requestedAt)}
@@ -134,12 +345,12 @@ function ApprovalCard({
 
         {/* Action — monospace */}
         <p className="mb-1.5 font-mono text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-          {approval.action}
+          {action}
         </p>
 
         {/* Context snippet */}
         <p className="mb-3 line-clamp-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-          {approval.context}
+          {context}
         </p>
 
         {/* Actions or resolved label */}
@@ -147,14 +358,16 @@ function ApprovalCard({
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => onApprove(approval.id)}
+              onClick={onApprove}
+              disabled={disabled}
               className="flex-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition-all duration-200 hover:bg-emerald-700"
             >
               ✓ Approve
             </button>
             <button
               type="button"
-              onClick={() => onDeny(approval.id)}
+              onClick={onDeny}
+              disabled={disabled}
               className="flex-1 rounded-lg border border-red-400 px-3 py-1.5 text-[11px] font-semibold text-red-600 transition-all duration-200 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/20"
             >
               ✕ Deny

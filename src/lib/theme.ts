@@ -1,4 +1,16 @@
-export type ThemeId = 'paper-light' | 'ops-dark' | 'premium-dark'
+export type ThemeId =
+  | 'paper-light'
+  | 'ops-dark'
+  | 'premium-dark'
+  | 'sunset-brand'
+
+const DARK_THEMES: ThemeId[] = ['ops-dark', 'premium-dark', 'sunset-brand']
+const THEME_SET = new Set<ThemeId>([
+  'paper-light',
+  'ops-dark',
+  'premium-dark',
+  'sunset-brand',
+])
 
 export const THEMES: Array<{
   id: ThemeId
@@ -6,16 +18,41 @@ export const THEMES: Array<{
   description: string
   icon: string
 }> = [
-  { id: 'paper-light', label: 'Paper Light', description: 'Warm white, gentle shadows', icon: '☀️' },
-  { id: 'ops-dark', label: 'Ops Dark', description: 'Dense structural dark', icon: '🖥️' },
-  { id: 'premium-dark', label: 'Premium Dark', description: 'Deep shadows, soft glow', icon: '✨' },
+  {
+    id: 'paper-light',
+    label: 'Paper Light',
+    description: 'Clean warm gray with soft shadows',
+    icon: '☀️',
+  },
+  {
+    id: 'ops-dark',
+    label: 'Ops Dark',
+    description: 'Slate dark with teal secondary accents',
+    icon: '🖥️',
+  },
+  {
+    id: 'premium-dark',
+    label: 'Premium Dark',
+    description: 'OLED black with high contrast',
+    icon: '✨',
+  },
+  {
+    id: 'sunset-brand',
+    label: 'Sunset Brand',
+    description: 'Warm brown immersion with amber accents',
+    icon: '🌇',
+  },
 ]
 
 const STORAGE_KEY = 'clawsuite-theme'
 
 export function getStoredTheme(): ThemeId {
   if (typeof window === 'undefined') return 'paper-light'
-  return (localStorage.getItem(STORAGE_KEY) as ThemeId) || 'paper-light'
+  const stored = localStorage.getItem(STORAGE_KEY)
+  if (stored && THEME_SET.has(stored as ThemeId)) {
+    return stored as ThemeId
+  }
+  return 'paper-light'
 }
 
 export function applyTheme(theme: ThemeId): void {
@@ -23,7 +60,7 @@ export function applyTheme(theme: ThemeId): void {
   html.setAttribute('data-theme', theme)
 
   // Also toggle dark class for Tailwind dark: variant
-  if (theme.includes('dark')) {
+  if (DARK_THEMES.includes(theme)) {
     html.classList.add('dark')
     html.classList.remove('light')
   } else {

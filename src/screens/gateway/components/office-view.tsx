@@ -107,16 +107,34 @@ function getStatusDotClass(status: AgentWorkingStatus): string {
   }
 }
 
+function getAgentStatusGlowClass(status: AgentWorkingStatus): string {
+  switch (status) {
+    case 'active':
+      return 'office-status-glow-active'
+    case 'error':
+    case 'none':
+      return 'office-status-glow-error'
+    default:
+      return 'office-status-glow-idle'
+  }
+}
+
+function getAgentEmoji(agent: AgentWorkingRow): string | null {
+  const row = agent as AgentWorkingRow & { emoji?: string; avatarEmoji?: string }
+  const emoji = row.emoji?.trim() || row.avatarEmoji?.trim()
+  return emoji || null
+}
+
 // ── SVG Office Furniture ──
 
 function DeskSVG({ x, y, occupied, accent }: { x: number; y: number; occupied: boolean; accent?: string }) {
   return (
     <g transform={`translate(${x} ${y})`}>
       {/* Desk surface */}
-      <rect x="-40" y="-8" width="80" height="40" rx="4" fill={occupied ? '#f8fafc' : '#f1f5f9'} stroke={occupied ? '#cbd5e1' : '#e2e8f0'} strokeWidth="1.5" />
+      <rect x="-40" y="-8" width="80" height="40" rx="4" fill={occupied ? '#f8fafc' : '#f1f5f9'} fillOpacity={occupied ? 0.78 : 0.7} stroke={occupied ? '#dbe4ee' : '#e6edf5'} strokeWidth="1" />
       {/* Desk legs */}
-      <rect x="-36" y="32" width="4" height="16" rx="1" fill="#94a3b8" />
-      <rect x="32" y="32" width="4" height="16" rx="1" fill="#94a3b8" />
+      <rect x="-36" y="32" width="4" height="16" rx="1" fill="#a7b4c6" />
+      <rect x="32" y="32" width="4" height="16" rx="1" fill="#a7b4c6" />
       {/* Monitor */}
       {occupied ? (
         <>
@@ -131,7 +149,7 @@ function DeskSVG({ x, y, occupied, accent }: { x: number; y: number; occupied: b
         </>
       )}
       {/* Chair */}
-      <ellipse cx="0" cy="56" rx="14" ry="6" fill={occupied ? (accent ? `${accent}33` : '#dbeafe') : '#f1f5f9'} />
+      <ellipse cx="0" cy="56" rx="14" ry="6" fill={occupied ? (accent ? `${accent}22` : '#dbeafe') : '#f1f5f9'} />
       <rect x="-10" y="48" width="20" height="10" rx="4" fill={occupied ? '#475569' : '#cbd5e1'} />
     </g>
   )
@@ -233,18 +251,19 @@ export function OfficeView({
 
       if (wanderCycle === 0) {
         // At desk
-        return { x: desk.x, y: desk.y - 20, atDesk: true }
+        return { x: desk.x, y: desk.y - 20, atDesk: true, stationary: true }
       } else if (wanderCycle === 1) {
         // Walking to social spot
         return {
           x: desk.x + (socialSpot.x - desk.x) * t,
           y: desk.y - 20 + (socialSpot.y - desk.y + 10) * t,
           atDesk: false,
+          stationary: false,
         }
       } else if (wanderCycle === 2) {
         // At social spot
         const bob = Math.sin(phase + index) * 2
-        return { x: socialSpot.x + (index % 2 === 0 ? -20 : 20), y: socialSpot.y + bob, atDesk: false }
+        return { x: socialSpot.x + (index % 2 === 0 ? -20 : 20), y: socialSpot.y + bob, atDesk: false, stationary: true }
       } else {
         // Walking back
         const socialSpotBack = SOCIAL_SPOTS[(index + Math.floor(tick / 60)) % SOCIAL_SPOTS.length]
@@ -252,12 +271,13 @@ export function OfficeView({
           x: socialSpotBack.x + (desk.x - socialSpotBack.x) * t,
           y: socialSpotBack.y + (desk.y - 20 - socialSpotBack.y) * t,
           atDesk: false,
+          stationary: false,
         }
       }
     }
 
     // Active/spawning agents stay at desk
-    return { x: desk.x, y: desk.y - 20, atDesk: true }
+    return { x: desk.x, y: desk.y - 20, atDesk: true, stationary: true }
   })
 
   return (
@@ -265,8 +285,8 @@ export function OfficeView({
       {/* Header bar */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white/80 px-4 py-2 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-neutral-900 dark:text-white">ClawSuite Office</span>
-          <span className="text-[11px] text-neutral-500 dark:text-slate-400">{agentRows.length} agents · {activeCount} working · {sessionCount} sessions</span>
+          <span className="text-sm font-semibold text-neutral-900 dark:text-white md:text-base">ClawSuite Office</span>
+          <span className="truncate text-[11px] text-neutral-500 dark:text-slate-400">{agentRows.length} agents · {activeCount} working · {sessionCount} sessions</span>
         </div>
         <div className="flex items-center gap-2">
           {missionRunning ? (
@@ -282,14 +302,77 @@ export function OfficeView({
         </div>
       </div>
 
-      {/* Office canvas */}
-      <div className={cn('relative flex-1 overflow-hidden', !compact && 'min-h-[440px]')}>
+      {/* Mobile: compact list instead of desk grid */}
+      <div className="flex-1 overflow-y-auto p-3 md:hidden">
+        <div className="space-y-2">
+          {agentRows.map((agent, index) => {
+            const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+            const statusMeta = getAgentStatusMeta(agent.status)
+            const emoji = getAgentEmoji(agent)
+            return (
+              <button
+                key={`${agent.id}-mobile`}
+                type="button"
+                onClick={() => onViewOutput(agent.id)}
+                className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+              >
+                <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-full', accent.avatar)}>
+                  {emoji ? (
+                    <span className="text-base leading-none" aria-hidden>{emoji}</span>
+                  ) : (
+                    <AgentAvatar index={index % 10} color={accent.hex} size={22} />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{agent.name}</p>
+                  <p className="truncate text-xs text-neutral-500 dark:text-slate-400">{getOfficeModelLabel(agent.modelId)}</p>
+                </div>
+                <span className={cn('shrink-0 text-xs font-semibold', statusMeta.className)}>{statusMeta.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Desktop office canvas */}
+      <div className={cn('relative hidden flex-1 overflow-hidden md:flex', !compact && 'min-h-[440px]')}>
+        <style>{`
+          @keyframes office-idle-float {
+            0%, 100% { transform: translateY(-3px); }
+            50% { transform: translateY(3px); }
+          }
+          @keyframes office-status-glow-green {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.38), 0 0 14px 2px rgba(16, 185, 129, 0.3); }
+            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0), 0 0 22px 6px rgba(16, 185, 129, 0.38); }
+          }
+          @keyframes office-status-glow-amber {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.32), 0 0 12px 2px rgba(245, 158, 11, 0.26); }
+            50% { box-shadow: 0 0 0 7px rgba(245, 158, 11, 0), 0 0 18px 4px rgba(245, 158, 11, 0.34); }
+          }
+          @keyframes office-status-glow-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.34), 0 0 12px 2px rgba(239, 68, 68, 0.3); }
+            50% { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0), 0 0 19px 5px rgba(239, 68, 68, 0.36); }
+          }
+          .office-agent-stationary {
+            animation: office-idle-float 3s ease-in-out infinite;
+          }
+          .office-status-glow-active {
+            animation: office-status-glow-green 2.2s ease-in-out infinite;
+          }
+          .office-status-glow-idle {
+            animation: office-status-glow-amber 2.6s ease-in-out infinite;
+          }
+          .office-status-glow-error {
+            animation: office-status-glow-red 2.2s ease-in-out infinite;
+          }
+        `}</style>
+
         {/* Floor pattern */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-40 dark:opacity-20"
+          className="pointer-events-none absolute inset-0 opacity-30 dark:opacity-20"
           style={{
-            backgroundImage: 'radial-gradient(circle at 1px 1px, #cbd5e1 1px, transparent 0)',
-            backgroundSize: '24px 24px',
+            backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(148,163,184,0.35) 1px, transparent 0)',
+            backgroundSize: '26px 26px',
           }}
         />
 
@@ -300,7 +383,7 @@ export function OfficeView({
           aria-hidden
         >
           {/* Floor zones */}
-          <rect x="80" y="140" width="680" height="420" rx="16" fill="#f8fafc" fillOpacity="0.5" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" className="dark:fill-slate-800/30 dark:stroke-slate-700" />
+          <rect x="80" y="140" width="680" height="420" rx="16" fill="#f8fafc" fillOpacity="0.34" stroke="#e4ecf4" strokeWidth="0.8" className="dark:fill-slate-800/20 dark:stroke-slate-700/60" />
 
           {/* Social zone labels */}
           <text x="880" y="110" fontSize="9" fill="#94a3b8" textAnchor="middle" fontWeight="600" className="uppercase">Break Area</text>
@@ -329,17 +412,14 @@ export function OfficeView({
         {agentRows.map((agent, index) => {
           const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
           const pos = agentPositions[index]
+          const emoji = getAgentEmoji(agent)
           const isSelected = agent.id === selectedOutputAgentId
           const isActive = agent.status === 'active'
           const isIdle = agent.status === 'idle' || agent.status === 'ready'
           const statusMeta = getAgentStatusMeta(agent.status)
-          const agentPhase = phase + index * 1.2
-          const bob = isActive ? Math.sin(agentPhase * 3) * 1.5 : Math.sin(agentPhase * 1.5) * 2
           const speechLine = getSpeechLine(agent, tick + index * 7)
           const showSpeech = Boolean(speechLine) && ((tick + index * 3) % 8 < 6)
-
-          const left = `${(pos.x / sceneW) * 100}%`
-          const top = `${((pos.y + bob) / sceneH) * 100}%`
+          const movementTransform = `translate3d(${pos.x}px, ${pos.y}px, 0) translate(-50%, -50%)`
 
           return (
             <button
@@ -347,30 +427,50 @@ export function OfficeView({
               type="button"
               onClick={() => onViewOutput(agent.id)}
               className={cn(
-                'group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-xl px-2 py-1.5 transition-all duration-300',
-                'hover:-translate-y-[calc(50%+2px)] hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400',
-                isSelected
-                  ? 'bg-white/95 shadow-lg ring-2 ring-orange-300 dark:bg-slate-800/95'
-                  : 'bg-white/70 hover:bg-white/90 hover:shadow-md dark:bg-slate-800/50 dark:hover:bg-slate-800/80',
+                'group absolute z-10 flex flex-col items-center rounded-xl bg-transparent px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400',
+                isSelected && 'ring-2 ring-orange-300/80',
               )}
-              style={{ left, top }}
+              style={{
+                left: 0,
+                top: 0,
+                transform: movementTransform,
+                transition: 'transform 0.8s ease-in-out',
+              }}
               title={`${agent.name} · ${statusMeta.label}`}
             >
               {/* Speech bubble */}
               {showSpeech ? (
-                <span className="mb-1 max-w-[140px] rounded-lg border border-neutral-200 bg-white px-2 py-1 text-[9px] leading-snug text-neutral-700 shadow-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200">
-                  {speechLine}
+                <span className="pointer-events-none relative mb-2 max-w-[180px] rounded-lg bg-white px-3 py-1.5 text-xs leading-snug text-neutral-700 shadow-lg dark:bg-slate-800 dark:text-slate-200">
+                  <span className="block truncate">{speechLine}</span>
+                  <span className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-white dark:bg-slate-800" />
                 </span>
               ) : null}
 
               {/* Avatar */}
-              <div className="relative">
-                <div style={{ transform: `scale(${isActive ? 1.05 : 1})`, transition: 'transform 0.3s' }}>
-                  <AgentAvatar
-                    index={index % 10}
-                    color={accent.hex}
-                    size={isActive ? 44 : 38}
-                  />
+              <div
+                className={cn(
+                  'relative rounded-full transition-transform duration-300 group-hover:scale-105',
+                  getAgentStatusGlowClass(agent.status),
+                )}
+              >
+                <div
+                  className={cn(
+                    'flex items-center justify-center rounded-full bg-transparent',
+                    pos.stationary && 'office-agent-stationary',
+                  )}
+                  style={{ width: isActive ? 46 : 40, height: isActive ? 46 : 40 }}
+                >
+                  {emoji ? (
+                    <span className="select-none leading-none" style={{ fontSize: isActive ? 30 : 26 }} aria-hidden>
+                      {emoji}
+                    </span>
+                  ) : (
+                    <AgentAvatar
+                      index={index % 10}
+                      color={accent.hex}
+                      size={isActive ? 44 : 38}
+                    />
+                  )}
                 </div>
                 {/* Status dot */}
                 <span className={cn(
@@ -404,7 +504,7 @@ export function OfficeView({
 
       {/* Footer — hidden in compact mode */}
       {!compact ? (
-        <div className="flex items-center justify-between border-t border-neutral-200 bg-white/80 px-4 py-2 text-[11px] text-neutral-500 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
+        <div className="hidden items-center justify-between border-t border-neutral-200 bg-white/80 px-4 py-2 text-[11px] text-neutral-500 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400 md:flex">
           <span>{agentRows.length}/{DESK_POSITIONS.length} desks occupied</span>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> Working</span>

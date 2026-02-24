@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
+import type { ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -61,6 +62,17 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
   { id: 'notifications', label: 'Notifications', icon: Notification03Icon },
   { id: 'advanced', label: 'Advanced', icon: CloudIcon },
 ]
+
+const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
+  'ops-dark',
+  'premium-dark',
+  'sunset-brand',
+])
+
+function isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
+  if (!theme) return false
+  return DARK_ENTERPRISE_THEMES.has(theme as ThemeId)
+}
 
 // ── Shared building blocks ──────────────────────────────────────────────
 
@@ -254,12 +266,19 @@ function AppearanceContent() {
     
     // If user switches to light/dark via the standard toggle, update enterprise theme too
     const currentEnterpriseTheme = localStorage.getItem('clawsuite-theme')
-    if (theme === 'light' && currentEnterpriseTheme && currentEnterpriseTheme.includes('dark')) {
+    if (
+      theme === 'light' &&
+      currentEnterpriseTheme &&
+      isDarkEnterpriseTheme(currentEnterpriseTheme)
+    ) {
       // Switch to Paper Light when going light
       const html = document.documentElement
       html.setAttribute('data-theme', 'paper-light')
       localStorage.setItem('clawsuite-theme', 'paper-light')
-    } else if (theme === 'dark' && (!currentEnterpriseTheme || !currentEnterpriseTheme.includes('dark'))) {
+    } else if (
+      theme === 'dark' &&
+      (!currentEnterpriseTheme || !isDarkEnterpriseTheme(currentEnterpriseTheme))
+    ) {
       // Switch to Ops Dark when going dark (default)
       const html = document.documentElement
       html.setAttribute('data-theme', 'ops-dark')
@@ -331,24 +350,31 @@ function AppearanceContent() {
 const ENTERPRISE_THEMES = [
   {
     id: 'paper-light',
-    label: 'Paper Light',
+    label: 'Clean',
     icon: '☀️',
-    desc: 'Warm white, gentle shadows',
-    preview: { bg: '#fefdfb', panel: '#faf9f7', border: '#e8e5df', accent: '#ea580c', text: '#1c1917' },
+    desc: 'Warm gray canvas with white cards',
+    preview: { bg: '#f5f5f5', panel: '#ffffff', border: '#e5e5e5', accent: '#f97316', text: '#1a1a1a' },
   },
   {
     id: 'ops-dark',
-    label: 'Ops Dark',
+    label: 'Slate',
     icon: '🖥️',
-    desc: 'Cold blue-steel, Grafana/Datadog',
-    preview: { bg: '#080c14', panel: '#0e1420', border: '#1e3a5f', accent: '#3b82f6', text: '#c8d8f0' },
+    desc: 'Deep slate with teal secondary glow',
+    preview: { bg: '#1e1e2e', panel: '#2a2a3e', border: '#3a3a4e', accent: '#14b8a6', text: '#e5e5e5' },
   },
   {
     id: 'premium-dark',
-    label: 'Premium Dark',
+    label: 'Midnight',
     icon: '✨',
-    desc: 'Deep zinc, violet glow, Linear',
-    preview: { bg: '#05050a', panel: '#131319', border: '#2a1f4a', accent: '#7c6fdd', text: '#f0eeff' },
+    desc: 'OLED true black with high contrast',
+    preview: { bg: '#000000', panel: '#0a0a0a', border: '#1a1a1a', accent: '#f97316', text: '#f5f5f5' },
+  },
+  {
+    id: 'sunset-brand',
+    label: 'Sunset',
+    icon: '🌇',
+    desc: 'Warm brown brand immersion',
+    preview: { bg: '#1a0e05', panel: '#2a1a0e', border: '#6b3c1b', accent: '#f59e0b', text: '#ffe7d1' },
   },
 ] as const
 
@@ -378,13 +404,16 @@ function EnterpriseThemePicker() {
   const { updateSettings } = useSettings()
   const [current, setCurrent] = useState(() => {
     if (typeof window === 'undefined') return 'paper-light'
-    return localStorage.getItem('clawsuite-theme') || 'paper-light'
+    const stored = localStorage.getItem('clawsuite-theme')
+    return ENTERPRISE_THEMES.some((theme) => theme.id === stored)
+      ? stored
+      : 'paper-light'
   })
 
-  function applyEnterpriseTheme(id: string) {
+  function applyEnterpriseTheme(id: ThemeId) {
     const html = document.documentElement
     html.setAttribute('data-theme', id)
-    if (id.includes('dark')) {
+    if (DARK_ENTERPRISE_THEMES.has(id)) {
       html.classList.add('dark')
       html.classList.remove('light')
       // Sync with settings store
@@ -400,7 +429,7 @@ function EnterpriseThemePicker() {
   }
 
   return (
-    <div className="grid grid-cols-3 gap-2 w-full">
+    <div className="grid w-full grid-cols-2 gap-2 md:grid-cols-4">
       {ENTERPRISE_THEMES.map((t) => {
         const isActive = current === t.id
         return (

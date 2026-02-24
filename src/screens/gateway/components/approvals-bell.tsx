@@ -1,18 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { ApprovalRequest } from '../lib/approvals-store'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type ApprovalsBellProps = {
   approvals: ApprovalRequest[]
-  onApprove: (id: string) => void
-  onDeny: (id: string) => void
+  onApprove: (id: string) => Promise<boolean> | void
+  onDeny: (id: string) => Promise<boolean> | void
 }
-
-// ── Helper ────────────────────────────────────────────────────────────────────
 
 function timeAgo(ms: number): string {
   const delta = Math.max(0, Date.now() - ms)
@@ -23,136 +19,51 @@ function timeAgo(ms: number): string {
   return `${Math.floor(m / 60)}h ago`
 }
 
-// ── ApprovalCard ──────────────────────────────────────────────────────────────
-
-function ApprovalCard({
-  approval,
-  onApprove,
-  onDeny,
-}: {
-  approval: ApprovalRequest
-  onApprove: () => void
-  onDeny: () => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const isGateway = approval.source === 'gateway'
-
-  return (
-    <div
-      className={cn(
-        'rounded-xl border p-3 transition-all',
-        isGateway
-          ? 'border-violet-200/60 bg-violet-50/40 dark:border-violet-500/20 dark:bg-violet-900/10'
-          : 'border-amber-200/70 bg-amber-50/50 dark:border-amber-500/20 dark:bg-amber-900/10',
-      )}
-    >
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span
-              className={cn(
-                'rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
-                isGateway
-                  ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
-                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-              )}
-            >
-              {isGateway ? '⚡ Gateway' : '🤖 Agent'}
-            </span>
-            <span className="truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100">
-              {approval.agentName}
-            </span>
-            <span className="ml-auto shrink-0 text-[10px] text-neutral-400">
-              {timeAgo(approval.requestedAt)}
-            </span>
-          </div>
-
-          {/* Action summary */}
-          <p
-            className={cn(
-              'mt-1.5 text-[11px] leading-snug text-neutral-700 dark:text-neutral-300',
-              expanded ? '' : 'line-clamp-2',
-            )}
-          >
-            {approval.action}
-          </p>
-
-          {/* Context (expanded) */}
-          {expanded && approval.context && approval.context !== approval.action ? (
-            <div className="mt-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 p-2">
-              <p className="font-mono text-[10px] leading-relaxed text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap break-words">
-                {approval.context}
-              </p>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Action row */}
-      <div className="mt-2.5 flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={onApprove}
-          className="flex-1 rounded-lg bg-emerald-500 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-600 active:bg-emerald-700"
-        >
-          ✓ Approve
-        </button>
-        <button
-          type="button"
-          onClick={onDeny}
-          className="flex-1 rounded-lg border border-red-200 bg-white dark:border-red-800/50 dark:bg-neutral-800 py-1.5 text-[11px] font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
-        >
-          ✕ Deny
-        </button>
-        {(approval.context && approval.context.length > 60) ? (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="shrink-0 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-[11px] font-medium text-neutral-500 dark:text-neutral-400 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-700"
-            title={expanded ? 'Collapse' : 'Read more'}
-          >
-            {expanded ? '↑' : '···'}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-// ── ApprovalsBell ─────────────────────────────────────────────────────────────
-
 export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellProps) {
   const [open, setOpen] = useState(false)
-  const [prevCount, setPrevCount] = useState(0)
   const [pulse, setPulse] = useState(false)
+  const [prevCount, setPrevCount] = useState(0)
+  const [actingIds, setActingIds] = useState<Record<string, 'approve' | 'deny'>>({})
   const ref = useRef<HTMLDivElement>(null)
 
-  const pending = approvals.filter((a) => a.status === 'pending')
+  const pending = useMemo(
+    () => approvals.filter((entry) => entry.status === 'pending').sort((a, b) => b.requestedAt - a.requestedAt),
+    [approvals],
+  )
   const count = pending.length
+  const latestThree = pending.slice(0, 3)
 
-  // Pulse animation when new approvals arrive
   useEffect(() => {
-    if (count > prevCount && prevCount >= 0) {
+    if (count > prevCount) {
       setPulse(true)
-      const t = window.setTimeout(() => setPulse(false), 1200)
-      return () => window.clearTimeout(t)
+      const timer = window.setTimeout(() => setPulse(false), 1200)
+      setPrevCount(count)
+      return () => window.clearTimeout(timer)
     }
     setPrevCount(count)
   }, [count, prevCount])
 
-  // Auto-open when first approval arrives
   useEffect(() => {
-    if (count > 0 && prevCount === 0) {
-      setOpen(true)
+    if (count === 0) {
+      setOpen(false)
+      setActingIds({})
+      return
     }
-  }, [count, prevCount])
 
-  // Click-outside to close
+    setActingIds((current) => {
+      const pendingIds = new Set(pending.map((entry) => entry.id))
+      const next: Record<string, 'approve' | 'deny'> = {}
+      for (const [id, action] of Object.entries(current)) {
+        if (pendingIds.has(id)) next[id] = action
+      }
+      return next
+    })
+  }, [count, pending])
+
   useEffect(() => {
     if (!open) return
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+    const handler = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
         setOpen(false)
       }
     }
@@ -160,143 +71,133 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  const hasGateway = pending.some((a) => a.source === 'gateway')
-  const hasAgent = pending.some((a) => a.source !== 'gateway')
+  async function handleQuickAction(id: string, action: 'approve' | 'deny') {
+    setActingIds((current) => ({ ...current, [id]: action }))
+    try {
+      if (action === 'approve') {
+        await Promise.resolve(onApprove(id))
+      } else {
+        await Promise.resolve(onDeny(id))
+      }
+    } finally {
+      setActingIds((current) => {
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+    }
+  }
 
   return (
     <div ref={ref} className="relative">
-      {/* Bell button */}
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen((value) => !value)}
         className={cn(
-          'relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all',
+          'relative flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all',
           count > 0
             ? open
-              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-              : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 dark:hover:bg-amber-900/30'
-            : 'text-neutral-500 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 hover:text-neutral-700 dark:hover:text-neutral-200',
+              ? 'border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+              : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/30'
+            : 'border-neutral-200 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200',
           pulse && 'ring-2 ring-amber-400/50',
         )}
         aria-label={`Approvals${count > 0 ? ` — ${count} pending` : ''}`}
       >
-        {/* Animated ring when new */}
         {pulse ? (
-          <span className="absolute inset-0 rounded-lg animate-ping border-2 border-amber-400 opacity-30 pointer-events-none" />
+          <span className="pointer-events-none absolute inset-0 animate-ping rounded-lg border-2 border-amber-400 opacity-30" />
         ) : null}
 
-        <span aria-hidden className="text-sm leading-none">
-          {count > 0 ? '🔔' : '🔕'}
-        </span>
+        <span aria-hidden className="text-sm leading-none">{count > 0 ? '🔔' : '🔕'}</span>
         <span className="hidden sm:inline">Approvals</span>
 
         {count > 0 ? (
-          <span className="flex items-center justify-center rounded-full bg-amber-500 min-w-[18px] h-[18px] px-1 text-[9px] font-bold text-white leading-none">
+          <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-none text-white">
             {count > 99 ? '99+' : count}
-          </span>
-        ) : null}
-
-        {/* Source type pills */}
-        {count > 0 ? (
-          <span className="hidden md:flex items-center gap-0.5">
-            {hasGateway ? (
-              <span className="rounded-full bg-violet-100 dark:bg-violet-900/40 px-1 text-[8px] font-semibold text-violet-700 dark:text-violet-300">GW</span>
-            ) : null}
-            {hasAgent ? (
-              <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-1 text-[8px] font-semibold text-amber-700 dark:text-amber-300">AG</span>
-            ) : null}
           </span>
         ) : null}
       </button>
 
-      {/* Dropdown panel */}
       {open ? (
         <div
           className={cn(
-            'absolute right-0 top-full mt-2 z-50 w-[360px] max-h-[480px] flex flex-col',
-            'rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900',
-            'shadow-[0_8px_30px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)]',
-            'overflow-hidden',
+            'absolute right-0 top-full z-50 mt-2 flex w-[360px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white',
+            'shadow-[0_8px_30px_rgba(0,0,0,0.15)] dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)]',
           )}
           role="dialog"
           aria-label="Pending approvals"
         >
-          {/* Panel header */}
-          <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                Approvals
+              <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Approvals</span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                {count} pending
               </span>
-              {count > 0 ? (
-                <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
-                  {count} pending
-                </span>
-              ) : null}
             </div>
-            <div className="flex items-center gap-2">
-              {hasGateway ? (
-                <span className="flex items-center gap-1 text-[10px] text-neutral-400">
-                  <span className="size-1.5 rounded-full bg-violet-400" /> Gateway
-                </span>
-              ) : null}
-              {hasAgent ? (
-                <span className="flex items-center gap-1 text-[10px] text-neutral-400">
-                  <span className="size-1.5 rounded-full bg-amber-400" /> Agents
-                </span>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-md p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
-                aria-label="Close"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-md p-0.5 text-neutral-400 transition-colors hover:text-neutral-600 dark:hover:text-neutral-200"
+              aria-label="Close"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
 
-          {/* Approval list */}
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-            {pending.length === 0 ? (
+          <div className="max-h-[420px] flex-1 space-y-2 overflow-y-auto p-3">
+            {latestThree.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
-                <span className="text-2xl mb-2">🛡️</span>
+                <span className="mb-2 text-2xl">🛡️</span>
                 <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">All clear</p>
-                <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">No pending approvals</p>
+                <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">No pending approvals</p>
               </div>
             ) : (
-              pending.map((approval) => (
-                <ApprovalCard
-                  key={approval.id}
-                  approval={approval}
-                  onApprove={() => { onApprove(approval.id); }}
-                  onDeny={() => { onDeny(approval.id); }}
-                />
-              ))
+              latestThree.map((approval) => {
+                const busy = actingIds[approval.id]
+                return (
+                  <article
+                    key={approval.id}
+                    className={cn(
+                      'rounded-lg border p-3',
+                      approval.source === 'gateway'
+                        ? 'border-violet-200/60 bg-violet-50/40 dark:border-violet-500/20 dark:bg-violet-900/10'
+                        : 'border-amber-200/70 bg-amber-50/50 dark:border-amber-500/20 dark:bg-amber-900/10',
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100">{approval.agentName}</p>
+                      <span className="shrink-0 text-[10px] text-neutral-400">{timeAgo(approval.requestedAt)}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-[11px] text-neutral-700 dark:text-neutral-300">{approval.action}</p>
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => void handleQuickAction(approval.id, 'approve')}
+                        disabled={Boolean(busy)}
+                        className="flex-1 rounded-lg bg-emerald-500 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {busy === 'approve' ? 'Approving...' : 'Approve'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleQuickAction(approval.id, 'deny')}
+                        disabled={Boolean(busy)}
+                        className="flex-1 rounded-lg border border-red-200 bg-white py-1.5 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-800/50 dark:bg-neutral-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                      >
+                        {busy === 'deny' ? 'Denying...' : 'Deny'}
+                      </button>
+                    </div>
+                  </article>
+                )
+              })
             )}
           </div>
 
-          {/* Footer */}
-          {pending.length > 0 ? (
-            <div className="border-t border-neutral-200 dark:border-neutral-700 px-4 py-2.5 flex items-center justify-between">
-              <span className="text-[10px] text-neutral-400">Agents await your decision</span>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => { pending.forEach((a) => onApprove(a.id)); }}
-                  className="rounded-lg bg-emerald-500 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-600 transition-colors"
-                >
-                  ✓ Approve All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { pending.forEach((a) => onDeny(a.id)); }}
-                  className="rounded-lg border border-red-200 dark:border-red-800/50 bg-white dark:bg-neutral-800 px-2.5 py-1 text-[10px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                >
-                  ✕ Deny All
-                </button>
-              </div>
+          {count > latestThree.length ? (
+            <div className="border-t border-neutral-200 px-4 py-2 text-[10px] text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+              +{count - latestThree.length} more pending in Approvals tab
             </div>
           ) : null}
         </div>

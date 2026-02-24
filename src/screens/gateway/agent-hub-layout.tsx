@@ -2086,6 +2086,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [expandedMissionCardId, setExpandedMissionCardId] = useState<string | null>(null)
   const [maximizedMissionId, setMaximizedMissionId] = useState<string | null>(null)
   const [_view, setView] = useState<'board' | 'timeline'>('board')
+  const [missionSubTab, setMissionSubTab] = useState<'overview' | 'active' | 'history'>('overview')
   const [missionState, setMissionState] = useState<'running' | 'paused' | 'stopped'>(
     'stopped',
   )
@@ -5840,13 +5841,41 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       { key: 'review', title: 'Review', subtitle: 'Completed, awaiting review', cards: reviewCards, accent: 'bg-blue-500', tint: 'bg-blue-50/30', emptyIcon: '👁️', emptyText: 'Completed missions appear here for review' },
       { key: 'done', title: 'Done', subtitle: 'Archived mission reports', cards: doneCards, accent: 'bg-amber-500', tint: 'bg-amber-50/30', emptyIcon: '🏆', emptyText: 'Archived missions and reports' },
     ]
+    const missionSubTabs: Array<{ id: 'overview' | 'active' | 'history'; label: string }> = [
+      { id: 'overview', label: 'Overview' },
+      { id: 'active', label: 'Active Mission' },
+      { id: 'history', label: 'History' },
+    ]
+    const historyCards = missionHistory.map((cp) => {
+      const completedTasks = cp.tasks.filter((t) => t.status === 'done' || t.status === 'completed').length
+      const totalTasks = cp.tasks.length
+      const derivedStatus = cp.status === 'aborted'
+        ? 'aborted'
+        : completedTasks >= totalTasks && totalTasks > 0
+          ? 'done'
+          : 'partial'
+      const statusClassName = derivedStatus === 'done'
+        ? 'border-emerald-400'
+        : derivedStatus === 'aborted'
+          ? 'border-red-400'
+          : 'border-amber-400'
+      return {
+        id: cp.id,
+        status: derivedStatus,
+        statusClassName,
+        title: truncateMissionGoal(cp.label, 96),
+        subtitle: `${completedTasks}/${totalTasks} tasks`,
+        updatedAt: cp.completedAt ?? cp.updatedAt,
+      }
+    })
+    const runningAgents = agentWorkingRows.filter((row) => row.status === 'active').length
 
     return (
       <div className="relative flex h-full min-h-0 flex-col bg-neutral-50 dark:bg-[var(--theme-bg,#0b0e14)]">
-        <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/90">
           <div>
-            <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Mission Board</h2>
-            <p className="text-[11px] text-neutral-500 dark:text-slate-400">Kanban view for mission planning and execution</p>
+            <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Mission Timeline</h2>
+            <p className="text-[11px] text-neutral-500 dark:text-slate-400">Execution flow with active and historical mission context</p>
           </div>
           <button
             type="button"
@@ -5857,35 +5886,177 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
-          <div className="grid min-w-[320px] grid-cols-1 gap-4 sm:min-w-[640px] sm:grid-cols-2 lg:min-w-[1080px] lg:grid-cols-4">
-            {columns.map((column) => (
-              <section
-                key={column.key}
-                className={cn('flex min-h-[560px] flex-col rounded-2xl border border-neutral-200 p-3.5 shadow-sm dark:border-slate-700', column.tint || 'bg-white/90 dark:bg-[var(--theme-card,#161b27)]')}
+        <div className="border-b border-neutral-200 bg-gradient-to-r from-white via-orange-50/40 to-amber-50/40 px-4 py-2.5 dark:border-slate-700 dark:from-slate-900/80 dark:via-slate-900/70 dark:to-slate-900/80">
+          <div className="relative inline-flex rounded-full border border-neutral-200 bg-white/80 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
+            <span
+              className={cn(
+                'absolute top-1 bottom-1 rounded-full bg-orange-100 transition-all duration-300 ease-out dark:bg-orange-900/40',
+                missionSubTab === 'overview' && 'left-1 w-[calc(33.333%-4px)]',
+                missionSubTab === 'active' && 'left-[calc(33.333%+1px)] w-[calc(33.333%-4px)]',
+                missionSubTab === 'history' && 'left-[calc(66.666%+2px)] w-[calc(33.333%-4px)]',
+              )}
+            />
+            {missionSubTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setMissionSubTab(tab.id)}
+                className={cn(
+                  'relative z-10 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:px-4',
+                  missionSubTab === tab.id
+                    ? 'text-orange-700 dark:text-orange-300'
+                    : 'text-neutral-500 hover:text-neutral-800 dark:text-slate-400 dark:hover:text-slate-200',
+                )}
               >
-                <div className="mb-3.5">
-                  <div className="flex items-center gap-2">
-                    <span className={cn('h-2 w-2 rounded-full', column.accent)} />
-                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">{column.title}</h3>
-                    <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600 dark:text-slate-400">
-                      {column.cards.length}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[10px] text-neutral-500 dark:text-slate-400">{column.subtitle}</p>
-                </div>
-
-                <div className="flex-1 space-y-3.5">
-                  {column.cards.length > 0 ? column.cards : (
-                    <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-200 bg-white/60 text-center">
-                      <span className="text-2xl">{column.emptyIcon}</span>
-                      <p className="text-xs text-neutral-400">{column.emptyText}</p>
-                    </div>
-                  )}
-                </div>
-              </section>
+                {tab.label}
+              </button>
             ))}
           </div>
+        </div>
+
+        <div className="flex-1 overflow-auto p-4">
+          {missionSubTab === 'overview' ? (
+            <div className="relative pl-5">
+              <div className="absolute bottom-0 left-[9px] top-1 w-px bg-gradient-to-b from-orange-200 via-neutral-200 to-transparent dark:from-orange-700/50 dark:via-slate-700 dark:to-transparent" />
+              <div className="space-y-5">
+                {columns.map((column) => (
+                  <section key={column.key} className="relative">
+                    <span className={cn('absolute -left-5 top-5 size-2.5 rounded-full ring-4 ring-white dark:ring-slate-900', column.accent)} />
+                    <div className={cn('rounded-2xl border border-neutral-200 p-3.5 shadow-sm dark:border-slate-700', column.tint || 'bg-white/90 dark:bg-[var(--theme-card,#161b27)]')}>
+                      <div className="mb-3.5 flex items-center justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">{column.title}</h3>
+                          <p className="mt-1 text-[10px] text-neutral-500 dark:text-slate-400">{column.subtitle}</p>
+                        </div>
+                        <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600 dark:bg-slate-800 dark:text-slate-400">
+                          {column.cards.length}
+                        </span>
+                      </div>
+                      <div className="space-y-3.5">
+                        {column.cards.length > 0 ? column.cards : (
+                          <div className="flex h-24 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-neutral-200 bg-white/60 text-center dark:border-slate-700 dark:bg-slate-800/30">
+                            <span className="text-xl">{column.emptyIcon}</span>
+                            <p className="text-xs text-neutral-400">{column.emptyText}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {missionSubTab === 'active' ? (
+            missionActive ? (
+              <div className="space-y-4">
+                <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Now Running</p>
+                      <h3 className="mt-1 text-base font-semibold text-neutral-900 dark:text-white">{activeMissionName || 'Untitled mission'}</h3>
+                      <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">{activeMissionGoal || missionGoal}</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => void handleMissionPause(false)} className="rounded-md bg-emerald-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-600">Start</button>
+                      <button type="button" onClick={() => void handleMissionPause(true)} className="rounded-md bg-amber-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-600">Pause</button>
+                      <button type="button" onClick={() => stopMissionAndCleanup('aborted')} className="rounded-md bg-red-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-red-600">Stop</button>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <div className="mb-1.5 flex items-center justify-between text-[11px] text-neutral-500 dark:text-slate-400">
+                      <span>{runningTaskStats.completed}/{runningTaskStats.total} tasks complete</span>
+                      <span>{runningElapsed}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-neutral-100 dark:bg-slate-800">
+                      <div className="h-2 rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.max(6, runningProgressPct)}%` }} />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-neutral-900 dark:text-white">Agent Status</p>
+                    <p className="text-[11px] text-neutral-500 dark:text-slate-400">{runningAgents}/{team.length} active</p>
+                  </div>
+                  <div className="space-y-2">
+                    {agentWorkingRows.length === 0 ? (
+                      <p className="text-xs text-neutral-500 dark:text-slate-400">No active agent sessions yet.</p>
+                    ) : (
+                      agentWorkingRows.map((row) => (
+                        <div key={row.id} className="flex items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              'size-2 rounded-full',
+                              row.status === 'active' && 'bg-emerald-500 animate-pulse',
+                              row.status === 'paused' && 'bg-amber-500',
+                              row.status === 'error' && 'bg-red-500',
+                              row.status === 'idle' && 'bg-blue-500',
+                              !['active', 'paused', 'error', 'idle'].includes(row.status) && 'bg-neutral-400',
+                            )} />
+                            <span className="text-xs font-medium text-neutral-800 dark:text-slate-100">{row.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => _handleSetAgentPaused(row.id, row.status !== 'paused')}
+                              className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[10px] font-medium text-neutral-600 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                            >
+                              {row.status === 'paused' ? 'Resume' : 'Pause'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setSteerAgentId(row.id); setSteerInput('') }}
+                              className="rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-[10px] font-medium text-orange-700 hover:bg-orange-100"
+                            >
+                              Steer
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+              </div>
+            ) : (
+              <div className="flex h-full min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/70 text-center dark:border-slate-700 dark:bg-slate-900/30">
+                <p className="text-sm text-neutral-500 dark:text-slate-400">No active mission. Launch one to view live timeline progress.</p>
+              </div>
+            )
+          ) : null}
+
+          {missionSubTab === 'history' ? (
+            <div className="space-y-3">
+              {historyCards.length === 0 ? (
+                <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/70 text-sm text-neutral-500 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-400">
+                  No mission history yet.
+                </div>
+              ) : (
+                historyCards.map((entry) => (
+                  <article
+                    key={entry.id}
+                    className={cn('rounded-xl border border-neutral-200 border-l-4 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]', entry.statusClassName)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-neutral-900 dark:text-white">{entry.title}</p>
+                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{entry.subtitle}</p>
+                      </div>
+                      <span className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
+                        entry.status === 'done' && 'bg-emerald-100 text-emerald-700',
+                        entry.status === 'aborted' && 'bg-red-100 text-red-700',
+                        entry.status === 'partial' && 'bg-amber-100 text-amber-700',
+                      )}>
+                        {entry.status}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-[11px] text-neutral-500 dark:text-slate-400">Updated {timeAgoFromMs(entry.updatedAt)}</p>
+                  </article>
+                ))
+              )}
+            </div>
+          ) : null}
         </div>
 
         {missionBoardModalOpen ? (
@@ -6389,7 +6560,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-5 py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+      <div
+        className={cn(
+          'flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 px-5 py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
+          isMobileHub
+            ? 'bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:bg-slate-900/70'
+            : 'bg-white dark:bg-slate-800',
+        )}
+      >
         <div className="flex min-w-0 items-baseline gap-2">
           <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-900 dark:text-white">Agent Hub</h1>
           <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
