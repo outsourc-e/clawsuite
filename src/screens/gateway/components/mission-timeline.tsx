@@ -6,7 +6,7 @@ import type { HubTask } from './task-board'
 type MissionTimelineProps = {
   tasks: HubTask[]
   agentOutputs: Map<string, string[]>
-  agentSessionMap?: Record<string, string>
+  agentSessionMap?: Record<string, string | null>
   agentStatuses: Map<string, { status: string; lastSeen: number }>
   missionState: string
   missionGoal: string
