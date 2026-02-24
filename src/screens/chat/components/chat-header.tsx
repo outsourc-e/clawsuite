@@ -125,15 +125,7 @@ function ChatHeaderComponent({
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
   const mobileTitle = formatMobileSessionTitle(activeTitle)
-  const statusLabel =
-    statusMode === 'tool'
-      ? `🔧 Using tool: ${activeToolName || 'Tool'}`
-      : statusMode === 'streaming'
-        ? '● Streaming'
-        : statusMode === 'sending'
-          ? '⚡ Sending...'
-          : 'Connected'
-  void _agentModel; void agentConnected // kept for prop compat
+  void _agentModel; void agentConnected; void statusMode; void activeToolName // kept for prop compat
 
   const handleRefresh = useCallback(() => {
     if (!onRefresh) return
@@ -232,10 +224,6 @@ function ChatHeaderComponent({
               <OrchestratorAvatar size={28} compact />
             </button>
           </div>
-        </div>
-        <div className="px-4 pb-1.5 text-[11px] text-primary-500 flex items-center gap-1.5">
-          <span className={cn('inline-block size-1.5 rounded-full', statusMode === 'streaming' ? 'bg-emerald-500 animate-pulse' : statusMode === 'sending' || statusMode === 'tool' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-400/70')} />
-          <span className="truncate">{statusLabel}</span>
         </div>
       </div>
     )
@@ -359,10 +347,6 @@ function ChatHeaderComponent({
             </TooltipRoot>
           </TooltipProvider>
         ) : null}
-      </div>
-      <div className="px-4 pb-1.5 text-[11px] text-primary-500 flex items-center gap-1.5">
-        <span className={cn('inline-block size-1.5 rounded-full', statusMode === 'streaming' ? 'bg-emerald-500 animate-pulse' : statusMode === 'sending' || statusMode === 'tool' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-400/70')} />
-        <span className="truncate">{statusLabel}</span>
       </div>
     </div>
   )
