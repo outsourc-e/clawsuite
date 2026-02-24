@@ -387,14 +387,16 @@ export function ChatScreen({
     isRealtimeStreaming,
   )
 
-  useEffect(() => {
-    if (!waitingForResponse) {
-      const timer = window.setTimeout(() => setLiveToolActivity([]), 800)
-      return () => window.clearTimeout(timer)
-    }
+  // Keep activity stream open persistently — opens on mount so it's ready
+  // before the first tool call fires (avoids connection latency gap).
+  const waitingForResponseRef = useRef(waitingForResponse)
+  useEffect(() => { waitingForResponseRef.current = waitingForResponse }, [waitingForResponse])
 
+  useEffect(() => {
     const events = new EventSource('/api/events')
     const onActivity = (event: MessageEvent) => {
+      // Only populate pills while waiting — but connection stays warm always
+      if (!waitingForResponseRef.current) return
       try {
         const payload = JSON.parse(event.data) as {
           type?: unknown
@@ -403,12 +405,10 @@ export function ChatScreen({
         if (payload.type !== 'tool' || typeof payload.title !== 'string') {
           return
         }
-
         const name = payload.title
           .replace(/^Tool activity:\s*/i, '')
           .trim()
         if (!name) return
-
         setLiveToolActivity((prev) => {
           const filtered = prev.filter((entry) => entry.name !== name)
           return [{ name, timestamp: Date.now() }, ...filtered].slice(0, 5)
@@ -417,12 +417,18 @@ export function ChatScreen({
         // Ignore malformed activity events.
       }
     }
-
     events.addEventListener('activity', onActivity)
     return () => {
       events.removeEventListener('activity', onActivity)
       events.close()
     }
+  }, []) // mount only — stays open for session lifetime
+
+  // Clear tool pills after response arrives (with brief delay so last pill is visible)
+  useEffect(() => {
+    if (waitingForResponse) return
+    const timer = window.setTimeout(() => setLiveToolActivity([]), 800)
+    return () => window.clearTimeout(timer)
   }, [waitingForResponse])
 
   useEffect(() => {
