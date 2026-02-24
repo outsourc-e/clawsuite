@@ -236,6 +236,7 @@ export function ChatScreen({
   >([])
   const streamTimer = useRef<number | null>(null)
   const streamIdleTimer = useRef<number | null>(null)
+  const failsafeTimerRef = useRef<number | null>(null)
   const lastAssistantSignature = useRef('')
   const refreshHistoryRef = useRef<() => void>(() => {})
   const retriedQueuedMessageKeysRef = useRef(new Set<string>())
@@ -573,6 +574,7 @@ export function ChatScreen({
     const streamingMsg = {
       role: 'assistant',
       content: [],
+      __optimisticId: 'streaming-current',
       __streamingStatus: 'streaming',
       __streamingText: realtimeStreamingText,
       __streamingThinking: realtimeStreamingThinking,
@@ -637,11 +639,19 @@ export function ChatScreen({
   useEffect(() => {
     return () => {
       streamStop()
+      if (failsafeTimerRef.current) {
+        window.clearTimeout(failsafeTimerRef.current)
+        failsafeTimerRef.current = null
+      }
     }
   }, [streamStop])
 
   const streamFinish = useCallback(() => {
     streamStop()
+    if (failsafeTimerRef.current) {
+      window.clearTimeout(failsafeTimerRef.current)
+      failsafeTimerRef.current = null
+    }
     setPendingGeneration(false)
     setWaitingForResponse(false)
   }, [streamStop])
@@ -721,61 +731,6 @@ export function ChatScreen({
       !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
   })
 
-  // Fast local auto-rename: title-case first 6 words of first user message,
-  // fires immediately when first assistant message arrives in an untitled session.
-  const fastTitleDoneRef = useRef(false)
-  // Reset on session change
-  useEffect(() => {
-    fastTitleDoneRef.current = false
-  }, [activeFriendlyId])
-  useEffect(() => {
-    if (isNewChat) return
-    if (fastTitleDoneRef.current) return
-    if (!resolvedSessionKey) return
-
-    // Only if session title is generic/empty
-    const sessionTitle = activeSession?.label ?? activeSession?.title ?? activeSession?.derivedTitle ?? ''
-    const isGeneric =
-      !sessionTitle ||
-      sessionTitle === 'New Session' ||
-      sessionTitle === 'New Chat' ||
-      /^(untitled|new session|new chat)$/i.test(sessionTitle.trim()) ||
-      /^[0-9a-f-]{8,}$/i.test(sessionTitle.trim())
-
-    if (!isGeneric) return
-
-    // Check if we have at least one assistant message
-    const hasAssistant = finalDisplayMessages.some((m) => m.role === 'assistant')
-    if (!hasAssistant) return
-
-    // Find the first user message
-    const firstUser = finalDisplayMessages.find((m) => m.role === 'user')
-    if (!firstUser) return
-
-    const userText = textFromMessage(firstUser).trim()
-    if (!userText) return
-
-    // Take first 6 words and title-case them
-    const words = userText.split(/\s+/).slice(0, 6)
-    const title = words
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(' ')
-      .replace(/[?!.,;:]+$/, '')
-
-    if (title.length < 3) return
-
-    fastTitleDoneRef.current = true
-    const key = resolvedSessionKey || activeSession?.key || activeSessionKey || ''
-    if (!key) return
-    void renameSession(key, activeSession?.friendlyId ?? null, title)
-  }, [
-    isNewChat,
-    resolvedSessionKey,
-    activeSession,
-    finalDisplayMessages,
-    activeSessionKey,
-    renameSession,
-  ])
 
   // Phase 4.1: Smart Model Suggestions
   const modelsQuery = useQuery({
@@ -1146,7 +1101,10 @@ export function ChatScreen({
 
     // Failsafe: clear waitingForResponse after 120s no matter what
     // Prevents infinite spinner if SSE/idle detection both fail
-    const failsafeTimer = window.setTimeout(() => {
+    if (failsafeTimerRef.current) {
+      window.clearTimeout(failsafeTimerRef.current)
+    }
+    failsafeTimerRef.current = window.setTimeout(() => {
       streamFinish()
     }, 120_000)
 
@@ -1204,10 +1162,17 @@ export function ChatScreen({
           if (import.meta.env.DEV)
             console.warn('[chat] streamStart error (non-fatal):', e)
         }
+        if (failsafeTimerRef.current) {
+          window.clearTimeout(failsafeTimerRef.current)
+          failsafeTimerRef.current = null
+        }
         setSending(false)
       })
       .catch((err: unknown) => {
-        window.clearTimeout(failsafeTimer)
+        if (failsafeTimerRef.current) {
+          window.clearTimeout(failsafeTimerRef.current)
+          failsafeTimerRef.current = null
+        }
         setSending(false)
         const messageText = err instanceof Error ? err.message : String(err)
         if (isMissingGatewayAuth(messageText)) {

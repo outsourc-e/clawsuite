@@ -283,6 +283,27 @@ function attachmentSource(attachment: GatewayAttachment | undefined): string {
   return ''
 }
 
+function attachmentExtension(attachment: GatewayAttachment): string {
+  const name = typeof attachment.name === 'string' ? attachment.name : ''
+  const fromName = name.split('.').pop()?.trim().toLowerCase() || ''
+  if (fromName) return fromName
+
+  const source = attachmentSource(attachment)
+  const fileName = source.split('?')[0]?.split('#')[0]?.split('/').pop() || ''
+  return fileName.split('.').pop()?.trim().toLowerCase() || ''
+}
+
+function isImageAttachment(attachment: GatewayAttachment): boolean {
+  const contentType =
+    typeof attachment.contentType === 'string'
+      ? attachment.contentType.trim().toLowerCase()
+      : ''
+  if (contentType.startsWith('image/')) return true
+
+  const ext = attachmentExtension(attachment)
+  return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'].includes(ext)
+}
+
 function MessageItemComponent({
   message,
   toolResultsByCallId,
@@ -674,22 +695,46 @@ function MessageItemComponent({
             >
               {hasAttachments && (
                 <div className="flex flex-wrap gap-2">
-                  {attachments.map((attachment) => (
-                    <a
-                      key={attachment.id}
-                      href={attachmentSource(attachment)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
-                    >
-                      <img
-                        src={attachmentSource(attachment)}
-                        alt={attachment.name || 'Attached image'}
-                        className="max-h-64 w-auto max-w-full object-contain"
-                        loading="lazy"
-                      />
-                    </a>
-                  ))}
+                  {attachments.map((attachment) => {
+                    const source = attachmentSource(attachment)
+                    const ext = attachmentExtension(attachment)
+                    const imageAttachment = isImageAttachment(attachment)
+
+                    if (imageAttachment) {
+                      return (
+                        <a
+                          key={attachment.id}
+                          href={source}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
+                        >
+                          <img
+                            src={source}
+                            alt={attachment.name || 'Attached image'}
+                            className="max-h-64 w-auto max-w-full object-contain"
+                            loading="lazy"
+                          />
+                        </a>
+                      )
+                    }
+
+                    return (
+                      <a
+                        key={attachment.id}
+                        href={source}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex max-w-full items-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700 hover:border-primary-400"
+                      >
+                        <span>📄</span>
+                        <span className="truncate">{attachment.name || 'Attachment'}</span>
+                        <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] uppercase text-primary-600">
+                          {ext || 'file'}
+                        </span>
+                      </a>
+                    )
+                  })}
                 </div>
               )}
               {hasInlineImages && (
@@ -759,7 +804,7 @@ function MessageItemComponent({
         )}
 
       {/* Render tool calls — collapsible ▶ tool result style */}
-      {hasToolCalls && !hasText && (
+      {hasToolCalls && (
         <div className="w-full max-w-[900px] mt-2">
           <Collapsible open={toolCallsOpen} onOpenChange={setToolCallsOpen}>
             <CollapsibleTrigger className="w-full justify-start gap-1.5 bg-transparent hover:bg-primary-50/60 data-panel-open:bg-primary-50/60 px-2 py-1 rounded-md text-xs text-neutral-500 dark:text-neutral-400">
