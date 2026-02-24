@@ -70,19 +70,19 @@ const themeScript = `
     }
     const root = document.documentElement
     const media = window.matchMedia('(prefers-color-scheme: dark)')
-    // Enterprise theme (data-theme attribute)
+    // ClawSuite theme class + data-theme attribute
     const enterpriseTheme = localStorage.getItem('clawsuite-theme')
     if (enterpriseTheme && (
       enterpriseTheme === 'ops-dark' ||
       enterpriseTheme === 'premium-dark' ||
-      enterpriseTheme === 'sunset-brand' ||
       enterpriseTheme === 'paper-light'
     )) {
       root.setAttribute('data-theme', enterpriseTheme)
+      root.classList.remove('paper-light', 'ops-dark', 'premium-dark')
+      root.classList.add(enterpriseTheme)
       if (
         enterpriseTheme === 'ops-dark' ||
-        enterpriseTheme === 'premium-dark' ||
-        enterpriseTheme === 'sunset-brand'
+        enterpriseTheme === 'premium-dark'
       ) {
         theme = 'dark'
       } else {
@@ -101,6 +101,40 @@ const themeScript = `
     media.addEventListener('change', () => {
       if (theme === 'system') apply()
     })
+  } catch {}
+})()
+`
+
+const themeColorScript = `
+(() => {
+  try {
+    const root = document.documentElement
+    const enterpriseTheme = localStorage.getItem('clawsuite-theme')
+    const settingsRaw = localStorage.getItem('openclaw-settings')
+    let appTheme = 'light'
+    if (settingsRaw) {
+      const parsed = JSON.parse(settingsRaw)
+      const saved = parsed?.state?.settings?.theme
+      if (saved === 'light' || saved === 'dark' || saved === 'system') {
+        appTheme = saved
+      }
+    }
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const isDark = enterpriseTheme === 'ops-dark' || enterpriseTheme === 'premium-dark'
+      ? true
+      : enterpriseTheme === 'paper-light'
+        ? false
+        : appTheme === 'dark' || (appTheme === 'system' && prefersDark)
+    const nextColor = isDark ? '#0f172a' : '#f97316'
+
+    let meta = document.querySelector('meta[name="theme-color"]')
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.setAttribute('name', 'theme-color')
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', nextColor)
+    root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
   } catch {}
 })()
 `
@@ -253,6 +287,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: themeColorScript }} />
       </head>
       <body>
         <script dangerouslySetInnerHTML={{ __html: `
@@ -260,9 +295,17 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             if (document.getElementById('splash-screen')) return;
             var bg = '#f8fafc', txt = '#0f172a', muted = '#64748b';
             try {
+              var enterprise = localStorage.getItem('clawsuite-theme');
               var s = localStorage.getItem('openclaw-settings');
               var t = 'light';
-              if (s) { var p = JSON.parse(s); t = (p && p.state && p.state.settings && p.state.settings.theme) || 'light'; }
+              if (enterprise === 'ops-dark' || enterprise === 'premium-dark') {
+                t = 'dark';
+              } else if (enterprise === 'paper-light') {
+                t = 'light';
+              } else if (s) {
+                var p = JSON.parse(s);
+                t = (p && p.state && p.state.settings && p.state.settings.theme) || 'light';
+              }
               if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
               if (t === 'dark') { bg = '#0c0c12'; txt = '#f8fafc'; muted = '#94a3b8'; }
             } catch(e){}

@@ -257,7 +257,7 @@ export function LiveFeedPanel() {
             <button
               type="button"
               onClick={() => setEvents([])}
-              className="rounded px-1.5 py-0.5 text-[10px] text-neutral-600 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
+              className="rounded px-1.5 py-0.5 text-[10px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
             >
               Clear
             </button>
