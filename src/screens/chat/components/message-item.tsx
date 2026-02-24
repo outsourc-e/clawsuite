@@ -607,6 +607,15 @@ function MessageItemComponent({
       )}
     >
 
+      {/* Bridge gap: thinking done but first text token not yet arrived */}
+      {effectiveIsStreaming && !thinking && !hasText && (
+        <div className="flex items-center gap-1.5 px-1 py-1">
+          <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:0ms]" />
+          <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:150ms]" />
+          <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:300ms]" />
+        </div>
+      )}
+
       {thinking && !hasText && (
         <div className="w-full max-w-[900px]">
           <Collapsible defaultOpen={false}>
