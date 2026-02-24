@@ -64,16 +64,16 @@ function KpiCard({
   delta?: { value: number; text: string }
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+    <div className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
       />
-      <div className="text-[11px] uppercase tracking-wider text-neutral-400">
+      <div className="text-[11px] uppercase tracking-wider text-primary-500 dark:text-neutral-400">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-semibold text-neutral-100">{value}</div>
-      {sub ? <div className="mt-1 text-xs text-neutral-400">{sub}</div> : null}
+      <div className="mt-2 text-2xl font-semibold text-primary-900 dark:text-neutral-100">{value}</div>
+      {sub ? <div className="mt-1 text-xs text-primary-500 dark:text-neutral-400">{sub}</div> : null}
       {delta ? (
         <div
           className={cn(
@@ -124,23 +124,23 @@ export function CostsScreen() {
   }
 
   return (
-    <div className="min-h-full bg-neutral-950 text-neutral-100">
+    <div className="min-h-full bg-primary-50 dark:bg-neutral-950 text-primary-900 dark:text-neutral-100">
       <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">Cost & Token Analytics</h1>
-            <p className="mt-1 text-sm text-neutral-400">
+            <p className="mt-1 text-sm text-primary-500 dark:text-neutral-400">
               Model spend, token usage, and session-level cost breakdown.
             </p>
           </div>
           <div className="flex items-center gap-2">
             {isFetching && !isLoading ? (
-              <span className="text-xs text-neutral-400">Refreshing…</span>
+              <span className="text-xs text-primary-500 dark:text-neutral-400">Refreshing…</span>
             ) : null}
             <button
               type="button"
               onClick={() => void refetch()}
-              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm text-neutral-200 hover:bg-neutral-800"
+              className="rounded-lg border border-primary-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm text-primary-800 dark:text-neutral-200 hover:bg-primary-100 dark:hover:bg-neutral-800"
             >
               Refresh
             </button>
@@ -148,7 +148,7 @@ export function CostsScreen() {
         </div>
 
         {isLoading ? (
-          <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-8 text-sm text-neutral-300">
+          <div className="rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8 text-sm text-primary-700 dark:text-neutral-300">
             Loading analytics…
           </div>
         ) : isError ? (
@@ -190,21 +190,21 @@ export function CostsScreen() {
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-              <section className="relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+              <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
                 <div
                   aria-hidden
                   className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
                 />
                 <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-neutral-100">
+                  <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
                     Per-Model Usage
                   </h2>
-                  <div className="text-xs text-neutral-400">
+                  <div className="text-xs text-primary-500 dark:text-neutral-400">
                     Sorted by cost desc
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <div className="grid grid-cols-[minmax(0,1.4fr)_110px_100px_minmax(120px,1fr)] gap-3 px-2 text-[11px] uppercase tracking-wider text-neutral-500">
+                  <div className="grid grid-cols-[minmax(0,1.4fr)_110px_100px_minmax(120px,1fr)] gap-3 px-2 text-[11px] uppercase tracking-wider text-primary-400 dark:text-neutral-500">
                     <div>Model</div>
                     <div className="text-right">Tokens</div>
                     <div className="text-right">Cost</div>
@@ -218,18 +218,18 @@ export function CostsScreen() {
                       return (
                         <div
                           key={row.model}
-                          className="grid grid-cols-[minmax(0,1.4fr)_110px_100px_minmax(120px,1fr)] items-center gap-3 rounded-lg border border-neutral-800/80 bg-neutral-950/60 px-2 py-2"
+                          className="grid grid-cols-[minmax(0,1.4fr)_110px_100px_minmax(120px,1fr)] items-center gap-3 rounded-lg border border-primary-200 dark:border-neutral-800/80 bg-primary-50 dark:bg-neutral-950/60 px-2 py-2"
                         >
-                          <div className="truncate text-sm text-neutral-100">
+                          <div className="truncate text-sm text-primary-900 dark:text-neutral-100">
                             {row.model}
                           </div>
-                          <div className="text-right text-sm tabular-nums text-neutral-300">
+                          <div className="text-right text-sm tabular-nums text-primary-700 dark:text-neutral-300">
                             {formatTokens(row.totalTokens)}
                           </div>
-                          <div className="text-right text-sm tabular-nums text-neutral-200">
+                          <div className="text-right text-sm tabular-nums text-primary-800 dark:text-neutral-200">
                             {formatMoney(row.costUsd)}
                           </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-neutral-800">
+                          <div className="h-2 overflow-hidden rounded-full bg-primary-100 dark:bg-neutral-800">
                             <div className="flex h-full w-full">
                               <div
                                 className="bg-blue-500"
@@ -249,13 +249,13 @@ export function CostsScreen() {
                       )
                     })}
                     {analytics.models.length === 0 ? (
-                      <div className="rounded-lg border border-neutral-800 px-3 py-6 text-center text-sm text-neutral-400">
+                      <div className="rounded-lg border border-primary-200 dark:border-neutral-800 px-3 py-6 text-center text-sm text-primary-500 dark:text-neutral-400">
                         No model usage data available.
                       </div>
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-4 text-xs text-neutral-400">
+                <div className="mt-3 flex items-center gap-4 text-xs text-primary-500 dark:text-neutral-400">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="size-2 rounded-full bg-blue-500" />
                     Input tokens
@@ -267,16 +267,16 @@ export function CostsScreen() {
                 </div>
               </section>
 
-              <section className="relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+              <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
                 <div
                   aria-hidden
                   className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
                 />
                 <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-neutral-100">
+                  <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
                     Daily Cost Trend
                   </h2>
-                  <div className="text-xs text-neutral-400">Last 30 days</div>
+                  <div className="text-xs text-primary-500 dark:text-neutral-400">Last 30 days</div>
                 </div>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
@@ -317,21 +317,21 @@ export function CostsScreen() {
               </section>
             </div>
 
-            <section className="relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+            <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
               />
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-neutral-100">
+                  <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
                     Session Cost Breakdown
                   </h2>
-                  <p className="mt-1 text-xs text-neutral-400">
+                  <p className="mt-1 text-xs text-primary-500 dark:text-neutral-400">
                     Top 10 most expensive sessions
                   </p>
                 </div>
-                <div className="text-xs text-neutral-400">
+                <div className="text-xs text-primary-500 dark:text-neutral-400">
                   Total tracked: {formatTokens(analytics.totals.tokens)} tokens ·{' '}
                   {formatMoney(analytics.totals.costUsd)}
                 </div>
@@ -340,7 +340,7 @@ export function CostsScreen() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-800 text-left text-[11px] uppercase tracking-wider text-neutral-500">
+                    <tr className="border-b border-primary-200 dark:border-neutral-800 text-left text-[11px] uppercase tracking-wider text-primary-400 dark:text-neutral-500">
                       <th className="px-2 py-2 font-medium">Session Key</th>
                       <th className="px-2 py-2 font-medium">Model</th>
                       <th className="px-2 py-2 font-medium text-right">
@@ -387,19 +387,19 @@ export function CostsScreen() {
                     {topSessionsSorted.map((row) => (
                       <tr
                         key={row.sessionKey}
-                        className="border-b border-neutral-900/80 hover:bg-neutral-950/60"
+                        className="border-b border-primary-200/80 dark:border-neutral-900/80 hover:bg-primary-50/80 dark:hover:bg-neutral-950/60"
                       >
-                        <td className="px-2 py-2 font-mono text-xs text-neutral-300">
+                        <td className="px-2 py-2 font-mono text-xs text-primary-700 dark:text-neutral-300">
                           <div className="max-w-[280px] truncate">{row.sessionKey}</div>
                         </td>
-                        <td className="px-2 py-2 text-neutral-200">{row.model}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-neutral-300">
+                        <td className="px-2 py-2 text-primary-800 dark:text-neutral-200">{row.model}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-primary-700 dark:text-neutral-300">
                           {formatTokens(row.totalTokens)}
                         </td>
-                        <td className="px-2 py-2 text-right tabular-nums text-neutral-100">
+                        <td className="px-2 py-2 text-right tabular-nums text-primary-900 dark:text-neutral-100">
                           {formatMoney(row.costUsd)}
                         </td>
-                        <td className="px-2 py-2 text-right text-neutral-400">
+                        <td className="px-2 py-2 text-right text-primary-500 dark:text-neutral-400">
                           {formatDateTime(row.lastActiveAt)}
                         </td>
                       </tr>
@@ -408,7 +408,7 @@ export function CostsScreen() {
                       <tr>
                         <td
                           colSpan={5}
-                          className="px-2 py-6 text-center text-sm text-neutral-400"
+                          className="px-2 py-6 text-center text-sm text-primary-500 dark:text-neutral-400"
                         >
                           No session data available.
                         </td>

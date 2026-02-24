@@ -44,14 +44,14 @@ function priorityBadgeClass(priority: TaskPriority): string {
   if (priority === 'P0') return 'bg-red-950/70 text-red-300'
   if (priority === 'P1') return 'bg-orange-950/70 text-orange-300'
   if (priority === 'P2') return 'bg-blue-950/70 text-blue-300'
-  return 'bg-neutral-800 text-neutral-300'
+  return 'bg-primary-100 dark:bg-neutral-800 text-primary-700 dark:text-neutral-300'
 }
 
 function mobilePriorityBadgeClass(priority: TaskPriority): string {
   if (priority === 'P0') return 'bg-red-950/70 text-red-300'
   if (priority === 'P1') return 'bg-orange-950/70 text-orange-300'
   if (priority === 'P2') return 'bg-blue-950/70 text-blue-300'
-  return 'bg-neutral-800 text-neutral-300'
+  return 'bg-primary-100 dark:bg-neutral-800 text-primary-700 dark:text-neutral-300'
 }
 
 function statusDotClass(status: TaskStatus): string {
@@ -145,14 +145,14 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
         title="Tasks"
         icon={Task01Icon}
         action={
-          <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 text-[10px] font-medium text-neutral-300">
+          <span className="inline-flex items-center rounded-full border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2 py-0.5 text-[10px] font-medium text-primary-700 dark:text-neutral-300">
             Backlog {backlogCount} • In progress {inProgressCount} • Done {doneCount}
           </span>
         }
-        className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 md:hidden [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
+        className="h-full rounded-xl border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 md:hidden [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500"
       >
         {cronJobsQuery.isLoading && tasks.length === 0 ? (
-          <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-3 text-sm text-neutral-400">
+          <div className="rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-3 text-sm text-primary-500 dark:text-neutral-400">
             Loading tasks…
           </div>
         ) : cronJobsQuery.isError ? (
@@ -160,7 +160,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
             {errorMessage ?? 'Unable to load tasks.'}
           </div>
         ) : tasks.length === 0 ? (
-          <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-3 text-sm text-neutral-400">
+          <div className="rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-3 text-sm text-primary-500 dark:text-neutral-400">
             No tasks yet
           </div>
         ) : (
@@ -170,7 +170,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
                 return (
                   <article
                     key={task.id}
-                    className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2"
+                    className="flex items-center gap-2 rounded-xl border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-2"
                   >
                     <span
                       className={cn(
@@ -180,7 +180,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
                     >
                       {task.priority}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-100">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
                       {task.title}
                     </span>
                     <span
@@ -197,7 +197,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
           <button
             type="button"
             onClick={() => void navigate({ to: '/cron' })}
-            className="inline-flex items-center gap-1 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-300"
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-primary-700 dark:hover:text-neutral-300"
           >
             View all ›
           </button>
@@ -208,7 +208,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
         <DashboardGlassCard
           title="Tasks"
           titleAccessory={
-            <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 font-mono text-[11px] font-medium text-neutral-200 tabular-nums">
+            <span className="inline-flex items-center rounded-full border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2 py-0.5 font-mono text-[11px] font-medium text-primary-800 dark:text-neutral-200 tabular-nums">
               {activeCount}
             </span>
           }
@@ -217,10 +217,10 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
           icon={Task01Icon}
           draggable={draggable}
           onRemove={onRemove}
-          className="h-full rounded-xl border-neutral-800 bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-neutral-500 [&_svg]:text-neutral-500"
+          className="h-full rounded-xl border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_h2]:text-[11px] [&_h2]:font-medium [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-primary-400 dark:[&_h2]:text-neutral-500 [&_svg]:text-primary-400 dark:[&_svg]:text-neutral-500"
         >
           {cronJobsQuery.isLoading && tasks.length === 0 ? (
-            <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-3 text-sm text-neutral-400">
+            <div className="rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-3 text-sm text-primary-500 dark:text-neutral-400">
               Loading tasks…
             </div>
           ) : cronJobsQuery.isError ? (
@@ -228,7 +228,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
               {errorMessage ?? 'Unable to load tasks.'}
             </div>
           ) : tasks.length === 0 ? (
-            <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-3 text-sm text-neutral-400">
+            <div className="rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-3 py-3 text-sm text-primary-500 dark:text-neutral-400">
               No tasks yet
             </div>
           ) : (
@@ -238,14 +238,14 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
                   <article
                     key={task.id}
                     className={cn(
-                      'flex items-center gap-2 rounded-lg border border-neutral-800 px-2.5 py-2',
-                      index % 2 === 0 ? 'bg-neutral-950' : 'bg-neutral-950/80',
+                      'flex items-center gap-2 rounded-lg border border-primary-200 dark:border-neutral-800 px-2.5 py-2',
+                      index % 2 === 0 ? 'bg-primary-50 dark:bg-neutral-950' : 'bg-primary-50 dark:bg-neutral-950/80',
                     )}
                   >
                     <span
                       className={cn('size-2 shrink-0 rounded-full', statusDotClass(task.status))}
                     />
-                    <span className="min-w-0 flex-1 truncate text-sm text-neutral-100">
+                    <span className="min-w-0 flex-1 truncate text-sm text-primary-900 dark:text-neutral-100">
                       {truncateTaskTitle(task.title)}
                     </span>
                     <span
@@ -261,7 +261,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
               })}
 
               {remainingCount > 0 ? (
-                <p className="px-1 text-xs text-neutral-400">+{remainingCount} more</p>
+                <p className="px-1 text-xs text-primary-500 dark:text-neutral-400">+{remainingCount} more</p>
               ) : null}
             </div>
           )}
@@ -270,7 +270,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
             <button
               type="button"
               onClick={() => void navigate({ to: '/cron' })}
-              className="inline-flex items-center gap-1 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-300"
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-primary-700 dark:hover:text-neutral-300"
             >
               View all →
             </button>
