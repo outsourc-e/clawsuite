@@ -19,6 +19,7 @@ export type StudioSettings = {
   preferredBudgetModel: string
   preferredPremiumModel: string
   onlySuggestCheaper: boolean
+  showSystemMetricsFooter: boolean
 }
 
 type SettingsState = {
@@ -40,6 +41,7 @@ export const defaultStudioSettings: StudioSettings = {
   preferredBudgetModel: '',
   preferredPremiumModel: '',
   onlySuggestCheaper: false,
+  showSystemMetricsFooter: false,
 }
 
 function resolveStoredAccent(value: string | null): AccentColor | null {

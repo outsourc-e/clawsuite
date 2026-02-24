@@ -1,4 +1,5 @@
 import { useSystemMetrics } from '@/hooks/use-system-metrics'
+import { useSettings } from '@/hooks/use-settings'
 import { cn } from '@/lib/utils'
 
 function usageColorClass(value: number): string {
@@ -18,7 +19,10 @@ function MetricDot({ className }: { className: string }) {
 }
 
 export function SystemMetricsFooter() {
+  const { settings } = useSettings()
   const { metrics } = useSystemMetrics()
+
+  if (!settings.showSystemMetricsFooter) return null
 
   const cpuDot = usageColorClass(metrics?.cpu ?? 0)
   const ramDot = usageColorClass(metrics?.ramPercent ?? 0)

@@ -366,6 +366,18 @@ function AppearanceContent() {
         </p>
         <EnterpriseThemePicker />
       </div>
+      <div className={SETTINGS_CARD_CLASS}>
+        <Row
+          label="System metrics footer"
+          description="Show a persistent footer with CPU, RAM, disk, and gateway status."
+        >
+          <Switch
+            checked={settings.showSystemMetricsFooter}
+            onCheckedChange={(c) => updateSettings({ showSystemMetricsFooter: c })}
+            aria-label="Show system metrics footer"
+          />
+        </Row>
+      </div>
     </div>
   )
 }

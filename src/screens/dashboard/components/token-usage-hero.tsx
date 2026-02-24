@@ -28,7 +28,7 @@ function MicroSparkBars({ data, accentClass }: { data: SparkPoint[]; accentClass
           <div
             key={`${point.date}-${index}`}
             className={cn(
-              'flex-1 rounded-[3px] bg-primary-100 dark:bg-neutral-800/90 transition-[height] duration-300',
+              'flex-1 rounded-[3px] bg-neutral-300 dark:bg-neutral-700 transition-[height] duration-300',
               isLatest && accentClass,
               point.value === 0 && 'opacity-40',
             )}

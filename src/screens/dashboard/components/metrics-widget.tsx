@@ -121,7 +121,7 @@ function MicroBarChart({ data, days, accentClass }: MicroBarChartProps) {
               'flex-1 rounded-sm transition-[height] duration-300',
               isLatest
                 ? accentClass
-                : 'bg-primary-100 dark:bg-neutral-800',
+                : 'bg-neutral-300 dark:bg-neutral-700',
               point.value === 0 && 'opacity-40',
             )}
             style={{ height: `${heightPx}px` }}
