@@ -64,7 +64,7 @@ export function ChannelsScreen() {
   const channelEntries = Object.entries(channels)
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-x-hidden">
+    <div className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
       <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 md:px-6 md:py-4">
         <div className="flex items-center gap-3">
           <h1 className="text-sm font-semibold text-ink md:text-[15px]">

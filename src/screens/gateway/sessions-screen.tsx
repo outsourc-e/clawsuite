@@ -71,7 +71,7 @@ export function SessionsScreen() {
   const sessions = query.data?.sessions || []
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
       <div className="flex items-center justify-between px-6 py-4 border-b border-primary-200">
         <div className="flex items-center gap-3">
           <h1 className="text-[15px] font-semibold text-ink">Sessions</h1>

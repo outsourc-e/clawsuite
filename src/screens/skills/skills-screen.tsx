@@ -86,8 +86,8 @@ function ErrorState({
   onRetry: () => void
 }) {
   return (
-    <div className="h-full overflow-y-auto bg-surface pb-24 text-ink md:pb-8">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4">
         <section className="rounded-2xl border border-primary-200 bg-primary-50/85 p-5 backdrop-blur-xl">
           <h1 className="text-lg font-medium text-ink">Failed to load skills</h1>
           <p className="mt-2 text-sm text-primary-600">
@@ -304,8 +304,8 @@ export function SkillsScreen() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-surface pb-24 text-ink md:pb-8">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">

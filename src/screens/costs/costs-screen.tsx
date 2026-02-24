@@ -124,8 +124,8 @@ export function CostsScreen() {
   }
 
   return (
-    <div className="min-h-full bg-primary-50 dark:bg-neutral-950 text-primary-900 dark:text-neutral-100">
-      <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+    <div className="min-h-full bg-surface px-4 pt-5 pb-10 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
+      <div className="mx-auto w-full max-w-[1200px]">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">Cost & Token Analytics</h1>

@@ -673,7 +673,7 @@ export function TasksScreen() {
   )
 
   return (
-    <main className="h-full overflow-y-auto bg-surface px-4 pt-6 pb-24 text-primary-900 md:px-6 md:pt-8 md:pb-0">
+    <main className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
       <section className="mx-auto w-full max-w-[1600px]">
         <header className="mb-4 flex flex-wrap items-center justify-between gap-2.5 md:mb-6">
           <div className="flex items-center gap-3">
