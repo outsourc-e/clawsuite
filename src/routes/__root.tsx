@@ -14,6 +14,7 @@ import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { GatewaySetupWizard } from '@/components/gateway-setup-wizard'
 import { GatewayReconnectBanner } from '@/components/gateway-reconnect-banner'
+import { ExecApprovalToast } from '@/components/exec-approval-toast'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
 
 const themeScript = `
@@ -272,6 +273,7 @@ function RootLayout() {
       <UpdateNotifier />
       <OpenClawUpdateNotifier />
       <Toaster />
+      <ExecApprovalToast />
       <WorkspaceShell />
       <SearchModal />
       <GatewaySetupWizard />
