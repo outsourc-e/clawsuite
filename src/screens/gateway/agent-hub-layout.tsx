@@ -10,7 +10,6 @@ import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type A
 import { OfficeView as PixelOfficeView } from './components/office-view'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { steerAgent, toggleAgentPause, fetchGatewayApprovals, resolveGatewayApproval, killAgentSession } from '@/lib/gateway-api'
@@ -1055,6 +1054,7 @@ const REPORT_META_LINE_PATTERNS = [
   /\b(please|kindly)\s+(re[-\s]?send|send again|confirm|clarify|provide)\b/i,
   /\bplease\s+(share|include|paste)\b.{0,50}\b(full|complete)\b.{0,20}\b(task|prompt|list|details|logs?)\b/i,
   /\b(as an ai|language model|i can adjust the report|i can revise|i['’]ll continue|i will continue|let me know if you want)\b/i,
+  /^(?:\*\*|__)?\s*⚠️?\s*note:\s*.*\b(truncat(?:ed|ion)?|cut off|context|prompt|message)\b/i,
 ] as const
 
 const GOAL_HARDWARE_KEYWORDS = /\b(gpu|cpu|hardware|card|vram|ram|nvidia|amd|chip|accelerator)\b/i
@@ -1098,8 +1098,10 @@ function scoreInsightLine(line: string, goalTokens: Set<string>): number {
 
 function normalizeInsightLine(line: string, missionGoal = ''): string | null {
   const normalized = line
+    .replace(/^\s*(?:\*\*|__)+\s*/, '')
     .replace(/^\s*[-*+]\s*/, '')
     .replace(/^\s*\d+\s*[.)-]\s*/, '')
+    .replace(/\s*(?:\*\*|__)+\s*$/g, '')
     .replace(/^`+|`+$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -1192,9 +1194,12 @@ function generateMissionReport(payload: MissionReportPayload): string {
     payload.goal,
     6,
   )
-  const nextActions = buildNextActionsChecklist(payload, recommendations, unresolvedRisks)
-  const completedRatio = taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0
   const topFindings = pickTopFindings(allAgentLines, payload.goal, 3)
+  const hasHighConfidenceOutcomes = topFindings.length > 0
+  const effectiveRecommendations = hasHighConfidenceOutcomes ? recommendations : []
+  const effectiveUnresolvedRisks = hasHighConfidenceOutcomes ? unresolvedRisks : []
+  const nextActions = buildNextActionsChecklist(payload, effectiveRecommendations, effectiveUnresolvedRisks)
+  const completedRatio = taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0
   const lines: string[] = []
 
   lines.push(`# Mission Report${payload.name ? `: ${payload.name}` : ''}`)
@@ -1244,18 +1249,21 @@ function generateMissionReport(payload: MissionReportPayload): string {
         lines.push('- No output captured')
       } else {
         if (findings.length > 0) findings.forEach((line) => lines.push(`- Finding: ${line}`))
-        if (recs.length > 0) recs.forEach((line) => lines.push(`- Recommendation: ${line}`))
-        if (risks.length > 0) risks.forEach((line) => lines.push(`- Risk/Open question: ${line}`))
+        if (findings.length > 0 && recs.length > 0) recs.forEach((line) => lines.push(`- Recommendation: ${line}`))
+        if (findings.length > 0 && risks.length > 0) risks.forEach((line) => lines.push(`- Risk/Open question: ${line}`))
+        if (findings.length === 0 && recs.length === 0 && risks.length === 0) {
+          lines.push('- No high-confidence outcomes extracted after filtering.')
+        }
         lines.push(`- Output lines captured: ${summary.lines.length}`)
       }
       lines.push('')
     })
   }
   lines.push('## Decisions And Recommendations')
-  if (recommendations.length === 0) {
+  if (effectiveRecommendations.length === 0) {
     lines.push('- No explicit recommendations were captured. Review per-agent findings for follow-ups.')
   } else {
-    recommendations.forEach((line) => lines.push(`- ${line}`))
+    effectiveRecommendations.forEach((line) => lines.push(`- ${line}`))
   }
   lines.push('')
   lines.push('## Artifacts And Files Produced')
@@ -1268,10 +1276,10 @@ function generateMissionReport(payload: MissionReportPayload): string {
   }
   lines.push('')
   lines.push('## Unresolved Risks And Open Questions')
-  if (unresolvedRisks.length === 0) {
+  if (effectiveUnresolvedRisks.length === 0) {
     lines.push('- No unresolved risks captured from agent output.')
   } else {
-    unresolvedRisks.forEach((line) => lines.push(`- ${line}`))
+    effectiveUnresolvedRisks.forEach((line) => lines.push(`- ${line}`))
   }
   lines.push('')
   lines.push('## Next Actions Checklist')
@@ -1715,7 +1723,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [providerWizardSelected, setProviderWizardSelected] = useState('')
   const [liveFeedVisible, setLiveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
-  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false)
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardStepIndex, setWizardStepIndex] = useState(0)
@@ -1854,10 +1861,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const dispatchingRef = useRef(false)
   const artifactDedupRef = useRef<Set<string>>(new Set())
   const agentOutputLinesRef = useRef<Record<string, string[]>>({})
+  const missionOutputLinesByMissionIdRef = useRef<Record<string, Record<string, string[]>>>({})
   const [_agentOutputLines, setAgentOutputLines] = useState<Record<string, string[]>>({})
   const missionCompletionSnapshotRef = useRef<MissionReportPayload | null>(null)
   const prevMissionStateRef = useRef<'running' | 'paused' | 'stopped'>('stopped')
   const completionSessionKeysRef = useRef<Record<string, string>>({})
+  const completionSessionKeysByMissionIdRef = useRef<Record<string, Record<string, string>>>({})
   const lastReportedMissionIdRef = useRef<string>('')
   // Mission ID for checkpointing
   const missionIdRef = useRef<string>('')
@@ -1885,7 +1894,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const buildMissionCompletionSnapshotRef = useRef<() => MissionReportPayload | null>(() => null)
   // Stable ref for live feed visibility (used in feed-count effect)
   const liveFeedVisibleRef = useRef(liveFeedVisible)
-  const shortcutsModalOpenRef = useRef(shortcutsModalOpen)
   const feedEventsRef = useRef<FeedEvent[]>([])
   const missionReportById = useMemo(() => {
     const reportMap = new Map<string, StoredMissionReport>()
@@ -1924,7 +1932,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   missionActiveRef.current = missionActive
   missionStateRef.current = missionState
   liveFeedVisibleRef.current = liveFeedVisible
-  shortcutsModalOpenRef.current = shortcutsModalOpen
 
   const mentionSuggestions = useMemo(() => {
     if (mentionQuery === null) return []
@@ -2003,6 +2010,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const captureAgentOutput = useCallback((agentId: string, text: string) => {
     const member = teamRef.current.find((entry) => entry.id === agentId)
     if (!member) return
+    const activeMissionId = missionIdRef.current
+    if (!activeMissionId) return
     const cleaned = text.trim()
     if (!cleaned) return
 
@@ -2015,6 +2024,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (nextLines.length > 0) {
       const current = agentOutputLinesRef.current[agentId] ?? []
       agentOutputLinesRef.current[agentId] = [...current, ...nextLines].slice(-200)
+      const missionScoped = missionOutputLinesByMissionIdRef.current[activeMissionId] ?? {}
+      missionOutputLinesByMissionIdRef.current[activeMissionId] = {
+        ...missionScoped,
+        [agentId]: [...(missionScoped[agentId] ?? []), ...nextLines].slice(-200),
+      }
       setAgentOutputLines((prev) => ({
         ...prev,
         [agentId]: [...(prev[agentId] ?? []), ...nextLines].slice(-200),
@@ -2041,25 +2055,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const teamSnapshot = teamRef.current.map((member) => ({ ...member }))
     const tasksSnapshot = (missionTasks.length > 0 ? missionTasks : boardTasks).map((task) => ({ ...task }))
     const artifactsSnapshot = artifacts.map((artifact) => ({ ...artifact }))
-    const agentSummaries: MissionAgentSummary[] = teamSnapshot.map((member) => {
-      const capturedLines = agentOutputLinesRef.current[member.id] ?? []
-      const feedFallback = capturedLines.length === 0
-        ? (feedEventsRef.current
-          ?.filter((ev: { agentName?: string; message?: string }) => (
-            ev.agentName === member.name || ev.message?.includes(member.name)
-          ))
-          .map((ev: { message?: string }) => ev.message ?? '')
-          .filter(Boolean)
-          .slice(-20) ?? [])
-        : []
-
-      return {
-        agentId: member.id,
-        agentName: member.name,
-        modelId: member.modelId,
-        lines: [...capturedLines, ...feedFallback].slice(-50),
-      }
-    })
+    const missionScopedOutput = missionOutputLinesByMissionIdRef.current[missionId] ?? {}
+    const agentSummaries: MissionAgentSummary[] = teamSnapshot.map((member) => ({
+      agentId: member.id,
+      agentName: member.name,
+      modelId: member.modelId,
+      lines: (missionScopedOutput[member.id] ?? []).slice(-50),
+    }))
     const resolvedTemplate = resolveActiveTemplate(teamSnapshot)
     const teamName = resolvedTemplate ? TEMPLATE_DISPLAY_NAMES[resolvedTemplate] : `Custom Team (${teamSnapshot.length})`
 
@@ -2081,6 +2083,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   const stopMissionAndCleanup = useCallback((reason: 'aborted' | 'completed' = 'aborted') => {
     missionCompletionSnapshotRef.current = buildMissionCompletionSnapshot()
+    if (missionCompletionSnapshotRef.current?.missionId) {
+      completionSessionKeysByMissionIdRef.current[missionCompletionSnapshotRef.current.missionId] = { ...agentSessionMap }
+    }
 
     const currentCp = loadMissionCheckpoint()
     if (currentCp) {
@@ -2112,6 +2117,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionTasks([])
     setDispatchedTaskIdsByAgent({})
     setPausedByAgentId({})
+    agentOutputLinesRef.current = {}
+    setAgentOutputLines({})
     setSelectedOutputAgentId(undefined)
     setActiveTab('missions')
     dispatchingRef.current = false
@@ -2735,6 +2742,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             // Capture snapshot BEFORE changing state (uses fresh ref to avoid stale closure)
             completionSessionKeysRef.current = { ...agentSessionMap }
             missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
+            const snapshotMissionId = missionCompletionSnapshotRef.current?.missionId
+            if (snapshotMissionId) {
+              completionSessionKeysByMissionIdRef.current[snapshotMissionId] = { ...completionSessionKeysRef.current }
+            }
             setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
             emitFeedEvent({
               type: 'system',
@@ -2819,20 +2830,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         return
       }
 
-      if (!isTypingTarget && (event.key === '?' || event.key === '/')) {
-        event.preventDefault()
-        setShortcutsModalOpen((prev) => !prev)
-        return
-      }
-
       // Escape: Close output panel → deselect agent
       if (event.key === 'Escape') {
         // Don't interfere when user is typing in an input/textarea
         if (isTypingTarget) return
-        if (shortcutsModalOpenRef.current) {
-          setShortcutsModalOpen(false)
-          return
-        }
         setSelectedOutputAgentId((prev) => {
           if (prev) return undefined
           setSelectedAgentId(undefined)
@@ -2976,6 +2977,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       // Capture snapshot BEFORE changing state (uses fresh ref to avoid stale closure)
       completionSessionKeysRef.current = { ...agentSessionMap }
       missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
+      const snapshotMissionId = missionCompletionSnapshotRef.current?.missionId
+      if (snapshotMissionId) {
+        completionSessionKeysByMissionIdRef.current[snapshotMissionId] = { ...completionSessionKeysRef.current }
+      }
       setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
       emitFeedEvent({ type: 'system', message: '✓ All agents reached terminal state — mission complete' })
     }, 4000)
@@ -3845,9 +3850,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (previous === 'running' && missionState === 'stopped') {
       const snapshot = missionCompletionSnapshotRef.current
       if (snapshot && lastReportedMissionIdRef.current !== snapshot.missionId) {
-        // Fetch real agent output from session history before building report
-        const sessionKeys = completionSessionKeysRef.current
+        // Fetch mission-scoped output from the mission's own sessions before building report.
+        const sessionKeys =
+          completionSessionKeysByMissionIdRef.current[snapshot.missionId]
+          ?? completionSessionKeysRef.current
         const fetchAndReport = async () => {
+          const fetchedOutputLines: Record<string, string[]> = {}
           for (const member of snapshot.team) {
             const sessionKey = sessionKeys[member.id]
             if (!sessionKey) continue
@@ -3865,13 +3873,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 if (text.trim()) lines.push(...text.split('\n').filter(Boolean))
               }
               if (lines.length > 0) {
-                agentOutputLinesRef.current[member.id] = lines.slice(-200)
+                fetchedOutputLines[member.id] = lines.slice(-200)
               }
             } catch { /* best-effort */ }
           }
-          // Rebuild snapshot with fetched output
-          const enrichedSnapshot = buildMissionCompletionSnapshotRef.current()
-          const usedSnapshot = enrichedSnapshot ?? snapshot
+          const missionScopedOutput = {
+            ...(missionOutputLinesByMissionIdRef.current[snapshot.missionId] ?? {}),
+            ...fetchedOutputLines,
+          }
+          missionOutputLinesByMissionIdRef.current[snapshot.missionId] = missionScopedOutput
+          const usedSnapshot: MissionReportPayload = {
+            ...snapshot,
+            completedAt: Date.now(),
+            agentSummaries: snapshot.team.map((member) => ({
+              agentId: member.id,
+              agentName: member.name,
+              modelId: member.modelId,
+              lines: (missionScopedOutput[member.id] ?? []).slice(-50),
+            })),
+          }
           const reportText = generateMissionReport(usedSnapshot)
           const taskStats = computeMissionTaskStats(usedSnapshot.tasks)
           const duration = Math.max(0, usedSnapshot.completedAt - usedSnapshot.startedAt)
@@ -3897,6 +3917,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           setMissionReports(saveStoredMissionReport(record))
           setCompletionModalReportId(record.id)
           setShowCompletionModal(true)
+          agentOutputLinesRef.current = {}
+          setAgentOutputLines({})
           lastReportedMissionIdRef.current = usedSnapshot.missionId
         }
         missionCompletionSnapshotRef.current = null
@@ -4058,6 +4080,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     artifactDedupRef.current = new Set()
     agentOutputLinesRef.current = {}
     setAgentOutputLines({})
+    missionOutputLinesByMissionIdRef.current[missionId] = {}
+    completionSessionKeysByMissionIdRef.current[missionId] = {}
     agentSessionsDoneRef.current = new Set()
     expectedAgentCountRef.current = teamWithRuntimeStatus.length
     missionCompletionSnapshotRef.current = null
@@ -4209,6 +4233,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   function closeCompletionModal() {
     setShowCompletionModal(false)
     setCompletionModalReportId(null)
+    agentOutputLinesRef.current = {}
+    setAgentOutputLines({})
   }
 
   const currentTeamLabel = `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · ${team.length} agents`
@@ -4368,11 +4394,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .slice(0, 3)
 
     // Shared card style
-    const cardCls = 'relative overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]'
+    const cardCls = 'relative overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)] min-h-[320px]'
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 px-1 pb-4 pt-3 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
         <div className="relative flex w-full min-h-0 flex-1 flex-col">
@@ -4395,7 +4421,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
 
           {/* ── 3-card row — shrink-0, anchored at bottom ── */}
-          <section className="relative mt-5 grid w-full shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <section className="relative mt-6 grid w-full shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
@@ -6268,14 +6294,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     compact={true}
                     onLine={(line) => {
                       if (!line.trim()) return
-                      agentOutputLinesRef.current[member.id] = [
-                        ...(agentOutputLinesRef.current[member.id] ?? []),
-                        line,
-                      ].slice(-200)
-                      setAgentOutputLines((prev) => ({
-                        ...prev,
-                        [member.id]: [...(prev[member.id] ?? []), line].slice(-200),
-                      }))
+                      captureAgentOutput(member.id, line)
                     }}
                   />
                 )
@@ -6283,30 +6302,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
         </div>
-      {shortcutsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShortcutsModalOpen(false)}>
-          <div className="w-full max-w-sm rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-5 py-4">
-              <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Keyboard Shortcuts</p>
-              <button type="button" onClick={() => setShortcutsModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200">✕</button>
-            </div>
-            <div className="p-5 space-y-2">
-              {[
-                ['Space', 'Pause / Resume mission'],
-                ['Cmd + Enter', 'Start mission'],
-                ['Esc', 'Close modals'],
-                ['N', 'New mission (when idle)'],
-                ['?', 'Show this shortcuts panel'],
-              ].map(([key, desc]) => (
-                <div key={key} className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-neutral-600 dark:text-neutral-400">{desc}</span>
-                  <kbd className="rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-2 py-0.5 text-[11px] font-mono text-neutral-700 dark:text-neutral-300">{key}</kbd>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {templatesModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setTemplatesModalOpen(false)}>
@@ -6629,7 +6624,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       <div className="mx-auto flex w-full max-w-[1600px] min-h-0 flex-1 flex-col px-4 md:px-6">
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <header className="relative z-10 shrink-0 mt-3 mb-0 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 md:px-5 md:py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+      <header
+        className={cn(
+          'relative z-10 shrink-0 rounded-xl border border-primary-200 bg-primary-50/95 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
+          activeTab === 'overview'
+            ? 'mb-1 mt-4 px-4 py-3 md:px-6 md:py-4'
+            : 'mb-0 mt-3 px-3 py-2 md:px-5 md:py-3',
+        )}
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
@@ -6677,15 +6679,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     {unreadFeedCount > 9 ? '9+' : unreadFeedCount}
                   </span>
                 ) : null}
-              </button>
-              <ThemeToggle variant="icon" />
-              <button
-                type="button"
-                onClick={() => setShortcutsModalOpen(true)}
-                className="inline-flex size-7 items-center justify-center rounded-full text-primary-500 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-                title="Keyboard shortcuts"
-              >
-                <span className="text-[11px] font-semibold">?</span>
               </button>
             </div>
           </div>
@@ -6886,17 +6879,18 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         const isPopupActive = popupStatus?.status === 'active'
         const agentTasks = missionTasks.filter((t) => t.agentId === agentPopupId)
         const currentTask = agentTasks.find((t) => t.status === 'in_progress') ?? agentTasks[0] ?? null
+        const popupGatewayModels = gatewayModels.slice(0, 120)
 
         return (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
             onClick={() => setAgentPopupId(null)}
           >
-            <div
-              className="flex w-full max-w-lg flex-col rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
-              style={{ maxHeight: '80vh' }}
-              onClick={(e) => e.stopPropagation()}
-            >
+              <div
+                className="flex w-full max-w-5xl flex-col rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
+                style={{ maxHeight: '80vh' }}
+                onClick={(e) => e.stopPropagation()}
+              >
               {/* Header */}
               <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-100 px-5 py-4 dark:border-neutral-800">
                 <div className="flex min-w-0 items-center gap-3">
@@ -6923,7 +6917,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <button
                     type="button"
                     title="Edit agent config"
-                    onClick={() => { setAgentPopupId(null); setActiveTab('configure'); setConfigSection('teams') }}
+                    onClick={() => { setAgentPopupId(null); setActiveTab('configure'); setConfigSection('agents') }}
                     className="rounded-lg border border-neutral-200 p-2 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700 dark:border-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                   >
                     ✏️
@@ -6956,27 +6950,114 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               {/* Live output */}
               <div className="min-h-0 flex-1 overflow-hidden px-5 py-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                    Agent Output
-                  </p>
-                  <p className="text-[10px] text-neutral-400 dark:text-neutral-500">Live stream</p>
-                </div>
-                <div className="h-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50/60 dark:border-neutral-700 dark:bg-neutral-950/40">
-                  {popupSessionKey ? (
-                    <AgentOutputPanel
-                      sessionKey={popupSessionKey}
-                      agentName={popupMember.name}
-                      tasks={agentTasks}
-                      onClose={() => setAgentPopupId(null)}
-                      modelId={popupMember.modelId}
-                      compact={true}
-                    />
-                  ) : (
-                    <div className="flex h-32 items-center justify-center text-sm text-neutral-400 dark:text-neutral-500">
-                      {missionActive ? 'Waiting for agent session to start...' : 'No active session — start a mission to see live output.'}
+                <div className="grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+                  <div className="min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50/60 dark:border-neutral-700 dark:bg-neutral-950/40">
+                    <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                        Agent Output
+                      </p>
+                      <p className="text-[10px] text-neutral-400 dark:text-neutral-500">Live stream</p>
                     </div>
-                  )}
+                    <div className="h-full min-h-[200px]">
+                      {popupSessionKey ? (
+                        <AgentOutputPanel
+                          sessionKey={popupSessionKey}
+                          agentName={popupMember.name}
+                          tasks={agentTasks}
+                          onClose={() => setAgentPopupId(null)}
+                          modelId={popupMember.modelId}
+                          compact={true}
+                        />
+                      ) : (
+                        <div className="flex h-32 items-center justify-center text-sm text-neutral-400 dark:text-neutral-500">
+                          {missionActive ? 'Waiting for agent session to start...' : 'No active session — start a mission to see live output.'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="min-h-0 overflow-auto rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                      Quick Edit
+                    </p>
+                    <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Update this agent without leaving overview.
+                    </p>
+                    <label className="mt-3 block">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Name</span>
+                      <input
+                        type="text"
+                        value={popupMember.name}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setTeam((prev) => prev.map((row) => (row.id === popupMember.id ? { ...row, name: value } : row)))
+                        }}
+                        className="w-full rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      />
+                    </label>
+                    <label className="mt-3 block">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Model</span>
+                      <select
+                        value={popupMember.modelId || 'auto'}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setTeam((prev) => prev.map((row) => (row.id === popupMember.id ? { ...row, modelId: value || 'auto' } : row)))
+                        }}
+                        className="w-full rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      >
+                        <option value="auto">Auto (gateway default)</option>
+                        <optgroup label="Presets">
+                          {MODEL_PRESETS.filter((preset) => preset.id !== 'auto').map((preset) => (
+                            <option key={`preset-${preset.id}`} value={preset.id}>
+                              {preset.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Gateway Models">
+                          {popupGatewayModels.map((model) => (
+                            <option key={`gateway-${model.value}`} value={model.value}>
+                              {model.provider} / {model.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </label>
+                    <label className="mt-3 block">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Role</span>
+                      <input
+                        type="text"
+                        value={popupMember.roleDescription}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setTeam((prev) => prev.map((row) => (row.id === popupMember.id ? { ...row, roleDescription: value } : row)))
+                        }}
+                        className="w-full rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      />
+                    </label>
+                    <label className="mt-3 block">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Goal</span>
+                      <textarea
+                        value={popupMember.goal}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setTeam((prev) => prev.map((row) => (row.id === popupMember.id ? { ...row, goal: value } : row)))
+                        }}
+                        rows={2}
+                        className="w-full resize-y rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      />
+                    </label>
+                    <label className="mt-3 block">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500">System Prompt</span>
+                      <textarea
+                        value={popupMember.backstory}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setTeam((prev) => prev.map((row) => (row.id === popupMember.id ? { ...row, backstory: value } : row)))
+                        }}
+                        rows={4}
+                        className="w-full resize-y rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 

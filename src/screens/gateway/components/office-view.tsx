@@ -373,7 +373,7 @@ export function OfficeView({
   return (
     <div className={cn('flex flex-col bg-gradient-to-b from-slate-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800', compact ? 'h-full' : 'min-h-[480px]')}>
       {/* Header bar */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white/80 px-4 py-2 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white/80 px-5 py-3 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-neutral-900 dark:text-white md:text-base">ClawSuite Office</span>
           <span className="truncate text-[11px] text-neutral-500 dark:text-slate-400">{agentRows.length} agents · {activeCount} working · {sessionCount} sessions</span>
@@ -391,7 +391,7 @@ export function OfficeView({
           <button
             type="button"
             onClick={() => onNewMission?.()}
-            className="rounded-full border border-accent-200 bg-accent-50 dark:border-accent-800/50 dark:bg-accent-900/20 px-3 py-1 text-[10px] font-semibold text-accent-600 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900/40 transition-colors"
+            className="rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
           >
             + New Mission
           </button>
@@ -436,13 +436,10 @@ export function OfficeView({
           <button
             type="button"
             onClick={() => setLayoutPickerOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+            className="inline-flex items-center rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
             title="Change office layout"
           >
             <span>✏️</span>
-            <span className="hidden text-[10px] sm:inline">
-              {layoutTemplate === 'grid' ? 'Grid' : layoutTemplate === 'roundtable' ? 'Roundtable' : 'War Room'}
-            </span>
           </button>
           {layoutPickerOpen && (
             <div className="absolute right-0 top-full z-50 mt-1 min-w-[120px] overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
