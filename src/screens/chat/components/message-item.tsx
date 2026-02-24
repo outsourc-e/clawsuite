@@ -20,7 +20,6 @@ import type { ToolPart } from '@/components/prompt-kit/tool'
 import { Message, MessageContent } from '@/components/prompt-kit/message'
 import { AssistantAvatar, UserAvatar } from '@/components/avatars'
 import { Tool } from '@/components/prompt-kit/tool'
-import { LoadingIndicator } from '@/components/loading-indicator'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -32,15 +31,6 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
-
-// Streaming cursor component — enhanced visibility
-function StreamingCursor() {
-  return (
-    <span className="inline-flex items-center ml-0.5">
-      <span className="size-1.5 rounded-full bg-primary-600 animate-pulse" />
-    </span>
-  )
-}
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -597,11 +587,11 @@ function MessageItemComponent({
             <div
               data-chat-message-bubble={isUser ? 'true' : undefined}
               className={cn(
-                'rounded-[12px] break-words whitespace-normal min-w-0 text-primary-900 flex flex-col gap-2',
+                'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
                 '',
                 !isUser
-                  ? 'bg-transparent w-full'
-                  : 'bg-primary-100 max-w-[75%] rounded-2xl px-3 py-2 md:px-4 md:py-2.5',
+                  ? 'bg-primary-50 border border-primary-200 rounded-2xl rounded-tl-sm text-primary-900'
+                  : 'bg-accent-500 text-white rounded-2xl rounded-tr-sm',
                 isQueued && isUser && !isFailed && 'opacity-70',
                 isFailed && isUser && 'bg-red-50/50 border border-red-300',
                 bubbleClassName,
@@ -657,18 +647,23 @@ function MessageItemComponent({
                     <MessageContent
                       markdown
                       className={cn(
-                        'text-primary-900 bg-transparent w-full text-pretty',
+                        'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
                         effectiveIsStreaming && 'chat-streaming-content',
+                        isUser && 'text-white',
                       )}
                     >
                       {assistantDisplayText}
                     </MessageContent>
-                    {effectiveIsStreaming && <StreamingCursor />}
+                    {effectiveIsStreaming && (
+                      <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent-500 align-text-bottom" />
+                    )}
                   </div>
                 ) : null)}
               {effectiveIsStreaming && !hasRevealedText && (
-                <div className="flex items-center gap-1.5 py-1">
-                  <LoadingIndicator ariaLabel="Assistant is responding" />
+                <div className="flex items-center gap-1 px-1 py-0.5">
+                  <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:0ms]" />
+                  <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:150ms]" />
+                  <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:300ms]" />
                 </div>
               )}
             </div>
