@@ -138,6 +138,20 @@ function getModelDisplayLabelFromLookup(
   return getModelDisplayLabel(modelId)
 }
 
+function getModelShortLabel(
+  modelId: string,
+  gatewayModelLabelById?: Map<string, { label: string; provider: string }>,
+): string {
+  if (!modelId) return 'Unknown'
+  const preset = MODEL_PRESETS.find((entry) => entry.id === modelId)
+  if (preset) return OFFICE_MODEL_LABEL[preset.id]
+  const gatewayModel = gatewayModelLabelById?.get(modelId)
+  if (gatewayModel?.label) return gatewayModel.label
+
+  const parts = modelId.split('/')
+  return parts[parts.length - 1] || modelId
+}
+
 type AgentActivityEntry = {
   lastLine?: string
   lastAt?: number
@@ -1567,6 +1581,32 @@ const AGENT_ACCENT_COLORS = [
   ...accent,
   hex: ['#f97316', '#3b82f6', '#8b5cf6', '#10b981', '#f43f5e', '#f59e0b', '#06b6d4', '#d946ef', '#84cc16', '#0ea5e9'][index] ?? '#f97316',
 }))
+
+// ── Model badge styling ────────────────────────────────────────────────────────
+const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
+  auto:   'rounded-full border border-neutral-200 bg-neutral-100 text-neutral-600',
+  opus:   'border border-accent-200 bg-accent-50 text-accent-700',
+  sonnet: 'border border-blue-200 bg-blue-50 text-blue-700',
+  codex:  'border border-emerald-200 bg-emerald-50 text-emerald-700',
+  flash:  'border border-violet-200 bg-violet-50 text-violet-700',
+  minimax: 'border border-amber-200 bg-amber-50 text-amber-700',
+}
+
+const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
+  auto:   'Auto',
+  opus:   'Opus',
+  sonnet: 'Sonnet',
+  codex:  'Codex',
+  flash:  'Flash',
+  minimax: 'MiniMax',
+}
+
+const DEFAULT_OFFICE_MODEL_BADGE =
+  'border border-neutral-200 bg-neutral-50 text-neutral-700'
+
+function getOfficeModelBadge(modelId: string): string {
+  return OFFICE_MODEL_BADGE[modelId as ModelPresetId] ?? DEFAULT_OFFICE_MODEL_BADGE
+}
 
 // ── HistoryView ────────────────────────────────────────────────────────────────
 function timeAgoFromMs(ms: number): string {
@@ -4130,209 +4170,336 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
 
   function renderOverviewContent() {
-    const savedTeamLaunchCards = teamConfigs.slice(0, 6)
-    const checkpointById = new Map(missionHistory.map((cp) => [cp.id, cp]))
-    const recentMissionSummaries = ([
-      ...missionReports.map((report) => {
-        const checkpointStatus = checkpointById.get(report.id)?.status
-        const status: 'completed' | 'failed' | 'aborted' =
-          checkpointStatus === 'aborted'
-            ? 'aborted'
-            : report.taskStats.failed > 0
-              ? 'failed'
-              : 'completed'
-        return {
-          id: report.id,
-          title: report.name || report.goal || 'Mission',
-          duration: report.duration,
-          completedAt: report.completedAt,
-          status,
-        }
-      }),
-      ...missionHistory
-        .filter((cp) => !missionReports.some((report) => report.id === cp.id))
-        .map((cp) => ({
-          id: cp.id,
-          title: cp.label || 'Mission',
-          duration: Math.max(0, (cp.completedAt ?? cp.updatedAt) - cp.startedAt),
-          completedAt: cp.completedAt ?? cp.updatedAt,
-          status: cp.status === 'aborted' ? 'aborted' : ('completed' as const),
-        })),
-    ] as Array<{
-      id: string
-      title: string
-      duration: number
-      completedAt: number
-      status: 'completed' | 'failed' | 'aborted'
-    }>)
+    // ── Derived data ───────────────────────────────────────────────────────
+    const runningCost = estimateMissionCost(missionTokenCount)
+    const missionElapsed = missionStartedAtRef.current
+      ? formatDuration(Date.now() - missionStartedAtRef.current)
+      : '0s'
+
+    // Active team data (Card 1) — prefer saved team config over template state
+    const activeTeamConfig = teamConfigs.find((c) => c.id === selectedTeamConfigId)
+    const activeTeamName = activeTeamConfig?.name
+      ?? (activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : team.length > 0 ? 'Custom Team' : null)
+    const activeTeamIcon = activeTeamConfig?.icon
+      ?? (activeTeamName ? (TEAM_QUICK_TEMPLATES.find((t) => t.templateId === activeTemplateId)?.icon ?? '👥') : null)
+    const activeTeamDescription = activeTeamConfig?.description ?? ''
+
+    // Recent missions data (Card 2) — merge stored reports + local checkpoints
+    const localHistoryItems = missionHistory.map((cp) => {
+      const completedTasks = cp.tasks.filter((t) => t.status === 'done' || t.status === 'completed').length
+      const totalTasks = cp.tasks.length
+      const duration = cp.completedAt ? cp.completedAt - cp.startedAt : Date.now() - cp.startedAt
+      const failed = cp.status === 'aborted' || cp.tasks.some((t) => t.status === 'blocked')
+      return {
+        id: cp.id,
+        name: cp.label,
+        goal: cp.label,
+        agentCount: cp.team.length,
+        duration,
+        completedAt: cp.completedAt || cp.updatedAt,
+        successRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+        failed,
+        taskStats: { total: totalTasks, completed: completedTasks, failed: failed ? 1 : 0 },
+      }
+    })
+    const storedReportItems = missionReports.map((report) => ({
+      id: report.id,
+      name: report.name || report.goal,
+      goal: report.goal,
+      agentCount: report.agents.length,
+      duration: report.duration,
+      completedAt: report.completedAt,
+      successRate: report.taskStats.total > 0
+        ? Math.round((report.taskStats.completed / report.taskStats.total) * 100)
+        : 0,
+      failed: report.taskStats.failed > 0,
+      taskStats: report.taskStats,
+    }))
+    const allMissions = [...localHistoryItems, ...storedReportItems]
       .sort((a, b) => b.completedAt - a.completedAt)
+      .slice(0, 5)
+    const recentMissions = allMissions
+
+    // Cost summary data (Card 3)
+    // Aggregate tokens + cost from stored reports (today's sessions)
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayMs = todayStart.getTime()
+    const todayReports = missionReports.filter((r) => r.completedAt >= todayMs)
+    const todayTokens = todayReports.reduce((sum, r) => sum + r.tokenCount, 0) + missionTokenCount
+    const todayEstCost = todayReports.reduce((sum, r) => sum + r.costEstimate, 0) + runningCost
+    const todaySessions = todayReports.length + (missionActive ? 1 : 0)
+    // Provider breakdown from active team models
+    const providerBreakdown = Array.from(
+      team.reduce((map, member) => {
+        const parts = member.modelId.split('/')
+        const provider = parts.length > 1 ? parts[0] : 'auto'
+        map.set(provider, (map.get(provider) ?? 0) + 1)
+        return map
+      }, new Map<string, number>()),
+    )
+      .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
 
-    const statusBadgeClass = {
-      completed: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/25 dark:text-emerald-400',
-      failed: 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-900/25 dark:text-red-400',
-      aborted: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-900/25 dark:text-amber-400',
-    } as const
-
-    const totalMissionsRun = new Set([
-      ...missionReports.map((report) => report.id),
-      ...missionHistory.map((cp) => cp.id),
-    ]).size
-    const configuredAgents = new Set([
-      ...team.map((member) => member.id),
-      ...teamConfigs.flatMap((config) => config.team.map((member) => member.id)),
-    ]).size
-    const latestRunAt = [...missionReports.map((report) => report.completedAt), ...missionHistory.map((cp) => cp.completedAt ?? cp.updatedAt)]
-      .sort((a, b) => b - a)[0]
+    // Shared card style
+    const cardCls = 'relative overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)]'
+    const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
       <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
-        <div className="relative flex min-h-0 flex-1 flex-col gap-4 py-3 pb-24 sm:py-4 sm:pb-4">
-          <section className="grid gap-3 rounded-2xl border border-neutral-200 bg-white/95 p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900/90 sm:grid-cols-3">
-            <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Total Missions Run</p>
-              <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-white">{totalMissionsRun}</p>
-            </div>
-            <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Agents Configured</p>
-              <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-white">{configuredAgents}</p>
-            </div>
-            <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Last Run</p>
-              <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-white">
-                {latestRunAt ? timeAgoFromMs(latestRunAt) : 'Never'}
-              </p>
-            </div>
-          </section>
+        {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
+        <div className="relative flex w-full min-h-0 flex-1 flex-col">
+          <div className="flex-1 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900" style={{ minHeight: '480px' }}>
+            <PixelOfficeView
+              agentRows={agentWorkingRows}
+              missionRunning={isMissionRunning}
+              onNewMission={() => openNewMissionModal()}
+              onViewOutput={(agentId) => {
+                setAgentPopupId(agentId)
+              }}
+              selectedOutputAgentId={selectedOutputAgentId}
+              activeTemplateName={
+                activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : undefined
+              }
+              processType={processType}
+              containerHeight={520}
+            />
+          </div>
+        </div>
 
-          <section className="flex min-h-[210px] items-center justify-center rounded-2xl border border-neutral-200 bg-white px-6 py-8 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-            <div className="max-w-xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
-                Launchpad
-              </p>
-              <p className="mt-2 text-lg font-semibold text-neutral-900 dark:text-white">
-                {missionActive ? (activeMissionName || 'Mission in Progress') : 'Ready for the next mission'}
-              </p>
-              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-                {missionActive
-                  ? `${truncateMissionGoal(activeMissionGoal || missionGoal || 'Active mission', 110)}`
-                  : 'Launch with a saved team or start a new mission setup.'}
-              </p>
-              <div className="mt-5 flex justify-center">
-                {missionActive ? (
-                  <button
-                    type="button"
-                    onClick={() => openMissionsView('active')}
-                    className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-300"
-                  >
-                    <span className="relative flex size-2">
-                      <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
-                      <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-                    </span>
-                    View Active Mission →
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => openNewMissionModal()}
-                    className="rounded-xl bg-accent-500 px-7 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-accent-600"
-                  >
-                    + New Mission
-                  </button>
-                )}
-              </div>
-            </div>
-          </section>
+          {/* ── 3-card row — shrink-0, anchored at bottom ── */}
+          <section className="relative mt-5 grid w-full shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
 
-          <section className="grid min-h-0 flex-1 gap-4 xl:grid-cols-2">
-            <article className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+            {/* ─── Card 1: Active Team ─────────────────────────────────── */}
+            <article className={cardCls}>
+              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Quick Launch Teams</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Active Team</h2>
                 <button
                   type="button"
                   onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
-                  className="text-[11px] font-medium text-accent-600 hover:text-accent-700"
+                  className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400 hover:border-neutral-300 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
                 >
-                  Manage Teams →
+                  Switch Team
                 </button>
               </div>
-              {savedTeamLaunchCards.length === 0 ? (
-                <div className="flex h-[220px] items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-center dark:border-neutral-700 dark:bg-neutral-800/40">
-                  <div>
-                    <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">No saved team configs yet</p>
-                    <p className="mt-1 text-xs text-neutral-500">Create and save team configs in Configure → Teams.</p>
+
+              {team.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-5 text-center">
+                  <span className="text-2xl">👥</span>
+                  <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">No team active</p>
+                  <button
+                    type="button"
+                    onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
+                    className="mt-1 rounded-lg bg-accent-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-accent-600 transition-colors"
+                  >
+                    + Create Team
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Team header row */}
+                  <div className="mb-3 flex items-center gap-2.5">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-50 dark:bg-accent-900/20 text-xl shadow-sm">
+                      {activeTeamIcon ?? '👥'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-neutral-900 dark:text-white">{activeTeamName ?? `Custom Team`}</p>
+                      <p className="text-[10px] text-neutral-400">
+                        {activeTeamDescription || `${team.length} agent${team.length !== 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Agent list — compact */}
+                  <ul className="space-y-1.5">
+                    {team.slice(0, 5).map((member, index) => {
+                      const ac = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+                      const row = agentWorkingRows.find((item) => item.id === member.id)
+                      return (
+                        <li key={member.id} className={cn('flex items-center gap-2', insetCls)}>
+                          <span className={cn('flex size-6 shrink-0 items-center justify-center rounded-full border border-white shadow-sm', ac.avatar)}>
+                            <AgentAvatar index={resolveAgentAvatarIndex(member, index)} color={ac.hex} size={14} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">{member.name}</div>
+                          </div>
+                          <span className={cn('shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-medium', getOfficeModelBadge(member.modelId))}>
+                            {getModelShortLabel(member.modelId, gatewayModelLabelById)}
+                          </span>
+                          <span className={cn('size-1.5 shrink-0 rounded-full',
+                            row?.status === 'active' ? 'bg-emerald-500 animate-pulse' :
+                            row?.status === 'idle' || row?.status === 'ready' ? 'bg-amber-400' :
+                            row?.status === 'error' ? 'bg-red-500' : 'bg-neutral-300',
+                          )} />
+                        </li>
+                      )
+                    })}
+                    {team.length > 5 ? (
+                      <li className="text-center text-[10px] text-neutral-400">+{team.length - 5} more agents</li>
+                    ) : null}
+                  </ul>
+                </>
+              )}
+            </article>
+
+            {/* ─── Card 2: Recent Missions ─────────────────────────────── */}
+            <article className={cardCls}>
+              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Recent Missions</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    openMissionsView()
+                  }}
+                  className="text-[10px] font-medium text-accent-500 hover:text-accent-600 transition-colors"
+                >
+                  Open Missions →
+                </button>
+              </div>
+
+              {/* Running mission pill */}
+              {missionActive ? (
+                <div className="mb-2 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20 px-3 py-2">
+                  <span className="relative flex size-2 shrink-0">
+                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
+                      {truncateMissionGoal(activeMissionGoal || missionGoal || 'Active mission', 48)}
+                    </p>
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                      Running · {missionElapsed} · {team.length} agents
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400">
+                    ⟳ Live
+                  </span>
+                </div>
+              ) : null}
+
+              {recentMissions.length === 0 && !missionActive ? (
+                <div className="flex flex-col items-center gap-2 py-5 text-center">
+                  <span className="text-2xl opacity-30">🚀</span>
+                  <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">No missions yet</p>
+                  <button
+                    type="button"
+                    onClick={() => openNewMissionModal()}
+                    className="mt-1 rounded-lg bg-accent-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-accent-600 transition-colors"
+                  >
+                    Start Mission
+                  </button>
+                </div>
+              ) : (
+                <ul className="space-y-1.5">
+                  {recentMissions.slice(0, 4).map((mission) => {
+                    const durationStr = formatDuration(mission.duration)
+                    const statusIcon = mission.failed ? '✗' : '✓'
+                    const statusCls = mission.failed ? 'text-red-500' : 'text-emerald-500'
+                    return (
+                      <li key={mission.id} className={cn('flex items-center gap-2', insetCls)}>
+                        <span className={cn('shrink-0 text-[11px] font-bold', statusCls)}>{statusIcon}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">
+                            {truncateMissionGoal(mission.name || mission.goal, 44)}
+                          </p>
+                          <p className="text-[10px] text-neutral-400">
+                            {mission.agentCount} agents · {durationStr} · {mission.successRate}%
+                          </p>
+                        </div>
+                        <span className={cn(
+                          'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                          mission.failed ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700',
+                        )}>
+                          {mission.failed ? 'Failed' : 'Done'}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </article>
+
+            {/* ─── Card 3: Cost Summary ────────────────────────────────── */}
+            <article className={cardCls}>
+              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Usage &amp; Cost</h2>
+                <span className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+                  Today
+                </span>
+              </div>
+
+              {/* Key metrics row */}
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                <div className={cn(insetCls, 'text-center')}>
+                  <p className="text-[9px] uppercase tracking-wide text-neutral-400 mb-0.5">Sessions</p>
+                  <p className="text-sm font-bold text-neutral-900 dark:text-white">{todaySessions > 0 ? todaySessions : '—'}</p>
+                </div>
+                <div className={cn(insetCls, 'text-center')}>
+                  <p className="text-[9px] uppercase tracking-wide text-neutral-400 mb-0.5">Tokens</p>
+                  <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                    {todayTokens > 0 ? (todayTokens >= 1000 ? `${Math.round(todayTokens / 1000)}k` : todayTokens) : '—'}
+                  </p>
+                </div>
+                <div className={cn(insetCls, 'text-center')}>
+                  <p className="text-[9px] uppercase tracking-wide text-neutral-400 mb-0.5">Est. Cost</p>
+                  <p className="text-sm font-bold text-accent-600 dark:text-accent-400">
+                    {todayEstCost > 0 ? `$${todayEstCost.toFixed(2)}` : '$0.00'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Live mission cost (if running) */}
+              {missionActive ? (
+                <div className={cn('mb-2 flex items-center justify-between gap-2', insetCls)}>
+                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400">Live mission</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="relative flex size-1.5 shrink-0">
+                      <span className="absolute inset-0 animate-ping rounded-full bg-accent-400/60" />
+                      <span className="relative inline-flex size-1.5 rounded-full bg-accent-500" />
+                    </span>
+                    <span className="font-mono text-[11px] font-semibold text-neutral-800 dark:text-white">
+                      ${runningCost.toFixed(2)} · {missionElapsed}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Provider breakdown */}
+              {providerBreakdown.length > 0 ? (
+                <div>
+                  <p className="mb-1.5 text-[9px] uppercase tracking-wide text-neutral-400">Providers in Use</p>
+                  <div className="space-y-1.5">
+                    {providerBreakdown.map(([provider, count]) => {
+                      const pct = team.length > 0 ? Math.round((count / team.length) * 100) : 0
+                      return (
+                        <div key={provider} className="flex items-center gap-2">
+                          <span className="w-16 shrink-0 truncate text-[10px] font-medium text-neutral-600 dark:text-neutral-400 capitalize">{provider}</span>
+                          <div className="flex-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800 h-1.5">
+                            <div
+                              className="h-full rounded-full bg-accent-400 transition-all"
+                              style={{ width: `${Math.max(10, pct)}%` }}
+                            />
+                          </div>
+                          <span className="w-8 shrink-0 text-right text-[9px] text-neutral-400">{count}×</span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {savedTeamLaunchCards.map((config) => (
-                    <button
-                      key={config.id}
-                      type="button"
-                      onClick={() => openNewMissionModal({ teamConfigId: config.id })}
-                      className="rounded-xl border border-neutral-200 bg-neutral-50/70 px-3 py-3 text-left transition-colors hover:border-accent-300 hover:bg-accent-50/50 dark:border-neutral-700 dark:bg-neutral-800/50"
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className="mt-0.5 text-base">{config.icon || '👥'}</span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{config.name}</p>
-                          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                            {config.team.length} agents
-                          </p>
-                          {config.description ? (
-                            <p className="mt-1 line-clamp-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-                              {config.description}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                <div className={cn('flex items-center justify-between gap-2', insetCls)}>
+                  <span className="text-[10px] text-neutral-400">No usage data yet</span>
+                  <span className="text-[10px] font-mono text-neutral-400">$0.00</span>
                 </div>
               )}
             </article>
 
-            <article className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Latest Mission Summaries</h2>
-                <button
-                  type="button"
-                  onClick={() => openMissionsView('history')}
-                  className="text-[11px] font-medium text-accent-600 hover:text-accent-700"
-                >
-                  View History →
-                </button>
-              </div>
-              {recentMissionSummaries.length === 0 ? (
-                <div className="flex h-[220px] items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-center dark:border-neutral-700 dark:bg-neutral-800/40">
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400">No completed missions yet.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {recentMissionSummaries.map((summary) => (
-                    <button
-                      key={summary.id}
-                      type="button"
-                      onClick={() => openMissionsView('history')}
-                      className="flex w-full items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50/70 px-3 py-2.5 text-left transition-colors hover:border-neutral-300 hover:bg-neutral-100/70 dark:border-neutral-700 dark:bg-neutral-800/50 dark:hover:bg-neutral-800"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-neutral-900 dark:text-white">{summary.title}</p>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                          {formatDuration(summary.duration)} · {timeAgoFromMs(summary.completedAt)}
-                        </p>
-                      </div>
-                      <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize', statusBadgeClass[summary.status])}>
-                        {summary.status}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </article>
           </section>
-        </div>
       </div>
     )
   }
