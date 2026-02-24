@@ -2187,6 +2187,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const pendingMissionNameRef = useRef('')
   const pendingMissionBudgetLimitRef = useRef('')
   const missionActiveRef = useRef(missionActive)
+  const missionStateRef = useRef(missionState)
   const handleCreateMissionRef = useRef<() => void>(() => {})
   // Stable ref for buildMissionCompletionSnapshot — kept in sync each render so
   // SSE closures (which can't list missionTasks etc. in their own deps) can call it.
@@ -2203,6 +2204,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   teamRef.current = team
   missionGoalRef.current = missionGoal
   missionActiveRef.current = missionActive
+  missionStateRef.current = missionState
   liveFeedVisibleRef.current = liveFeedVisible
 
   const appendArtifacts = useCallback((nextArtifacts: MissionArtifact[]) => {
@@ -2934,7 +2936,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
             setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
             emitFeedEvent({
-              type: 'mission_started',
+              type: 'system',
               message: `✓ All ${expected} agents completed — mission auto-finished`,
             })
           }, 2000)
@@ -3006,7 +3008,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         if (isTypingTarget) return
         if (!missionActiveRef.current) return
         event.preventDefault()
-        void handleMissionPause(missionState === 'running')
+        void handleMissionPause(missionStateRef.current === 'running')
         return
       }
 
@@ -3157,7 +3159,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       // Capture snapshot BEFORE changing state (uses fresh ref to avoid stale closure)
       missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
       setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
-      emitFeedEvent({ type: 'mission_started', message: '✓ All agents reached terminal state — mission complete' })
+      emitFeedEvent({ type: 'system', message: '✓ All agents reached terminal state — mission complete' })
     }, 4000)
     return () => window.clearTimeout(timer)
   }, [agentWorkingRows, missionActive, missionState])
@@ -3283,11 +3285,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
 
   const _handleSetAgentPaused = useCallback(
-    async (agentId: string, pause: boolean) => {
+    async (agentId: string, pause: boolean): Promise<boolean> => {
       const sessionKey = agentSessionMap[agentId]
       if (!sessionKey) {
         toast('No active session to control', { type: 'error' })
-        return
+        return false
       }
 
       const member = team.find((entry) => entry.id === agentId)
@@ -3306,6 +3308,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         toast(`${agentName} ${pause ? 'paused' : 'resumed'}`, {
           type: 'success',
         })
+        return true
       } catch (error) {
         setPausedByAgentId((prev) => ({ ...prev, [agentId]: previousPaused }))
         toast(
@@ -3314,18 +3317,29 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             : `Failed to ${pause ? 'pause' : 'resume'} ${agentName}`,
           { type: 'error' },
         )
+        return false
       }
     },
     [agentSessionMap, pausedByAgentId, team],
   )
 
   const handleMissionPause = useCallback(async (pause: boolean) => {
-    setMissionState(pause ? 'paused' : 'running')
-    await Promise.allSettled(
+    const previousMissionState = missionStateRef.current
+    await Promise.all(
       team
         .filter((m) => agentSessionMap[m.id])
-        .map((m) => _handleSetAgentPaused(m.id, pause))
+        .map((m) => _handleSetAgentPaused(m.id, pause)),
     )
+      .then((results) => {
+        if (results.every(Boolean)) {
+          setMissionState(pause ? 'paused' : 'running')
+          return
+        }
+        setMissionState(previousMissionState)
+      })
+      .catch(() => {
+        setMissionState(previousMissionState)
+      })
   }, [team, agentSessionMap, _handleSetAgentPaused])
 
   const handleKillAgent = useCallback(async (agentId: string) => {
@@ -3620,9 +3634,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           type: 'system',
           message: `Failed to dispatch to ${member?.name || agentId}: ${errorMessage}`,
         })
-        // Mark tasks as done so progress counts them (not stuck at 0%)
-        const taskIds = agentTasks.map((task) => task.id)
-        moveTasksToStatus(taskIds, 'done')
         agentSessionsDoneRef.current.add(sessionKey)
         setAgentSessionStatus((prev) => ({
           ...prev,
@@ -5364,14 +5375,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .slice(0, 4)
       .map((entry) => {
         const status = String(entry.status || '').toLowerCase()
-        const completed = status === 'done' || status === 'completed'
         const endedAt = entry.completedAt ?? entry.updatedAt
         const durationMs = endedAt > entry.startedAt ? endedAt - entry.startedAt : 0
         return {
           id: `${entry.kind}-${entry.id}`,
           title: truncateMissionGoal(entry.label || entry.goal || 'Mission', 72),
           duration: formatDuration(durationMs),
-          failed: !completed,
+          failed: status === 'failed' || status === 'error',
         }
       })
     const doneTaskCount = missionTasks.filter((task) => task.status === 'done').length
