@@ -85,7 +85,7 @@ export function OverviewTab({
                 <button
                   type="button"
                   onClick={onStopMission}
-                  className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+                  className="rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600"
                 >
                   Stop
                 </button>
@@ -102,7 +102,7 @@ export function OverviewTab({
               <button
                 type="button"
                 onClick={onOpenLaunchWizard}
-                className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+                className="rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600"
               >
                 Start Mission
               </button>
@@ -176,7 +176,7 @@ export function OverviewTab({
             <button
               type="button"
               onClick={onOpenConfigureAgents}
-              className="text-xs font-medium text-orange-600 hover:text-orange-700"
+              className="text-xs font-medium text-accent-600 hover:text-accent-700"
             >
               Configure
             </button>
@@ -234,7 +234,7 @@ export function OverviewTab({
                       <span
                         className={cn(
                           'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                          isBusy ? 'bg-orange-100 text-orange-700' : 'bg-neutral-200 text-neutral-700',
+                          isBusy ? 'bg-accent-100 text-accent-700' : 'bg-neutral-200 text-neutral-700',
                         )}
                       >
                         {getOfficeModelLabel(agent.modelId)}
@@ -269,7 +269,7 @@ export function OverviewTab({
                           'flex-1 rounded-lg border bg-white px-2 py-1.5 text-[11px] font-medium transition-colors',
                           isRunning
                             ? 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-                            : 'border-orange-200 text-orange-600 hover:bg-orange-50',
+                            : 'border-accent-200 text-accent-600 hover:bg-accent-50',
                         )}
                       >
                         Configure
@@ -280,7 +280,7 @@ export function OverviewTab({
                         className={cn(
                           'flex-1 rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition-colors',
                           isRunning
-                            ? 'border-orange-500 bg-orange-500 text-white hover:bg-orange-600'
+                            ? 'border-accent-500 bg-accent-500 text-white hover:bg-accent-600'
                             : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50',
                         )}
                       >
@@ -302,7 +302,7 @@ export function OverviewTab({
             <ul className="mt-2 space-y-2">
               {recentActivityItems.map((item, index) => (
                 <li key={`${index}-${item}`} className="flex items-start gap-2 text-xs">
-                  <span className="mt-1 size-1.5 rounded-full bg-orange-500" />
+                  <span className="mt-1 size-1.5 rounded-full bg-accent-500" />
                   <span className="text-neutral-700">{item}</span>
                 </li>
               ))}

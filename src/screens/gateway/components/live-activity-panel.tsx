@@ -449,7 +449,7 @@ export function LiveActivityPanel({
                 className={cn(
                   'rounded p-1 text-[11px] transition-colors',
                   pinnedOutput
-                    ? 'text-orange-500'
+                    ? 'text-accent-500'
                     : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300',
                 )}
               >

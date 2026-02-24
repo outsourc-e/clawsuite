@@ -79,10 +79,10 @@ export function MissionTimeline({
 
   return (
     <section className={cn('mx-auto w-full max-w-[960px]', missionCardCls)}>
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
       <ol className="space-y-4">
         <li className="flex items-start gap-3">
-          <span className="mt-1 h-[14px] w-[14px] rounded-full bg-orange-400" />
+          <span className="mt-1 h-[14px] w-[14px] rounded-full bg-accent-400" />
           <div>
             <p className="text-[16px] font-bold text-neutral-900 dark:text-neutral-100">Mission started</p>
             <p className="text-xs text-neutral-500">{new Date(startedAt).toLocaleString()}</p>
@@ -181,7 +181,7 @@ export function MissionTimeline({
             <li key={`agent-${member.id}`} className="flex items-start gap-3">
               <span className={cn('mt-2 h-3 w-3 rounded-full', statusDotClass)} />
               <div className={cn('min-w-0 flex-1', missionCardCls)}>
-                <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
+                <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-base font-bold text-neutral-900 dark:text-neutral-100">{member.name}</p>
                   <span className={cn('rounded-full px-2.5 py-1 text-xs', statusBadgeClass)} title={statusTitle}>

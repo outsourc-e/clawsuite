@@ -84,6 +84,7 @@ import { Route as ApiAgentActivityRouteImport } from './routes/api/agent-activit
 import { Route as ApiTasksIndexRouteImport } from './routes/api/tasks/index'
 import { Route as ApiTasksTaskIdRouteImport } from './routes/api/tasks/$taskId'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
 import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
 import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
 import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
@@ -483,6 +484,11 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   path: '/send',
   getParentRoute: () => ApiSessionsRoute,
 } as any)
+const ApiMemoryWriteRoute = ApiMemoryWriteRouteImport.update({
+  id: '/api/memory/write',
+  path: '/api/memory/write',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMemorySearchRoute = ApiMemorySearchRouteImport.update({
   id: '/api/memory/search',
   path: '/api/memory/search',
@@ -694,6 +700,7 @@ export interface FileRoutesByFullPath {
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
+  '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
@@ -793,6 +800,7 @@ export interface FileRoutesByTo {
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
+  '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks': typeof ApiTasksIndexRoute
@@ -894,6 +902,7 @@ export interface FileRoutesById {
   '/api/memory/list': typeof ApiMemoryListRoute
   '/api/memory/read': typeof ApiMemoryReadRoute
   '/api/memory/search': typeof ApiMemorySearchRoute
+  '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
@@ -996,6 +1005,7 @@ export interface FileRouteTypes {
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
+    | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks/'
@@ -1095,6 +1105,7 @@ export interface FileRouteTypes {
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
+    | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks'
@@ -1195,6 +1206,7 @@ export interface FileRouteTypes {
     | '/api/memory/list'
     | '/api/memory/read'
     | '/api/memory/search'
+    | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks/'
@@ -1284,6 +1296,7 @@ export interface RootRouteChildren {
   ApiMemoryListRoute: typeof ApiMemoryListRoute
   ApiMemoryReadRoute: typeof ApiMemoryReadRoute
   ApiMemorySearchRoute: typeof ApiMemorySearchRoute
+  ApiMemoryWriteRoute: typeof ApiMemoryWriteRoute
   ApiTasksTaskIdRoute: typeof ApiTasksTaskIdRoute
   ApiTasksIndexRoute: typeof ApiTasksIndexRoute
 }
@@ -1815,6 +1828,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSendRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/memory/write': {
+      id: '/api/memory/write'
+      path: '/api/memory/write'
+      fullPath: '/api/memory/write'
+      preLoaderRoute: typeof ApiMemoryWriteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/memory/search': {
       id: '/api/memory/search'
       path: '/api/memory/search'
@@ -2140,6 +2160,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMemoryListRoute: ApiMemoryListRoute,
   ApiMemoryReadRoute: ApiMemoryReadRoute,
   ApiMemorySearchRoute: ApiMemorySearchRoute,
+  ApiMemoryWriteRoute: ApiMemoryWriteRoute,
   ApiTasksTaskIdRoute: ApiTasksTaskIdRoute,
   ApiTasksIndexRoute: ApiTasksIndexRoute,
 }

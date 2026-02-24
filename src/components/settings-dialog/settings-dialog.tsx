@@ -9,18 +9,15 @@ import {
   Moon01Icon,
   Notification03Icon,
   PaintBoardIcon,
-  Settings02Icon,
-  SourceCodeSquareIcon,
   Sun01Icon,
   UserIcon,
   MessageMultiple01Icon,
 } from '@hugeicons/core-free-icons'
-import { useState, useEffect, Component } from 'react'
+import { useState, Component } from 'react'
 import type * as React from 'react'
 import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
 import type { ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
@@ -28,7 +25,6 @@ import {
   getChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import { useOnboardingTour } from '@/hooks/use-onboarding-tour'
 import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import { UserAvatar } from '@/components/avatars'
 import { Input } from '@/components/ui/input'
@@ -36,6 +32,7 @@ import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
+import { applyAccentColor } from '@/lib/accent-colors'
 import {
   DialogClose,
   DialogContent,
@@ -50,7 +47,6 @@ type SectionId =
   | 'profile'
   | 'appearance'
   | 'chat'
-  | 'editor'
   | 'notifications'
   | 'advanced'
 
@@ -58,7 +54,6 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
   { id: 'profile', label: 'Profile', icon: UserIcon },
   { id: 'appearance', label: 'Appearance', icon: PaintBoardIcon },
   { id: 'chat', label: 'Chat', icon: MessageMultiple01Icon },
-  { id: 'editor', label: 'Editor', icon: SourceCodeSquareIcon },
   { id: 'notifications', label: 'Notifications', icon: Notification03Icon },
   { id: 'advanced', label: 'Advanced', icon: CloudIcon },
 ]
@@ -84,8 +79,11 @@ function SectionHeader({
   description: string
 }) {
   return (
-    <div className="mb-4">
-      <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+    <div className="mb-2">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
+        Settings
+      </p>
+      <h3 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
         {title}
       </h3>
       <p className="text-xs text-primary-500 dark:text-neutral-400">
@@ -105,7 +103,7 @@ function Row({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-4 py-1.5">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-primary-900 dark:text-neutral-100">
           {label}
@@ -120,6 +118,9 @@ function Row({
     </div>
   )
 }
+
+const SETTINGS_CARD_CLASS =
+  'rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm'
 
 // ── Section components ──────────────────────────────────────────────────
 
@@ -188,43 +189,45 @@ function ProfileContent() {
   const errorId = 'profile-name-error'
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <SectionHeader
         title="Profile"
-        description="Your display name and avatar for chat."
+        description="Your display identity in chat."
       />
-      <div className="flex items-center gap-4 pb-2">
-        <UserAvatar size={48} src={cs.avatarDataUrl} alt={displayName} />
-        <div>
-          <p className="text-sm font-medium text-primary-900 dark:text-neutral-100">
-            {displayName}
-          </p>
-          <p className="text-xs text-primary-500 dark:text-neutral-400">
-            Shown in sidebar and chat.
-          </p>
+      <div className={SETTINGS_CARD_CLASS}>
+        <div className="flex items-center gap-3">
+          <UserAvatar size={44} src={cs.avatarDataUrl} alt={displayName} />
+          <div>
+            <p className="text-sm font-medium text-primary-900 dark:text-neutral-100">
+              {displayName}
+            </p>
+            <p className="text-xs text-primary-500 dark:text-neutral-400">
+              No email connected
+            </p>
+          </div>
         </div>
       </div>
-      <Row label="Display name">
-        <div className="flex-1 max-w-xs">
-          <Input
-            value={cs.displayName}
-            onChange={(e) => handleNameChange(e.target.value)}
-            placeholder="User"
-            className="h-9 w-full"
-            maxLength={50}
-            aria-label="Display name"
-            aria-invalid={!!nameError}
-            aria-describedby={nameError ? errorId : undefined}
-          />
-          {nameError && (
-            <p id={errorId} className="mt-1 text-xs text-red-600" role="alert">
-              {nameError}
-            </p>
-          )}
-        </div>
-      </Row>
-      <Row label="Profile picture">
-        <div className="flex flex-col gap-2">
+      <div className={SETTINGS_CARD_CLASS}>
+        <Row label="Display name" description="Shown in chat and sidebar">
+          <div className="w-full max-w-xs">
+            <Input
+              value={cs.displayName}
+              onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="User"
+              className="h-8 w-full rounded-lg border-primary-200 text-sm"
+              maxLength={50}
+              aria-label="Display name"
+              aria-invalid={!!nameError}
+              aria-describedby={nameError ? errorId : undefined}
+            />
+            {nameError && (
+              <p id={errorId} className="mt-1 text-xs text-red-600" role="alert">
+                {nameError}
+              </p>
+            )}
+          </div>
+        </Row>
+        <Row label="Avatar">
           <div className="flex items-center gap-2">
             <label className="block">
               <input
@@ -233,7 +236,7 @@ function ProfileContent() {
                 onChange={handleAvatarUpload}
                 disabled={processing}
                 aria-label="Upload profile picture"
-                className="block max-w-[12rem] cursor-pointer text-xs text-primary-700 dark:text-neutral-300 file:mr-2 file:cursor-pointer file:rounded-md file:border file:border-primary-200 dark:file:border-neutral-600 file:bg-primary-100 dark:file:bg-neutral-700 file:px-2 file:py-1 file:text-xs file:font-medium file:text-primary-900 dark:file:text-neutral-100 file:transition-colors hover:file:bg-primary-200 dark:hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="block max-w-[13rem] cursor-pointer text-xs text-primary-700 dark:text-neutral-300 file:mr-2 file:cursor-pointer file:rounded-lg file:border file:border-primary-200 file:bg-primary-100 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-primary-900 file:transition-colors hover:file:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </label>
             <Button
@@ -241,6 +244,7 @@ function ProfileContent() {
               size="sm"
               onClick={() => updateCS({ avatarDataUrl: null })}
               disabled={!cs.avatarDataUrl || processing}
+              className="h-8 rounded-lg border-primary-200 px-3"
             >
               Remove
             </Button>
@@ -250,8 +254,8 @@ function ProfileContent() {
               {profileError}
             </p>
           )}
-        </div>
-      </Row>
+        </Row>
+      </div>
     </div>
   )
 }
@@ -293,56 +297,75 @@ function AppearanceContent() {
     return 'bg-green-500'
   }
 
+  function handleAccentColorChange(selectedAccent: AccentColor) {
+    localStorage.setItem('clawsuite-accent', selectedAccent)
+    document.documentElement.setAttribute('data-accent', selectedAccent)
+    applyAccentColor(selectedAccent)
+    updateSettings({ accentColor: selectedAccent })
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <SectionHeader
         title="Appearance"
-        description="Theme, accent color, and loading animation."
+        description="Theme and color accents."
       />
-      <Row label="Theme">
-        <Tabs value={settings.theme} onValueChange={handleThemeChange}>
-          <TabsList variant="default" className="gap-1">
-            <TabsTab value="system">
-              <HugeiconsIcon icon={ComputerIcon} size={16} strokeWidth={1.5} />
-              <span>System</span>
-            </TabsTab>
-            <TabsTab value="light">
-              <HugeiconsIcon icon={Sun01Icon} size={16} strokeWidth={1.5} />
-              <span>Light</span>
-            </TabsTab>
-            <TabsTab value="dark">
-              <HugeiconsIcon icon={Moon01Icon} size={16} strokeWidth={1.5} />
-              <span>Dark</span>
-            </TabsTab>
-          </TabsList>
-        </Tabs>
-      </Row>
-      <Row label="Accent color">
-        <div className="flex gap-1.5">
-          {(['orange', 'purple', 'blue', 'green'] as const).map((color) => (
-            <Button
-              key={color}
-              variant="ghost"
-              size="sm"
-              onClick={() => updateSettings({ accentColor: color })}
+      <div className={SETTINGS_CARD_CLASS}>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
+          Theme Mode
+        </p>
+        <div className="inline-flex rounded-lg border border-primary-200 bg-white p-1">
+          {[
+            { value: 'light', label: 'Light', icon: Sun01Icon },
+            { value: 'dark', label: 'Dark', icon: Moon01Icon },
+            { value: 'system', label: 'System', icon: ComputerIcon },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleThemeChange(option.value)}
               className={cn(
-                'border border-primary-200 bg-primary-100/70 hover:bg-primary-200',
-                settings.accentColor === color &&
-                  'border-primary-500 bg-primary-200',
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
+                settings.theme === option.value
+                  ? 'bg-accent-500 text-white'
+                  : 'text-primary-600 hover:bg-primary-100',
               )}
             >
-              <span
-                className={cn('size-2.5 rounded-full', badgeClass(color))}
-              />
-              <span className="capitalize">{color}</span>
-            </Button>
+              <HugeiconsIcon icon={option.icon} size={16} strokeWidth={1.5} />
+              {option.label}
+            </button>
           ))}
         </div>
-      </Row>
-      <Row label="Enterprise Theme">
+      </div>
+      <div className={SETTINGS_CARD_CLASS}>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
+          Accent Color
+        </p>
+        <div className="flex items-center gap-2">
+          {(['orange', 'purple', 'blue', 'green'] as const).map((color) => (
+            <button
+              key={color}
+              type="button"
+              onClick={() => handleAccentColorChange(color)}
+              aria-label={`Set accent color to ${color}`}
+              className={cn(
+                'inline-flex size-8 items-center justify-center rounded-full border transition-colors',
+                settings.accentColor === color
+                  ? 'border-primary-900 bg-primary-100'
+                  : 'border-primary-200 bg-white hover:bg-primary-100',
+              )}
+            >
+              <span className={cn('size-4 rounded-full', badgeClass(color))} />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className={SETTINGS_CARD_CLASS}>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
+          Enterprise Theme
+        </p>
         <EnterpriseThemePicker />
-      </Row>
-      <LoaderContent />
+      </div>
     </div>
   )
 }
@@ -381,20 +404,18 @@ const ENTERPRISE_THEMES = [
 function ThemeSwatch({ colors }: { colors: typeof ENTERPRISE_THEMES[number]['preview'] }) {
   return (
     <div
-      className="w-full h-10 rounded-md overflow-hidden border flex"
+      className="flex h-10 w-full overflow-hidden rounded-md border"
       style={{ borderColor: colors.border, backgroundColor: colors.bg }}
     >
-      {/* Sidebar strip */}
-      <div className="w-4 h-full flex flex-col gap-0.5 p-0.5" style={{ backgroundColor: colors.panel }}>
-        {[1,2,3].map((i) => (
-          <div key={i} className="rounded-sm h-1.5 w-full" style={{ backgroundColor: colors.border }} />
+      <div className="flex h-full w-4 flex-col gap-0.5 p-0.5" style={{ backgroundColor: colors.panel }}>
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-1.5 w-full rounded-sm" style={{ backgroundColor: colors.border }} />
         ))}
       </div>
-      {/* Content area */}
-      <div className="flex-1 p-1 flex flex-col gap-0.5">
-        <div className="h-1.5 rounded w-3/4" style={{ backgroundColor: colors.text, opacity: 0.8 }} />
-        <div className="h-1 rounded w-1/2" style={{ backgroundColor: colors.text, opacity: 0.3 }} />
-        <div className="mt-0.5 h-1.5 rounded-full w-6" style={{ backgroundColor: colors.accent }} />
+      <div className="flex flex-1 flex-col gap-0.5 p-1">
+        <div className="h-1.5 w-3/4 rounded" style={{ backgroundColor: colors.text, opacity: 0.8 }} />
+        <div className="h-1 w-1/2 rounded" style={{ backgroundColor: colors.text, opacity: 0.3 }} />
+        <div className="mt-0.5 h-1.5 w-6 rounded-full" style={{ backgroundColor: colors.accent }} />
       </div>
     </div>
   )
@@ -429,7 +450,7 @@ function EnterpriseThemePicker() {
   }
 
   return (
-    <div className="grid w-full grid-cols-2 gap-2 md:grid-cols-4">
+    <div className="grid w-full grid-cols-2 gap-2">
       {ENTERPRISE_THEMES.map((t) => {
         const isActive = current === t.id
         return (
@@ -438,10 +459,10 @@ function EnterpriseThemePicker() {
             type="button"
             onClick={() => applyEnterpriseTheme(t.id)}
             className={cn(
-              'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-all',
+              'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors',
               isActive
-                ? 'border-accent-500 bg-accent-50/30 ring-1 ring-accent-400/30'
-                : 'border-primary-200 bg-primary-50/50 hover:border-primary-300 hover:bg-primary-100/50',
+                ? 'border-accent-500 bg-accent-50 text-accent-700'
+                : 'border-primary-200 bg-primary-50/80 hover:bg-primary-100',
             )}
           >
             <ThemeSwatch colors={t.preview} />
@@ -500,11 +521,11 @@ function LoaderContent() {
     )
   }
   return (
-    <div className="pt-2">
-      <p className="mb-2 text-xs text-primary-500 dark:text-neutral-400">
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
         Loading animation
       </p>
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-4 gap-2">
         {styles.map((o) => (
           <button
             key={o.value}
@@ -513,8 +534,8 @@ function LoaderContent() {
             className={cn(
               'flex min-h-14 flex-col items-center justify-center gap-1.5 rounded-lg border px-1.5 py-1.5 transition-colors',
               cs.loaderStyle === o.value
-                ? 'border-primary-500 bg-primary-200/60 text-primary-900'
-                : 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100',
+                ? 'border-accent-500 bg-accent-50 text-accent-700'
+                : 'border-primary-200 bg-primary-50/80 text-primary-700 hover:bg-primary-100',
             )}
             aria-pressed={cs.loaderStyle === o.value}
           >
@@ -532,78 +553,36 @@ function LoaderContent() {
 function ChatContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <SectionHeader
-        title="Chat Display"
-        description="Control what's visible in chat messages."
+        title="Chat"
+        description="Message visibility and response loader style."
       />
-      <Row
-        label="Show tool messages"
-        description="Display tool call details when the agent uses tools."
-      >
-        <Switch
-          checked={cs.showToolMessages}
-          onCheckedChange={(c) => updateCS({ showToolMessages: c })}
-          aria-label="Show tool messages"
-        />
-      </Row>
-      <Row
-        label="Show reasoning blocks"
-        description="Display model thinking and reasoning process."
-      >
-        <Switch
-          checked={cs.showReasoningBlocks}
-          onCheckedChange={(c) => updateCS({ showReasoningBlocks: c })}
-          aria-label="Show reasoning blocks"
-        />
-      </Row>
-    </div>
-  )
-}
-
-function EditorContent() {
-  const { settings, updateSettings } = useSettings()
-  return (
-    <div className="space-y-3">
-      <SectionHeader
-        title="Editor"
-        description="Configure Monaco defaults for the files workspace."
-      />
-      <Row label="Font size">
-        <div className="flex w-full max-w-[14rem] items-center gap-2">
-          <input
-            type="range"
-            min={12}
-            max={20}
-            value={settings.editorFontSize}
-            onChange={(e) =>
-              updateSettings({ editorFontSize: Number(e.target.value) })
-            }
-            className="w-full accent-primary-900 dark:accent-primary-400"
-            aria-label={`Editor font size: ${settings.editorFontSize} pixels`}
-            aria-valuemin={12}
-            aria-valuemax={20}
-            aria-valuenow={settings.editorFontSize}
+      <div className={SETTINGS_CARD_CLASS}>
+        <Row
+          label="Show tool messages"
+          description="Display tool call details in assistant responses."
+        >
+          <Switch
+            checked={cs.showToolMessages}
+            onCheckedChange={(c) => updateCS({ showToolMessages: c })}
+            aria-label="Show tool messages"
           />
-          <span className="w-10 text-right text-sm tabular-nums text-primary-700 dark:text-neutral-300">
-            {settings.editorFontSize}px
-          </span>
-        </div>
-      </Row>
-      <Row label="Word wrap">
-        <Switch
-          checked={settings.editorWordWrap}
-          onCheckedChange={(c) => updateSettings({ editorWordWrap: c })}
-          aria-label="Word wrap"
-        />
-      </Row>
-      <Row label="Minimap">
-        <Switch
-          checked={settings.editorMinimap}
-          onCheckedChange={(c) => updateSettings({ editorMinimap: c })}
-          aria-label="Show minimap"
-        />
-      </Row>
+        </Row>
+        <Row
+          label="Show reasoning blocks"
+          description="Display model reasoning blocks when available."
+        >
+          <Switch
+            checked={cs.showReasoningBlocks}
+            onCheckedChange={(c) => updateCS({ showReasoningBlocks: c })}
+            aria-label="Show reasoning blocks"
+          />
+        </Row>
+      </div>
+      <div className={SETTINGS_CARD_CLASS}>
+        <LoaderContent />
+      </div>
     </div>
   )
 }
@@ -611,40 +590,42 @@ function EditorContent() {
 function NotificationsContent() {
   const { settings, updateSettings } = useSettings()
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <SectionHeader
         title="Notifications"
-        description="Control alert delivery and usage thresholds."
+        description="Simple alerts and threshold controls."
       />
-      <Row label="Enable alerts">
-        <Switch
-          checked={settings.notificationsEnabled}
-          onCheckedChange={(c) => updateSettings({ notificationsEnabled: c })}
-          aria-label="Enable alerts"
-        />
-      </Row>
-      <Row label="Usage threshold">
-        <div className="flex w-full max-w-[14rem] items-center gap-2">
-          <input
-            type="range"
-            min={50}
-            max={100}
-            value={settings.usageThreshold}
-            onChange={(e) =>
-              updateSettings({ usageThreshold: Number(e.target.value) })
-            }
-            className="w-full accent-primary-900 dark:accent-primary-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!settings.notificationsEnabled}
-            aria-label={`Usage threshold: ${settings.usageThreshold} percent`}
-            aria-valuemin={50}
-            aria-valuemax={100}
-            aria-valuenow={settings.usageThreshold}
+      <div className={SETTINGS_CARD_CLASS}>
+        <Row label="Enable alerts">
+          <Switch
+            checked={settings.notificationsEnabled}
+            onCheckedChange={(c) => updateSettings({ notificationsEnabled: c })}
+            aria-label="Enable alerts"
           />
-          <span className="w-10 text-right text-sm tabular-nums text-primary-700 dark:text-neutral-300">
-            {settings.usageThreshold}%
-          </span>
-        </div>
-      </Row>
+        </Row>
+        <Row label="Usage threshold">
+          <div className="flex w-full max-w-[14rem] items-center gap-2">
+            <input
+              type="range"
+              min={50}
+              max={100}
+              value={settings.usageThreshold}
+              onChange={(e) =>
+                updateSettings({ usageThreshold: Number(e.target.value) })
+              }
+              className="w-full accent-primary-900 dark:accent-primary-400 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!settings.notificationsEnabled}
+              aria-label={`Usage threshold: ${settings.usageThreshold} percent`}
+              aria-valuemin={50}
+              aria-valuemax={100}
+              aria-valuenow={settings.usageThreshold}
+            />
+            <span className="w-10 text-right text-sm tabular-nums text-primary-700 dark:text-neutral-300">
+              {settings.usageThreshold}%
+            </span>
+          </div>
+        </Row>
+      </div>
     </div>
   )
 }
@@ -654,32 +635,7 @@ function AdvancedContent() {
   const [connectionStatus, setConnectionStatus] = useState<
     'idle' | 'testing' | 'connected' | 'failed'
   >('idle')
-  const [availableModels, setAvailableModels] = useState<
-    Array<{ id: string; label: string }>
-  >([])
-  const [modelsError, setModelsError] = useState(false)
   const [urlError, setUrlError] = useState<string | null>(null)
-  const { resetTour } = useOnboardingTour()
-
-  useEffect(() => {
-    setModelsError(false)
-    fetch('/api/models')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.models) {
-          setAvailableModels(
-            d.models.map((m: any) => ({
-              id: m.id || '',
-              label: m.id?.split('/').pop() || m.id || '',
-            })),
-          )
-          setModelsError(false)
-        }
-      })
-      .catch(() => {
-        setModelsError(true)
-      })
-  }, [])
 
   function validateAndUpdateUrl(value: string) {
     if (value && value.length > 0) {
@@ -711,139 +667,68 @@ function AdvancedContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Gateway Connection"
-        description="Set your gateway endpoint."
+        title="Advanced"
+        description="Gateway endpoint and connectivity."
       />
-      <Row label="Gateway URL">
-        <div className="flex-1 max-w-sm">
-          <input
-            type="url"
-            placeholder="https://api.openclaw.ai"
-            value={settings.gatewayUrl}
-            onChange={(e) => validateAndUpdateUrl(e.target.value)}
-            className="h-9 w-full rounded-lg border border-primary-200 dark:border-neutral-600 bg-primary-50 dark:bg-neutral-800 px-2.5 text-sm text-primary-900 dark:text-neutral-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
-            aria-label="Gateway URL"
-            aria-invalid={!!urlError}
-            aria-describedby={urlError ? urlErrorId : undefined}
-          />
-          {urlError && (
-            <p
-              id={urlErrorId}
-              className="mt-1 text-xs text-red-600"
-              role="alert"
-            >
-              {urlError}
-            </p>
-          )}
-        </div>
-      </Row>
-      <Row label="Connection">
-        <span
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
-            connectionStatus === 'connected' &&
-              'border-green-500/35 bg-green-500/10 text-green-600',
-            connectionStatus === 'failed' &&
-              'border-red-500/35 bg-red-500/10 text-red-600',
-            connectionStatus === 'testing' &&
-              'border-accent-500/35 bg-accent-500/10 text-accent-600',
-            connectionStatus === 'idle' &&
-              'border-primary-300 bg-primary-100 text-primary-700',
-          )}
-        >
-          {connectionStatus === 'idle'
-            ? 'Not tested'
-            : connectionStatus === 'testing'
-              ? 'Testing...'
-              : connectionStatus === 'connected'
-                ? 'Connected'
-                : 'Failed'}
-        </span>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => void testConnection()}
-          disabled={connectionStatus === 'testing' || !!urlError}
-        >
-          <HugeiconsIcon
-            icon={CheckmarkCircle02Icon}
-            size={16}
-            strokeWidth={1.5}
-          />
-          Test
-        </Button>
-      </Row>
-
-      <div className="border-t border-primary-200 dark:border-neutral-700 pt-4">
-        <SectionHeader
-          title="Smart Suggestions"
-          description="Proactive model suggestions."
-        />
-        <Row label="Enable suggestions">
-          <Switch
-            checked={settings.smartSuggestionsEnabled}
-            onCheckedChange={(c) =>
-              updateSettings({ smartSuggestionsEnabled: c })
-            }
-            aria-label="Enable smart suggestions"
-          />
+      <div className={SETTINGS_CARD_CLASS}>
+        <Row label="Gateway URL" description="Used for API requests from Studio">
+          <div className="w-full max-w-sm">
+            <Input
+              type="url"
+              placeholder="https://api.openclaw.ai"
+              value={settings.gatewayUrl}
+              onChange={(e) => validateAndUpdateUrl(e.target.value)}
+              className="h-8 w-full rounded-lg border-primary-200 text-sm"
+              aria-label="Gateway URL"
+              aria-invalid={!!urlError}
+              aria-describedby={urlError ? urlErrorId : undefined}
+            />
+            {urlError && (
+              <p
+                id={urlErrorId}
+                className="mt-1 text-xs text-red-600"
+                role="alert"
+              >
+                {urlError}
+              </p>
+            )}
+          </div>
         </Row>
-        <Row label="Budget model">
-          <select
-            value={settings.preferredBudgetModel}
-            onChange={(e) =>
-              updateSettings({ preferredBudgetModel: e.target.value })
-            }
-            className="h-9 w-full max-w-[14rem] rounded-lg border border-primary-200 dark:border-neutral-600 bg-primary-50 dark:bg-neutral-800 px-2 text-sm text-primary-900 dark:text-neutral-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
-            aria-label="Preferred budget model"
+        <Row label="Connection status">
+          <span
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
+              connectionStatus === 'connected' &&
+                'border-green-500/35 bg-green-500/10 text-green-600',
+              connectionStatus === 'failed' &&
+                'border-red-500/35 bg-red-500/10 text-red-600',
+              connectionStatus === 'testing' &&
+                'border-accent-500/35 bg-accent-500/10 text-accent-600',
+              connectionStatus === 'idle' &&
+                'border-primary-300 bg-primary-100 text-primary-700',
+            )}
           >
-            <option value="">Auto-detect</option>
-            {modelsError && <option disabled>Failed to load models</option>}
-            {availableModels.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </Row>
-        <Row label="Premium model">
-          <select
-            value={settings.preferredPremiumModel}
-            onChange={(e) =>
-              updateSettings({ preferredPremiumModel: e.target.value })
-            }
-            className="h-9 w-full max-w-[14rem] rounded-lg border border-primary-200 dark:border-neutral-600 bg-primary-50 dark:bg-neutral-800 px-2 text-sm text-primary-900 dark:text-neutral-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
-            aria-label="Preferred premium model"
+            {connectionStatus === 'idle'
+              ? 'Not tested'
+              : connectionStatus === 'testing'
+                ? 'Testing...'
+                : connectionStatus === 'connected'
+                  ? 'Connected'
+                  : 'Failed'}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void testConnection()}
+            disabled={connectionStatus === 'testing' || !!urlError}
+            className="h-8 rounded-lg border-primary-200 px-3"
           >
-            <option value="">Auto-detect</option>
-            {modelsError && <option disabled>Failed to load models</option>}
-            {availableModels.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </Row>
-        <Row label="Only suggest cheaper">
-          <Switch
-            checked={settings.onlySuggestCheaper}
-            onCheckedChange={(c) => updateSettings({ onlySuggestCheaper: c })}
-            aria-label="Only suggest cheaper models"
-          />
-        </Row>
-      </div>
-
-      <div className="border-t border-primary-200 dark:border-neutral-700 pt-4">
-        <SectionHeader
-          title="Onboarding"
-          description="Restart the welcome tour."
-        />
-        <Row
-          label="Restart Tour"
-          description="Show the welcome walkthrough again"
-        >
-          <Button variant="secondary" size="sm" onClick={resetTour}>
-            Restart Tour
+            <HugeiconsIcon
+              icon={CheckmarkCircle02Icon}
+              size={16}
+              strokeWidth={1.5}
+            />
+            Test
           </Button>
         </Row>
       </div>
@@ -891,7 +776,6 @@ const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
   profile: ProfileContent,
   appearance: AppearanceContent,
   chat: ChatContent,
-  editor: EditorContent,
   notifications: NotificationsContent,
   advanced: AdvancedContent,
 }
@@ -907,15 +791,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(680px,95vw)] h-[min(80dvh,640px)] max-h-[calc(100dvh-3rem)] overflow-hidden">
+      <DialogContent className="h-[min(88dvh,740px)] min-h-[520px] w-full max-w-3xl overflow-hidden rounded-2xl border border-primary-200 bg-white p-0 shadow-xl">
         <div className="flex h-full min-h-0 flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-primary-200 px-5 py-3">
+          <div className="flex items-center justify-between rounded-t-2xl border-b border-primary-200 bg-primary-50/80 px-5 py-4">
             <div>
-              <DialogTitle className="text-base font-semibold">
+              <DialogTitle className="text-base font-semibold text-primary-900 dark:text-neutral-100">
                 Settings
               </DialogTitle>
-              <DialogDescription className="hidden">
+              <DialogDescription className="sr-only">
                 Configure ClawSuite
               </DialogDescription>
             </div>
@@ -924,7 +807,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  className="text-primary-500 dark:text-neutral-400 hover:bg-primary-100 dark:hover:bg-neutral-800"
+                  className="rounded-full text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
                   aria-label="Close"
                 >
                   <HugeiconsIcon
@@ -938,35 +821,32 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </div>
 
           <SettingsErrorBoundary>
-            {/* Horizontal tabs */}
-            <div className="flex gap-0.5 border-b border-primary-200 px-5 overflow-x-auto scrollbar-none">
-              {SECTIONS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setActive(s.id)}
-                  className={cn(
-                    'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-medium transition-colors',
-                    active === s.id
-                      ? 'border-accent-500 text-accent-600'
-                      : 'border-transparent text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200',
-                  )}
-                >
-                  <HugeiconsIcon icon={s.icon} size={14} strokeWidth={1.5} />
-                  {s.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
-              <ActiveContent />
+            <div className="flex min-h-0 flex-1">
+              <aside className="w-44 shrink-0 border-r border-primary-200 bg-primary-50/60 p-2">
+                <nav className="space-y-1">
+                  {SECTIONS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setActive(s.id)}
+                      className={cn(
+                        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-primary-600 transition-colors hover:bg-primary-100',
+                        active === s.id && 'bg-accent-50 font-medium text-accent-700',
+                      )}
+                    >
+                      <HugeiconsIcon icon={s.icon} size={16} strokeWidth={1.5} />
+                      {s.label}
+                    </button>
+                  ))}
+                </nav>
+              </aside>
+              <div className="min-w-0 flex-1 overflow-y-auto p-5">
+                <ActiveContent />
+              </div>
             </div>
           </SettingsErrorBoundary>
 
-          {/* Footer */}
-          <div className="border-t border-primary-200 dark:border-neutral-700 px-5 py-2.5 text-xs text-primary-500 dark:text-neutral-400 flex items-center gap-1.5">
-            <HugeiconsIcon icon={Settings02Icon} size={14} strokeWidth={1.5} />
+          <div className="rounded-b-2xl border-t border-primary-200 bg-primary-50/60 px-5 py-3 text-xs text-primary-500 dark:text-neutral-400">
             Changes saved automatically.
           </div>
         </div>

@@ -67,7 +67,7 @@ function KpiCard({
     <div className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent-500 via-accent-400/50 to-transparent"
       />
       <div className="text-[11px] uppercase tracking-wider text-primary-500 dark:text-neutral-400">
         {label}
@@ -193,7 +193,7 @@ export function CostsScreen() {
               <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent-500 via-accent-400/50 to-transparent"
                 />
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
@@ -270,7 +270,7 @@ export function CostsScreen() {
               <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent-500 via-accent-400/50 to-transparent"
                 />
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
@@ -320,7 +320,7 @@ export function CostsScreen() {
             <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+                className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent-500 via-accent-400/50 to-transparent"
               />
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>

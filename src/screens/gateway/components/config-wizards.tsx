@@ -313,8 +313,8 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">{children}</span>
 }
 
-const INPUT_CLS = 'h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 transition-colors'
-const SELECT_CLS = 'h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1'
+const INPUT_CLS = 'h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-1 transition-colors'
+const SELECT_CLS = 'h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-1'
 
 // ─── AgentWizardModal ─────────────────────────────────────────────────────────
 
@@ -383,7 +383,7 @@ export function AgentWizardModal({
           <input
             value={member.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
-            className="h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-base font-semibold text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 transition-colors"
+            className="h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-base font-semibold text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-1 transition-colors"
             placeholder={`Agent ${memberIndex + 1}`}
           />
         </div>
@@ -442,7 +442,7 @@ export function AgentWizardModal({
                       <button key={tpl.id} type="button"
                         onClick={() => { onUpdate({ backstory: active ? '' : tpl.prompt }) }}
                         className={cn('rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors gap-1',
-                          active ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+                          active ? 'border-accent-300 bg-accent-50 text-accent-700 dark:border-accent-700 dark:bg-accent-900/20 dark:text-accent-400'
                             : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-500 hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700')}
                         title={tpl.prompt.slice(0, 120)}
                       >
@@ -459,7 +459,7 @@ export function AgentWizardModal({
             ref={systemPromptRef}
             value={member.backstory}
             onChange={(e) => { onUpdate({ backstory: e.target.value }) }}
-            className="mt-2 w-full resize-none rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 py-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-1 font-mono leading-relaxed overflow-auto"
+            className="mt-2 w-full resize-none rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 py-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-1 font-mono leading-relaxed overflow-auto"
             style={{ minHeight: 100, maxHeight: 400 }}
             placeholder="Persona, instructions, and context for this agent..."
           />
@@ -484,7 +484,7 @@ export function AgentWizardModal({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
+          className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-accent-600 transition-colors"
         >
           {addMode ? '+ Add Agent' : 'Save Changes'}
         </button>
@@ -520,8 +520,8 @@ function TeamIconPicker({
             type="button"
             onClick={() => { onSelect(icon); onClose() }}
             className={cn(
-              'flex size-7 items-center justify-center rounded-md text-base transition-all hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:scale-110',
-              currentIcon === icon ? 'bg-orange-50 dark:bg-orange-900/20 ring-1 ring-orange-400' : '',
+              'flex size-7 items-center justify-center rounded-md text-base transition-all hover:bg-accent-50 dark:hover:bg-accent-900/20 hover:scale-110',
+              currentIcon === icon ? 'bg-accent-50 dark:bg-accent-900/20 ring-1 ring-accent-400' : '',
             )}
           >
             {icon}
@@ -577,7 +577,7 @@ export function TeamWizardModal({
   const [showIconPicker, setShowIconPicker] = useState(false)
   const [localMembers, setLocalMembers] = useState(teamMembers.map((m) => ({ ...m })))
 
-  const accentBorder = isActive ? 'border-orange-400' : 'border-blue-400'
+  const accentBorder = isActive ? 'border-accent-400' : 'border-blue-400'
   const notInTeam = availableAgents.filter((a) => !localMembers.some((m) => m.id === a.id))
 
   function handleSave() {
@@ -635,7 +635,7 @@ export function TeamWizardModal({
           type="button"
           onClick={() => { if (!isActive) { onLoad(); onClose() } }}
           title={isActive ? 'Active team' : 'Set as active team'}
-          className={cn('text-2xl leading-none transition-colors mr-1', isActive ? 'text-orange-400 cursor-default' : 'text-neutral-300 hover:text-orange-400 cursor-pointer')}
+          className={cn('text-2xl leading-none transition-colors mr-1', isActive ? 'text-accent-400 cursor-default' : 'text-neutral-300 hover:text-accent-400 cursor-pointer')}
         >
           {isActive ? '⭐' : '☆'}
         </button>
@@ -672,7 +672,7 @@ export function TeamWizardModal({
               <p className="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 py-3 text-center text-xs text-neutral-400">No agents yet — add some below</p>
             ) : localMembers.map((member) => (
               <div key={member.id} className="flex items-center gap-2.5 rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2.5">
-                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/30 text-[11px] font-bold text-accent-600 dark:text-accent-400">
                   {member.name[0]?.toUpperCase() ?? '?'}
                 </div>
                 <p className="min-w-0 flex-1 text-xs font-semibold text-neutral-900 dark:text-white truncate">{member.name}</p>
@@ -729,7 +729,7 @@ export function TeamWizardModal({
         <button
           type="button"
           onClick={handleSave}
-          className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+          className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white hover:bg-accent-600 transition-colors"
         >
           ✓ Save
         </button>
@@ -831,8 +831,8 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
   return (
     <WizardModal open onClose={onClose} width="max-w-lg">
       {/* Header */}
-      <div className="flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4 border-l-orange-400">
-        <div className="flex size-12 items-center justify-center rounded-full bg-orange-50 dark:bg-orange-900/20 text-2xl shadow-sm">
+      <div className="flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4 border-l-accent-400">
+        <div className="flex size-12 items-center justify-center rounded-full bg-accent-50 dark:bg-accent-900/20 text-2xl shadow-sm">
           {teamIcon}
         </div>
         <div className="flex-1">
@@ -841,9 +841,9 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
         </div>
         {/* Step dots */}
         <div className="flex items-center gap-1.5 mr-2">
-          <span className={cn('size-2 rounded-full transition-colors', step === 1 ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
-          <span className={cn('size-2 rounded-full transition-colors', step === 2 ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
-          <span className={cn('size-2 rounded-full transition-colors', step === 3 ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+          <span className={cn('size-2 rounded-full transition-colors', step === 1 ? 'bg-accent-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+          <span className={cn('size-2 rounded-full transition-colors', step === 2 ? 'bg-accent-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+          <span className={cn('size-2 rounded-full transition-colors', step === 3 ? 'bg-accent-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
         </div>
         <button type="button" onClick={onClose}
           className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
@@ -862,7 +862,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
               onChange={(e) => setTeamName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && teamName.trim()) setStep(2) }}
               placeholder="e.g. Research Squad, Dev Team..."
-              className="h-11 w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 text-sm text-neutral-900 dark:text-white outline-none ring-orange-400 focus:ring-2 transition-colors"
+              className="h-11 w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 text-sm text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-2 transition-colors"
             />
             <p className="mt-2 text-xs text-neutral-400 dark:text-neutral-500">You can change this later</p>
           </div>
@@ -871,7 +871,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
               type="button"
               onClick={() => setStep(2)}
               disabled={!teamName.trim()}
-              className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-40 transition-colors"
+              className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white hover:bg-accent-600 disabled:opacity-40 transition-colors"
             >
               Next →
             </button>
@@ -893,7 +893,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
                   className={cn(
                     'flex size-11 items-center justify-center rounded-xl text-2xl transition-all hover:scale-110',
                     teamIcon === ic
-                      ? 'bg-orange-100 dark:bg-orange-900/40 ring-2 ring-orange-400'
+                      ? 'bg-accent-100 dark:bg-accent-900/40 ring-2 ring-accent-400'
                       : 'hover:bg-neutral-100 dark:hover:bg-neutral-800',
                   )}
                 >
@@ -913,7 +913,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
             <button
               type="button"
               onClick={() => setStep(3)}
-              className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+              className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white hover:bg-accent-600 transition-colors"
             >
               Next →
             </button>
@@ -940,7 +940,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
                     }}
                     className={cn('flex items-center gap-2 rounded-xl border-2 px-3 py-3 text-left transition-all',
                       selectedTemplate === tpl.id
-                        ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/15 shadow-sm'
+                        ? 'border-accent-400 bg-accent-50 dark:bg-accent-900/15 shadow-sm'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600')}
                   >
                     <span className="shrink-0 text-xl">{tpl.icon}</span>
@@ -987,13 +987,13 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
                       className={cn(
                         'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all',
                         checked
-                          ? 'border-orange-300 bg-orange-50/50 dark:border-orange-700/50 dark:bg-orange-900/10'
+                          ? 'border-accent-300 bg-accent-50/50 dark:border-accent-700/50 dark:bg-accent-900/10'
                           : 'border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/30 opacity-60 hover:opacity-80',
                       )}
                     >
                       <span className={cn(
                         'flex size-4 shrink-0 items-center justify-center rounded border-2 transition-all',
-                        checked ? 'border-orange-500 bg-orange-500' : 'border-neutral-300 dark:border-neutral-600',
+                        checked ? 'border-accent-500 bg-accent-500' : 'border-neutral-300 dark:border-neutral-600',
                       )}>
                         {checked ? <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> : null}
                       </span>
@@ -1026,7 +1026,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
               type="button"
               onClick={handleCreate}
               disabled={!canCreate}
-              className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+              className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white hover:bg-accent-600 disabled:opacity-50 transition-colors"
             >
               Create Team
             </button>
@@ -1152,7 +1152,7 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
           <button
             type="button"
             onClick={() => { onSave(apiKey, defaultModel); onClose() }}
-            className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+            className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white hover:bg-accent-600 transition-colors"
           >
             Update Provider
           </button>

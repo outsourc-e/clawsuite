@@ -377,7 +377,7 @@ export function OfficeView({
           <button
             type="button"
             onClick={() => onNewMission?.()}
-            className="rounded-full border border-orange-200 bg-orange-50 dark:border-orange-800/50 dark:bg-orange-900/20 px-3 py-1 text-[10px] font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+            className="rounded-full border border-accent-200 bg-accent-50 dark:border-accent-800/50 dark:bg-accent-900/20 px-3 py-1 text-[10px] font-semibold text-accent-600 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900/40 transition-colors"
           >
             + New Mission
           </button>
@@ -556,8 +556,8 @@ export function OfficeView({
               type="button"
               onClick={() => onViewOutput(agent.id)}
               className={cn(
-                'group absolute z-10 flex flex-col items-center rounded-xl bg-transparent px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400',
-                isSelected && 'ring-2 ring-orange-300/80',
+                'group absolute z-10 flex flex-col items-center rounded-xl bg-transparent px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400',
+                isSelected && 'ring-2 ring-accent-300/80',
               )}
               style={{
                 left: 0,

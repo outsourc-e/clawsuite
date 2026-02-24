@@ -1526,7 +1526,7 @@ function ChatComposerComponent({
                               icon={PinIcon}
                               size={14}
                               strokeWidth={1.5}
-                              className="text-orange-500"
+                              className="text-accent-500"
                             />
                             <span>Pinned</span>
                           </div>
@@ -1550,7 +1550,7 @@ function ChatComposerComponent({
                                   className={cn(
                                     'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50',
                                     optionActive &&
-                                      'border-l-2 border-orange-500 bg-neutral-100 text-neutral-900',
+                                      'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
                                   )}
                                   role="option"
                                   aria-selected={optionActive}
@@ -1561,7 +1561,7 @@ function ChatComposerComponent({
                                   </span>
                                   {optionActive && (
                                     <span
-                                      className="h-1.5 w-1.5 rounded-full bg-orange-500"
+                                      className="h-1.5 w-1.5 rounded-full bg-accent-500"
                                       aria-label="Currently active"
                                     />
                                   )}
@@ -1572,7 +1572,7 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-3 rounded px-1 text-xs leading-none text-orange-500 opacity-80 transition-opacity hover:bg-orange-50 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-orange-300"
+                                  className="absolute right-3 rounded px-1 text-xs leading-none text-accent-500 opacity-80 transition-opacity hover:bg-accent-50 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300"
                                   aria-label={`Unpin ${option.label}`}
                                   title="Unpin"
                                 >
@@ -1642,7 +1642,7 @@ function ChatComposerComponent({
                                   className={cn(
                                     'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50',
                                     optionActive &&
-                                      'border-l-2 border-orange-500 bg-neutral-100 text-neutral-900',
+                                      'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
                                   )}
                                   role="option"
                                   aria-selected={optionActive}
@@ -1653,7 +1653,7 @@ function ChatComposerComponent({
                                   </span>
                                   {optionActive && (
                                     <span
-                                      className="h-1.5 w-1.5 rounded-full bg-orange-500"
+                                      className="h-1.5 w-1.5 rounded-full bg-accent-500"
                                       aria-label="Currently active"
                                     />
                                   )}
@@ -1664,7 +1664,7 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 hover:text-orange-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-orange-300 group-hover:opacity-100"
+                                  className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 hover:text-accent-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300 group-hover:opacity-100"
                                   aria-label={`Pin ${option.label}`}
                                   title="Pin"
                                 >

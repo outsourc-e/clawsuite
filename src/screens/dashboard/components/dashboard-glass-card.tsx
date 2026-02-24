@@ -62,7 +62,7 @@ export function DashboardGlassCard({
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent-500 via-accent-400/50 to-transparent"
       />
       <header className="mb-2 flex shrink-0 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">

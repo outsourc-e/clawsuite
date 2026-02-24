@@ -97,7 +97,7 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-orange-500 via-orange-400/50 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent-500 via-accent-400/50 to-transparent"
       />
       <div className="flex items-start justify-between gap-3">
         <div>

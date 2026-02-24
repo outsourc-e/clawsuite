@@ -269,7 +269,7 @@ export function ApprovalsPage({ approvals, onApprove, onDeny }: ApprovalsPagePro
                           row.source === 'gateway'
                             ? 'border-violet-200 bg-violet-50/40 dark:border-violet-800/40 dark:bg-violet-900/10'
                             : 'border-amber-200 bg-amber-50/40 dark:border-amber-800/40 dark:bg-amber-900/10',
-                          newIds[row.key] && 'animate-pulse ring-2 ring-orange-300/70 dark:ring-orange-500/40',
+                          newIds[row.key] && 'animate-pulse ring-2 ring-accent-300/70 dark:ring-accent-500/40',
                         )}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-2">

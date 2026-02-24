@@ -42,6 +42,12 @@ export const defaultStudioSettings: StudioSettings = {
   onlySuggestCheaper: false,
 }
 
+function resolveStoredAccent(value: string | null): AccentColor | null {
+  return value === 'purple' || value === 'blue' || value === 'green' || value === 'orange'
+    ? value
+    : null
+}
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     function createSettingsStore(set) {
@@ -115,11 +121,15 @@ export function applyTheme(theme: SettingsThemeMode) {
   } else {
     root.setAttribute('data-theme', 'paper-light')
   }
+
+  const storedAccent = resolveStoredAccent(localStorage.getItem('clawsuite-accent')) || 'orange'
+  root.setAttribute('data-accent', storedAccent)
 }
 
 function applySettingsAppearance(settings: StudioSettings) {
   applyTheme(settings.theme)
-  applyAccentColor(settings.accentColor)
+  const storedAccent = resolveStoredAccent(localStorage.getItem('clawsuite-accent'))
+  applyAccentColor(storedAccent ?? settings.accentColor)
 }
 
 let didInitializeSettingsAppearance = false
@@ -145,9 +155,9 @@ export function initializeSettingsAppearance() {
       }
 
       if (nextSettings.accentColor !== previousSettings.accentColor) {
+        localStorage.setItem('clawsuite-accent', nextSettings.accentColor)
         applyAccentColor(nextSettings.accentColor)
       }
     },
   )
 }
-

@@ -147,7 +147,7 @@ function AgentRow({
       className={cn(
         'group relative flex cursor-pointer items-stretch overflow-hidden rounded-lg border transition-all',
         'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50',
-        isSelected && 'border-orange-200 bg-orange-50/40 ring-1 ring-orange-200',
+        isSelected && 'border-accent-200 bg-accent-50/40 ring-1 ring-accent-200',
       )}
     >
       {/* Left accent bar */}
@@ -298,7 +298,7 @@ function AgentCompactCard({
       onClick={onSelect}
       className={cn(
         'relative w-40 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white px-2.5 py-2 text-left transition-colors hover:border-neutral-300 hover:bg-neutral-50',
-        isSelected && 'border-orange-200 ring-1 ring-orange-200',
+        isSelected && 'border-accent-200 ring-1 ring-accent-200',
       )}
     >
       {/* Top accent bar */}
