@@ -699,10 +699,9 @@ function ChatMessageListComponent({
     const sessionChanged = prevSessionKeyRef.current !== sessionKey
     prevSessionKeyRef.current = sessionKey
 
-    // Always scroll on session change
+    // Always scroll on session change (instant)
     if (sessionChanged) {
       stickToBottomRef.current = true
-      // Use requestAnimationFrame to ensure DOM has updated
       frameId = window.requestAnimationFrame(() => scrollToBottom('auto'))
       return () => {
         if (frameId !== null) window.cancelAnimationFrame(frameId)
@@ -711,7 +710,10 @@ function ChatMessageListComponent({
 
     // Scroll to bottom if sticking
     if (stickToBottomRef.current) {
-      frameId = window.requestAnimationFrame(() => scrollToBottom('auto'))
+      // Use smooth scroll only when user is near bottom (<200px) and new messages arrive;
+      // use instant scroll during streaming to avoid choppiness.
+      const behavior: ScrollBehavior = isNearBottomRef.current && !isStreaming ? 'smooth' : 'auto'
+      frameId = window.requestAnimationFrame(() => scrollToBottom(behavior))
     }
 
     return () => {

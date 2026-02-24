@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
-  ReloadIcon,
 } from '@hugeicons/core-free-icons'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
@@ -66,14 +65,6 @@ function formatMobileSessionTitle(rawTitle: string): string {
   return title
 }
 
-function formatSyncAge(updatedAt: number): string {
-  if (updatedAt <= 0) return ''
-  const seconds = Math.round((Date.now() - updatedAt) / 1000)
-  if (seconds < 5) return 'just now'
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.round(seconds / 60)
-  return `${minutes}m ago`
-}
 
 type ChatHeaderProps = {
   activeTitle: string
@@ -114,21 +105,12 @@ function ChatHeaderComponent({
   onOpenAgentDetails,
   pullOffset = 0,
 }: ChatHeaderProps) {
-  const [syncLabel, setSyncLabel] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(activeTitle)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const isSavingTitleRef = useRef(false)
-
-  useEffect(() => {
-    if (dataUpdatedAt <= 0) return
-    const update = () => setSyncLabel(formatSyncAge(dataUpdatedAt))
-    update()
-    const id = setInterval(update, 5000)
-    return () => clearInterval(id)
-  }, [dataUpdatedAt])
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)')
@@ -329,44 +311,33 @@ function ChatHeaderComponent({
           aria-label="Saving session name"
         />
       ) : null}
-      {syncLabel ? (
-        <span
-          className={cn(
-            'mr-1 text-[11px] tabular-nums transition-colors',
-            isStale ? 'text-amber-500' : 'text-primary-400',
-          )}
-          title={
-            dataUpdatedAt > 0
-              ? `Last synced: ${new Date(dataUpdatedAt).toLocaleTimeString()}`
-              : undefined
-          }
-        >
-          {isStale ? '⚠ ' : ''}
-          {syncLabel}
-        </span>
-      ) : null}
-      {onRefresh ? (
+      {dataUpdatedAt > 0 ? (
         <TooltipProvider>
           <TooltipRoot>
             <TooltipTrigger
-              onClick={handleRefresh}
+              onClick={onRefresh ? handleRefresh : undefined}
               render={
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="mr-1 text-primary-500 hover:bg-primary-100 hover:text-primary-700"
-                  aria-label="Refresh chat"
+                <button
+                  type="button"
+                  aria-label={isStale ? 'Stale — click to sync' : 'Live'}
+                  className={cn(
+                    'mr-2 inline-flex items-center justify-center rounded-full transition-colors',
+                    isRefreshing && 'animate-pulse',
+                    onRefresh ? 'cursor-pointer hover:opacity-70' : 'cursor-default',
+                  )}
                 >
-                  <HugeiconsIcon
-                    icon={ReloadIcon}
-                    size={20}
-                    strokeWidth={1.5}
-                    className={cn(isRefreshing && 'animate-spin')}
+                  <span
+                    className={cn(
+                      'block size-2 rounded-full transition-colors duration-500',
+                      isStale ? 'bg-amber-400' : 'bg-emerald-500',
+                    )}
                   />
-                </Button>
+                </button>
               }
             />
-            <TooltipContent side="bottom">Sync messages</TooltipContent>
+            <TooltipContent side="bottom">
+              {isStale ? 'Stale — click to sync' : 'Live'}
+            </TooltipContent>
           </TooltipRoot>
         </TooltipProvider>
       ) : null}

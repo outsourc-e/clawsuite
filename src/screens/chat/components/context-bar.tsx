@@ -104,6 +104,9 @@ function ContextBarComponent({ compact: _compact }: { compact?: boolean }) {
         : 'text-emerald-600'
 
   if (isMobile) {
+    // On mobile: hide when usage is ≤80%; show with warning color when >80%
+    if (clampedPct <= 80) return null
+
     return (
       <div className="relative w-full">
         {/* Invisible tap target */}

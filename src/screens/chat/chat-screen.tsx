@@ -721,6 +721,62 @@ export function ChatScreen({
       !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
   })
 
+  // Fast local auto-rename: title-case first 6 words of first user message,
+  // fires immediately when first assistant message arrives in an untitled session.
+  const fastTitleDoneRef = useRef(false)
+  // Reset on session change
+  useEffect(() => {
+    fastTitleDoneRef.current = false
+  }, [activeFriendlyId])
+  useEffect(() => {
+    if (isNewChat) return
+    if (fastTitleDoneRef.current) return
+    if (!resolvedSessionKey) return
+
+    // Only if session title is generic/empty
+    const sessionTitle = activeSession?.label ?? activeSession?.title ?? activeSession?.derivedTitle ?? ''
+    const isGeneric =
+      !sessionTitle ||
+      sessionTitle === 'New Session' ||
+      sessionTitle === 'New Chat' ||
+      /^(untitled|new session|new chat)$/i.test(sessionTitle.trim()) ||
+      /^[0-9a-f-]{8,}$/i.test(sessionTitle.trim())
+
+    if (!isGeneric) return
+
+    // Check if we have at least one assistant message
+    const hasAssistant = finalDisplayMessages.some((m) => m.role === 'assistant')
+    if (!hasAssistant) return
+
+    // Find the first user message
+    const firstUser = finalDisplayMessages.find((m) => m.role === 'user')
+    if (!firstUser) return
+
+    const userText = textFromMessage(firstUser).trim()
+    if (!userText) return
+
+    // Take first 6 words and title-case them
+    const words = userText.split(/\s+/).slice(0, 6)
+    const title = words
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ')
+      .replace(/[?!.,;:]+$/, '')
+
+    if (title.length < 3) return
+
+    fastTitleDoneRef.current = true
+    const key = resolvedSessionKey || activeSession?.key || activeSessionKey || ''
+    if (!key) return
+    void renameSession(key, activeSession?.friendlyId ?? null, title)
+  }, [
+    isNewChat,
+    resolvedSessionKey,
+    activeSession,
+    finalDisplayMessages,
+    activeSessionKey,
+    renameSession,
+  ])
+
   // Phase 4.1: Smart Model Suggestions
   const modelsQuery = useQuery({
     queryKey: ['models'],

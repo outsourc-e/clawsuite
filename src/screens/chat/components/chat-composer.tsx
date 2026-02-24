@@ -1120,13 +1120,30 @@ function ChatComposerComponent({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleSubmit])
 
+  // ⌘+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector
+  useEffect(() => {
+    const handleModelShortcut = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === 'm'
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        setIsModelMenuOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleModelShortcut, true)
+    return () => window.removeEventListener('keydown', handleModelShortcut, true)
+  }, [])
+
   const submitDisabled =
     disabled || (value.trim().length === 0 && attachments.length === 0)
 
   const hasDraft = value.trim().length > 0 || attachments.length > 0
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
-    : 'Ask anything... (⌘↵ to send)'
+    : 'Ask anything... (⌘↵ to send · ⌘⇧M to switch model)'
   const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
   const isSlashMenuOpen =
     slashCommandQuery !== null && !disabled && !isSlashMenuDismissed
