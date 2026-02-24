@@ -43,7 +43,6 @@ import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { BrowserSidebarPreview } from '@/components/browser-view/browser-sidebar-preview'
-import { UsageMeterCompact } from '@/components/usage-meter/usage-meter-compact'
 import { cn } from '@/lib/utils'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
@@ -107,6 +106,76 @@ const STATE_GLOW: Record<string, string> = {
   orchestrating: 'border-accent-400/50 shadow-[0_0_8px_rgba(249,115,22,0.2)]',
 }
 
+// ── Usage helpers (inline in OrchestratorCard) ─────────────────────────────
+
+const USAGE_POLL_MS = 30_000
+const PREFERRED_PROVIDER_KEY_OC = 'clawsuite-preferred-provider'
+
+type OcUsageLine = {
+  type: 'progress' | 'text' | 'badge'
+  label: string
+  used?: number
+  limit?: number
+  format?: 'percent' | 'dollars' | 'tokens'
+  value?: string
+  color?: string
+}
+
+type OcProviderEntry = {
+  provider: string
+  displayName: string
+  status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
+  plan?: string
+  lines: Array<OcUsageLine>
+}
+
+type OcUsageRow = { label: string; pct: number }
+
+function ocBarColor(pct: number): string {
+  if (pct >= 80) return 'bg-red-500'
+  if (pct >= 60) return 'bg-amber-400'
+  return 'bg-emerald-500'
+}
+function ocTextColor(pct: number): string {
+  if (pct >= 80) return 'text-red-500'
+  if (pct >= 60) return 'text-amber-500'
+  return 'text-emerald-600'
+}
+
+function ocReadNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const p = Number(value)
+    if (Number.isFinite(p)) return p
+  }
+  return 0
+}
+
+function ocReadPercent(value: unknown): number {
+  const n = ocReadNumber(value)
+  if (n <= 1 && n > 0) return n * 100
+  return n
+}
+
+function ocParseContextPct(payload: unknown): number {
+  const root = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+  const usage =
+    (root.today as Record<string, unknown> | undefined) ??
+    (root.usage as Record<string, unknown> | undefined) ??
+    (root.summary as Record<string, unknown> | undefined) ??
+    (root.totals as Record<string, unknown> | undefined) ??
+    root
+  return ocReadPercent(
+    (usage as Record<string, unknown>)?.contextPercent ??
+      (usage as Record<string, unknown>)?.context_percent ??
+      (usage as Record<string, unknown>)?.context ??
+      root?.contextPercent ??
+      root?.context_percent,
+  )
+}
+
+// ── OrchestratorCard ────────────────────────────────────────────────────────
+
 function OrchestratorCard({
   compact = false,
   cardRef,
@@ -124,27 +193,76 @@ function OrchestratorCard({
 
   // Fetch model from gateway
   const [model, setModel] = useState('')
+
+  // Usage state
+  const [contextPct, setContextPct] = useState<number | null>(null)
+  const [usageRows, setUsageRows] = useState<OcUsageRow[]>([])
+  const [providerLabel, setProviderLabel] = useState<string | null>(null)
+  const [usageExpanded, setUsageExpanded] = useState(true)
+  const [providers, setProviders] = useState<OcProviderEntry[]>([])
+  const [preferredProvider, setPreferredProvider] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    try { return window.localStorage.getItem(PREFERRED_PROVIDER_KEY_OC) } catch { return null }
+  })
+
+  function getPrimaryProvider(all: OcProviderEntry[], preferred: string | null) {
+    if (preferred) {
+      const m = all.find((p) => p.provider === preferred && p.status === 'ok' && p.lines.length > 0)
+      if (m) return m
+    }
+    return all.find((p) => p.status === 'ok' && p.lines.length > 0) ?? null
+  }
+
   useEffect(() => {
     let cancelled = false
-    async function fetchModel() {
+    async function fetchAll() {
       try {
+        // session-status: model + context pct
         const res = await fetch('/api/session-status')
         if (!res.ok) return
         const data = await res.json()
         const payload = data.payload ?? data
         const m = payload.model ?? payload.currentModel ?? ''
         if (!cancelled && m) setModel(String(m))
-      } catch {
-        /* noop */
-      }
+        const pct = ocParseContextPct(payload)
+        if (!cancelled) setContextPct(Math.min(100, Math.round(pct)))
+      } catch { /* noop */ }
+
+      try {
+        // provider-usage: all bars
+        const res2 = await fetch('/api/provider-usage')
+        if (!res2.ok || cancelled) return
+        const data2 = await res2.json().catch(() => null) as {
+          ok?: boolean
+          providers?: Array<OcProviderEntry>
+        } | null
+        if (!data2?.providers || cancelled) return
+
+        setProviders(data2.providers)
+        const primary = getPrimaryProvider(data2.providers, preferredProvider)
+        if (!primary) return
+
+        const rows: OcUsageRow[] = primary.lines
+          .filter((l) => l.type === 'progress' && l.used !== undefined)
+          .map((l) => ({ label: l.label.slice(0, 6), pct: Math.min(100, Math.round(l.used as number)) }))
+        if (!cancelled) setUsageRows(rows)
+
+        const name = primary.displayName.split(' ')[0]
+        const lbl = primary.plan ? `${name} ${primary.plan}` : name
+        if (!cancelled) setProviderLabel(lbl.length > 14 ? name : lbl)
+      } catch { /* noop */ }
     }
-    void fetchModel()
-    const timer = setInterval(fetchModel, 30_000)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [])
+
+    void fetchAll()
+    const timer = setInterval(fetchAll, USAGE_POLL_MS)
+    return () => { cancelled = true; clearInterval(timer) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferredProvider])
+
+  function handleProviderChange(provider: string) {
+    setPreferredProvider(provider)
+    try { window.localStorage.setItem(PREFERRED_PROVIDER_KEY_OC, provider) } catch { /* noop */ }
+  }
 
   const displayName = agentName || 'Agent'
 
@@ -158,12 +276,13 @@ function OrchestratorCard({
     const trimmed = editValue.trim()
     setAgentName(trimmed)
     setIsEditing(false)
-    try {
-      localStorage.setItem(AGENT_NAME_KEY, trimmed)
-    } catch {
-      /* noop */
-    }
+    try { localStorage.setItem(AGENT_NAME_KEY, trimmed) } catch { /* noop */ }
   }
+
+  // Build usage rows: provider rows if available, else synthetic context row
+  const ctxRow: OcUsageRow = { label: 'Ctx', pct: contextPct ?? 0 }
+  const displayRows: OcUsageRow[] = usageRows.length > 0 ? usageRows : (contextPct !== null ? [ctxRow] : [])
+  const usageHeader = providerLabel ? `USAGE · ${providerLabel.toUpperCase()}` : 'USAGE'
 
   return (
     <div
@@ -243,6 +362,60 @@ function OrchestratorCard({
           ) : null}
         </div>
       </div>
+
+      {/* ── Usage section — seamless inside the card ── */}
+      {!compact && displayRows.length > 0 && (
+        <div className="mt-3 border-t border-primary-300/40 pt-2.5 space-y-1.5">
+          {/* Collapsible header */}
+          <button
+            type="button"
+            onClick={() => setUsageExpanded((v) => !v)}
+            className="flex w-full items-center justify-between text-[9px] font-semibold uppercase tracking-widest text-primary-400 hover:text-primary-500 transition-colors cursor-pointer"
+            aria-expanded={usageExpanded}
+          >
+            <span>{usageHeader}</span>
+            <span className="text-primary-300">{usageExpanded ? '▲' : '▼'}</span>
+          </button>
+
+          {usageExpanded && (
+            <div className="space-y-1.5">
+              {displayRows.map((row) => (
+                <div key={row.label} className="flex items-center gap-2">
+                  <span className="w-10 shrink-0 text-[10px] text-primary-500">
+                    {row.label}
+                  </span>
+                  <div className="h-1.5 flex-1 rounded-full bg-primary-200/70">
+                    <div
+                      className={cn('h-full rounded-full transition-all', ocBarColor(row.pct))}
+                      style={{ width: `${row.pct}%` }}
+                    />
+                  </div>
+                  <span className={cn('w-7 text-right text-[10px] tabular-nums', ocTextColor(row.pct))}>
+                    {row.pct}%
+                  </span>
+                </div>
+              ))}
+
+              {/* Provider picker */}
+              {providers.filter((p) => p.status === 'ok').length > 1 && (
+                <select
+                  value={preferredProvider ?? ''}
+                  onChange={(e) => handleProviderChange(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-primary-300/50 bg-primary-50 px-2 py-1 text-[10px] text-primary-700"
+                >
+                  {providers
+                    .filter((p) => p.status === 'ok')
+                    .map((p) => (
+                      <option key={p.provider} value={p.provider}>
+                        {p.displayName}
+                      </option>
+                    ))}
+                </select>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -620,13 +793,8 @@ export function AgentViewPanel() {
           <ScrollAreaRoot className="h-[calc(100vh-3.25rem)]">
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
-                {/* Main Agent Card */}
+                {/* Main Agent Card (includes usage section) */}
                 <OrchestratorCard compact={viewMode === 'compact'} />
-
-                {/* Usage meter — compact sidebar widget */}
-                <div className="rounded-xl border border-primary-300/50 bg-primary-100/40 px-2 py-2">
-                  <UsageMeterCompact />
-                </div>
 
                 {/* Swarm — agent cards */}
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
@@ -1028,11 +1196,6 @@ export function AgentViewPanel() {
                 {/* Content — same as desktop sidebar */}
                 <div className="space-y-3 p-3">
                   <OrchestratorCard compact={viewMode === 'compact'} />
-
-                  {/* Usage meter — compact sidebar widget */}
-                  <div className="rounded-xl border border-primary-300/50 bg-primary-100/40 px-2 py-2">
-                    <UsageMeterCompact />
-                  </div>
 
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
                     <div className="mb-1 flex justify-center">
