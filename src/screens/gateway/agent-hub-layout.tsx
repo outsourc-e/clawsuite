@@ -248,10 +248,11 @@ const MISSION_TEMPLATES = [
 type GatewayStatus = 'connected' | 'disconnected' | 'spawning'
 type WizardStep = 'gateway' | 'team' | 'goal' | 'launch'
 
-type ActiveTab = 'missions' | 'history' | 'configure'
+type ActiveTab = 'overview' | 'missions' | 'history' | 'configure'
 type ConfigSection = 'agents' | 'teams' | 'keys'
 
 const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
+  { id: 'overview', icon: '🏢', label: 'Office' },
   { id: 'missions', icon: '🚀', label: 'Active Mission' },
   { id: 'history', icon: '📋', label: 'History' },
   { id: 'configure', icon: '⚙️', label: 'Configure' },
@@ -1493,316 +1494,6 @@ function getOfficeModelBadge(modelId: string): string {
   return OFFICE_MODEL_BADGE[modelId as ModelPresetId] ?? DEFAULT_OFFICE_MODEL_BADGE
 }
 
-function getAgentStatusMeta(status: AgentWorkingStatus): {
-  label: string
-  className: string
-  dotClassName: string
-  pulse?: boolean
-} {
-  switch (status) {
-    case 'active':
-      return {
-        label: 'Active',
-        className: 'text-blue-600',
-        dotClassName: 'bg-blue-500',
-        pulse: true,
-      }
-    case 'ready':
-    case 'idle':
-      return {
-        label: 'Ready',
-        className: 'text-emerald-600',
-        dotClassName: 'bg-emerald-500',
-      }
-    case 'error':
-      return {
-        label: 'Error',
-        className: 'text-red-600',
-        dotClassName: 'bg-red-500',
-      }
-    case 'none':
-      return {
-        label: 'No session',
-        className: 'text-neutral-400',
-        dotClassName: 'bg-neutral-400',
-      }
-    case 'spawning':
-      return {
-        label: 'Spawning',
-        className: 'text-amber-600',
-        dotClassName: 'bg-amber-400',
-        pulse: true,
-      }
-    case 'paused':
-      return {
-        label: 'Paused',
-        className: 'text-amber-700',
-        dotClassName: 'bg-amber-500',
-      }
-    default:
-      return {
-        label: toTitleCase(String(status)),
-        className: 'text-neutral-600',
-        dotClassName: 'bg-neutral-400',
-      }
-  }
-}
-
-// ── OfficeView ─────────────────────────────────────────────────────────────────
-type OfficeViewProps = {
-  agentRows: AgentWorkingRow[]
-  missionRunning: boolean
-  onViewOutput: (agentId: string) => void
-  selectedOutputAgentId?: string
-  activeTemplateName?: string
-  processType: 'sequential' | 'hierarchical' | 'parallel'
-}
-
-function OfficeView({
-  agentRows,
-  missionRunning,
-  onViewOutput,
-  selectedOutputAgentId,
-  activeTemplateName,
-  processType,
-}: OfficeViewProps) {
-  if (agentRows.length === 0) {
-    return (
-      <div className="flex h-full min-h-[360px] items-center justify-center p-8">
-        <div className="text-center">
-          <p className="mb-3 text-4xl">🏢</p>
-          <p className="text-sm font-medium text-neutral-600 dark:text-slate-400">No agents in your team</p>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">Switch to the Team tab to add agents.</p>
-        </div>
-      </div>
-    )
-  }
-
-  const processTypeBadgeClass =
-    processType === 'hierarchical' ? 'border-violet-300 bg-violet-50 text-violet-700' :
-    processType === 'sequential'   ? 'border-blue-300 bg-blue-50 text-blue-700' :
-                                     'border-emerald-300 bg-emerald-50 text-emerald-700'
-
-  return (
-    <div className="h-full min-h-[420px] overflow-y-auto bg-neutral-50 p-4">
-      {/* ── Crew strip ─────────────────────────────────────────────────── */}
-      <div className="mb-4 flex items-center gap-3 rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-3 shadow-sm">
-        {/* Overlapping agent avatars */}
-        <div className="flex -space-x-2">
-          {agentRows.slice(0, 5).map((agent, i) => {
-            const accent = AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length]
-            return (
-              <div
-                key={agent.id}
-                title={agent.name}
-                className={cn(
-                  'flex size-8 items-center justify-center rounded-full border-2 border-white shadow-sm',
-                  accent.avatar,
-                )}
-              >
-                <AgentAvatar index={i} color={accent.hex} size={22} />
-              </div>
-            )
-          })}
-          {agentRows.length > 5 ? (
-            <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-neutral-100 text-[10px] font-bold text-neutral-600 dark:text-slate-400">
-              +{agentRows.length - 5}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Labels */}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-sm font-semibold text-neutral-800">
-            {agentRows.length} agent{agentRows.length !== 1 ? 's' : ''}
-          </span>
-          {activeTemplateName ? (
-            <>
-              <span className="text-neutral-300">·</span>
-              <span className="truncate text-sm text-neutral-500 dark:text-slate-400">{activeTemplateName}</span>
-            </>
-          ) : null}
-        </div>
-
-        {/* Process type badge */}
-        <div className="flex items-center gap-2 shrink-0">
-          {missionRunning && (
-            <span className="flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
-              <span className="relative flex size-1.5">
-                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-              </span>
-              MISSION ACTIVE
-            </span>
-          )}
-          <span
-            className={cn(
-              'rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
-              processTypeBadgeClass,
-            )}
-          >
-            {processType}
-          </span>
-        </div>
-      </div>
-
-      {/* ── Agent desk grid ─────────────────────────────────────────────── */}
-      <div
-        className={cn(
-          'grid auto-rows-fr gap-4',
-          agentRows.length <= 3 ? 'grid-cols-1 sm:grid-cols-2' :
-          'grid-cols-1 sm:grid-cols-2 md:grid-cols-3',
-        )}
-      >
-        {agentRows.map((agent, i) => {
-          const accent = AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length]
-          const isActive = agent.status === 'active'
-          const isSelected = agent.id === selectedOutputAgentId
-          const isSpawning = agent.status === 'spawning'
-          const statusMeta = getAgentStatusMeta(agent.status)
-
-          // Fix 2: Standardised status dots
-          // 🟢 Green = active  🟡 Yellow = has session (idle/ready)  ⚫ Gray = no session  🔴 Red = error
-          const statusDotEl = isActive ? (
-            <span className="relative flex size-3 shrink-0">
-              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
-              <span className="relative inline-flex size-3 rounded-full bg-emerald-500" />
-            </span>
-          ) : isSpawning ? (
-            <span className="relative flex size-3 shrink-0">
-              <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/60" />
-              <span className="relative inline-flex size-3 rounded-full bg-amber-400" />
-            </span>
-          ) : (
-            <span
-              className={cn(
-                'size-3 shrink-0 rounded-full',
-                agent.status === 'idle'  ? 'bg-yellow-500' :
-                agent.status === 'ready' ? 'bg-yellow-500' :
-                agent.status === 'error' ? 'bg-red-500' :
-                'bg-neutral-400',  // 'none' — no session
-              )}
-            />
-          )
-
-          return (
-            <div
-              key={agent.id}
-              className={cn(
-            'relative flex h-full min-h-[248px] cursor-pointer flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent-200 hover:shadow-md hover:ring-1 hover:ring-accent-200',
-            isSelected
-                  ? 'shadow-md ring-1 ring-accent-300'
-                  : '',
-                isActive && missionRunning && !isSelected && 'ring-1 ring-emerald-200',
-              )}
-            >
-              {/* Top accent bar (3px) */}
-              <div className={cn('h-[3px] w-full', accent.bar)} />
-
-              <div className="flex h-full flex-col p-4">
-                {/* Header: avatar (left) + status dot (right) */}
-                <div className="flex items-start justify-between">
-                  {/* Avatar */}
-                  <div
-                    className={cn(
-                      'flex size-12 items-center justify-center rounded-full border border-white/80 shadow-sm',
-                      accent.avatar,
-                    )}
-                  >
-                    <AgentAvatar index={i} color={accent.hex} size={28} />
-                  </div>
-                  {/* Status dot */}
-                  {statusDotEl}
-                </div>
-
-                {/* Agent name */}
-                <h3 className="mt-3 truncate text-sm font-semibold tracking-tight text-neutral-900 dark:text-white">
-                  {agent.name}
-                </h3>
-
-                {/* Role / model row */}
-                <div className="mt-1 flex flex-wrap items-start gap-1.5">
-                  {agent.roleDescription ? (
-                    <span className="line-clamp-2 min-w-0 text-xs text-neutral-600 dark:text-slate-400">
-                      {agent.roleDescription}
-                    </span>
-                  ) : null}
-                  <span
-                    className={cn(
-                      'shrink-0 px-2 py-0.5 font-mono text-[10px] font-medium',
-                      getOfficeModelBadge(agent.modelId),
-                    )}
-                  >
-                    {getModelShortLabel(agent.modelId)}
-                  </span>
-                </div>
-
-                <p
-                  className={cn(
-                    'mt-2 text-[11px] font-medium',
-                    statusMeta.className,
-                  )}
-                >
-                  ● {statusMeta.label}
-                </p>
-                {agent.lastLine ? (
-                  <p className="mt-1 line-clamp-2 min-h-[2.1em] font-mono text-xs leading-relaxed text-neutral-500 dark:text-slate-400">
-                    {agent.lastLine}
-                  </p>
-                ) : (
-                  <p className="mt-1 min-h-[2.1em] font-mono text-xs leading-relaxed text-neutral-400">
-                    {agent.status === 'none' ? 'Waiting for session' : 'No recent output'}
-                  </p>
-                )}
-
-                {/* Footer: task count badge */}
-                {agent.taskCount > 0 ? (
-                  <div className="mt-2">
-                    <span className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 dark:text-slate-400">
-                      {agent.taskCount} task{agent.taskCount !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                ) : null}
-
-                {/* Edit agent button — full-width */}
-                <button
-                  type="button"
-                  title="Click to view agent output"
-                  onClick={() => onViewOutput(agent.id)}
-                  className={cn(
-                    'mt-auto w-full cursor-pointer rounded-lg border px-2 py-2 text-[11px] font-medium transition-colors',
-                    isSelected
-                      ? 'border-accent-200 bg-accent-50 text-accent-700 hover:bg-accent-100'
-                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-accent-200 hover:bg-accent-50 hover:text-accent-700',
-                  )}
-                >
-                  Edit agent
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Fix 2: Status dot legend */}
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-2 shadow-sm">
-        <span className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-slate-400">
-          <span className="size-2 rounded-full bg-emerald-500" /> Active
-        </span>
-        <span className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-slate-400">
-          <span className="size-2 rounded-full bg-yellow-500" /> Idle
-        </span>
-        <span className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-slate-400">
-          <span className="size-2 rounded-full bg-neutral-400" /> No session
-        </span>
-        <span className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-slate-400">
-          <span className="size-2 rounded-full bg-red-500" /> Error
-        </span>
-      </div>
-    </div>
-  )
-}
-
 // ── HistoryView ────────────────────────────────────────────────────────────────
 function timeAgoFromMs(ms: number): string {
   const delta = Math.max(0, Date.now() - ms)
@@ -2061,13 +1752,9 @@ function HistoryView() {
   )
 }
 
-// Retained temporarily while the new 3-tab layout rolls out.
-void OfficeView
-void HistoryView
-
 export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // ── Tab + sidebar state ────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<ActiveTab>('missions')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   const [configSection, setConfigSection] = useState<ConfigSection>('agents')
   const [avatarPickerOpenId, setAvatarPickerOpenId] = useState<string | null>(null)
   const [agentWizardOpenId, setAgentWizardOpenId] = useState<string | null>(null)
@@ -4474,11 +4161,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex min-h-0 flex-col gap-4 bg-neutral-50/80 px-4 pb-8 pt-4 dark:bg-[var(--theme-bg,#0b0e14)] md:px-6">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
-        <div className="relative mt-4 sm:mt-5 flex w-full min-h-0 flex-1 flex-col">
-          <div className="flex-1 min-h-[420px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
+        <div className="relative flex w-full min-h-0 flex-1 flex-col">
+          <div className="flex-1 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900" style={{ minHeight: '480px' }}>
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
@@ -4497,7 +4184,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
 
           {/* ── 3-card row — shrink-0, anchored at bottom ── */}
-          <section className="relative mb-4 mt-8 grid w-full shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <section className="relative mt-5 grid w-full shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
@@ -7031,14 +6718,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* ── Tab content area ── */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {/* Always-visible office view (compact header) */}
-          <div className="shrink-0 overflow-hidden bg-white dark:bg-[var(--theme-panel,#111520)]" style={{ maxHeight: '340px' }}>
-            {renderOverviewContent()}
-          </div>
-
-          {/* Tab content below office view */}
-          <div className="flex min-h-0 flex-1 overflow-hidden border-t border-neutral-200 dark:border-slate-700">
+          {/* Tab content — full height, no cramped header */}
+          <div className="flex min-h-0 flex-1 overflow-hidden">
             <div className="min-w-0 flex-1 overflow-hidden">
+              {activeTab === 'overview' && (
+                <div className="h-full min-h-0 overflow-y-auto bg-white dark:bg-[var(--theme-panel,#111520)]">
+                  {renderOverviewContent()}
+                </div>
+              )}
+
               {activeTab === 'configure' && (
                 <div className="h-full min-h-0 bg-white dark:bg-[var(--theme-panel,#111520)]">
                   {renderConfigureContent()}
