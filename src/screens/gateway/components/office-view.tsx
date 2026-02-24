@@ -35,6 +35,9 @@ export const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
 }
 
 const DEFAULT_OFFICE_MODEL_BADGE = 'border border-neutral-200 bg-neutral-50 text-neutral-700'
+type OfficeLayoutTemplate = 'grid' | 'roundtable' | 'warroom'
+type SocialSpotType = 'coffee' | 'water' | 'plant' | 'snack'
+type SocialSpot = { x: number; y: number; type: SocialSpotType }
 
 export function getOfficeModelBadge(modelId: string): string {
   return OFFICE_MODEL_BADGE[modelId as ModelPresetId] ?? DEFAULT_OFFICE_MODEL_BADGE
@@ -63,19 +66,67 @@ export function getAgentStatusMeta(status: AgentWorkingStatus): {
   }
 }
 
-// ── Office Layout: 12 desk positions with generous spacing ──
-const DESK_POSITIONS = [
+const GRID_DESK_POSITIONS = [
   { x: 120, y: 180 }, { x: 310, y: 180 }, { x: 500, y: 180 }, { x: 690, y: 180 },
   { x: 120, y: 320 }, { x: 310, y: 320 }, { x: 500, y: 320 }, { x: 690, y: 320 },
   { x: 215, y: 460 }, { x: 405, y: 460 }, { x: 595, y: 460 }, { x: 785, y: 460 },
 ]
 
-// Social spots: coffee machine, water cooler, lounge, snack bar
-const SOCIAL_SPOTS = [
+const ROUNDTABLE_DESK_POSITIONS = Array.from({ length: 12 }, (_, i) => {
+  const angle = (i * 30 - 90) * Math.PI / 180
+  const cx = 450
+  const cy = 320
+  const r = 240
+  return {
+    x: cx + r * Math.cos(angle),
+    y: cy + r * Math.sin(angle),
+  }
+})
+
+const WARROOM_DESK_POSITIONS = [
+  { x: 90, y: 200 }, { x: 228, y: 200 }, { x: 366, y: 200 },
+  { x: 504, y: 200 }, { x: 642, y: 200 }, { x: 780, y: 200 },
+  { x: 90, y: 420 }, { x: 228, y: 420 }, { x: 366, y: 420 },
+  { x: 504, y: 420 }, { x: 642, y: 420 }, { x: 780, y: 420 },
+]
+
+const GRID_SOCIAL_SPOTS: SocialSpot[] = [
   { x: 880, y: 140, type: 'coffee' as const },
   { x: 880, y: 300, type: 'water' as const },
   { x: 60, y: 440, type: 'plant' as const },
   { x: 880, y: 460, type: 'snack' as const },
+]
+
+const ROUNDTABLE_SOCIAL_SPOTS: SocialSpot[] = [
+  { x: 450, y: 320, type: 'plant' },
+  { x: 510, y: 320, type: 'snack' },
+  { x: 870, y: 120, type: 'coffee' },
+  { x: 870, y: 480, type: 'water' },
+]
+
+const WARROOM_SOCIAL_SPOTS: SocialSpot[] = [
+  { x: 56, y: 300, type: 'coffee' },
+  { x: 56, y: 350, type: 'water' },
+  { x: 904, y: 300, type: 'snack' },
+  { x: 904, y: 350, type: 'plant' },
+]
+
+const DESK_POSITIONS_BY_TEMPLATE: Record<OfficeLayoutTemplate, Array<{ x: number; y: number }>> = {
+  grid: GRID_DESK_POSITIONS,
+  roundtable: ROUNDTABLE_DESK_POSITIONS,
+  warroom: WARROOM_DESK_POSITIONS,
+}
+
+const SOCIAL_SPOTS_BY_TEMPLATE: Record<OfficeLayoutTemplate, SocialSpot[]> = {
+  grid: GRID_SOCIAL_SPOTS,
+  roundtable: ROUNDTABLE_SOCIAL_SPOTS,
+  warroom: WARROOM_SOCIAL_SPOTS,
+}
+
+const LAYOUT_TEMPLATE_OPTIONS: Array<{ key: OfficeLayoutTemplate; label: string }> = [
+  { key: 'grid', label: '⊞ Grid' },
+  { key: 'roundtable', label: '○ Roundtable' },
+  { key: 'warroom', label: '▬▬ War Room' },
 ]
 
 function truncateSpeech(text: string, max = 64): string {
@@ -218,6 +269,26 @@ export function OfficeView({
   // When containerHeight is set, we use compact mode: header only (no footer), SVG fills remaining space
   const compact = Boolean(containerHeight)
   const [tick, setTick] = useState(0)
+  const [layoutTemplate, setLayoutTemplate] = useState<OfficeLayoutTemplate>(() => {
+    if (typeof window === 'undefined') return 'grid'
+    const saved = window.localStorage.getItem('clawsuite:office-layout')
+    return saved === 'roundtable' || saved === 'warroom' || saved === 'grid' ? saved : 'grid'
+  })
+
+  const deskPositions = DESK_POSITIONS_BY_TEMPLATE[layoutTemplate]
+  const socialSpots = SOCIAL_SPOTS_BY_TEMPLATE[layoutTemplate]
+  const socialLabelPosition = layoutTemplate === 'roundtable'
+    ? { x: 450, y: 108, text: 'Collaboration Ring' }
+    : layoutTemplate === 'warroom'
+      ? { x: 480, y: 112, text: 'Briefing Lounge' }
+      : { x: 880, y: 110, text: 'Break Area' }
+
+  const changeLayout = (nextTemplate: OfficeLayoutTemplate) => {
+    setLayoutTemplate(nextTemplate)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('clawsuite:office-layout', nextTemplate)
+    }
+  }
 
   useEffect(() => {
     const timer = window.setInterval(() => setTick((t) => t + 1), 200)
@@ -244,14 +315,14 @@ export function OfficeView({
 
   // Assign agents to desks, idle agents wander to social spots
   const agentPositions = agentRows.map((agent, index) => {
-    const desk = DESK_POSITIONS[index % DESK_POSITIONS.length]
+    const desk = deskPositions[index % deskPositions.length]
     const isIdle = agent.status === 'idle' || agent.status === 'ready'
     const isPaused = agent.status === 'paused'
 
     // Idle/paused agents wander between desk and social spots
     if (isIdle || isPaused) {
       const wanderCycle = Math.floor((tick + index * 17) / 25) % 4 // 0=desk, 1=walking, 2=social, 3=walking back
-      const socialSpot = SOCIAL_SPOTS[(index + Math.floor(tick / 60)) % SOCIAL_SPOTS.length]
+      const socialSpot = socialSpots[(index + Math.floor(tick / 60)) % socialSpots.length]
       const t = ((tick + index * 17) % 25) / 25
 
       if (wanderCycle === 0) {
@@ -271,7 +342,7 @@ export function OfficeView({
         return { x: socialSpot.x + (index % 2 === 0 ? -20 : 20), y: socialSpot.y + bob, atDesk: false, stationary: true }
       } else {
         // Walking back
-        const socialSpotBack = SOCIAL_SPOTS[(index + Math.floor(tick / 60)) % SOCIAL_SPOTS.length]
+        const socialSpotBack = socialSpots[(index + Math.floor(tick / 60)) % socialSpots.length]
         return {
           x: socialSpotBack.x + (desk.x - socialSpotBack.x) * t,
           y: socialSpotBack.y + (desk.y - 20 - socialSpotBack.y) * t,
@@ -346,6 +417,28 @@ export function OfficeView({
       </div>
 
       {/* Desktop office canvas */}
+      <div className="hidden shrink-0 justify-end px-3 pb-1 pt-2 md:flex">
+        <div className="ml-auto mb-2 flex w-fit gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-slate-800">
+          {LAYOUT_TEMPLATE_OPTIONS.map((template) => {
+            const active = template.key === layoutTemplate
+            return (
+              <button
+                key={template.key}
+                type="button"
+                onClick={() => changeLayout(template.key)}
+                className={cn(
+                  'rounded-md px-3 py-1 text-[11px] font-medium transition-colors',
+                  active
+                    ? 'bg-accent-500 text-white'
+                    : 'border border-neutral-200 bg-white text-neutral-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300',
+                )}
+              >
+                {template.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
       <div className={cn('relative hidden flex-1 overflow-hidden md:flex', !compact && 'min-h-[440px]')}>
         <style>{`
           @keyframes office-idle-float {
@@ -411,10 +504,10 @@ export function OfficeView({
           <rect x="80" y="140" width="680" height="420" rx="16" fill="#f8fafc" fillOpacity="0.34" stroke="#e4ecf4" strokeWidth="0.8" className="dark:fill-slate-800/20 dark:stroke-slate-700/60" />
 
           {/* Social zone labels */}
-          <text x="880" y="110" fontSize="9" fill="#94a3b8" textAnchor="middle" fontWeight="600" className="uppercase">Break Area</text>
+          <text x={socialLabelPosition.x} y={socialLabelPosition.y} fontSize="9" fill="#94a3b8" textAnchor="middle" fontWeight="600" className="uppercase">{socialLabelPosition.text}</text>
 
           {/* Furniture */}
-          {SOCIAL_SPOTS.map((spot, i) => (
+          {socialSpots.map((spot, i) => (
             spot.type === 'coffee' ? <CoffeeMachineSVG key={i} x={spot.x} y={spot.y} /> :
             spot.type === 'water' ? <WaterCoolerSVG key={i} x={spot.x} y={spot.y} /> :
             spot.type === 'snack' ? <SnackBarSVG key={i} x={spot.x} y={spot.y} /> :
@@ -426,10 +519,21 @@ export function OfficeView({
           <PlantSVG x={60} y={560} />
 
           {/* All desks (empty ones too) */}
-          {DESK_POSITIONS.map((desk, i) => {
+          {deskPositions.map((desk, i) => {
             const occupied = i < agentRows.length
             const accent = occupied ? AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length] : undefined
-            return <DeskSVG key={`desk-${i}`} x={desk.x} y={desk.y} occupied={occupied} accent={accent?.hex} />
+            return (
+              <g
+                key={`desk-${i}`}
+                className="transition-all duration-500"
+                style={{
+                  transform: `translate(${desk.x}px, ${desk.y}px)`,
+                  transition: 'transform 0.5s ease-in-out',
+                }}
+              >
+                <DeskSVG x={0} y={0} occupied={occupied} accent={accent?.hex} />
+              </g>
+            )
           })}
         </svg>
 
@@ -530,7 +634,7 @@ export function OfficeView({
       {/* Footer — hidden in compact mode */}
       {!compact ? (
         <div className="hidden items-center justify-between border-t border-neutral-200 bg-white/80 px-4 py-2 text-[11px] text-neutral-500 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400 md:flex">
-          <span>{agentRows.length}/{DESK_POSITIONS.length} desks occupied</span>
+          <span>{agentRows.length}/{deskPositions.length} desks occupied</span>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> Working</span>
             <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-neutral-400" /> Idle</span>
