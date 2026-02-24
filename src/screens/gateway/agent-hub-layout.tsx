@@ -5653,7 +5653,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             ) : null}
 
             {missionSubTab === 'active' ? (
-              missionActive ? (
+              (missionActive || showCompletionModal) ? (
                 <div className="flex w-full flex-col gap-4 overflow-y-auto pb-4 pr-1" style={{ maxHeight: 'calc(100vh - 220px)' }}>
                   <section className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-5 py-4 shadow-sm">
                     <div className="flex items-center justify-between gap-3">
@@ -5696,9 +5696,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       </div>
                       <span className={cn(
                         "rounded-full px-2.5 py-1 text-xs text-white",
+                        !missionActive && showCompletionModal ? "bg-emerald-600" :
                         missionState === "paused" ? "bg-amber-500" : "bg-emerald-700"
                       )}>
-                        {missionState === "paused" ? "⏸ Paused" : "● Running"}
+                        {!missionActive && showCompletionModal ? "✓ Complete" :
+                         missionState === "paused" ? "⏸ Paused" : "● Running"}
                       </span>
                     </div>
 
@@ -5725,7 +5727,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       <div className="h-1 rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
                     </div>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-4 dark:border-neutral-800">
+                    {missionActive && <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-4 dark:border-neutral-800">
                       <button
                         type="button"
                         onClick={() => void handleSoftPause(missionState === "running")}
@@ -5756,7 +5758,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       >
                         ■ Stop Mission
                       </button>
-                    </div>
+                    </div>}
                   </section>
 
                   <div className="space-y-3">
