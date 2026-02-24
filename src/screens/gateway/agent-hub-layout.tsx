@@ -5387,22 +5387,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const doneTaskCount = missionTasks.filter((task) => task.status === 'done').length
     const totalTaskCount = missionTasks.length
     const totalReportsCount = historyCards.length
-    const missionCardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm'
+    const missionCardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm'
     return (
       <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white" />
         <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3">
             <div>
-              <h2 className="text-lg font-bold text-neutral-900">Mission Control</h2>
-              <p className="text-xs text-neutral-500">Track active runs, review history, and launch new missions</p>
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Mission Control</h2>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">Track active runs, review history, and launch new missions</p>
             </div>
             <div className="flex items-center gap-2">
               {missionActive ? (
                 <button
                   type="button"
                   onClick={() => stopMissionAndCleanup('aborted')}
-                  className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-red-600"
+                  className="min-h-11 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm font-medium text-red-600"
                 >
                   <span className="mr-2 text-[10px]">■</span>
                   Stop Mission
@@ -5418,7 +5418,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
 
-          <div className="flex w-full overflow-hidden rounded-xl border border-neutral-200 bg-white">
+          <div className="flex w-full overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
             {missionSubTabs.map((tab) => {
               const isActive = missionSubTab === tab.id
               return (
@@ -5430,7 +5430,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     'flex-1 px-4 py-3 text-center text-sm font-medium transition-colors whitespace-nowrap',
                     isActive
                       ? 'bg-orange-50 text-orange-600 border-b-2 border-orange-500'
-                      : 'bg-white text-neutral-600 hover:bg-neutral-50',
+                      : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800',
                   )}
                 >
                   {tab.label}
@@ -5459,7 +5459,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <button
                     type="button"
                     onClick={handleDiscardCheckpoint}
-                    className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                   >
                     Discard
                   </button>
@@ -5474,30 +5474,30 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <div className="flex flex-wrap gap-3">
                   <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Mission State</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Mission State</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
                   </article>
                   <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Tasks</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Tasks</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
                   </article>
                   <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Total Reports</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900">{totalReportsCount}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Total Reports</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{totalReportsCount}</p>
                   </article>
                 </div>
 
                 {missionActive ? (
                   <section className={missionCardCls}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Active Mission</p>
-                    <p className="mt-1 text-base font-semibold text-neutral-900">{activeMissionGoal || missionGoal || 'Untitled mission'}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Active Mission</p>
+                    <p className="mt-1 text-base font-semibold text-neutral-900 dark:text-neutral-100">{activeMissionGoal || missionGoal || 'Untitled mission'}</p>
                     <button
                       type="button"
                       onClick={() => setMissionSubTab('active')}
-                      className="mt-4 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600"
+                      className="mt-4 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-medium text-red-600"
                     >
                       View Active Mission →
                     </button>
@@ -5506,8 +5506,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <section className={cn('flex min-h-[280px] items-center justify-center p-12 text-center', missionCardCls)}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                     <div>
-                      <p className="text-base font-semibold text-neutral-900">No active mission</p>
-                      <p className="mt-1 text-sm text-neutral-500">Start a mission to see inline agent output and timeline progress.</p>
+                      <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">No active mission</p>
+                      <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Start a mission to see inline agent output and timeline progress.</p>
                       <button
                         type="button"
                         onClick={() => openNewMissionModal()}
@@ -5523,7 +5523,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <section className={missionCardCls}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Recent Missions</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Recent Missions</p>
                       <button
                         type="button"
                         onClick={() => setMissionSubTab('history')}
@@ -5533,7 +5533,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       </button>
                     </div>
                     {recentCompletedMissions.length === 0 ? (
-                      <p className="mt-3 text-sm text-neutral-500">No completed missions yet.</p>
+                      <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">No completed missions yet.</p>
                     ) : (
                       <div className="mt-2">
                         {recentCompletedMissions.map((entry) => (
@@ -5557,9 +5557,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   </section>
                   <section className={missionCardCls}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Quick Launch Teams</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Quick Launch Teams</p>
                     {teamConfigs.length === 0 ? (
-                      <p className="mt-3 text-sm text-neutral-500">Save a team config in Configure to quick-launch missions here.</p>
+                      <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">Save a team config in Configure to quick-launch missions here.</p>
                     ) : (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {teamConfigs.slice(0, 6).map((config) => (
@@ -5587,7 +5587,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">MISSION GOAL</p>
-                        <p className="mt-1 text-base text-neutral-900">{activeMissionGoal || missionGoal || ''}</p>
+                        <p className="mt-1 text-base text-neutral-900 dark:text-neutral-100">{activeMissionGoal || missionGoal || ''}</p>
                       </div>
                       <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-xs text-white">Running</span>
                     </div>
@@ -5606,7 +5606,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           )
                         })}
                       </div>
-                      <div className="flex items-center gap-3 text-sm text-neutral-500">
+                      <div className="flex items-center gap-3 text-sm text-neutral-500 dark:text-neutral-400">
                         <span>{runningTaskStats.completed} / {runningTaskStats.total} tasks · {runningElapsed} elapsed</span>
                       </div>
                     </div>
@@ -5632,16 +5632,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     />
                   </div>
 
-                  <section className="relative overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+                  <section className="relative overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm">
                     <div className="flex items-start justify-between gap-2 px-4 pb-3 pt-4">
                       <div>
-                        <p className="text-sm font-semibold text-neutral-900">Live Feed</p>
-                        <p className="mt-0.5 text-xs text-neutral-500">Last 5 events</p>
+                        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Live Feed</p>
+                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Last 5 events</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setLiveFeedVisible(true)}
-                        className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
+                        className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                       >
                         View All
                       </button>
@@ -5655,8 +5655,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <div className={cn('flex min-h-[280px] w-full items-center justify-center text-center', missionCardCls)}>
                   <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                   <div>
-                    <p className="text-base font-semibold text-neutral-900">No active mission</p>
-                    <p className="mt-1 text-sm text-neutral-500">Start a mission to see inline agent output and timeline progress.</p>
+                    <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">No active mission</p>
+                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Start a mission to see inline agent output and timeline progress.</p>
                     <button
                       type="button"
                       onClick={() => openNewMissionModal()}
@@ -5681,7 +5681,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <div
                       key={`${entry.kind}-${entry.id}`}
                       className={cn(
-                        'rounded-xl border border-l-4 border-neutral-200 bg-white p-4 shadow-sm',
+                        'rounded-xl border border-l-4 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm',
                         (entry.status === 'done' || entry.status === 'completed') && 'border-l-emerald-500',
                         entry.status === 'aborted' && 'border-l-red-500',
                         entry.status !== 'aborted' && entry.status !== 'done' && entry.status !== 'completed' && 'border-l-amber-500',
@@ -5689,8 +5689,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-sm font-semibold text-neutral-900">{truncateMissionGoal(entry.label, 96)}</p>
-                          <p className="mt-0.5 text-xs text-neutral-500">{entry.taskCompletedCount}/{entry.taskCount} tasks</p>
+                          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{truncateMissionGoal(entry.label, 96)}</p>
+                          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{entry.taskCompletedCount}/{entry.taskCount} tasks</p>
                         </div>
                         <span className={cn(
                           'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
@@ -5702,13 +5702,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-neutral-400">{timeAgoFromMs(entry.completedAt ?? entry.updatedAt)}</p>
-                      <p className="mt-1 text-xs text-neutral-500">{entry.teamCount} agents · Duration {formatDuration(Math.max(0, (entry.completedAt ?? entry.updatedAt) - entry.startedAt))}</p>
+                      <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{entry.teamCount} agents · Duration {formatDuration(Math.max(0, (entry.completedAt ?? entry.updatedAt) - entry.startedAt))}</p>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         {entry.kind === 'report' ? (
                           <button
                             type="button"
                             onClick={() => setMaximizedMissionId(entry.id)}
-                            className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                            className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                           >
                             View Report
                           </button>
@@ -5717,7 +5717,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           <button
                             type="button"
                             onClick={() => setMaximizedMissionId(entry.id)}
-                            className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                            className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                           >
                             Open Full
                           </button>
@@ -5906,7 +5906,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 {/* Step 3: Review & Launch */}
                 {missionWizardStep === 3 ? (
                   <div className="space-y-4">
-                    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                    <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 p-4">
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Launch Summary</h4>
                       <div className="mt-3 space-y-2">
                         <div className="flex justify-between text-sm">
@@ -6020,7 +6020,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 }}
               />
               <div className="mt-3 flex justify-end gap-2">
-                <button type="button" onClick={() => setSteerAgentId(null)} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Cancel</button>
+                <button type="button" onClick={() => setSteerAgentId(null)} className="rounded-lg border border-neutral-200 dark:border-neutral-600 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800">Cancel</button>
                 <button
                   type="button"
                   disabled={!steerInput.trim()}
@@ -6151,7 +6151,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               <button
                                 type="button"
                                 onClick={() => { void handleKillAgent(row.id); setMaximizedMissionId(null) }}
-                                className="flex size-7 items-center justify-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors text-sm"
+                                className="flex size-7 items-center justify-center rounded-lg border border-red-200 dark:border-red-900 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors text-sm"
                                 title="Kill agent"
                               >
                                 ✕
