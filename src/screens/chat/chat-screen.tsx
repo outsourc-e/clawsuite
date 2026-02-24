@@ -1114,7 +1114,21 @@ export function ChatScreen({
       const mimeType =
         normalizeMimeType(attachment.contentType) ||
         readDataUrlMimeType(attachment.dataUrl)
-      const encodedContent = stripDataUrlPrefix(attachment.dataUrl)
+      const isImage = isImageMimeType(mimeType)
+      // For text/file attachments, dataUrl holds raw text (not a base64 data URL).
+      // We must base64-encode it so the server can build a valid data: URI.
+      const rawDataUrl = attachment.dataUrl ?? ''
+      let encodedContent: string
+      let finalDataUrl: string
+      if (!isImage && !rawDataUrl.startsWith('data:')) {
+        encodedContent = btoa(unescape(encodeURIComponent(rawDataUrl)))
+        finalDataUrl = mimeType
+          ? `data:${mimeType};base64,${encodedContent}`
+          : `data:text/plain;base64,${encodedContent}`
+      } else {
+        encodedContent = stripDataUrlPrefix(rawDataUrl)
+        finalDataUrl = rawDataUrl
+      }
       return {
         id: attachment.id,
         name: attachment.name,
@@ -1122,11 +1136,11 @@ export function ChatScreen({
         contentType: mimeType || undefined,
         mimeType: mimeType || undefined,
         mediaType: mimeType || undefined,
-        type: isImageMimeType(mimeType) ? 'image' : 'file',
+        type: isImage ? 'image' : 'file',
         content: encodedContent,
         data: encodedContent,
         base64: encodedContent,
-        dataUrl: attachment.dataUrl,
+        dataUrl: finalDataUrl,
         size: attachment.size,
       }
     })
