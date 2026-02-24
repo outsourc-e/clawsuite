@@ -313,6 +313,9 @@ export function AgentCard({
     </>
   ) : null
 
+  const compactModelLabel =
+    node.model.length > 20 ? `${node.model.slice(0, 19)}…` : node.model
+
   // Detail panel view
   if (showDetail) {
     return (
@@ -466,44 +469,69 @@ export function AgentCard({
       {/* Compact mode: horizontal layout */}
       {isCompact ? (
         <>
-          <div className="flex items-start gap-2 overflow-visible">
-            <div className="relative mt-0.5 flex size-8 shrink-0 items-center justify-center overflow-visible rounded-full border border-primary-300/70 bg-primary-200/80">
-              {node.isMain ? (
-                <AgentAvatar size="sm" />
-              ) : (
-                <PixelAvatar
-                  color={getPersonaColors(node.name, node.id).body}
-                  accentColor={getPersonaColors(node.name, node.id).accent}
-                  size={24}
-                  status={node.status === 'queued' ? 'idle' : node.status}
-                />
-              )}
+          <div className="flex items-start gap-2.5 overflow-visible">
+            <div className="relative mt-0.5 size-10 shrink-0 cursor-default">
+              <AgentProgress
+                value={node.progress}
+                status={node.status}
+                size={40}
+                strokeWidth={2.5}
+                className="absolute inset-0"
+              />
+              <div className="absolute inset-1 inline-flex items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80">
+                {node.isMain ? (
+                  <AgentAvatar size="sm" />
+                ) : (
+                  <PixelAvatar
+                    color={getPersonaColors(node.name, node.id).body}
+                    accentColor={getPersonaColors(node.name, node.id).accent}
+                    size={26}
+                    status={node.status === 'queued' ? 'idle' : node.status}
+                  />
+                )}
+              </div>
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <h4 className="flex-1 truncate text-xs font-medium text-primary-900">
+              <div className="flex items-start gap-2">
+                <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-primary-900">
                   {node.name}
                 </h4>
-                <span className="size-2 shrink-0 rounded-full bg-emerald-500" />
-                {renderWardenMenu('size-6 rounded-md')}
+                {renderWardenMenu('size-6 shrink-0 rounded-md')}
               </div>
 
-              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] tabular-nums text-primary-600">
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px]">
                 <span
-                  className="inline-block max-w-[110px] truncate rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-                  title={node.model}
-                >
-                  {node.model}
+                  className={cn(
+                    'inline-flex size-1.5 shrink-0 rounded-full',
+                    node.status === 'failed'
+                      ? 'bg-red-400'
+                      : node.status === 'thinking'
+                        ? 'bg-accent-400'
+                        : node.status === 'queued'
+                          ? 'bg-primary-500'
+                          : 'bg-emerald-400',
+                  )}
+                />
+                <span className={cn('truncate font-medium', getStatusTextClassName(node.status))}>
+                  {getStatusLabel(node.status)}
                 </span>
-                <span className="shrink-0">·</span>
-                <span className="shrink-0">{formatRuntime(node.runtimeSeconds)}</span>
-                <span className="shrink-0">·</span>
-                <span className="shrink-0">${node.cost.toFixed(2)}</span>
               </div>
+
+              <p
+                className="mt-0.5 max-w-[20ch] truncate text-[10px] font-mono leading-none text-primary-600"
+                title={node.model}
+              >
+                {compactModelLabel}
+              </p>
+
+              <p className="mt-1 truncate text-[11px] text-primary-700">{node.task}</p>
+              <p className="mt-0.5 truncate text-[10px] tabular-nums text-primary-600">
+                {formatRuntime(node.runtimeSeconds)} · {node.tokenCount.toLocaleString()} tokens · ${node.cost.toFixed(2)}
+              </p>
 
               {showActions ? (
-                <div className="mt-1.5 flex items-center gap-1">
+                <div className="mt-2 flex items-center gap-1.5">
                   {onChat ? (
                     <Button
                       variant="secondary"
