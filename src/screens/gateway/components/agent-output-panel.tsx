@@ -15,6 +15,7 @@ export type AgentOutputPanelProps = {
   sessionKey: string | null
   tasks: HubTask[]
   onClose: () => void
+  onLine?: (line: string) => void
   /** Model preset id — shown in header badge e.g. 'pc1-coder', 'sonnet' */
   modelId?: string
   /** Optional runtime status label shown in the header badge. */
@@ -151,6 +152,7 @@ export function AgentOutputPanel({
   sessionKey,
   tasks,
   onClose,
+  onLine,
   modelId,
   statusLabel,
   compact = false,
@@ -219,6 +221,7 @@ export function AgentOutputPanel({
       }
 
       setMessages((prev) => upsertAssistantStream(prev, text, fullReplace))
+      onLine?.(text)
     })
 
     // 'tool' — tool call event
@@ -291,12 +294,13 @@ export function AgentOutputPanel({
         return
       }
       setMessages((prev) => appendAssistantMessage(prev, text))
+      onLine?.(text)
     })
 
     return () => {
       source.close()
     }
-  }, [sessionKey, streamReconnectNonce])
+  }, [onLine, sessionKey, streamReconnectNonce])
 
   const inner = (
     <>

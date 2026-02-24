@@ -5833,6 +5833,37 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       )
                     })}
                   </div>
+                  {/* Background output capture — renders invisible panels per agent to capture SSE output into agentOutputLinesRef for reports */}
+                  <div style={{ display: 'none' }} aria-hidden="true">
+                    {team.map((member) => {
+                      const sessionKey = agentSessionMap[member.id] ?? null
+                      if (!sessionKey) return null
+                      const agentTasks = missionTasks.filter((t) => t.agentId === member.id)
+                      return (
+                        <AgentOutputPanel
+                          key={`capture-${member.id}`}
+                          sessionKey={sessionKey}
+                          agentName={member.name}
+                          tasks={agentTasks}
+                          onClose={() => {}}
+                          modelId={member.modelId}
+                          compact={true}
+                          onLine={(line) => {
+                            if (!line.trim()) return
+                            agentOutputLinesRef.current[member.id] = [
+                              ...(agentOutputLinesRef.current[member.id] ?? []),
+                              line,
+                            ].slice(-200)
+                            // Also update state so compact card shows latest lines
+                            setAgentOutputLines((prev) => ({
+                              ...prev,
+                              [member.id]: [...(prev[member.id] ?? []), line].slice(-200),
+                            }))
+                          }}
+                        />
+                      )
+                    })}
+                  </div>
 
                   <section className="relative overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm">
                     <div className="flex items-start justify-between gap-2 px-4 pb-3 pt-4">
