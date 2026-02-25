@@ -4957,17 +4957,53 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
 
-    // Shared card style
-    const cardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)] p-4 shadow-sm'
+    // Shared card style — secondary/supporting (smaller than hero)
+    const cardCls = 'relative overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)] px-3 py-2 shadow-sm'
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
+
+    // Office stats derived
+    const activeAgentCount = agentWorkingRows.length
+    const workingAgentCount = agentWorkingRows.filter((r) => r.status === 'active').length
+    const sessionCount = team.length
 
     return (
       <div className="relative flex flex-col h-full min-h-0 bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
-        {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
-        <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-[1600px] flex-1 min-h-0 px-3 sm:px-4 flex flex-col">
+
+        {/* ── ClawSuite Office — HERO CARD (full-width, first, largest) ── */}
+        <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-[1600px] shrink-0 px-3 sm:px-4">
+          <div className="rounded-xl border border-primary-200 bg-primary-50/95 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)] overflow-hidden">
+
+            {/* ── Office stats row — sits above the canvas ── */}
+            <div className="flex items-center gap-4 border-b border-primary-100 dark:border-neutral-800/60 px-4 py-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                <span className="text-base">🏢</span>
+                <span className="font-semibold text-neutral-900 dark:text-white">ClawSuite Office</span>
+              </div>
+              <div className="flex items-center gap-3 ml-2">
+                <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200">{activeAgentCount}</span> agent{activeAgentCount !== 1 ? 's' : ''}
+                </span>
+                <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{workingAgentCount}</span> working
+                </span>
+                <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200">{sessionCount}</span> in team
+                </span>
+              </div>
+              {isMissionRunning && (
+                <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800/50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                  <span className="relative flex size-1.5">
+                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+                    <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                  Mission Active
+                </span>
+              )}
+            </div>
+
           {/* Desktop: isometric office view — fixed aspect ratio, no overflow */}
-          <div className="hidden sm:flex flex-1 min-h-[380px] overflow-visible rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm" style={{ aspectRatio: '16/9' }}>
+          <div className="hidden sm:flex min-h-[400px] md:min-h-[520px] overflow-visible bg-white dark:bg-neutral-900" style={{ aspectRatio: '16/9' }}>
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
@@ -5069,6 +5105,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               </div>
             )}
           </div>
+          </div>{/* ── end hero card ── */}
         </div>
 
           {/* ── Quick Launch Bar ── */}

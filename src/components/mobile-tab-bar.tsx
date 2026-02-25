@@ -138,10 +138,10 @@ export function MobileTabBar() {
       <nav
         ref={navRef}
         className={cn(
-          'fixed inset-x-0 bottom-0 z-40 isolate',
+          'fixed inset-x-0 bottom-0 z-40',
+          // Glass effect: frosted background + blur. No isolate — isolate breaks backdrop-filter on children.
+          'bg-white/80 backdrop-blur-xl dark:bg-neutral-900/80',
           'border-t border-white/20 dark:border-white/10',
-          'bg-white/80 dark:bg-neutral-900/80',
-          'supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-neutral-900/70',
           'pb-[max(var(--safe-b),env(safe-area-inset-bottom))]',
           'md:hidden transition-all duration-200',
           hideTabBar
@@ -150,7 +150,7 @@ export function MobileTabBar() {
         )}
         aria-label="Mobile navigation"
       >
-        <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-white/30 dark:border-white/10 px-1 py-1.5 shadow-[0_4px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-sm">
+        <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-white/30 dark:border-white/10 px-1 py-1.5 shadow-[0_4px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
           {TABS.map((tab) => {
             const isActive = tab.match(pathname)
             const isCenterChat = tab.id === 'chat'
