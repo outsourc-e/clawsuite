@@ -4870,6 +4870,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
+              onNewMission={() => openNewMissionModal()}
               onViewOutput={(agentId) => {
                 if (isMissionRunning) {
                   setMaximizedMissionId('running')
@@ -6966,7 +6967,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             : 'bg-white dark:bg-slate-800',
         )}
       >
-        <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
           <div className="flex min-w-0 items-baseline gap-2">
             <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-900 dark:text-white">Agent Hub</h1>
             <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
@@ -6985,7 +6986,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
       <div className="shrink-0 border-b border-neutral-200 bg-neutral-50/80 px-5 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
-        <div className="mx-auto w-full max-w-[1200px] overflow-x-auto">
+        <div className="mx-auto w-full max-w-7xl overflow-x-auto">
           <div className="flex min-w-max items-center">
             {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'configure'
