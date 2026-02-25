@@ -321,30 +321,31 @@ function OrchestratorCard({
   const displayRows: OcUsageRow[] = usageRows.length > 0 ? usageRows : (contextPct !== null ? [ctxRow] : [])
   const usageHeader = providerLabel ?? 'Usage'
 
-  // Provider logo mapping
-  const PROVIDER_LOGOS: Record<string, string> = {
-    'claude': '🟠',
-    'anthropic': '🟠',
-    'openai': '🟢',
-    'gemini': '🔵',
-    'google': '🔵',
-    'mistral': '🟡',
-    'groq': '⚡',
-    'ollama': '🦙',
-    'minimax': '🟣',
-    'deepseek': '🐋',
-    'cohere': '🔴',
-    'together': '🟤',
+  // Provider logo URLs (Simple Icons CDN)
+  const PROVIDER_LOGO_URLS: Record<string, string> = {
+    'anthropic': 'https://cdn.simpleicons.org/anthropic',
+    'claude':    'https://cdn.simpleicons.org/anthropic',
+    'openai':    'https://cdn.simpleicons.org/openai',
+    'gemini':    'https://cdn.simpleicons.org/googlegemini',
+    'google':    'https://cdn.simpleicons.org/google',
+    'mistral':   'https://cdn.simpleicons.org/mistral',
+    'groq':      'https://cdn.simpleicons.org/groq',
+    'ollama':    'https://cdn.simpleicons.org/ollama',
+    'deepseek':  'https://cdn.simpleicons.org/deepseek',
+    'minimax':   'https://cdn.simpleicons.org/minimax',
+    'cohere':    'https://cdn.simpleicons.org/cohere',
+    'meta':      'https://cdn.simpleicons.org/meta',
+    'nvidia':    'https://cdn.simpleicons.org/nvidia',
   }
-  function getProviderLogo(label: string | null): string {
-    if (!label) return '◉'
+  function getProviderLogoUrl(label: string | null): string | null {
+    if (!label) return null
     const key = label.toLowerCase()
-    for (const [k, v] of Object.entries(PROVIDER_LOGOS)) {
+    for (const [k, v] of Object.entries(PROVIDER_LOGO_URLS)) {
       if (key.includes(k)) return v
     }
-    return '◉'
+    return null
   }
-  const providerLogo = getProviderLogo(providerLabel)
+  const providerLogoUrl = getProviderLogoUrl(providerLabel)
   const canCycleOc = allOcProviders.filter((p) => p.status === 'ok' && p.lines.length > 0).length > 1
 
   return (
@@ -429,13 +430,14 @@ function OrchestratorCard({
       {/* ── Usage section ── */}
       {displayRows.length > 0 && (
         <div className={cn('border-t border-primary-300/40 pt-2 space-y-1.5', compact ? 'mt-1.5 px-2' : 'mt-2 px-3')}>
-          {/* Provider header row */}
+          {/* Provider header row — centered */}
           <div className="flex w-full items-center justify-between">
+            <div className="flex-1" />
             <button
               type="button"
               onClick={canCycleOc ? cycleOcProvider : undefined}
               className={cn(
-                'flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tracking-wide transition-colors',
+                'flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold tracking-wide transition-colors',
                 canCycleOc
                   ? 'cursor-pointer text-primary-500 hover:bg-primary-200/60 hover:text-primary-700'
                   : 'cursor-default text-primary-400',
@@ -443,18 +445,29 @@ function OrchestratorCard({
               )}
               title={canCycleOc ? 'Click to switch provider' : undefined}
             >
-              <span className="text-sm leading-none">{providerLogo}</span>
+              {providerLogoUrl ? (
+                <img
+                  src={providerLogoUrl}
+                  alt={usageHeader}
+                  className="h-3 w-3 object-contain opacity-70"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+              ) : (
+                <span className="h-3 w-3 rounded-full bg-primary-300/60 inline-block" />
+              )}
               <span className="capitalize">{usageHeader}</span>
               {canCycleOc && <span className="text-[9px] opacity-50">↻</span>}
             </button>
-            <button
-              type="button"
-              onClick={() => setUsageExpanded((v) => !v)}
-              className="rounded p-0.5 text-[9px] text-primary-300 hover:text-primary-500 transition-colors cursor-pointer"
-              aria-expanded={usageExpanded}
-            >
-              {usageExpanded ? '▲' : '▼'}
-            </button>
+            <div className="flex-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setUsageExpanded((v) => !v)}
+                className="rounded p-0.5 text-[9px] text-primary-300 hover:text-primary-500 transition-colors cursor-pointer"
+                aria-expanded={usageExpanded}
+              >
+                {usageExpanded ? '▲' : '▼'}
+              </button>
+            </div>
           </div>
 
           {usageExpanded && (
@@ -581,8 +594,7 @@ export function AgentViewPanel() {
   const cliAgentsQuery = useCliAgents()
   const cliAgents = cliAgentsQuery.data ?? []
   // Auto: expanded avatar when idle, compact when agents are working
-  const viewMode =
-    activeCount > 0 || cliAgents.length > 0 ? 'compact' : 'expanded'
+  const viewMode = 'expanded'
 
   // Auto-expand history only when first entry arrives
   const prevHistoryCount = useRef(0)
@@ -862,7 +874,7 @@ export function AgentViewPanel() {
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
                 {/* Main Agent Card (includes usage section) */}
-                <OrchestratorCard compact={viewMode === 'compact'} />
+                <OrchestratorCard compact={false} />
 
                 {/* Swarm — agent cards */}
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
@@ -1263,7 +1275,7 @@ export function AgentViewPanel() {
                 </div>
                 {/* Content — same as desktop sidebar */}
                 <div className="space-y-3 p-3">
-                  <OrchestratorCard compact={viewMode === 'compact'} />
+                  <OrchestratorCard compact={false} />
 
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
                     <div className="mb-1 flex justify-center">
