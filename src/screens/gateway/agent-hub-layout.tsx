@@ -1112,19 +1112,39 @@ function extractPreviewLine(lines: string[]): string {
 }
 
 /**
- * Smart truncation: if content exceeds maxWords, keep intro + conclusion with "..." in middle.
+ * Smart truncation: keep intro, any summary/conclusion section, and tail.
+ * If ≤ 40 lines, return as-is. Otherwise keep first 15 + detected summary section + last 5.
  */
-function smartTruncate(lines: string[], maxWords = 500): string[] {
-  const fullText = lines.join('\n')
-  const wc = fullText.split(/\s+/).filter(Boolean).length
-  if (wc <= maxWords) return lines
+function smartTruncate(lines: string[], maxLines = 40): string[] {
+  if (lines.length <= maxLines) return lines
 
-  // Keep first ~40% and last ~40% of lines
-  const keepHead = Math.max(3, Math.floor(lines.length * 0.4))
-  const keepTail = Math.max(3, Math.floor(lines.length * 0.4))
-  const head = lines.slice(0, keepHead)
-  const tail = lines.slice(-keepTail)
-  return [...head, '', '...*(truncated — full output was ~' + wc + ' words)*...', '', ...tail]
+  const head = lines.slice(0, 15)
+  const tail = lines.slice(-5)
+
+  // Try to find a summary/conclusion/key section in the omitted middle
+  const summaryHeaderPattern = /^#{1,3}\s+(Summary|Conclusion|Key Findings|Results|Recommendations)/i
+  let summarySection: string[] | null = null
+  for (let i = 15; i < lines.length - 5; i++) {
+    if (summaryHeaderPattern.test(lines[i].trim())) {
+      const sectionLines: string[] = [lines[i]]
+      for (let j = i + 1; j < lines.length - 5; j++) {
+        // Stop at next heading or end
+        if (/^#{1,3}\s+/.test(lines[j].trim()) && j > i) break
+        sectionLines.push(lines[j])
+        if (sectionLines.length >= 15) break // cap summary section length
+      }
+      summarySection = sectionLines
+      break
+    }
+  }
+
+  const omittedCount = lines.length - 15 - 5 - (summarySection?.length ?? 0)
+  const result = [...head, '', `[... ${omittedCount} lines omitted ...]`, '']
+  if (summarySection) {
+    result.push(...summarySection, '')
+  }
+  result.push(...tail)
+  return result
 }
 
 /**
@@ -1212,6 +1232,83 @@ function detectArtifactsFromText(params: {
       content: tableLines.join('\n'),
       timestamp,
     })
+  }
+
+  // Numbered recommendation lists (consecutive lines starting with "1." "2." etc.)
+  const numberedLines: string[] = []
+  for (const line of lines) {
+    if (/^\s*\d+\.\s+/.test(line)) {
+      numberedLines.push(line)
+    } else if (numberedLines.length > 0) {
+      if (numberedLines.length >= 3) {
+        const preview = numberedLines[0].trim().slice(0, 50)
+        artifacts.push({
+          id: createTaskId(),
+          agentId,
+          agentName,
+          type: 'text',
+          title: `List (${numberedLines.length} items): ${preview}`,
+          content: numberedLines.join('\n'),
+          timestamp,
+        })
+      }
+      numberedLines.length = 0
+    }
+  }
+  if (numberedLines.length >= 3) {
+    const preview = numberedLines[0].trim().slice(0, 50)
+    artifacts.push({
+      id: createTaskId(),
+      agentId,
+      agentName,
+      type: 'text',
+      title: `List (${numberedLines.length} items): ${preview}`,
+      content: numberedLines.join('\n'),
+      timestamp,
+    })
+  }
+
+  // Command lines (install/run commands)
+  const commandPattern = /(?:ollama run|pip install|npm install|git clone)\s+\S+/g
+  const seenCommands = new Set<string>()
+  for (const match of text.matchAll(commandPattern)) {
+    const cmd = match[0].trim()
+    if (seenCommands.has(cmd)) continue
+    seenCommands.add(cmd)
+    artifacts.push({
+      id: createTaskId(),
+      agentId,
+      agentName,
+      type: 'code',
+      title: `Command: ${cmd.length > 50 ? cmd.slice(0, 47) + '…' : cmd}`,
+      content: cmd,
+      timestamp,
+    })
+  }
+
+  // Quick Reference / Commands sections
+  const refHeaderPattern = /^#{1,3}\s+(Quick Reference|Commands)\s*$/i
+  for (let i = 0; i < lines.length; i++) {
+    if (refHeaderPattern.test(lines[i].trim())) {
+      const sectionLines: string[] = [lines[i]]
+      for (let j = i + 1; j < lines.length; j++) {
+        if (/^#{1,3}\s+/.test(lines[j].trim()) && j > i) break
+        sectionLines.push(lines[j])
+        if (sectionLines.length >= 30) break
+      }
+      if (sectionLines.length >= 2) {
+        const headerText = lines[i].replace(/^#{1,3}\s+/, '').trim()
+        artifacts.push({
+          id: createTaskId(),
+          agentId,
+          agentName,
+          type: 'text',
+          title: `Reference: ${headerText}`,
+          content: sectionLines.join('\n'),
+          timestamp,
+        })
+      }
+    }
   }
 
   return artifacts
@@ -6706,30 +6803,32 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div
         className={cn(
-          'flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 px-5 py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
+          'shrink-0 border-b border-neutral-200 px-5 py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
           isMobileHub
             ? 'bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:bg-slate-900/70'
             : 'bg-white dark:bg-slate-800',
         )}
       >
-        <div className="flex min-w-0 items-baseline gap-2">
-          <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-900 dark:text-white">Agent Hub</h1>
-          <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
-        </div>
-        {/* Right-side header controls */}
-        <div className="flex items-center gap-2">
-          {/* Approvals Bell — always visible in header */}
-          <ApprovalsBell
-            approvals={approvals}
-            onApprove={handleApprove}
-            onDeny={handleDeny}
-          />
+        <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-4">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-900 dark:text-white">Agent Hub</h1>
+            <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
+          </div>
+          {/* Right-side header controls */}
+          <div className="flex items-center gap-2">
+            {/* Approvals Bell — always visible in header */}
+            <ApprovalsBell
+              approvals={approvals}
+              onApprove={handleApprove}
+              onDeny={handleDeny}
+            />
+          </div>
         </div>
       </div>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-neutral-50/80 px-2 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
-        <div className="min-w-0 flex-1 overflow-x-auto">
+      <div className="shrink-0 border-b border-neutral-200 bg-neutral-50/80 px-5 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+        <div className="mx-auto w-full max-w-[1200px] overflow-x-auto">
           <div className="flex min-w-max items-center">
             {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'configure'
