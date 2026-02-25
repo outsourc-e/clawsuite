@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 const execFileAsync = promisify(execFile)
 
@@ -280,7 +281,10 @@ function toCliAgent(
 export const Route = createFileRoute('/api/cli-agents')({
   server: {
     handlers: {
-      GET: async function getCliAgents() {
+      GET: async function getCliAgents({ request }: { request: Request }) {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const { stdout } = await execFileAsync('ps', ['aux'])
           const processes = parsePsAuxOutput(stdout)

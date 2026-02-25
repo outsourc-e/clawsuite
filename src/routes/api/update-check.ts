@@ -3,6 +3,12 @@ import path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 /**
  * Checks if the local repo is behind the remote.
@@ -211,6 +217,13 @@ export const Route = createFileRoute('/api/update-check')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        const ip = getClientIp(request)
+        // update-check POST triggers git pull + npm install — high RCE risk, strict limit
+        if (!rateLimit(`update-check-post:${ip}`, 3, 60_000)) {
+          return rateLimitResponse()
         }
         try {
           const result = runUpdate()

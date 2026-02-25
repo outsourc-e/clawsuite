@@ -7,6 +7,7 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 function extractFolderName(fullPath: string): string {
   const parts = fullPath.replace(/\\/g, '/').split('/')
@@ -93,6 +94,9 @@ export const Route = createFileRoute('/api/workspace')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const url = new URL(request.url)
           const savedPath = url.searchParams.get('saved') || undefined

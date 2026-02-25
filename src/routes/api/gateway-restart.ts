@@ -2,6 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/gateway-restart')({
   server: {
@@ -9,6 +15,13 @@ export const Route = createFileRoute('/api/gateway-restart')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        const ip = getClientIp(request)
+        // gateway-restart triggers service disruption — limit to 5 per minute per IP
+        if (!rateLimit(`gateway-restart:${ip}`, 5, 60_000)) {
+          return rateLimitResponse()
         }
 
         try {
