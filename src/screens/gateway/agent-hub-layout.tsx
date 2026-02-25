@@ -5829,21 +5829,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: 'Failed' },
     }
 
-    const missionCardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm'
-    return (
-      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-neutral-950">
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
-        <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
-          {/* ── Header ──────────────────────────────────────────────────── */}
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3">
-            <div>
-              <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Mission Control</h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">Track active runs, review history, and launch new missions</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => openNewMissionModal()}
+	    const missionCardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm'
+	    return (
+	      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-neutral-950">
+	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
+	        <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
+	          {/* ── Header ──────────────────────────────────────────────────── */}
+	          <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card,#ffffff)] p-4 shadow-sm dark:bg-[var(--theme-card,#161b27)]">
+	            <div>
+	              <h2 className="text-lg font-bold text-[var(--theme-text)]">Mission Control</h2>
+	              <p className="text-xs text-[var(--theme-text)] opacity-70">Track active runs, review history, and launch new missions</p>
+	            </div>
+	            <div className="flex items-center gap-2">
+	              <button
+	                type="button"
+	                onClick={() => openNewMissionModal()}
                 className="min-h-11 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white hover:bg-accent-600"
               >
                 + New Mission
