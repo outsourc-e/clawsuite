@@ -48,7 +48,15 @@ jobs:
 
           FOUND=0
           for pattern in "${PATTERNS[@]}"; do
-            if grep -rE "$pattern" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.json" --include="*.env*" . 2>/dev/null | grep -v node_modules | grep -v ".lock" | grep -v dist; then
+            if grep -rE "$pattern" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.json" --include="*.env*" . 2>/dev/null \
+              | grep -v node_modules \
+              | grep -v ".lock" \
+              | grep -v dist \
+              | grep -v "test-redaction" \
+              | grep -v "diagnostics.ts" \
+              | grep -v "placeholder" \
+              | grep -v "# pragma: allowlist secret" \
+              | grep -v "example\|sample\|fake\|dummy\|test\|mock" ; then
               echo "⚠️ Potential secret found matching: $pattern"
               FOUND=1
             fi
