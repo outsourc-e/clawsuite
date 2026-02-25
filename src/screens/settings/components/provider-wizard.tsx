@@ -22,6 +22,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useGatewayRestart } from '@/components/gateway-restart-overlay'
 import { cn } from '@/lib/utils'
 import { ProviderIcon } from './provider-icon'
 
@@ -94,6 +95,8 @@ function getStepIndex(step: WizardStep): number {
 }
 
 export function ProviderWizard({ open, onOpenChange }: ProviderWizardProps) {
+  const { triggerRestart: _triggerRestart } = useGatewayRestart()
+
   const [step, setStep] = useState<WizardStep>('provider')
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     null,
@@ -179,29 +182,38 @@ export function ProviderWizard({ open, onOpenChange }: ProviderWizardProps) {
       },
     }
 
-    try {
+    const providerName = selectedProvider.name
+    const patchBody = JSON.stringify({
+      raw: JSON.stringify(patch, null, 2),
+      reason: `Studio: add ${providerName} API key`,
+    })
+
+    async function saveConfigAndRestart() {
       const res = await fetch('/api/config-patch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          raw: JSON.stringify(patch, null, 2),
-          reason: `Studio: add ${selectedProvider.name} API key`,
-        }),
+        body: patchBody,
       })
 
       const data = (await res.json()) as { ok: boolean; error?: string }
 
       if (!data.ok) {
-        setSaveState('error')
-        setSaveError(data.error || 'Failed to save config')
-        return
+        throw new Error(data.error || 'Failed to save config')
       }
+    }
 
+    try {
+      // Mark as saved, close wizard, then trigger the confirm → save → restart flow
       setSaveState('saved')
       setVerificationMessage(
-        `${selectedProvider.name} API key saved to config. Gateway will restart to apply changes.`,
+        `${providerName} API key saved. Gateway is restarting to apply changes.`,
       )
       setStep('verify')
+      onOpenChange(false)
+      resetState()
+
+      // Shows confirm dialog: user can click "Restart & Apply" or "Cancel"
+      await triggerRestart(saveConfigAndRestart)
     } catch (err) {
       setSaveState('error')
       setSaveError(err instanceof Error ? err.message : 'Network error')

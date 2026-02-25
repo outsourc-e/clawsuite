@@ -62,6 +62,7 @@ import { Route as ApiOllamaHealthRouteImport } from './routes/api/ollama-health'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
+import { Route as ApiGatewayRestartRouteImport } from './routes/api/gateway-restart'
 import { Route as ApiGatewayDiscoverRouteImport } from './routes/api/gateway-discover'
 import { Route as ApiGatewayConfigRouteImport } from './routes/api/gateway-config'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
@@ -378,6 +379,11 @@ const ApiHistoryRoute = ApiHistoryRouteImport.update({
   path: '/api/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGatewayRestartRoute = ApiGatewayRestartRouteImport.update({
+  id: '/api/gateway-restart',
+  path: '/api/gateway-restart',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGatewayDiscoverRoute = ApiGatewayDiscoverRouteImport.update({
   id: '/api/gateway-discover',
   path: '/api/gateway-discover',
@@ -678,6 +684,7 @@ export interface FileRoutesByFullPath {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
+  '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
@@ -782,6 +789,7 @@ export interface FileRoutesByTo {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
+  '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
@@ -888,6 +896,7 @@ export interface FileRoutesById {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
+  '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
@@ -995,6 +1004,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-config'
     | '/api/gateway-discover'
+    | '/api/gateway-restart'
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
@@ -1099,6 +1109,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-config'
     | '/api/gateway-discover'
+    | '/api/gateway-restart'
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
@@ -1204,6 +1215,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-config'
     | '/api/gateway-discover'
+    | '/api/gateway-restart'
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
@@ -1310,6 +1322,7 @@ export interface RootRouteChildren {
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayConfigRoute: typeof ApiGatewayConfigRoute
   ApiGatewayDiscoverRoute: typeof ApiGatewayDiscoverRoute
+  ApiGatewayRestartRoute: typeof ApiGatewayRestartRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
@@ -1726,6 +1739,13 @@ declare module '@tanstack/react-router' {
       path: '/api/history'
       fullPath: '/api/history'
       preLoaderRoute: typeof ApiHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway-restart': {
+      id: '/api/gateway-restart'
+      path: '/api/gateway-restart'
+      fullPath: '/api/gateway-restart'
+      preLoaderRoute: typeof ApiGatewayRestartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/gateway-discover': {
@@ -2206,6 +2226,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayConfigRoute: ApiGatewayConfigRoute,
   ApiGatewayDiscoverRoute: ApiGatewayDiscoverRoute,
+  ApiGatewayRestartRoute: ApiGatewayRestartRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
