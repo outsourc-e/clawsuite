@@ -12,7 +12,6 @@ import {
   ComputerTerminal01Icon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
-import { GatewayControlPanel } from './terminal-panel-control'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -376,7 +375,6 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
           />
 
           <div className="flex h-full flex-col">
-            <GatewayControlPanel />
 
             <div className="flex items-center gap-2 border-b border-primary-200 px-3 py-2">
               <div className="flex items-center gap-2 overflow-x-auto">
