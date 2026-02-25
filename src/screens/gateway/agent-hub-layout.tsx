@@ -4375,8 +4375,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     const durationStr = formatDuration(mission.duration)
                     const statusIcon = mission.failed ? '✗' : '✓'
                     const statusCls = mission.failed ? 'text-red-500' : 'text-emerald-500'
+                    const matchReport = missionReports.find((r) => r.id === mission.id)
                     return (
-                      <li key={mission.id} className={cn('flex items-center gap-2', insetCls)}>
+                      <li
+                        key={mission.id}
+                        className={cn('flex items-center gap-2', insetCls, matchReport && 'cursor-pointer hover:border-accent-300 dark:hover:border-accent-700 transition-colors')}
+                        onClick={() => { if (matchReport) setSelectedReport(matchReport) }}
+                      >
                         <span className={cn('shrink-0 text-[11px] font-bold', statusCls)}>{statusIcon}</span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">
@@ -4388,7 +4393,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         </div>
                         <span className={cn(
                           'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
-                          mission.failed ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700',
+                          mission.failed ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
                         )}>
                           {mission.failed ? 'Failed' : 'Done'}
                         </span>
@@ -5519,17 +5524,28 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">No completed missions yet.</p>
                     ) : (
                       <div className="mt-3 space-y-2">
-                        {recentCompletedMissions.map((entry) => (
-                          <article key={entry.id} className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3 py-2">
+                        {recentCompletedMissions.map((entry) => {
+                          const reportId = entry.id.startsWith('report-') ? entry.id.slice(7) : entry.id.startsWith('history-') ? entry.id.slice(8) : entry.id
+                          const matchReport = missionReports.find((r) => r.id === reportId)
+                          return (
+                          <article
+                            key={entry.id}
+                            className={cn(
+                              'rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3 py-2',
+                              matchReport && 'cursor-pointer hover:border-accent-300 dark:hover:border-accent-700 transition-colors',
+                            )}
+                            onClick={() => { if (matchReport) setSelectedReport(matchReport) }}
+                          >
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{entry.title}</p>
-                              <span className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-0.5 text-[10px] font-semibold text-neutral-400">Completed</span>
+                              <span className="shrink-0 rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-0.5 text-[10px] font-semibold text-neutral-400">Completed</span>
                             </div>
                             <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
                               {entry.duration} · {timeAgoFromMs(entry.completedAt)}
                             </p>
                           </article>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </section>
