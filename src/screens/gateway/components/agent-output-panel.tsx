@@ -37,6 +37,13 @@ export type AgentOutputPanelProps = {
    * (triple-subscribe regression). Messages are fed via the shared state instead.
    */
   externalStream?: boolean
+  /**
+   * Pre-captured output lines from the parent's SSE stream.
+   * When provided (and non-empty), these are rendered directly instead of
+   * the internal `messages` state. This is the Option A fix for the live
+   * output panel — the parent already has the data, just pass it down.
+   */
+  outputLines?: string[]
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -200,6 +207,7 @@ export function AgentOutputPanel({
   statusLabel,
   compact = false,
   externalStream = false,
+  outputLines,
 }: AgentOutputPanelProps) {
   const cachedInitial = readCachedSessionState(sessionKey)
   const [messages, setMessages] = useState<OutputMessage[]>(cachedInitial?.messages ?? [])
@@ -423,7 +431,19 @@ export function AgentOutputPanel({
               : 'mt-1 min-h-[300px] flex-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] text-sm leading-6 text-[var(--theme-text)]',
           )}
         >
-          {messages.length === 0 && !sessionEnded ? (
+          {/* Option A: render parent-captured output lines directly when available */}
+          {outputLines && outputLines.length > 0 ? (
+            <>
+              {outputLines.map((line, index) => (
+                <div key={index} className="my-1">
+                  <Markdown className="text-sm leading-6 text-[var(--theme-text)] [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_pre]:my-2 [&_pre]:bg-[var(--theme-card2)] [&_pre]:border-[var(--theme-border)] [&_code]:text-emerald-600 dark:[&_code]:text-emerald-300">
+                    {stripThinkBlocks(line)}
+                  </Markdown>
+                </div>
+              ))}
+              <span className="animate-pulse text-emerald-600 dark:text-emerald-400">▊</span>
+            </>
+          ) : messages.length === 0 && !sessionEnded ? (
             <p className="animate-pulse text-[var(--theme-muted)]">Waiting for response…</p>
           ) : (
             <>
