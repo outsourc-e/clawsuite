@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 /**
  * POST /api/validate-provider
@@ -77,6 +78,9 @@ export const Route = createFileRoute('/api/validate-provider')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const body = (await request.json().catch(() => ({}))) as ValidateBody
 

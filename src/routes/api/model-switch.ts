@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 import { gatewayRpc } from '../../server/gateway'
 
 type SessionsPatchResponse = {
@@ -15,6 +16,9 @@ export const Route = createFileRoute('/api/model-switch')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,

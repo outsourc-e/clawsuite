@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 function resolveSessionsDir() {
   // Keep in sync with Clawdbot default layout:
@@ -27,7 +28,10 @@ function resolveSessionsDir() {
 export const Route = createFileRoute('/api/paths')({
   server: {
     handlers: {
-      GET: () => {
+      GET: ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         return json(resolveSessionsDir())
       },
     },

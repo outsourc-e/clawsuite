@@ -1,11 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '@/server/auth-middleware'
 import { gatewayCronRpc, normalizeCronRuns } from '@/server/cron'
 
 export const Route = createFileRoute('/api/cron/runs/$jobId')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const url = new URL(request.url)
           const limitRaw = Number(url.searchParams.get('limit') ?? '10')

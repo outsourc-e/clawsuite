@@ -445,11 +445,14 @@ export async function startBrowserStream(): Promise<{ port: number }> {
   const { WebSocketServer } = await import('ws')
 
   return new Promise((resolve) => {
+    const appPort = process.env.PORT || '3001'
+    const allowedOrigin = `http://localhost:${appPort}`
+
     server = http.createServer((req, res) => {
       // CORS preflight
       if (req.method === 'OPTIONS') {
         res.writeHead(204, {
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': allowedOrigin,
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
         })
@@ -469,13 +472,13 @@ export async function startBrowserStream(): Promise<{ port: number }> {
             const result = await handleAction(params.action, params)
             res.writeHead(200, {
               'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Origin': allowedOrigin,
             })
             res.end(JSON.stringify(result))
           } catch (err) {
             res.writeHead(500, {
               'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Origin': allowedOrigin,
             })
             res.end(JSON.stringify({ error: String(err) }))
           }
@@ -486,7 +489,7 @@ export async function startBrowserStream(): Promise<{ port: number }> {
       // Status
       res.writeHead(200, {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowedOrigin,
       })
       res.end(
         JSON.stringify({

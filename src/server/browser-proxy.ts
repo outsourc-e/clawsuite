@@ -60,9 +60,11 @@ export async function startProxy(): Promise<{ port: number; url: string }> {
         (clientReq.headers['x-proxy-url'] as string)
 
       // Handle CORS preflight
+      const appPort = process.env.PORT || '3001'
+      const allowedOrigin = `http://localhost:${appPort}`
       if (clientReq.method === 'OPTIONS') {
         clientRes.writeHead(200, {
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': allowedOrigin,
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': '*',
           'Access-Control-Max-Age': '86400',
@@ -78,7 +80,7 @@ export async function startProxy(): Promise<{ port: number; url: string }> {
           currentTargetOrigin = url
           clientRes.writeHead(200, {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Origin': allowedOrigin,
           })
           clientRes.end(JSON.stringify({ ok: true, url }))
         } else {
@@ -92,7 +94,7 @@ export async function startProxy(): Promise<{ port: number; url: string }> {
       if (reqUrl.pathname === '/__proxy__/status') {
         clientRes.writeHead(200, {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': allowedOrigin,
         })
         clientRes.end(
           JSON.stringify({
@@ -159,8 +161,8 @@ export async function startProxy(): Promise<{ port: number; url: string }> {
             }
           }
 
-          // Add permissive CORS
-          headers['access-control-allow-origin'] = '*'
+          // Add CORS — restrict to same-origin app only
+          headers['access-control-allow-origin'] = allowedOrigin
           headers['access-control-allow-credentials'] = 'true'
 
           // Rewrite Location headers for redirects

@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 import path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 /**
  * Checks if the local repo is behind the remote.
@@ -187,7 +188,10 @@ function runUpdate(): { ok: boolean; output: string } {
 export const Route = createFileRoute('/api/update-check')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const now = Date.now()
           if (lastCheck && now - lastCheck.at < CHECK_COOLDOWN_MS) {
@@ -204,7 +208,10 @@ export const Route = createFileRoute('/api/update-check')({
           )
         }
       },
-      POST: async () => {
+      POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const result = runUpdate()
           return json(result)

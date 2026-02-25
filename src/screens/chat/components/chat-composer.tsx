@@ -1352,19 +1352,12 @@ function ChatComposerComponent({
           return
         }
       }
-      // Enter to send (Shift+Enter inserts newline — default textarea behavior)
-      if (
-        event.key === 'Enter' &&
-        !event.shiftKey &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !event.nativeEvent.isComposing
-      ) {
-        event.preventDefault()
-        handleSubmit()
-      }
+      // Enter-to-send is handled by PromptInputTextarea via the onSubmit prop.
+      // Handling it here too causes handleSubmit() to fire twice on every Enter
+      // keypress (once via onSubmit → handlePromptSubmit, once via this onKeyDown
+      // handler), which duplicates messages when text is pasted then sent.
     },
-    [handleDismissSlashMenu, handleSubmit, isSlashMenuOpen],
+    [handleDismissSlashMenu, isSlashMenuOpen],
   )
 
   // Combine internal ref with external wrapperRef
