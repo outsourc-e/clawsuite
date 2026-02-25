@@ -1,6 +1,6 @@
 {
   "name": "clawsuite",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Supercharged dashboard for OpenClaw AI agents — chat, file explorer, terminal, and usage tracking",
   "author": "Eric (https://github.com/outsourc-e)",
   "license": "MIT",
