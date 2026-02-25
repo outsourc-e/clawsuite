@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
 import { TaskBoard as _TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
 import { LiveFeedPanel } from './components/live-feed-panel'
-import { MissionTimeline } from './components/mission-timeline'
+// MissionTimeline available for future detail views:
+// import { MissionTimeline } from './components/mission-timeline'
 import { AgentOutputPanel } from './components/agent-output-panel'
 import { emitFeedEvent, onFeedEvent } from './components/feed-event-bus'
 import { AgentsWorkingPanel as _AgentsWorkingPanel, type AgentWorkingRow, type AgentWorkingStatus } from './components/agents-working-panel'
@@ -2170,7 +2171,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [newMissionBudgetLimit, setNewMissionBudgetLimit] = useState('120000')
   const [maximizedMissionId, setMaximizedMissionId] = useState<string | null>(null)
   const [_view, setView] = useState<'board' | 'timeline'>('board')
-  const [missionSubTab, setMissionSubTab] = useState<'overview' | 'active' | 'history'>('overview')
+  const [missionSubTab, setMissionSubTab] = useState<'all' | 'running' | 'needs_input' | 'complete' | 'failed'>('all')
   const [missionState, setMissionState] = useState<'running' | 'paused' | 'stopped'>(
     'stopped',
   )
@@ -4032,9 +4033,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         // Auto-show completion report modal
         setCompletionReport(record)
         setCompletionReportVisible(true)
-        // Switch to missions tab / history so user sees the result
+        // Switch to missions tab so user sees the result
         setActiveTab('missions')
-        setMissionSubTab('history')
+        setMissionSubTab('complete')
       }
       missionCompletionSnapshotRef.current = null
       // Reload mission history to pick up any new checkpoints
@@ -4349,7 +4350,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && missionGoal.trim()) {
                       setActiveTab('missions')
-                      setMissionSubTab('overview')
+                      setMissionSubTab('all')
                       window.setTimeout(() => handleCreateMissionRef.current(), 0)
                     }
                   }}
@@ -5386,7 +5387,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const currentTeamLabel = `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · ${team.length} agents`
     const missionTasksForBoard = missionTasks.length > 0 ? missionTasks : boardTasks
     const runningTaskStats = computeMissionTaskStats(missionTasksForBoard)
-    const runningElapsed = missionStartedAtRef.current ? formatDuration(Date.now() - missionStartedAtRef.current) : '0s'
     const runningProgressPct = runningTaskStats.total > 0 ? Math.round((runningTaskStats.completed / runningTaskStats.total) * 100) : 0
     const missionTeamOptions = [
       { id: '__current__', label: currentTeamLabel, team },
@@ -5477,58 +5477,105 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       }, 0)
     }
 
-    const missionSubTabs: Array<{ id: 'overview' | 'active' | 'history'; label: string }> = [
-      { id: 'overview', label: 'Overview' },
-      { id: 'active', label: 'Active Mission' },
-      { id: 'history', label: 'History' },
-    ]
-    const historyCards = missionHistory.map((cp) => {
+    // ── Build unified mission list ─────────────────────────────────────────
+    type MissionListStatus = 'running' | 'needs_input' | 'complete' | 'failed'
+    type MissionListEntry = {
+      id: string
+      status: MissionListStatus
+      title: string
+      goal: string
+      agents: string[]
+      duration: string
+      startedAt: number
+      report?: StoredMissionReport
+    }
+
+    const missionListEntries: MissionListEntry[] = []
+
+    // Active mission (if any)
+    if (missionActive) {
+      const anyWaiting = agentWorkingRows.some((r) => r.status === 'waiting_for_input')
+      missionListEntries.push({
+        id: missionIdRef.current || 'active',
+        status: anyWaiting ? 'needs_input' : 'running',
+        title: activeMissionName || activeMissionGoal || missionGoal || 'Active Mission',
+        goal: activeMissionGoal || missionGoal || '',
+        agents: team.map((m) => m.name),
+        duration: missionStartedAtRef.current ? formatDuration(Date.now() - missionStartedAtRef.current) : '0s',
+        startedAt: missionStartedAtRef.current || Date.now(),
+      })
+    }
+
+    // History entries
+    for (const cp of missionHistory) {
       const completedTasks = cp.tasks.filter((t) => t.status === 'done' || t.status === 'completed').length
       const totalTasks = cp.tasks.length
-      const derivedStatus = cp.status === 'aborted'
-        ? 'aborted'
-        : completedTasks >= totalTasks && totalTasks > 0
-          ? 'done'
-          : 'partial'
-      return {
+      const isComplete = completedTasks >= totalTasks && totalTasks > 0 && cp.status !== 'aborted'
+      const completedAt = cp.completedAt ?? cp.updatedAt
+      const dur = completedAt > cp.startedAt ? formatDuration(completedAt - cp.startedAt) : '—'
+      const matchingReport = missionReports.find((r) => r.id === cp.id)
+      const agentNames = cp.tasks
+        .map((t) => t.assignedTo)
+        .filter((name, idx, arr): name is string => Boolean(name) && arr.indexOf(name) === idx)
+      missionListEntries.push({
         id: cp.id,
-        status: derivedStatus,
+        status: cp.status === 'aborted' ? 'failed' : isComplete ? 'complete' : 'failed',
         title: truncateMissionGoal(cp.label, 96),
         goal: cp.label,
-        subtitle: `${completedTasks}/${totalTasks} tasks`,
-        updatedAt: cp.completedAt ?? cp.updatedAt,
-      }
-    })
-    const recentCompletedMissions = [
-      ...missionHistory
-        .filter((cp) => cp.status === 'completed')
-        .map((cp) => {
-          const completedAt = cp.completedAt ?? cp.updatedAt
-          const duration = completedAt > cp.startedAt ? formatDuration(completedAt - cp.startedAt) : 'Unknown duration'
-          return {
-            id: `history-${cp.id}`,
-            title: truncateMissionGoal(cp.label, 72),
-            completedAt,
-            duration,
-          }
-        }),
-      ...missionReports.map((report) => ({
-        id: `report-${report.id}`,
-        title: truncateMissionGoal(report.name || report.goal || 'Mission', 72),
-        completedAt: report.completedAt,
+        agents: agentNames,
+        duration: dur,
+        startedAt: cp.startedAt ?? cp.updatedAt,
+        report: matchingReport,
+      })
+    }
+
+    // Reports not in history
+    for (const report of missionReports) {
+      if (missionListEntries.some((e) => e.id === report.id)) continue
+      missionListEntries.push({
+        id: report.id,
+        status: 'complete',
+        title: truncateMissionGoal(report.name || report.goal || 'Mission', 96),
+        goal: report.goal,
+        agents: report.agents.map((a) => a.name),
         duration: formatDuration(report.duration),
-      })),
+        startedAt: report.completedAt - report.duration,
+        report,
+      })
+    }
+
+    // Sort: running/needs_input first, then by startedAt desc
+    missionListEntries.sort((a, b) => {
+      const priority = { running: 0, needs_input: 1, complete: 2, failed: 3 } as const
+      if (priority[a.status] !== priority[b.status]) return priority[a.status] - priority[b.status]
+      return b.startedAt - a.startedAt
+    })
+
+    const filteredEntries = missionSubTab === 'all'
+      ? missionListEntries
+      : missionListEntries.filter((e) => e.status === missionSubTab)
+
+    const filterTabs: Array<{ id: typeof missionSubTab; label: string; count: number }> = [
+      { id: 'all', label: 'All', count: missionListEntries.length },
+      { id: 'running', label: 'Running', count: missionListEntries.filter((e) => e.status === 'running').length },
+      { id: 'needs_input', label: 'Needs Input', count: missionListEntries.filter((e) => e.status === 'needs_input').length },
+      { id: 'complete', label: 'Complete', count: missionListEntries.filter((e) => e.status === 'complete').length },
+      { id: 'failed', label: 'Failed', count: missionListEntries.filter((e) => e.status === 'failed').length },
     ]
-      .sort((a, b) => b.completedAt - a.completedAt)
-      .slice(0, 3)
-    const doneTaskCount = missionTasks.filter((task) => task.status === 'done').length
-    const totalTaskCount = missionTasks.length
-    const totalReportsCount = missionHistory.length || historyCards.length
+
+    const STATUS_BADGE: Record<MissionListStatus, { bg: string; text: string; label: string; pulse?: boolean }> = {
+      running: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', label: 'Running', pulse: true },
+      needs_input: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', label: 'Needs Input', pulse: true },
+      complete: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', label: 'Complete' },
+      failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: 'Failed' },
+    }
+
     const missionCardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm'
     return (
       <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-neutral-950">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
         <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
+          {/* ── Header ──────────────────────────────────────────────────── */}
           <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3">
             <div>
               <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Mission Control</h2>
@@ -5555,8 +5602,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
 
-          <div className="flex w-full rounded-xl bg-neutral-100 dark:bg-neutral-900/80 dark:border dark:border-neutral-700/50 p-1">
-            {missionSubTabs.map((tab) => {
+          {/* ── Filter Bar ──────────────────────────────────────────────── */}
+          <div className="flex w-full items-center gap-1 rounded-xl bg-neutral-100 dark:bg-neutral-900/80 dark:border dark:border-neutral-700/50 p-1">
+            {filterTabs.map((tab) => {
               const isActive = missionSubTab === tab.id
               return (
                 <button
@@ -5564,371 +5612,226 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   type="button"
                   onClick={() => setMissionSubTab(tab.id)}
                   className={cn(
-                    'transition-colors',
+                    'flex items-center gap-1.5 transition-colors',
                     isActive
-                      ? 'flex-1 rounded-lg bg-white dark:bg-neutral-800 py-2 text-center text-sm font-semibold text-accent-600 dark:text-accent-400 shadow-sm transition-colors'
-                      : 'flex-1 rounded-lg py-2 text-center text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300 transition-colors',
+                      ? 'flex-1 rounded-lg bg-white dark:bg-neutral-800 py-2 text-center text-sm font-semibold text-accent-600 dark:text-accent-400 shadow-sm'
+                      : 'flex-1 rounded-lg py-2 text-center text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300',
                   )}
                 >
-                  {tab.label}
+                  <span className="mx-auto flex items-center gap-1.5">
+                    {tab.label}
+                    {tab.count > 0 && (
+                      <span className={cn(
+                        'inline-flex min-w-[18px] items-center justify-center rounded-full px-1 py-0.5 text-[10px] font-bold leading-none',
+                        isActive
+                          ? 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-400'
+                          : 'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400',
+                      )}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </span>
                 </button>
               )
             })}
           </div>
 
+          {/* ── Mission List ────────────────────────────────────────────── */}
           <div className="min-h-0 flex-1 overflow-auto">
-            {missionSubTab === 'overview' ? (
-              <div className="w-full space-y-4">
-                <div className="flex flex-wrap gap-3">
-                  <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Mission State</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{missionState ? capitalizeFirst(missionState) : 'Idle'}</p>
-                  </article>
-                  <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Tasks</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{`${doneTaskCount}/${totalTaskCount} complete`}</p>
-                  </article>
-                  <article className={cn('min-w-[180px] flex-1', missionCardCls)}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Total Reports</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{totalReportsCount}</p>
-                  </article>
-                </div>
-
-                {missionActive ? (
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Active Mission</p>
-                    <p className="mt-1 text-base font-semibold text-neutral-900 dark:text-neutral-100">{activeMissionGoal || missionGoal || 'Untitled mission'}</p>
+            {filteredEntries.length === 0 ? (
+              <div className={cn('flex h-48 items-center justify-center text-center', missionCardCls)}>
+                <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
+                <div className="max-w-md">
+                  <span className="text-3xl">{missionSubTab === 'all' ? '🚀' : '📋'}</span>
+                  <p className="mt-2 text-sm font-medium text-neutral-600 dark:text-neutral-400">
+                    {missionSubTab === 'all'
+                      ? 'No missions yet — launch one to get started'
+                      : `No ${filterTabs.find((t) => t.id === missionSubTab)?.label.toLowerCase()} missions`}
+                  </p>
+                  {missionSubTab === 'all' && (
                     <button
                       type="button"
-                      onClick={() => setMissionSubTab('active')}
-                      className="mt-4 rounded-lg bg-accent-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-600 transition-colors"
+                      onClick={() => openNewMissionModal()}
+                      className="mt-3 rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-600 transition-colors"
                     >
-                      View Active Mission →
+                      + New Mission
                     </button>
-                  </section>
-                ) : (
-                  <section className={cn('flex min-h-[200px] items-center justify-center p-12 text-center', missionCardCls)}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <div className="max-w-md">
-                      <span className="text-3xl">🚀</span>
-                      <p className="mt-2 text-base font-semibold text-neutral-900 dark:text-neutral-100">Ready to launch</p>
-                      <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Start a mission to coordinate your AI agents on a goal.</p>
-                      <button
-                        type="button"
-                        onClick={() => openNewMissionModal()}
-                        className="mt-4 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-600 transition-colors shadow-sm"
-                      >
-                        + New Mission
-                      </button>
-                      {EXAMPLE_MISSIONS.length > 0 && (
-                        <div className="mt-4 flex flex-wrap justify-center gap-2">
-                          {EXAMPLE_MISSIONS.map((ex) => (
-                            <button
-                              key={ex.label}
-                              type="button"
-                              onClick={() => openNewMissionModal({ goal: ex.text, name: ex.label })}
-                              className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3 py-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:border-accent-400 hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
-                            >
-                              {ex.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                )}
-
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Recent Missions</p>
-                      <button type="button" onClick={() => setMissionSubTab('history')} className="text-[11px] font-medium text-accent-600 hover:text-accent-700">Open History</button>
-                    </div>
-                    {recentCompletedMissions.length === 0 ? (
-                      <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">No completed missions yet.</p>
-                    ) : (
-                      <div className="mt-3 space-y-2">
-                        {recentCompletedMissions.map((entry) => {
-                          const reportId = entry.id.startsWith('report-') ? entry.id.slice(7) : entry.id.startsWith('history-') ? entry.id.slice(8) : entry.id
-                          const matchReport = missionReports.find((r) => r.id === reportId)
-                          return (
-                          <article
-                            key={entry.id}
-                            className={cn(
-                              'rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3 py-2',
-                              matchReport && 'cursor-pointer hover:border-accent-300 dark:hover:border-accent-700 transition-colors',
-                            )}
-                            onClick={() => { if (matchReport) setSelectedReport(matchReport) }}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{entry.title}</p>
-                              <span className="shrink-0 rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-0.5 text-[10px] font-semibold text-neutral-400">Completed</span>
-                            </div>
-                            <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-                              {entry.duration} · {timeAgoFromMs(entry.completedAt)}
-                            </p>
-                          </article>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </section>
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Quick Launch Teams</p>
-                    {teamConfigs.length === 0 ? (
-                      <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">Save a team config in Configure to quick-launch missions here.</p>
-                    ) : (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {teamConfigs.slice(0, 6).map((config) => (
-                          <button
-                            key={`ql-${config.id}`}
-                            type="button"
-                            onClick={() => openNewMissionModal({ teamConfigId: config.id, name: `Mission with ${config.name}` })}
-                            className="min-h-11 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-800 transition-colors hover:border-accent-500 hover:text-accent-500"
-                          >
-                            {config.icon ?? '👥'} {config.name} · {config.team.length}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </section>
+                  )}
                 </div>
               </div>
-            ) : null}
-
-            {missionSubTab === 'active' ? (
-              missionActive ? (
-                <div className="w-full space-y-4">
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">MISSION GOAL</p>
-                        <p className="mt-1 text-base text-neutral-900 dark:text-neutral-100">{activeMissionGoal || missionGoal || ''}</p>
-                      </div>
-                      <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-xs text-white">Running</span>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex -space-x-2">
-                        {team.map((member) => {
-                          const parts = member.name.trim().split(/\s+/).filter(Boolean)
-                          const initials = parts.length > 1
-                            ? `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
-                            : (parts[0] ?? '?').slice(0, 2).toUpperCase()
-                          return (
-                            <div key={member.id} className="flex h-8 w-8 items-center justify-center rounded-full border border-white bg-neutral-900 text-[10px] font-semibold text-white" title={member.name}>
-                              {initials}
-                            </div>
-                          )
-                        })}
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-neutral-500 dark:text-neutral-400">
-                        <span>{runningTaskStats.completed} / {runningTaskStats.total} tasks · {runningElapsed} elapsed</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 h-1 rounded-full bg-neutral-200 dark:bg-neutral-700">
-                      <div className="h-1 rounded-full bg-accent-500 transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
-                    </div>
-                  </section>
-
-                  <div className="w-full">
-                    <MissionTimeline tasks={missionTasks} agentOutputs={new Map(Object.entries(agentOutputLines))}
-                      agentSessionMap={agentSessionMap}
-                      agentStatuses={new Map(
-                        Object.entries(agentSessionStatus).map(([id, s]) => [
-                          id,
-                          { status: s.status, lastSeen: typeof s.lastSeen === 'number' ? s.lastSeen : Date.now() },
-                        ]),
+            ) : (
+              <div className="space-y-2">
+                {filteredEntries.map((entry) => {
+                  const badge = STATUS_BADGE[entry.status]
+                  const isLive = entry.status === 'running' || entry.status === 'needs_input'
+                  return (
+                    <article
+                      key={entry.id}
+                      className={cn(
+                        missionCardCls,
+                        'cursor-pointer transition-all hover:shadow-md',
+                        entry.status === 'needs_input' && 'ring-2 ring-amber-400/50 dark:ring-amber-500/30',
+                        entry.report && 'hover:border-accent-300 dark:hover:border-accent-700',
                       )}
-                      missionState={missionState}
-                      missionGoal={activeMissionGoal || missionGoal || ''}
-                      teamMembers={team}
-                      elapsedTime={missionStartedAtRef.current ? Date.now() - missionStartedAtRef.current : undefined}
-                    />
-                  </div>
-
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-base font-bold text-neutral-900 dark:text-neutral-100">Mission Controls</p>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Warden controls for active mission state</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleMissionPause(false)}
-                        disabled={missionState === 'running'}
-                        className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-600 text-white hover:bg-emerald-700"
-                      >
-                        Resume
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleMissionPause(true)}
-                        disabled={missionState === 'paused'}
-                        className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-amber-500 text-white hover:bg-amber-600"
-                      >
-                        Pause
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => stopMissionAndCleanup('aborted')}
-                        className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700"
-                      >
-                        Stop
-                      </button>
-                    </div>
-                  </section>
-
-                  {/* ── Inline Agent Output Feed ─────────────────────────── */}
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-base font-bold text-neutral-900 dark:text-neutral-100">Agent Output</p>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Live streaming output from all agents</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
+                      onClick={() => {
+                        if (isLive) {
+                          // For running/needs_input: expand agent output panel
                           setOutputPanelVisible(true)
                           if (!selectedOutputAgentId && team.length > 0) {
                             setSelectedOutputAgentId(team[0].id)
                           }
-                        }}
-                        className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
-                      >
-                        Expand ↗
-                      </button>
-                    </div>
-                    <div className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 divide-y divide-neutral-100 dark:divide-neutral-700/50">
-                      {agentWorkingRows.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-sm text-neutral-400">Waiting for agents to start...</div>
-                      ) : (
-                        agentWorkingRows.map((row) => {
-                          const lines = agentOutputLines[row.id] ?? []
-                          const statusMeta = getAgentStatusMeta(row.status)
-                          return (
-                            <div key={row.id} className="px-4 py-3">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <span className={cn('size-2 shrink-0 rounded-full', statusMeta.dotClassName, statusMeta.pulse && 'animate-pulse')} />
-                                <span className="text-xs font-semibold text-neutral-900 dark:text-white">{row.name}</span>
-                                <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-semibold', statusMeta.className)}>
-                                  {row.status}
-                                </span>
-                                {row.currentTask && (
-                                  <span className="ml-auto truncate text-[10px] text-neutral-400 max-w-[200px]">
-                                    📋 {row.currentTask}
-                                  </span>
-                                )}
-                              </div>
-                              {lines.length > 0 ? (
-                                <div className="ml-4 space-y-0.5 font-mono text-[11px] leading-relaxed text-neutral-600 dark:text-slate-400">
-                                  {lines.slice(-4).map((line, idx) => (
-                                    <p key={idx} className="truncate">{line}</p>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="ml-4 text-[11px] text-neutral-400 italic">No output yet</p>
-                              )}
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
-                  </section>
-
-                  {/* ── Live Event Feed ──────────────────────────────────── */}
-                  <section className={missionCardCls}>
-                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-base font-bold text-neutral-900 dark:text-neutral-100">Event Log</p>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">System events and activity</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setLiveFeedVisible(true)}
-                        className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
-                      >
-                        View All
-                      </button>
-                    </div>
-                    <div className="mt-3 h-56 overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700">
-                      <LiveFeedPanel />
-                    </div>
-                  </section>
-                </div>
-              ) : (
-                <div className={cn('flex h-full min-h-[220px] w-full items-center justify-center text-center', missionCardCls)}>
-                  <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400">No active mission. Launch one to view live timeline progress.</p>
-                </div>
-              )
-            ) : null}
-
-            {missionSubTab === 'history' ? (
-              historyCards.length === 0 ? (
-                <div className={cn('flex h-40 items-center justify-center text-sm text-neutral-500 dark:text-neutral-400', missionCardCls)}>
-                  <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                  No mission history yet.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {historyCards.map((entry) => {
-                    const matchingReport = missionReports.find((r) => r.id === entry.id)
-                    return (
-                    <div key={entry.id} className={missionCardCls}>
+                        } else if (entry.report) {
+                          setSelectedReport(entry.report)
+                        }
+                      }}
+                    >
                       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{entry.title}</p>
-                          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{entry.subtitle}</p>
-                        </div>
+                      <div className="flex items-center gap-3">
+                        {/* Status Badge */}
                         <span className={cn(
-                          'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
-                          entry.status === 'done' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-                          entry.status === 'aborted' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                          entry.status === 'partial' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+                          'shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide',
+                          badge.bg, badge.text,
+                          badge.pulse && 'animate-pulse',
                         )}>
-                          {entry.status}
+                          {badge.label}
                         </span>
+
+                        {/* Mission Title + Goal */}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{entry.title}</p>
+                          {entry.goal !== entry.title && (
+                            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 truncate">{entry.goal}</p>
+                          )}
+                        </div>
+
+                        {/* Agents */}
+                        <div className="hidden sm:flex -space-x-1.5 shrink-0">
+                          {entry.agents.slice(0, 4).map((name, idx) => {
+                            const initials = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+                            return (
+                              <div key={`${entry.id}-agent-${idx}`} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-800 dark:bg-neutral-700 text-[8px] font-bold text-white" title={name}>
+                                {initials}
+                              </div>
+                            )
+                          })}
+                          {entry.agents.length > 4 && (
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-300 dark:bg-neutral-600 text-[8px] font-bold text-neutral-700 dark:text-neutral-300">
+                              +{entry.agents.length - 4}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Duration */}
+                        <span className="shrink-0 text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">{entry.duration}</span>
+
+                        {/* Started At */}
+                        <span className="hidden md:block shrink-0 text-[11px] text-neutral-400 dark:text-neutral-500">{timeAgoFromMs(entry.startedAt)}</span>
+
+                        {/* Action */}
+                        <div className="shrink-0">
+                          {isLive ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); stopMissionAndCleanup('aborted') }}
+                              className="rounded-md border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-900/20 px-2 py-1 text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                            >
+                              Stop
+                            </button>
+                          ) : entry.report ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setSelectedReport(entry.report!) }}
+                              className="rounded-md border border-accent-200 dark:border-accent-800/50 bg-accent-50 dark:bg-accent-900/20 px-2 py-1 text-[11px] font-medium text-accent-700 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900/40 transition-colors"
+                            >
+                              View Report
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal }) }}
+                              className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-2 py-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                            >
+                              Re-run
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">Updated {timeAgoFromMs(entry.updatedAt)}</p>
-                      <div className="mt-3 flex gap-2">
-                        {matchingReport ? (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedReport(matchingReport)}
-                            className="rounded-md bg-accent-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-accent-600 transition-colors"
-                          >
-                            View Report
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal })}
-                          className="rounded-md border border-accent-200 dark:border-accent-800/50 bg-accent-50 dark:bg-accent-900/20 px-2.5 py-1 text-xs font-medium text-accent-700 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900/40 transition-colors"
-                        >
-                          Re-run
-                        </button>
-                      </div>
-                    </div>
-                    )
-                  })}
-                </div>
-              )
-            ) : null}
+
+                      {/* ── Inline expansion for running/needs_input missions ── */}
+                      {isLive && (
+                        <div className="mt-3 space-y-3 border-t border-neutral-100 dark:border-neutral-800 pt-3">
+                          {/* Progress bar */}
+                          <div className="flex items-center gap-3">
+                            <div className="h-1.5 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700">
+                              <div className="h-1.5 rounded-full bg-accent-500 transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
+                            </div>
+                            <span className="shrink-0 text-[11px] text-neutral-500">{runningTaskStats.completed}/{runningTaskStats.total} tasks</span>
+                          </div>
+
+                          {/* Agent status rows */}
+                          <div className="divide-y divide-neutral-100 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50">
+                            {agentWorkingRows.map((row) => {
+                              const statusMeta = getAgentStatusMeta(row.status)
+                              const lastOutput = (agentOutputLines[row.id] ?? []).slice(-1)[0]
+                              return (
+                                <div key={row.id} className="flex items-center gap-2 px-3 py-2">
+                                  <span className={cn('size-2 shrink-0 rounded-full', statusMeta.dotClassName, statusMeta.pulse && 'animate-pulse')} />
+                                  <span className="text-xs font-semibold text-neutral-900 dark:text-white shrink-0">{row.name}</span>
+                                  <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold', statusMeta.className)}>
+                                    {statusMeta.label}
+                                  </span>
+                                  {lastOutput && (
+                                    <span className="ml-auto truncate text-[10px] text-neutral-400 max-w-[300px] font-mono">{lastOutput}</span>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {/* Warden controls */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); void handleMissionPause(false) }}
+                              disabled={missionState === 'running'}
+                              className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              Resume
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); void handleMissionPause(true) }}
+                              disabled={missionState === 'paused'}
+                              className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 bg-amber-500 text-white hover:bg-amber-600"
+                            >
+                              Pause
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOutputPanelVisible(true)
+                                if (!selectedOutputAgentId && team.length > 0) setSelectedOutputAgentId(team[0].id)
+                              }}
+                              className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                            >
+                              Agent Output ↗
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setLiveFeedVisible(true) }}
+                              className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                            >
+                              Event Log
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
         {missionBoardModalOpen ? (
