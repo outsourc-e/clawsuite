@@ -365,19 +365,27 @@ export function AgentOutputPanel({
           {tasks.map((task) => (
             <div
               key={task.id}
-              className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2"
+              className={cn(
+                'rounded-lg px-3 py-2',
+                compact
+                  ? 'border border-neutral-800 bg-neutral-900/70'
+                  : 'border border-[var(--theme-border)] bg-[var(--theme-card)]',
+              )}
             >
               <div className="flex items-center gap-2">
-                <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                <span className="text-xs font-medium text-[var(--theme-text)]">
+                <span className={cn(
+                  'size-1.5 rounded-full',
+                  task.status === 'done' ? 'bg-emerald-500' : task.status === 'in_progress' ? 'bg-blue-500 animate-pulse' : 'bg-neutral-500',
+                )} />
+                <span className={cn('text-xs font-medium', compact ? 'text-neutral-300' : 'text-[var(--theme-text)]')}>
                   {task.title}
                 </span>
               </div>
-              <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+              <p className={cn('mt-1 text-[10px]', compact ? 'text-neutral-500' : 'text-[var(--theme-muted)]')}>
                 {task.status === 'in_progress'
                   ? 'Working...'
                   : task.status === 'done'
-                    ? 'Completed'
+                    ? '✓ Completed'
                     : 'Queued'}
               </p>
             </div>
