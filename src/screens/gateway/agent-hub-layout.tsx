@@ -3640,13 +3640,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           type: 'success',
         })
       } catch (error) {
-        setPausedByAgentId((prev) => ({ ...prev, [agentId]: previousPaused }))
-        toast(
-          error instanceof Error
-            ? error.message
-            : `Failed to ${pause ? 'pause' : 'resume'} ${agentName}`,
-          { type: 'error' },
-        )
+        // Graceful fallback: if server-side pause isn't available, keep local
+        // paused state but warn the user instead of crashing.
+        const errMsg = error instanceof Error ? error.message : String(error)
+        const isNotImplemented =
+          errMsg.includes('404') || errMsg.includes('not found') || errMsg.includes('Not Found') || errMsg.includes('not implemented')
+        if (isNotImplemented) {
+          // Server doesn't support pause — keep optimistic local state and inform user
+          toast(`${agentName} pause not available on this gateway`, { type: 'warning' })
+          emitFeedEvent({
+            type: 'system',
+            message: `Pause not available for ${agentName} — gateway endpoint missing`,
+            agentName,
+          })
+        } else {
+          setPausedByAgentId((prev) => ({ ...prev, [agentId]: previousPaused }))
+          toast(errMsg || `Failed to ${pause ? 'pause' : 'resume'} ${agentName}`, { type: 'error' })
+        }
       }
     },
     [agentSessionMap, pausedByAgentId, team],
@@ -3654,11 +3664,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   const handleMissionPause = useCallback(async (pause: boolean) => {
     setMissionState(pause ? 'paused' : 'running')
-    await Promise.allSettled(
-      team
-        .filter((m) => agentSessionMap[m.id])
-        .map((m) => _handleSetAgentPaused(m.id, pause))
-    )
+    try {
+      await Promise.allSettled(
+        team
+          .filter((m) => agentSessionMap[m.id])
+          .map((m) => _handleSetAgentPaused(m.id, pause))
+      )
+    } catch {
+      // allSettled won't throw, but guard against unexpected errors
+    }
   }, [team, agentSessionMap, _handleSetAgentPaused])
 
   const handleKillAgent = useCallback(async (agentId: string) => {
@@ -3837,6 +3851,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           .then((sessionKey) => {
             if (isStaleLaunch()) return
             currentMap[member.id] = sessionKey
+            // Update session map incrementally so output panel gets sessionKey ASAP
+            // (not just after all agents finish spawning)
+            setAgentSessionMap((prev) => ({ ...prev, [member.id]: sessionKey }))
             setSpawnState((prev) => ({ ...prev, [member.id]: 'ready' }))
             // Set status to active immediately after spawn so SSE streams open right away.
             // (The session poll will confirm/correct this within 5s; using 'active' ensures
@@ -4437,15 +4454,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     expectedAgentCountRef.current = teamWithRuntimeStatus.length
     missionCompletionSnapshotRef.current = null
     setMissionTokenCount(0)
-    const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId
+    // ── Auto-open Live Output panel: pick first assigned agent, fallback to first team member ──
+    const firstAssignedAgentId = createdTasks.find((task) => task.agentId)?.agentId ?? teamWithRuntimeStatus[0]?.id
     setSelectedOutputAgentId(firstAssignedAgentId)
-    if (firstAssignedAgentId) setOutputPanelVisible(true)
+    setOutputPanelVisible(true)
     setPausedByAgentId({})
     sessionActivityRef.current = new Map()
-    // ── Auto-switch to Mission tab → Running filter and open Live Output panel ──
+    // ── Auto-switch to Mission tab → Running filter ──
     setActiveTab('missions')
     setMissionSubTab('running')
-    setOutputPanelVisible(true)
     setWizardOpen(false)
     emitFeedEvent({
       type: 'mission_started',
@@ -4482,6 +4499,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
 
 
+
+  function openNewMissionModal(prefill?: Partial<MissionBoardDraft>) {
+    setNewMissionName(prefill?.name ?? '')
+    setNewMissionGoal(prefill?.goal ?? missionGoal)
+    setNewMissionTeamConfigId(prefill?.teamConfigId ?? '__current__')
+    setNewMissionProcessType(prefill?.processType ?? processType)
+    setNewMissionBudgetLimit(prefill?.budgetLimit ?? budgetLimit)
+    setMissionBoardModalOpen(true)
+    setMissionWizardStep(0)
+  }
 
   function renderOverviewContent() {
     // ── Derived data ───────────────────────────────────────────────────────
@@ -4600,9 +4627,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && missionGoal.trim()) {
+                      // Open mission wizard on the Missions tab with pre-filled goal
                       setActiveTab('missions')
-                      setMissionSubTab('running')
-                      window.setTimeout(() => handleCreateMissionRef.current(), 0)
+                      window.setTimeout(() => openNewMissionModal({ goal: missionGoal.trim() }), 0)
                     }
                   }}
                 />
@@ -4611,7 +4638,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   disabled={!missionGoal.trim()}
                   onClick={() => {
                     if (missionGoal.trim()) {
-                      handleCreateMissionRef.current()
+                      // Open mission wizard on the Missions tab with pre-filled goal
+                      setActiveTab('missions')
+                      window.setTimeout(() => openNewMissionModal({ goal: missionGoal.trim() }), 0)
                     }
                   }}
                   className="shrink-0 rounded-lg bg-accent-500 px-4 py-2 text-xs font-semibold text-white hover:bg-accent-600 disabled:opacity-40 transition-colors"
@@ -4744,7 +4773,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">No missions yet</p>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('missions')}
+                    onClick={() => {
+                      setActiveTab('missions')
+                      // Open mission wizard after switching tab
+                      window.setTimeout(() => openNewMissionModal(), 0)
+                    }}
                     className="mt-1 rounded-lg bg-orange-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-orange-600 transition-colors"
                   >
                     + New Mission
@@ -5664,16 +5697,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       return { totalCost, avgCost }
     }
 
-    function openNewMissionModal(prefill?: Partial<MissionBoardDraft>) {
-      setNewMissionName(prefill?.name ?? '')
-      setNewMissionGoal(prefill?.goal ?? missionGoal)
-      setNewMissionTeamConfigId(prefill?.teamConfigId ?? '__current__')
-      setNewMissionProcessType(prefill?.processType ?? processType)
-      setNewMissionBudgetLimit(prefill?.budgetLimit ?? budgetLimit)
-      setMissionBoardModalOpen(true)
-      setMissionWizardStep(0)
-    }
-
     function handleSaveMissionDraft() {
       const goal = newMissionGoal.trim()
       const name = newMissionName.trim() || 'Untitled mission'
@@ -6043,6 +6066,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             {agentWorkingRows.map((row) => {
                               const statusMeta = getAgentStatusMeta(row.status)
                               const lastOutput = extractPreviewLine(agentOutputLines[row.id] ?? [])
+                              const canSteer = row.status === 'active' || row.status === 'waiting_for_input'
                               return (
                                 <div key={row.id} className="flex items-center gap-2 px-3 py-2">
                                   <span className={cn('size-2 shrink-0 rounded-full', statusMeta.dotClassName, statusMeta.pulse && 'animate-pulse')} />
@@ -6051,10 +6075,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                     {statusMeta.label}
                                   </span>
                                   {lastOutput !== 'Agent working...' ? (
-                                    <span className="ml-auto truncate text-[10px] text-neutral-400 max-w-[300px] font-mono">{lastOutput}</span>
+                                    <span className="ml-auto truncate text-[10px] text-neutral-400 max-w-[200px] font-mono">{lastOutput}</span>
                                   ) : (agentOutputLines[row.id]?.length ?? 0) > 0 ? (
-                                    <span className="ml-auto truncate text-[10px] text-neutral-500 max-w-[300px] font-mono italic">{lastOutput}</span>
+                                    <span className="ml-auto truncate text-[10px] text-neutral-500 max-w-[200px] font-mono italic">{lastOutput}</span>
                                   ) : null}
+                                  {/* Per-agent Steer button */}
+                                  {canSteer && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setSteerAgentId(row.id)
+                                        setSteerInput('')
+                                      }}
+                                      className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors"
+                                      title={`Send directive to ${row.name}`}
+                                    >
+                                      ✦ Steer
+                                    </button>
+                                  )}
                                 </div>
                               )
                             })}
@@ -6078,6 +6117,26 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             >
                               ⏸ Pause
                             </button>
+                            {/* Steer button — opens inline input for sending a directive to the first active/waiting agent */}
+                            {(missionState === 'running' || agentWorkingRows.some((r) => r.status === 'waiting_for_input')) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  // Pick first active or waiting_for_input agent
+                                  const targetAgent = agentWorkingRows.find((r) => r.status === 'waiting_for_input' || r.status === 'active')
+                                  if (targetAgent) {
+                                    setSteerAgentId(targetAgent.id)
+                                    setSteerInput('')
+                                  } else {
+                                    toast('No active agent to steer', { type: 'warning' })
+                                  }
+                                }}
+                                className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors bg-violet-500 text-white hover:bg-violet-600"
+                              >
+                                ✦ Steer
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); stopMissionAndCleanup('aborted') }}
