@@ -5,6 +5,7 @@ import { useGatewayChatStore } from '../../../stores/gateway-chat-store'
 import { appendHistoryMessage, chatQueryKeys } from '../chat-queries'
 import { toast } from '../../../components/ui/toast'
 import type { GatewayMessage } from '../types'
+import { textFromMessage } from '../utils'
 
 const EMPTY_MESSAGES: GatewayMessage[] = []
 const EMPTY_TOOL_CALLS: Array<{ id: string; name: string; phase: string; args?: unknown }> = []
@@ -16,6 +17,8 @@ type UseRealtimeChatHistoryOptions = {
   enabled?: boolean
   onUserMessage?: (message: GatewayMessage, source?: string) => void
   onApprovalRequest?: (approval: Record<string, unknown>) => void
+  onCompactionStart?: () => void
+  onCompactionEnd?: () => void
 }
 
 /**
@@ -31,6 +34,8 @@ export function useRealtimeChatHistory({
   enabled = true,
   onUserMessage,
   onApprovalRequest,
+  onCompactionStart,
+  onCompactionEnd,
 }: UseRealtimeChatHistoryOptions) {
   const queryClient = useQueryClient()
   const [lastCompletedRunAt, setLastCompletedRunAt] = useState<number | null>(
@@ -38,6 +43,7 @@ export function useRealtimeChatHistory({
   )
   const completedStreamingTextRef = useRef<string>('')
   const completedStreamingThinkingRef = useRef<string>('')
+  const lastCompactionSignalRef = useRef<string>('')
 
   const { connectionState, lastError, reconnect } = useGatewayChatStream({
     sessionKey: sessionKey === 'new' ? undefined : sessionKey,
@@ -98,6 +104,7 @@ export function useRealtimeChatHistory({
                 newCount > 0 &&
                 newCount < prevCount * 0.6
               ) {
+                onCompactionEnd?.()
                 toast(
                   'Context compacted — older messages were summarized to free up space',
                   {
@@ -111,7 +118,7 @@ export function useRealtimeChatHistory({
           }
         }
       },
-      [sessionKey, friendlyId, queryClient],
+      [sessionKey, friendlyId, queryClient, onCompactionEnd],
     ),
     onApprovalRequest,
   })
@@ -158,6 +165,36 @@ export function useRealtimeChatHistory({
     realtimeMessages.length,
     sessionKey,
   ])
+
+  useEffect(() => {
+    if (!onCompactionStart) return
+    if (realtimeMessages.length === 0) return
+    const latest = realtimeMessages[realtimeMessages.length - 1]
+    if (!latest) return
+
+    const textCandidates = [
+      textFromMessage(latest),
+      ...((Array.isArray(latest.content) ? latest.content : []).map((part) => {
+        if (part.type === 'text') return String(part.text ?? '')
+        if (part.type === 'thinking') return String(part.thinking ?? '')
+        return ''
+      })),
+    ]
+      .join('\n')
+      .toLowerCase()
+
+    if (
+      !textCandidates.includes('pre-compaction') &&
+      !textCandidates.includes('compaction')
+    ) {
+      return
+    }
+
+    const signal = `${latest.role ?? ''}:${textCandidates}`
+    if (signal === lastCompactionSignalRef.current) return
+    lastCompactionSignalRef.current = signal
+    onCompactionStart()
+  }, [onCompactionStart, realtimeMessages])
 
   // Periodic history sync — catch missed messages every 30s
   // Skip during active streaming to prevent race conditions

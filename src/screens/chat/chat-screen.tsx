@@ -245,6 +245,7 @@ export function ChatScreen({
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
     [],
   )
+  const [isCompacting, setIsCompacting] = useState(false)
 
   const pendingStartRef = useRef(false)
   const composerHandleRef = useRef<ChatComposerHandle | null>(null)
@@ -379,6 +380,12 @@ export function ChatScreen({
           gatewayApprovalId: gatewayApprovalId || undefined,
         })
         setPendingApprovals(loadApprovals().filter((entry) => entry.status === 'pending'))
+      }, []),
+      onCompactionStart: useCallback(() => {
+        setIsCompacting(true)
+      }, []),
+      onCompactionEnd: useCallback(() => {
+        setIsCompacting(false)
       }, []),
     })
 
@@ -1671,6 +1678,13 @@ export function ChatScreen({
           )}
 
           <ContextBar compact={compact} />
+
+          {isCompacting && (
+            <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300">
+              <span className="animate-spin">⚙️</span>
+              <span>Compacting context — summarizing older messages...</span>
+            </div>
+          )}
 
           {gatewayNotice && <div className="sticky top-0 z-20 px-4 py-2">{gatewayNotice}</div>}
           {pendingApprovals.length > 0 && (
