@@ -14,8 +14,10 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
 
 - ClawSuite web application code
 - API routes and gateway communication
-- Client-side data handling
-- Authentication and authorization (when implemented)
+- Authentication and session management
+- Client-side data handling and rendering
+- Exec approval and human-in-the-loop controls
+- Browser proxy and screenshot endpoints
 
 ## Out of Scope
 
@@ -23,16 +25,39 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
 - Third-party dependencies (report to the respective maintainer)
 - Social engineering attacks
 
-## Security Measures
+## Security Measures (v3.0.0+)
 
-- API keys and tokens are never bundled in client-side code
+**Authentication**
+- All API routes require authentication as of v3.0.0
+- Session tokens use timing-safe comparison to prevent timing attacks
+- httpOnly + SameSite=Strict cookies
+- Token revocation on logout
+
+**Network**
+- `Access-Control-Allow-Origin` restricted to localhost — no wildcard CORS
+- Browser proxy and screenshot endpoints locked to same-origin only
+- Rate limiting on high-risk endpoints (file access, debug, exec)
+
+**Data & File Access**
+- Path traversal prevention on all file and memory routes (`ensureWorkspacePath()`)
+- `.md`-only restriction on memory write routes
+- No API keys or secrets ever exposed to client-side code
 - Gateway tokens are server-side only
-- Diagnostic output is scrubbed of sensitive data
+- Diagnostic output scrubbed of sensitive data
+
+**Agent Safety**
+- Exec approval workflow — sensitive gateway exec commands require explicit human approval via in-UI modal
+- Skills security scanning — every skill from the marketplace is scanned for suspicious patterns before install
+
+**Configuration**
 - Environment files are gitignored
+- Config endpoints redact credentials in responses
+- Example configs use placeholder keys only
 
 ## Supported Versions
 
 | Version | Supported |
-| ------- | --------- |
-| main    | ✅        |
-| < main  | ❌        |
+|---------|-----------|
+| v3.x (main) | ✅ Active |
+| v2.x | ⚠️ Security fixes only |
+| < v2.0 | ❌ Unsupported |
