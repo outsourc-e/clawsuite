@@ -7,6 +7,7 @@ type ApiSessionRow = {
   id?: string
   model?: string
   modelName?: string
+  agent?: string
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
@@ -31,6 +32,17 @@ type ApiModelRow = {
   [key: string]: unknown
 }
 
+type ApiAgentRow = {
+  agent?: string
+  inputTokens?: number
+  outputTokens?: number
+  totalTokens?: number
+  costUsd?: number
+  totalCost?: number
+  sessionCount?: number
+  [key: string]: unknown
+}
+
 type ApiCostPoint = {
   date?: string
   amount?: number
@@ -40,6 +52,7 @@ type ApiCostPoint = {
 type ApiPayload = {
   ok: boolean
   sessions?: Array<ApiSessionRow>
+  agents?: Array<ApiAgentRow>
   cost?: {
     daily?: Array<ApiCostPoint>
     timeseries?: Array<ApiCostPoint>
@@ -70,6 +83,8 @@ export type CostKpis = {
   todayDeltaPct: number | null
   monthToDate: number
   projectedEom: number
+  budgetUsedPct: number | null
+  mostExpensiveAgent: string | null
   activeSessions: number
 }
 
@@ -81,6 +96,15 @@ export type CostModelRow = {
   costUsd: number
 }
 
+export type CostAgentRow = {
+  agent: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  costUsd: number
+  sessionCount: number
+}
+
 export type CostDayRow = {
   date: string
   label: string
@@ -90,6 +114,7 @@ export type CostDayRow = {
 export type CostSessionRow = {
   sessionKey: string
   model: string
+  agent: string
   inputTokens: number
   outputTokens: number
   totalTokens: number
@@ -97,9 +122,10 @@ export type CostSessionRow = {
   lastActiveAt: number | null
 }
 
-type DerivedCostAnalytics = {
+export type DerivedCostAnalytics = {
   kpis: CostKpis
   models: Array<CostModelRow>
+  agents: Array<CostAgentRow>
   daily: Array<CostDayRow>
   sessions: Array<CostSessionRow>
   topSessions: Array<CostSessionRow>
@@ -142,7 +168,7 @@ function toTimestampMs(value: unknown): number | null {
 }
 
 function formatDayLabel(dateKey: string) {
-  const dt = new Date(`${dateKey}T00:00:00`)
+  const dt = new Date(dateKey + 'T00:00:00')
   return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
@@ -198,24 +224,93 @@ function normalizeModels(
           ? record.model
           : 'unknown'
       const inputTokens = readNumber(
-        record.inputTokens ?? record.input ?? totals.input ?? totals.inputTokens,
+        record.inputTokens ??
+          record.input ??
+          totals.input ??
+          totals.inputTokens,
       )
       const outputTokens = readNumber(
-        record.outputTokens ?? record.output ?? totals.output ?? totals.outputTokens,
+        record.outputTokens ??
+          record.output ??
+          totals.output ??
+          totals.outputTokens,
       )
       const totalTokens =
-        readNumber(record.totalTokens ?? totals.totalTokens) || inputTokens + outputTokens
+        readNumber(record.totalTokens ?? totals.totalTokens) ||
+        inputTokens + outputTokens
       const costUsd = readNumber(
-        record.costUsd ?? record.totalCost ?? totals.totalCost ?? totals.costUsd,
+        record.costUsd ??
+          record.totalCost ??
+          totals.totalCost ??
+          totals.costUsd,
       )
       return { model, inputTokens, outputTokens, totalTokens, costUsd }
     })
     .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens)
 }
 
+function extractAgentFromSessionKey(sessionKey: string): string {
+  if (!sessionKey) return 'unknown'
+  const parts = sessionKey.split(':')
+  if (parts[0] === 'agent' && parts.length >= 3) {
+    if (parts[2] === 'subagent') return 'subagent'
+    return parts[2] || parts[1] || 'agent'
+  }
+  if (parts[0] === 'cron') return 'cron'
+  return parts[0] || 'unknown'
+}
+
+function normalizeAgents(
+  agents: Array<ApiAgentRow> | undefined,
+  sessions: Array<CostSessionRow>,
+): Array<CostAgentRow> {
+  if (Array.isArray(agents) && agents.length > 0) {
+    return agents
+      .map((row) => {
+        const record = toRecord(row)
+        return {
+          agent:
+            typeof record.agent === 'string' && record.agent.length > 0
+              ? record.agent
+              : 'unknown',
+          inputTokens: readNumber(record.inputTokens),
+          outputTokens: readNumber(record.outputTokens),
+          totalTokens: readNumber(record.totalTokens),
+          costUsd: readNumber(record.costUsd ?? record.totalCost),
+          sessionCount: readNumber(record.sessionCount),
+        }
+      })
+      .sort((a, b) => b.costUsd - a.costUsd)
+  }
+
+  // Fallback: derive from sessions client-side
+  const map = new Map<string, CostAgentRow>()
+  for (const s of sessions) {
+    const agent = s.agent || 'unknown'
+    const existing = map.get(agent)
+    if (existing) {
+      existing.inputTokens += s.inputTokens
+      existing.outputTokens += s.outputTokens
+      existing.totalTokens += s.totalTokens
+      existing.costUsd += s.costUsd
+      existing.sessionCount += 1
+    } else {
+      map.set(agent, {
+        agent,
+        inputTokens: s.inputTokens,
+        outputTokens: s.outputTokens,
+        totalTokens: s.totalTokens,
+        costUsd: s.costUsd,
+        sessionCount: 1,
+      })
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.costUsd - a.costUsd)
+}
+
 function normalizeSessions(
   payload: Array<ApiSessionRow> | ApiPayload['cost'] | undefined,
-) {
+): Array<CostSessionRow> {
   const root = toRecord(payload)
   const rows = Array.isArray(payload)
     ? payload
@@ -233,9 +328,16 @@ function normalizeSessions(
             ? record.key
             : typeof record.id === 'string' && record.id.length > 0
               ? record.id
-          : 'session'
+              : 'session'
+      const agent =
+        typeof record.agent === 'string' && record.agent.length > 0
+          ? record.agent
+          : extractAgentFromSessionKey(sessionKey)
       const inputTokens = readNumber(
-        record.inputTokens ?? usage.inputTokens ?? usage.input ?? usage.promptTokens,
+        record.inputTokens ??
+          usage.inputTokens ??
+          usage.input ??
+          usage.promptTokens,
       )
       const outputTokens = readNumber(
         record.outputTokens ??
@@ -244,29 +346,41 @@ function normalizeSessions(
           usage.completionTokens,
       )
       const totalTokens =
-        readNumber(record.totalTokens ?? usage.totalTokens) || inputTokens + outputTokens
+        readNumber(record.totalTokens ?? usage.totalTokens) ||
+        inputTokens + outputTokens
       return {
         sessionKey,
         model:
           typeof record.model === 'string' && record.model.length > 0
             ? record.model
-            : typeof record.modelName === 'string' && record.modelName.length > 0
+            : typeof record.modelName === 'string' &&
+                record.modelName.length > 0
               ? record.modelName
-            : 'unknown',
+              : 'unknown',
+        agent,
         inputTokens,
         outputTokens,
         totalTokens,
-        costUsd: readNumber(record.costUsd ?? record.totalCost ?? usage.totalCost ?? usage.costUsd),
+        costUsd: readNumber(
+          record.costUsd ??
+            record.totalCost ??
+            usage.totalCost ??
+            usage.costUsd,
+        ),
         lastActiveAt: toTimestampMs(record.lastActiveAt ?? record.updatedAt),
       } satisfies CostSessionRow
     })
     .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens)
 }
 
+/** Monthly budget in USD — user-configurable in the future */
+const DEFAULT_MONTHLY_BUDGET = 100
+
 function buildKpis(
   daily: Array<CostDayRow>,
   sessions: Array<CostSessionRow>,
   modelRows: Array<CostModelRow>,
+  agentRows: Array<CostAgentRow>,
 ): CostKpis {
   const today = new Date()
   const todayKey = today.toISOString().slice(0, 10)
@@ -275,7 +389,8 @@ function buildKpis(
   const yesterdayKey = yesterday.toISOString().slice(0, 10)
 
   const todaySpend = daily.find((d) => d.date === todayKey)?.amount ?? 0
-  const yesterdaySpend = daily.find((d) => d.date === yesterdayKey)?.amount ?? 0
+  const yesterdaySpend =
+    daily.find((d) => d.date === yesterdayKey)?.amount ?? 0
   const todayDelta = todaySpend - yesterdaySpend
   const todayDeltaPct =
     yesterdaySpend > 0 ? (todayDelta / yesterdaySpend) * 100 : null
@@ -284,16 +399,27 @@ function buildKpis(
   const month = today.getMonth()
   const monthToDate = daily
     .filter((d) => {
-      const dt = new Date(`${d.date}T00:00:00`)
+      const dt = new Date(d.date + 'T00:00:00')
       return dt.getFullYear() === year && dt.getMonth() === month
     })
     .reduce((sum, d) => sum + d.amount, 0)
 
   const dayOfMonth = today.getDate()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const projectedEom = dayOfMonth > 0 ? (monthToDate / dayOfMonth) * daysInMonth : 0
+  const projectedEom =
+    dayOfMonth > 0 ? (monthToDate / dayOfMonth) * daysInMonth : 0
 
-  const activeSessions = sessions.filter((s) => s.totalTokens > 0 || s.costUsd > 0).length
+  const budgetUsedPct =
+    DEFAULT_MONTHLY_BUDGET > 0
+      ? (monthToDate / DEFAULT_MONTHLY_BUDGET) * 100
+      : null
+
+  const mostExpensiveAgent =
+    agentRows.length > 0 ? agentRows[0].agent : null
+
+  const activeSessions = sessions.filter(
+    (s) => s.totalTokens > 0 || s.costUsd > 0,
+  ).length
   const fallbackActive = modelRows.length > 0 ? modelRows.length : 0
 
   return {
@@ -303,6 +429,8 @@ function buildKpis(
     todayDeltaPct,
     monthToDate,
     projectedEom,
+    budgetUsedPct,
+    mostExpensiveAgent,
     activeSessions: activeSessions || fallbackActive,
   }
 }
@@ -310,14 +438,16 @@ function buildKpis(
 function derive(payload: ApiPayload): DerivedCostAnalytics {
   const models = normalizeModels(payload.models ?? payload.cost)
   const sessions = normalizeSessions(payload.sessions ?? payload.cost)
+  const agents = normalizeAgents(payload.agents, sessions)
   const daily = buildDailySeries(payload.cost)
-  const kpis = buildKpis(daily, sessions, models)
+  const kpis = buildKpis(daily, sessions, models, agents)
   const totalTokens = models.reduce((sum, m) => sum + m.totalTokens, 0)
   const totalCostUsd = models.reduce((sum, m) => sum + m.costUsd, 0)
 
   return {
     kpis,
     models,
+    agents,
     daily,
     sessions,
     topSessions: sessions.slice(0, 10),
@@ -333,18 +463,21 @@ export function useCostAnalytics() {
     queryKey: ['usage-analytics', 'costs'],
     queryFn: async () => {
       const res = await fetch('/api/usage-analytics')
-      const json = (await res.json()) as ApiPayload
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || `HTTP ${res.status}`)
+      const payload = (await res.json()) as ApiPayload
+      if (!res.ok || !payload.ok) {
+        throw new Error(payload.error || 'HTTP ' + res.status)
       }
-      return json
+      return payload
     },
     refetchInterval: 60_000,
     staleTime: 30_000,
     retry: 1,
   })
 
-  const derived = useMemo(() => derive(query.data ?? { ok: true }), [query.data])
+  const derived = useMemo(
+    () => derive(query.data ?? { ok: true }),
+    [query.data],
+  )
 
   return {
     ...query,

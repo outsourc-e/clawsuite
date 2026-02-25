@@ -4,6 +4,8 @@ declare module 'recharts' {
   export const ResponsiveContainer: ComponentType<any>
   export const BarChart: ComponentType<any>
   export const Bar: ComponentType<any>
+  export const LineChart: ComponentType<any>
+  export const Line: ComponentType<any>
   export const CartesianGrid: ComponentType<any>
   export const XAxis: ComponentType<any>
   export const YAxis: ComponentType<any>

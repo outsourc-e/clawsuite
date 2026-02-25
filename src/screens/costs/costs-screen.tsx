@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-} from '@hugeicons/core-free-icons'
+import { ArrowDown01Icon, ArrowUp01Icon } from '@hugeicons/core-free-icons'
 import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -73,8 +72,14 @@ function KpiCard({
       <div className="text-[11px] uppercase tracking-wider text-primary-500 dark:text-neutral-400">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-semibold text-primary-900 dark:text-neutral-100">{value}</div>
-      {sub ? <div className="mt-1 text-xs text-primary-500 dark:text-neutral-400">{sub}</div> : null}
+      <div className="mt-2 text-2xl font-semibold text-primary-900 dark:text-neutral-100">
+        {value}
+      </div>
+      {sub ? (
+        <div className="mt-1 text-xs text-primary-500 dark:text-neutral-400">
+          {sub}
+        </div>
+      ) : null}
       {delta ? (
         <div
           className={cn(
@@ -105,8 +110,28 @@ export function CostsScreen() {
       document.documentElement.classList.contains('dark'))
 
   const chartColors = isDark
-    ? { grid: '#262626', tick: '#a3a3a3', axis: '#404040', tooltip: { bg: '#171717', border: '#262626', text: '#e5e5e5' }, cursor: 'rgba(255,255,255,0.03)' }
-    : { grid: '#e5e7eb', tick: '#6b7280', axis: '#d1d5db', tooltip: { bg: '#ffffff', border: '#e5e7eb', text: '#111827' }, cursor: 'rgba(0,0,0,0.04)' }
+    ? {
+        grid: '#262626',
+        tick: '#a3a3a3',
+        axis: '#404040',
+        tooltip: {
+          bg: '#171717',
+          border: '#262626',
+          text: '#e5e5e5',
+        },
+        cursor: 'rgba(255,255,255,0.03)',
+      }
+    : {
+        grid: '#e5e7eb',
+        tick: '#6b7280',
+        axis: '#d1d5db',
+        tooltip: {
+          bg: '#ffffff',
+          border: '#e5e7eb',
+          text: '#111827',
+        },
+        cursor: 'rgba(0,0,0,0.04)',
+      }
 
   const modelMaxTokens = useMemo(
     () => Math.max(1, ...analytics.models.map((m) => m.totalTokens)),
@@ -140,14 +165,18 @@ export function CostsScreen() {
       <div className="mx-auto w-full max-w-[1200px]">
         <header className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
           <div>
-            <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">Cost & Token Analytics</h1>
+            <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
+              Cost &amp; Token Analytics
+            </h1>
             <p className="text-xs text-primary-500 dark:text-neutral-400">
-              Model spend, token usage, and session-level cost breakdown.
+              Model spend, per-agent breakdown, and daily cost trends.
             </p>
           </div>
           <div className="flex items-center gap-2">
             {isFetching && !isLoading ? (
-              <span className="text-xs text-primary-500 dark:text-neutral-400">Refreshing…</span>
+              <span className="text-xs text-primary-500 dark:text-neutral-400">
+                Refreshing…
+              </span>
             ) : null}
             <button
               type="button"
@@ -166,16 +195,24 @@ export function CostsScreen() {
         ) : isError ? (
           <div className="rounded-xl border border-red-900/60 bg-red-950/30 p-6">
             <p className="text-sm text-red-200">
-              {error instanceof Error ? error.message : 'Failed to load analytics'}
+              {error instanceof Error
+                ? error.message
+                : 'Failed to load analytics'}
             </p>
           </div>
         ) : (
           <div className="space-y-5">
+            {/* ── Hero KPI Cards ─────────────────────────────────────── */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <KpiCard
-                label="Today's Spend"
-                value={formatMoney(analytics.kpis.todaySpend)}
-                sub={formatMoney(analytics.kpis.yesterdaySpend) + ' yesterday'}
+                label="Month-to-Date"
+                value={formatMoney(analytics.kpis.monthToDate)}
+                sub={
+                  formatMoney(analytics.kpis.todaySpend) +
+                  ' today · ' +
+                  formatMoney(analytics.kpis.yesterdaySpend) +
+                  ' yesterday'
+                }
                 delta={{
                   value: analytics.kpis.todayDelta,
                   text: formatDelta(
@@ -185,23 +222,33 @@ export function CostsScreen() {
                 }}
               />
               <KpiCard
-                label="Month-to-Date"
-                value={formatMoney(analytics.kpis.monthToDate)}
-                sub="Running total"
-              />
-              <KpiCard
                 label="Projected EOM"
                 value={formatMoney(analytics.kpis.projectedEom)}
-                sub="Linear projection"
+                sub="Linear projection from MTD"
               />
               <KpiCard
-                label="Active Sessions"
-                value={String(analytics.kpis.activeSessions)}
-                sub={`${analytics.models.length} models tracked`}
+                label="Budget Used"
+                value={
+                  analytics.kpis.budgetUsedPct != null
+                    ? `${analytics.kpis.budgetUsedPct.toFixed(1)}%`
+                    : '—'
+                }
+                sub={`of $100/mo budget · ${analytics.kpis.activeSessions} active sessions`}
+              />
+              <KpiCard
+                label="Top Agent"
+                value={analytics.kpis.mostExpensiveAgent ?? '—'}
+                sub={
+                  analytics.agents.length > 0
+                    ? `${formatMoney(analytics.agents[0].costUsd)} · ${analytics.agents[0].sessionCount} sessions`
+                    : 'No agent data'
+                }
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+            {/* ── Per-Agent Spend + Daily Cost Trend ─────────────────── */}
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+              {/* Per-Agent Bar Chart */}
               <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
                 <div
                   aria-hidden
@@ -209,76 +256,93 @@ export function CostsScreen() {
                 />
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
-                    Per-Model Usage
+                    Per-Agent Spend
                   </h2>
                   <div className="text-xs text-primary-500 dark:text-neutral-400">
-                    Sorted by cost desc
+                    {analytics.agents.length} agents
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="grid grid-cols-[minmax(0,1.4fr)_110px_100px_minmax(120px,1fr)] gap-3 px-2 text-[11px] uppercase tracking-wider text-primary-400 dark:text-neutral-500">
-                    <div>Model</div>
-                    <div className="text-right">Tokens</div>
-                    <div className="text-right">Cost</div>
-                    <div>Usage Mix</div>
+                {analytics.agents.length > 0 ? (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={analytics.agents}
+                        layout="vertical"
+                        margin={{ left: 8, right: 12, top: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid
+                          stroke={chartColors.grid}
+                          horizontal={false}
+                        />
+                        <XAxis
+                          type="number"
+                          tick={{
+                            fill: chartColors.tick,
+                            fontSize: 11,
+                          }}
+                          tickLine={false}
+                          axisLine={{ stroke: chartColors.axis }}
+                          tickFormatter={(v: number | string) => `$${v}`}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="agent"
+                          tick={{
+                            fill: chartColors.tick,
+                            fontSize: 11,
+                          }}
+                          tickLine={false}
+                          axisLine={false}
+                          width={80}
+                        />
+                        <Tooltip
+                          cursor={{ fill: chartColors.cursor }}
+                          contentStyle={{
+                            background: chartColors.tooltip.bg,
+                            border: `1px solid ${chartColors.tooltip.border}`,
+                            borderRadius: '0.75rem',
+                            color: chartColors.tooltip.text,
+                          }}
+                          formatter={(value: number) => [
+                            formatMoney(value),
+                            'Cost',
+                          ]}
+                        />
+                        <Bar
+                          dataKey="costUsd"
+                          fill="#8b5cf6"
+                          radius={[0, 4, 4, 0]}
+                          maxBarSize={28}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                  <div className="space-y-1">
-                    {analytics.models.map((row) => {
-                      const inputPct = (row.inputTokens / modelMaxTokens) * 100
-                      const outputPct =
-                        (row.outputTokens / modelMaxTokens) * 100
-                      return (
-                        <div
-                          key={row.model}
-                          className="grid grid-cols-[minmax(0,1.4fr)_110px_100px_minmax(120px,1fr)] items-center gap-3 rounded-lg border border-primary-200 dark:border-neutral-800/80 bg-primary-50 dark:bg-neutral-950/60 px-2 py-2"
-                        >
-                          <div className="truncate text-sm text-primary-900 dark:text-neutral-100">
-                            {row.model}
-                          </div>
-                          <div className="text-right text-sm tabular-nums text-primary-700 dark:text-neutral-300">
-                            {formatTokens(row.totalTokens)}
-                          </div>
-                          <div className="text-right text-sm tabular-nums text-primary-800 dark:text-neutral-200">
-                            {formatMoney(row.costUsd)}
-                          </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-primary-100 dark:bg-neutral-800">
-                            <div className="flex h-full w-full">
-                              <div
-                                className="bg-blue-500"
-                                style={{ width: `${Math.min(100, inputPct)}%` }}
-                                title={`Input: ${formatTokens(row.inputTokens)}`}
-                              />
-                              <div
-                                className="bg-purple-500"
-                                style={{
-                                  width: `${Math.min(100, outputPct)}%`,
-                                }}
-                                title={`Output: ${formatTokens(row.outputTokens)}`}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {analytics.models.length === 0 ? (
-                      <div className="rounded-lg border border-primary-200 dark:border-neutral-800 px-3 py-6 text-center text-sm text-primary-500 dark:text-neutral-400">
-                        No model usage data available.
+                ) : (
+                  <div className="flex h-64 items-center justify-center text-sm text-primary-500 dark:text-neutral-400">
+                    No agent data available.
+                  </div>
+                )}
+                {analytics.agents.length > 0 ? (
+                  <div className="mt-2 space-y-1">
+                    {analytics.agents.map((agent) => (
+                      <div
+                        key={agent.agent}
+                        className="flex items-center justify-between text-xs"
+                      >
+                        <span className="text-primary-700 dark:text-neutral-300">
+                          {agent.agent}
+                        </span>
+                        <span className="tabular-nums text-primary-500 dark:text-neutral-400">
+                          {formatTokens(agent.totalTokens)} tokens ·{' '}
+                          {agent.sessionCount} sessions
+                        </span>
                       </div>
-                    ) : null}
+                    ))}
                   </div>
-                </div>
-                <div className="mt-3 flex items-center gap-4 text-xs text-primary-500 dark:text-neutral-400">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-blue-500" />
-                    Input tokens
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-purple-500" />
-                    Output tokens
-                  </span>
-                </div>
+                ) : null}
               </section>
 
+              {/* Daily Cost Trend — Line Chart */}
               <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
                 <div
                   aria-hidden
@@ -288,12 +352,17 @@ export function CostsScreen() {
                   <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
                     Daily Cost Trend
                   </h2>
-                  <div className="text-xs text-primary-500 dark:text-neutral-400">Last 30 days</div>
+                  <div className="text-xs text-primary-500 dark:text-neutral-400">
+                    Last 30 days
+                  </div>
                 </div>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analytics.daily}>
-                      <CartesianGrid stroke={chartColors.grid} vertical={false} />
+                    <LineChart data={analytics.daily}>
+                      <CartesianGrid
+                        stroke={chartColors.grid}
+                        vertical={false}
+                      />
                       <XAxis
                         dataKey="label"
                         tick={{ fill: chartColors.tick, fontSize: 11 }}
@@ -309,26 +378,111 @@ export function CostsScreen() {
                         width={44}
                       />
                       <Tooltip
-                        cursor={{ fill: chartColors.cursor }}
                         contentStyle={{
                           background: chartColors.tooltip.bg,
                           border: `1px solid ${chartColors.tooltip.border}`,
                           borderRadius: '0.75rem',
                           color: chartColors.tooltip.text,
                         }}
+                        formatter={(value: number) => [
+                          formatMoney(value),
+                          'Cost',
+                        ]}
                       />
-                      <Bar
+                      <Line
+                        type="monotone"
                         dataKey="amount"
-                        fill="#22c55e"
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={24}
+                        stroke="#22c55e"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4, fill: '#22c55e' }}
                       />
-                    </BarChart>
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </section>
             </div>
 
+            {/* ── Per-Model Usage ────────────────────────────────────── */}
+            <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent-500 via-accent-400/50 to-transparent"
+              />
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
+                  Per-Model Usage
+                </h2>
+                <div className="text-xs text-primary-500 dark:text-neutral-400">
+                  Sorted by cost desc
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="grid grid-cols-[minmax(0,1.4fr)_110px_100px_minmax(120px,1fr)] gap-3 px-2 text-[11px] uppercase tracking-wider text-primary-400 dark:text-neutral-500">
+                  <div>Model</div>
+                  <div className="text-right">Tokens</div>
+                  <div className="text-right">Cost</div>
+                  <div>Usage Mix</div>
+                </div>
+                <div className="space-y-1">
+                  {analytics.models.map((row) => {
+                    const inputPct = (row.inputTokens / modelMaxTokens) * 100
+                    const outputPct = (row.outputTokens / modelMaxTokens) * 100
+                    return (
+                      <div
+                        key={row.model}
+                        className="grid grid-cols-[minmax(0,1.4fr)_110px_100px_minmax(120px,1fr)] items-center gap-3 rounded-lg border border-primary-200 dark:border-neutral-800/80 bg-primary-50 dark:bg-neutral-950/60 px-2 py-2"
+                      >
+                        <div className="truncate text-sm text-primary-900 dark:text-neutral-100">
+                          {row.model}
+                        </div>
+                        <div className="text-right text-sm tabular-nums text-primary-700 dark:text-neutral-300">
+                          {formatTokens(row.totalTokens)}
+                        </div>
+                        <div className="text-right text-sm tabular-nums text-primary-800 dark:text-neutral-200">
+                          {formatMoney(row.costUsd)}
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-primary-100 dark:bg-neutral-800">
+                          <div className="flex h-full w-full">
+                            <div
+                              className="bg-blue-500"
+                              style={{
+                                width: `${Math.min(100, inputPct)}%`,
+                              }}
+                              title={`Input: ${formatTokens(row.inputTokens)}`}
+                            />
+                            <div
+                              className="bg-purple-500"
+                              style={{
+                                width: `${Math.min(100, outputPct)}%`,
+                              }}
+                              title={`Output: ${formatTokens(row.outputTokens)}`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {analytics.models.length === 0 ? (
+                    <div className="rounded-lg border border-primary-200 dark:border-neutral-800 px-3 py-6 text-center text-sm text-primary-500 dark:text-neutral-400">
+                      No model usage data available.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-4 text-xs text-primary-500 dark:text-neutral-400">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-blue-500" />
+                  Input tokens
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-purple-500" />
+                  Output tokens
+                </span>
+              </div>
+            </section>
+
+            {/* ── Session Cost Breakdown ─────────────────────────────── */}
             <section className="relative overflow-hidden rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
               <div
                 aria-hidden
@@ -344,8 +498,8 @@ export function CostsScreen() {
                   </p>
                 </div>
                 <div className="text-xs text-primary-500 dark:text-neutral-400">
-                  Total tracked: {formatTokens(analytics.totals.tokens)} tokens ·{' '}
-                  {formatMoney(analytics.totals.costUsd)}
+                  Total tracked: {formatTokens(analytics.totals.tokens)} tokens
+                  · {formatMoney(analytics.totals.costUsd)}
                 </div>
               </div>
 
@@ -354,6 +508,7 @@ export function CostsScreen() {
                   <thead>
                     <tr className="border-b border-primary-200 dark:border-neutral-800 text-left text-[11px] uppercase tracking-wider text-primary-400 dark:text-neutral-500">
                       <th className="px-2 py-2 font-medium">Session Key</th>
+                      <th className="px-2 py-2 font-medium">Agent</th>
                       <th className="px-2 py-2 font-medium">Model</th>
                       <th className="px-2 py-2 font-medium text-right">
                         <button
@@ -402,9 +557,18 @@ export function CostsScreen() {
                         className="border-b border-primary-200/80 dark:border-neutral-900/80 hover:bg-primary-50/80 dark:hover:bg-neutral-950/60"
                       >
                         <td className="px-2 py-2 font-mono text-xs text-primary-700 dark:text-neutral-300">
-                          <div className="max-w-[280px] truncate">{row.sessionKey}</div>
+                          <div className="max-w-[220px] truncate">
+                            {row.sessionKey}
+                          </div>
                         </td>
-                        <td className="px-2 py-2 text-primary-800 dark:text-neutral-200">{row.model}</td>
+                        <td className="px-2 py-2 text-primary-600 dark:text-neutral-400">
+                          <span className="inline-flex items-center rounded-md bg-accent-500/10 px-1.5 py-0.5 text-xs font-medium text-accent-600 dark:text-accent-400">
+                            {row.agent}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 text-primary-800 dark:text-neutral-200">
+                          {row.model}
+                        </td>
                         <td className="px-2 py-2 text-right tabular-nums text-primary-700 dark:text-neutral-300">
                           {formatTokens(row.totalTokens)}
                         </td>
@@ -419,7 +583,7 @@ export function CostsScreen() {
                     {topSessionsSorted.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={6}
                           className="px-2 py-6 text-center text-sm text-primary-500 dark:text-neutral-400"
                         >
                           No session data available.
