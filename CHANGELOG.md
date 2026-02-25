@@ -20,6 +20,20 @@ The flagship feature of v3.0. A complete multi-agent orchestration system built 
 - **Agent output streaming** — Terminal-style live output panel per agent: dark background, monospace, timestamps, per-agent tabs
 - **Mission completion flow** — Automatic report generation on completion, status transitions, and elapsed time tracking
 - **Exec approval prompts** — When the gateway triggers an exec approval event, ClawSuite surfaces a modal for human approve/deny — human-in-the-loop for sensitive commands
+- **@mention autocomplete in wizard** — Type `@agentname` in the mission goal field for cursor-tracked agent autocomplete with arrow key navigation
+- **Checkpoint restore** — Saves mission state so you can restore and re-launch from where you left off
+- **Mission maximize panel** — Full-screen mission detail view: steer, pause, view output, all from one modal
+- **Drag-and-drop kanban** — Task board with drag-and-drop columns and list/kanban toggle view
+- **Rich report modal** — Completion reports with markdown rendering, artifact list, and download button
+- **History tab overhaul** — Filters by status, redesigned mission cards, "View Report" wired to report modal
+- **Soft pause** — Steer-based pause/resume replaces broken gateway RPC for reliable agent pausing
+- **Desktop output panel** — Slides in from the right when an agent is selected; persists output history on close/reopen
+- **Kill agent + retry spawn** — Kill a running agent or retry a failed spawn directly from the mission view
+- **Archive missions** — Archive completed missions from the review view to keep history clean
+- **Re-run missions** — Re-run button on completed missions reopens wizard with pre-filled goal
+- **Error boundary** — `AgentHubErrorBoundary` wraps the entire hub to prevent render crashes from breaking the app
+- **External sub-agents** — Chat sub-agents from other sessions appear in the office view
+- **PC1 model presets** — Distilled model presets (pc1-planner, pc1-coder, pc1-critic) + loop team template built in
 
 ---
 
@@ -38,11 +52,19 @@ A visual representation of your agent team in real time.
 ### 💬 Chat — Live Token Streaming (Upgraded)
 
 - **Real-time SSE streaming** — Tokens stream to the chat bubble as they arrive — no waiting for full response
-- **Stream deduplication** — Guard against duplicate tokens from reconnect events
-- **Compaction banner** — Amber "compaction in progress" banner shown inline when context is being summarized
+- **Telegram-style animation** — Bouncing dots while thinking, pulsing cursor during stream, smooth text transition
+- **Immediate processing indicator** — Shows elapsed timer from the moment you send — zero dead air
+- **Live tool call pills** — Tool calls render inline as the agent works during multi-step responses
+- **Tool result collapse** — Tool results collapse cleanly so the conversation stays readable
+- **Nonce-based message dedup** — Optimistic messages replaced correctly on SSE match; no duplicates on reconnect
+- **Compaction banner** — Amber "compaction in progress" banner shown inline during context summarization
+- **Inline session rename** — Click the session name in the header to rename it on the spot
+- **File attachments** — `.md`, `.txt`, images — content injected into message body, images auto-compressed before send
+- **Hover actions bar** — Copy, retry, and additional actions appear on hover per message
+- **Exec approval banner** — When gateway triggers an exec approval, a banner appears inline in chat
+- **Activity EventSource** — Connects on mount so tool pill activity has zero latency gap
+- **Double-send fixes** — `submittingRef` guard + `type=button` on send button prevents form double-fire
 - **Chat input theme** — Input box border and background match the active theme
-- **Paste deduplication** — Fixed duplicate messages when pasting from clipboard or attaching files
-- **File/image attachment** — Attach images and files inline in the chat composer
 
 ---
 
@@ -54,7 +76,11 @@ A visual representation of your agent team in real time.
 - **Theme picker** — Settings dialog → Appearance tab → choose theme live
 - **Deep dark mode** — 66+ components fully wired to CSS custom properties (`--theme-bg`, `--theme-card`, `--theme-panel`, `--theme-border`, `--theme-text`, `--theme-muted`)
 - **Theme persistence** — Saved preference rehydrates before first render (no flash of wrong theme)
-- **Accent color** — Dynamic accent color system works across all three themes
+- **Accent color routing** — `orange-*` replaced with `accent-*` tokens across 13 files — accent now fully dynamic
+- **Dark mode sweep** — Full dark: prefix audit across tasks widget, costs screen, metrics widget, memory browser, mission areas
+- **bg-surface / text-ink overrides** — Applied across all 3 enterprise themes for consistent surface/text contrast
+- **Dark mode toggle** — Syncs `data-theme` attribute correctly — prevents paper-light vars overriding dark: classes
+- **Splash theme init** — Theme applied before first render to prevent flash
 
 ---
 
@@ -69,11 +95,41 @@ A visual representation of your agent team in real time.
 
 ---
 
+### ⚙️ Settings & Providers (Upgraded)
+
+- **2-panel settings dialog** — Left nav + right panel layout, 6 organized tabs
+- **Add Provider modal** — Popup wizard with real provider logos, custom baseUrl/apiType, dynamic model dropdown from gateway
+- **Remove provider** — Delete providers with confirmation dialog
+- **Model presets** — 6 new built-in presets: GPT-5, o3, Gemini Pro, DeepSeek R1, MiniMax, Grok
+- **Default model persistence** — Set a default model from the provider picker, saved to gateway config
+- **Team icon picker** — Choose an emoji icon for each team config
+- **3-step team wizard** — Guided flow: name → add agents → activate
+- **Agent inline edit** — Click any agent card to edit name, model, system prompt in place
+- **Unique agent names** — Enforced automatically so sessions are always distinguishable
+- **Specialty field** — Add a description/specialty to each agent for clarity in team views
+
+---
+
+### ⚡ Exec Approval System (New)
+
+- **Global toast overlay** — Exec approval requests surface as a dismissable overlay on every screen — never miss one
+- **Approvals bell** — Bell icon in the Agent Hub header shows pending approval count with badge
+- **Gateway polling** — Polls the gateway approval queue and syncs state in real time
+- **Server-side event store** — `/api/approvals` backed by a server-side event store — approvals survive UI refreshes
+- **In-chat banner** — Approval requests also appear as inline banners in the active chat session
+
+---
+
 ### 🔴 Live Session Roster — Agent Sidebar (New)
 
 - **Live agent list** — All configured agents shown with real-time status indicators
 - **Per-agent session state** — Active, idle, paused, error — with animated pulse on active
 - **Model badge** — Shows current model shortname per agent
+- **Usage meter** — Compact 2-bar usage display with provider rotation and set-default picker
+- **Orchestrator card** — Merged orchestrator card + usage into a single seamless card at the top
+- **Expand/collapse cards** — Click any agent card to expand full detail; compact by default
+- **Section toggles** — Eyeball icon hides/shows History and Browser sidebar sections
+- **Title tooltips** — Full agent name appears on hover when truncated in compact view
 - **Collapsible sidebar** — Toggle with keyboard shortcut or sidebar button
 - **No-sidebar mode** — Agent Hub runs without sidebar for maximum workspace focus
 
@@ -137,9 +193,23 @@ A visual representation of your agent team in real time.
 ### 🛠️ Developer Tools (Upgraded)
 
 - **Debug console** — Gateway diagnostics with connection status, error feed, pattern-based troubleshooter
-- **Cron manager** — Schedule recurring tasks, view run history, manual trigger
-- **Terminal** — Full PTY with cross-platform support, session persistence
+- **Cron manager** — Schedule recurring tasks, view run history, manual trigger — now with schedule type + payload type selectors
+- **Terminal** — Full PTY with cross-platform support, session persistence; SSE event names fixed
+- **Browser** — Multi-method fallback, proper navigate route, no demo mode stubs, correct error states
 - **Provider setup** — Guided onboarding wizard for adding API providers
+
+---
+
+### 🎯 UI / Layout Polish (Upgraded)
+
+- **Page container normalization** — All screens unified: `min-h-full bg-surface px-4 md:px-6 pt-5 md:pt-8`, `max-w-[1200px] mx-auto` inner content
+- **Agent Hub container** — Unified `max-w-[1600px]` across header, tab bar, and all content sections
+- **Dashboard header cards** — All 9 sub-pages get dashboard-style header cards for visual consistency
+- **Logo fix** — Gradient ID collision fixed with `useId` per instance (prevented broken logos in React)
+- **Tab nav** — `px-4 md:px-6` padding matches header margins; tabs fill full width evenly
+- **Agent status labels** — Unified across all components: Ready→Idle, Stopped→Idle, Spawning→Starting
+- **Widget contrast** — Dashboard card contrast improved across light and dark modes
+- **GlanceCard** — Removed backdrop-blur bleed, unified widget controls to ghost button style
 
 ---
 
