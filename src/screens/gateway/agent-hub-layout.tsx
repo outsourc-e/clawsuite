@@ -3,7 +3,8 @@ import { AgentHubErrorBoundary } from './components/agent-hub-error-boundary'
 import { useQuery } from '@tanstack/react-query'
 import { TEAM_TEMPLATES, MODEL_PRESETS, type ModelPresetId, type TeamMember, type TeamTemplateId, type AgentSessionStatusEntry } from './components/team-panel'
 import { TaskBoard as _TaskBoard, type HubTask, type TaskBoardRef, type TaskStatus } from './components/task-board'
-import { LiveFeedPanel } from './components/live-feed-panel'
+// LiveFeedPanel removed — right panel is now Live Output only
+// import { LiveFeedPanel } from './components/live-feed-panel'
 // MissionTimeline available for future detail views:
 // import { MissionTimeline } from './components/mission-timeline'
 import { AgentOutputPanel } from './components/agent-output-panel'
@@ -2124,8 +2125,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [newAgentDraft, setNewAgentDraft] = useState<(TeamMember & { backstory: string; roleDescription: string }) | null>(null)
   const [providerWizardStep, setProviderWizardStep] = useState<'select' | 'key'>('select')
   const [providerWizardSelected, setProviderWizardSelected] = useState('')
-  const [liveFeedVisible, setLiveFeedVisible] = useState(false)
+  const [liveFeedVisible] = useState(false)
   const [unreadFeedCount, setUnreadFeedCount] = useState(0)
+  // Suppress unused warnings — Live Feed UI removed but feed event tracking still uses these
+  void liveFeedVisible; void unreadFeedCount
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardStepIndex, setWizardStepIndex] = useState(0)
@@ -2178,6 +2181,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [budgetLimit, setBudgetLimit] = useState('120000')
   const [, setActiveMissionBudgetLimit] = useState('')
   const [autoAssign, setAutoAssign] = useState(true)
+  void autoAssign; void setAutoAssign // Sidebar controls removed; keeping state for future use
   const [, setTeamPanelFlash] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string>()
   const [selectedOutputAgentId, setSelectedOutputAgentId] = useState<string>()
@@ -2362,7 +2366,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       agentId: member.id,
       agentName: member.name,
       modelId: member.modelId,
-      lines: (agentOutputLinesRef.current[member.id] ?? []).slice(-4),
+      lines: (agentOutputLinesRef.current[member.id] ?? []).slice(-20),
     }))
     const resolvedTemplate = resolveActiveTemplate(teamSnapshot)
     const teamName = resolvedTemplate ? TEMPLATE_DISPLAY_NAMES[resolvedTemplate] : `Custom Team (${teamSnapshot.length})`
@@ -3051,17 +3055,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         const doneCount = agentSessionsDoneRef.current.size
         const expected = expectedAgentCountRef.current
 
-        // Auto-complete: if all expected agents have finished, stop the mission
+        // Auto-complete: if all expected agents have finished, stop the mission.
+        // Delay long enough for final SSE output to flush into agentOutputLinesRef
+        // so the mission report captures all agent output (not just partial).
         if (expected > 0 && doneCount >= expected) {
           window.setTimeout(() => {
-            // Capture snapshot BEFORE changing state (uses fresh ref to avoid stale closure)
+            // Capture snapshot AFTER output has settled (uses fresh ref to avoid stale closure)
             missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
             setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
             emitFeedEvent({
               type: 'mission_started',
               message: `✓ All ${expected} agents completed — mission auto-finished`,
             })
-          }, 2000)
+          }, 5000)
         }
       })
       source.addEventListener('open', () => {
@@ -3283,11 +3289,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     )
     if (!allTerminal) return
     const timer = window.setTimeout(() => {
-      // Capture snapshot BEFORE changing state (uses fresh ref to avoid stale closure)
+      // Capture snapshot AFTER output has settled (uses fresh ref to avoid stale closure)
       missionCompletionSnapshotRef.current = buildMissionCompletionSnapshotRef.current()
       setMissionState((prev) => (prev === 'running' ? 'stopped' : prev))
       emitFeedEvent({ type: 'mission_started', message: '✓ All agents reached terminal state — mission complete' })
-    }, 4000)
+    }, 6000)
     return () => window.clearTimeout(timer)
   }, [agentWorkingRows, missionActive, missionState])
 
@@ -4198,9 +4204,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (firstAssignedAgentId) setOutputPanelVisible(true)
     setPausedByAgentId({})
     sessionActivityRef.current = new Map()
-    // ── Auto-switch to Mission tab and show live feed ──────────────────────
+    // ── Auto-switch to Mission tab and open Live Output panel ──────────────
     setActiveTab('missions')
-    setLiveFeedVisible(true)
+    setOutputPanelVisible(true)
     setWizardOpen(false)
     emitFeedEvent({
       type: 'mission_started',
@@ -5557,16 +5563,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       return b.startedAt - a.startedAt
     })
 
+    // Deduplicate entries with the same ID (history + reports can overlap)
+    const seenIds = new Set<string>()
+    const dedupedEntries = missionListEntries.filter((entry) => {
+      if (seenIds.has(entry.id)) return false
+      seenIds.add(entry.id)
+      return true
+    })
+
     const filteredEntries = missionSubTab === 'all'
-      ? missionListEntries
-      : missionListEntries.filter((e) => e.status === missionSubTab)
+      ? dedupedEntries
+      : dedupedEntries.filter((e) => e.status === missionSubTab)
 
     const filterTabs: Array<{ id: typeof missionSubTab; label: string; count: number }> = [
-      { id: 'all', label: 'All', count: missionListEntries.length },
-      { id: 'running', label: 'Running', count: missionListEntries.filter((e) => e.status === 'running').length },
-      { id: 'needs_input', label: 'Needs Input', count: missionListEntries.filter((e) => e.status === 'needs_input').length },
-      { id: 'complete', label: 'Complete', count: missionListEntries.filter((e) => e.status === 'complete').length },
-      { id: 'failed', label: 'Failed', count: missionListEntries.filter((e) => e.status === 'failed').length },
+      { id: 'all', label: 'All', count: dedupedEntries.length },
+      { id: 'running', label: 'Running', count: dedupedEntries.filter((e) => e.status === 'running').length },
+      { id: 'needs_input', label: 'Needs Input', count: dedupedEntries.filter((e) => e.status === 'needs_input').length },
+      { id: 'complete', label: 'Complete', count: dedupedEntries.filter((e) => e.status === 'complete').length },
+      { id: 'failed', label: 'Failed', count: dedupedEntries.filter((e) => e.status === 'failed').length },
     ]
 
     const STATUS_BADGE: Record<MissionListStatus, { bg: string; text: string; label: string; pulse?: boolean }> = {
@@ -5588,22 +5602,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <p className="text-xs text-neutral-500 dark:text-neutral-400">Track active runs, review history, and launch new missions</p>
             </div>
             <div className="flex items-center gap-2">
-              {missionActive ? (
-                <button
-                  type="button"
-                  onClick={() => stopMissionAndCleanup('aborted')}
-                  className="min-h-11 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm font-medium text-red-600"
-                >
-                  <span className="mr-2 text-[10px]">■</span>
-                  Stop Mission
-                </button>
-              ) : null}
               <button
                 type="button"
                 onClick={() => openNewMissionModal()}
                 className="min-h-11 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white hover:bg-accent-600"
               >
-                New Mission
+                + New Mission
               </button>
             </div>
           </div>
@@ -5648,11 +5652,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <div className={cn('flex h-48 items-center justify-center text-center', missionCardCls)}>
                 <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                 <div className="max-w-md">
-                  <span className="text-3xl">{missionSubTab === 'all' ? '🚀' : '📋'}</span>
+                  <span className="text-3xl">{missionSubTab === 'all' ? '🚀' : missionSubTab === 'running' ? '⏳' : missionSubTab === 'needs_input' ? '💬' : missionSubTab === 'complete' ? '✅' : '❌'}</span>
                   <p className="mt-2 text-sm font-medium text-neutral-600 dark:text-neutral-400">
                     {missionSubTab === 'all'
-                      ? 'No missions yet — launch one to get started'
-                      : `No ${filterTabs.find((t) => t.id === missionSubTab)?.label.toLowerCase()} missions`}
+                      ? 'No active missions — launch one with New Mission ↑'
+                      : missionSubTab === 'running'
+                        ? 'No missions running right now'
+                        : missionSubTab === 'needs_input'
+                          ? 'No missions waiting for input'
+                          : missionSubTab === 'complete'
+                            ? 'No completed missions yet — finish your first one!'
+                            : 'No failed missions — nice!'}
                   </p>
                   {missionSubTab === 'all' && (
                     <button
@@ -5676,7 +5686,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       className={cn(
                         missionCardCls,
                         'cursor-pointer transition-all hover:shadow-md',
-                        entry.status === 'needs_input' && 'ring-2 ring-amber-400/50 dark:ring-amber-500/30',
+                        entry.status === 'running' && 'ring-2 ring-blue-400/40 dark:ring-blue-500/30 border-blue-200 dark:border-blue-800/50 bg-blue-50/30 dark:bg-blue-950/20',
+                        entry.status === 'needs_input' && 'ring-2 ring-amber-400/50 dark:ring-amber-500/30 border-amber-200 dark:border-amber-800/50',
+                        entry.status === 'complete' && 'hover:border-emerald-300 dark:hover:border-emerald-700',
+                        entry.status === 'failed' && 'hover:border-red-300 dark:hover:border-red-700',
                         entry.report && 'hover:border-accent-300 dark:hover:border-accent-700',
                       )}
                       onClick={() => {
@@ -5702,29 +5715,37 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           {badge.label}
                         </span>
 
-                        {/* Mission Title + Goal */}
+                        {/* Mission Title + Goal + Short ID */}
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{entry.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{entry.title}</p>
+                            <span className="shrink-0 rounded bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] font-mono text-neutral-400 dark:text-neutral-500">
+                              #{entry.id.slice(-6)}
+                            </span>
+                          </div>
                           {entry.goal !== entry.title && (
                             <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 truncate">{entry.goal}</p>
                           )}
                         </div>
 
-                        {/* Agents */}
-                        <div className="hidden sm:flex -space-x-1.5 shrink-0">
-                          {entry.agents.slice(0, 4).map((name, idx) => {
-                            const initials = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-                            return (
-                              <div key={`${entry.id}-agent-${idx}`} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-800 dark:bg-neutral-700 text-[8px] font-bold text-white" title={name}>
-                                {initials}
+                        {/* Agent count + avatars */}
+                        <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+                          <div className="flex -space-x-1.5">
+                            {entry.agents.slice(0, 3).map((name, idx) => {
+                              const initials = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+                              return (
+                                <div key={`${entry.id}-agent-${idx}`} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-800 dark:bg-neutral-700 text-[8px] font-bold text-white" title={name}>
+                                  {initials}
+                                </div>
+                              )
+                            })}
+                            {entry.agents.length > 3 && (
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-300 dark:bg-neutral-600 text-[8px] font-bold text-neutral-700 dark:text-neutral-300">
+                                +{entry.agents.length - 3}
                               </div>
-                            )
-                          })}
-                          {entry.agents.length > 4 && (
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-300 dark:bg-neutral-600 text-[8px] font-bold text-neutral-700 dark:text-neutral-300">
-                              +{entry.agents.length - 4}
-                            </div>
-                          )}
+                            )}
+                          </div>
+                          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 tabular-nums">{entry.agents.length} agent{entry.agents.length !== 1 ? 's' : ''}</span>
                         </div>
 
                         {/* Duration */}
@@ -5738,10 +5759,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           {isLive ? (
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); stopMissionAndCleanup('aborted') }}
-                              className="rounded-md border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-900/20 px-2 py-1 text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOutputPanelVisible(true)
+                                if (!selectedOutputAgentId && team.length > 0) setSelectedOutputAgentId(team[0].id)
+                              }}
+                              className="rounded-md border border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                             >
-                              Stop
+                              Live Output ↗
                             </button>
                           ) : entry.report ? (
                             <button
@@ -5794,7 +5819,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             })}
                           </div>
 
-                          {/* Warden controls */}
+                          {/* Warden controls — single source of truth for mission actions */}
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -5802,7 +5827,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               disabled={missionState === 'running'}
                               className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 bg-emerald-600 text-white hover:bg-emerald-700"
                             >
-                              Resume
+                              ▶ Resume
                             </button>
                             <button
                               type="button"
@@ -5810,8 +5835,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               disabled={missionState === 'paused'}
                               className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 bg-amber-500 text-white hover:bg-amber-600"
                             >
-                              Pause
+                              ⏸ Pause
                             </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); stopMissionAndCleanup('aborted') }}
+                              className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors bg-red-600 text-white hover:bg-red-700"
+                            >
+                              ■ Stop
+                            </button>
+                            <div className="flex-1" />
                             <button
                               type="button"
                               onClick={(e) => {
@@ -5821,14 +5854,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               }}
                               className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
                             >
-                              Agent Output ↗
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setLiveFeedVisible(true) }}
-                              className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
-                            >
-                              Event Log
+                              Live Output ↗
                             </button>
                           </div>
                         </div>
@@ -6361,30 +6387,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             onApprove={handleApprove}
             onDeny={handleDeny}
           />
-
-          {/* Live View toggle */}
-          <button
-            type="button"
-            aria-pressed={liveFeedVisible}
-            title={liveFeedVisible ? 'Hide live feed' : 'Show live feed (📡 activity log)'}
-            onClick={() => {
-              setLiveFeedVisible((v) => !v)
-            }}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-              liveFeedVisible
-                ? 'bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800/50'
-                : 'text-neutral-500 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 hover:text-neutral-800 dark:hover:text-neutral-200',
-            )}
-          >
-            <span aria-hidden>📡</span>
-            <span>Live View</span>
-            {unreadFeedCount > 0 && !liveFeedVisible ? (
-              <span className="ml-0.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                {unreadFeedCount > 99 ? '99+' : unreadFeedCount}
-              </span>
-            ) : null}
-          </button>
         </div>
       </div>
 
@@ -6460,152 +6462,82 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           )}
         </div>
 
-        {/* ── Collapsible Live Feed + Approvals + Mission Controls sidebar ── */}
-        {/* Keep mounted once opened so LiveFeedPanel history is preserved on hide/show */}
-        {(liveFeedVisible || liveFeedEverOpenedRef.current) ? (
-          <div
-            className="flex w-72 shrink-0 flex-col border-l border-neutral-200 bg-neutral-50/30 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]"
-            style={{ display: liveFeedVisible ? undefined : 'none' }}
-          >
-            {/* Approvals notification area */}
-            {approvals.filter((a) => a.status === 'pending').length > 0 ? (
-              <div className="border-b border-neutral-200 px-3 py-2.5">
-                <h3 className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                  <span>⚠️ Pending Approvals</span>
-                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
-                    {approvals.filter((a) => a.status === 'pending').length}
-                  </span>
-                </h3>
-                <div className="mt-2 space-y-1.5">
-                  {approvals.filter((a) => a.status === 'pending').slice(0, 5).map((approval) => (
-                    <div key={approval.id} className="rounded-lg border border-amber-200 bg-amber-50/50 px-2.5 py-2">
-                      <p className="truncate text-[11px] font-medium text-neutral-800">{approval.agentName}</p>
-                      <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-600 dark:text-slate-400">{approval.action}</p>
-                      <div className="mt-1.5 flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleApprove(approval.id)}
-                          className="rounded-md bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white hover:bg-emerald-600"
-                        >
-                          ✓ Approve
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeny(approval.id)}
-                          className="rounded-md border border-red-200 bg-white px-2 py-1 text-[10px] font-medium text-red-600 hover:bg-red-50"
-                        >
-                          ✕ Deny
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <LiveFeedPanel />
-            </div>
-
-            {/* Mission controls (bottom of sidebar) */}
-            <div className="border-t border-neutral-200 px-4 py-3">
-              {missionActive ? (
-                <>
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">
-                    Mission Controls
-                  </h3>
-                  <div className="mt-2 grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => void handleMissionPause(false)}
-                      className={cn(
-                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
-                        missionState === 'running'
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
-                      )}
-                    >
-                      Start<span className="ml-1 text-[9px] opacity-50">Space</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleMissionPause(true)}
-                      className={cn(
-                        'rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors',
-                        missionState === 'paused'
-                          ? 'bg-amber-500 text-white'
-                          : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
-                      )}
-                    >
-                      Pause
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => stopMissionAndCleanup('aborted')}
-                      className="rounded-md bg-red-100 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-200"
-                    >
-                      Stop
-                    </button>
-                  </div>
-
-                  <label className="mt-3 block">
-                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">
-                      Budget Limit (max tokens)
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={budgetLimit}
-                      onChange={(event) => setBudgetLimit(event.target.value)}
-                      className="w-full rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1.5 text-xs text-neutral-900 outline-none ring-orange-400 focus:ring-1"
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setAutoAssign((current) => !current)}
-                    className="mt-2 flex w-full items-center justify-between rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
-                  >
-                    <span>Auto-assign tasks</span>
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                        autoAssign
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-neutral-100 text-neutral-600',
-                      )}
-                    >
-                      {autoAssign ? 'On' : 'Off'}
-                    </span>
-                  </button>
-                </>
-              ) : (
-                <p className="text-xs text-neutral-400">Start a mission to see controls here</p>
-              )}
-            </div>
-          </div>
-        ) : null}
-
-        {/* Desktop Agent Output Panel — slides in when an agent is selected */}
+        {/* ── Right Panel: Live Output (single purpose — terminal-style agent output) ── */}
         {!isMobileHub && outputPanelVisible && selectedOutputAgentId && (
-          <div className="flex w-80 shrink-0 flex-col border-l border-neutral-200 dark:border-slate-700 bg-white dark:bg-[var(--theme-panel,#111520)]">
-            <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
-                  {selectedOutputAgentName}
-                </p>
-                <p className="text-[10px] text-neutral-500 dark:text-neutral-400">Live Output</p>
+          <div className="flex w-96 shrink-0 flex-col border-l border-neutral-200 dark:border-neutral-700 bg-neutral-950 dark:bg-[#0a0d12]">
+            {/* Terminal-style header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 px-3 py-2.5 bg-neutral-900">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="flex size-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-neutral-100 font-mono">
+                    {selectedOutputAgentName}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {selectedOutputModelId && (
+                      <span className="text-[10px] text-neutral-500 font-mono">{getModelDisplayLabel(selectedOutputModelId)}</span>
+                    )}
+                    <span className="text-[10px] text-neutral-600 font-mono">·</span>
+                    <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{missionTokenCount.toLocaleString()} tokens</span>
+                    {selectedOutputStatusLabel && (
+                      <>
+                        <span className="text-[10px] text-neutral-600 font-mono">·</span>
+                        <span className={cn(
+                          'text-[10px] font-mono font-semibold',
+                          selectedOutputStatusLabel === 'Active' && 'text-emerald-400',
+                          selectedOutputStatusLabel === 'Idle' && 'text-neutral-400',
+                          selectedOutputStatusLabel === 'Waiting For Input' && 'text-amber-400',
+                          selectedOutputStatusLabel === 'Error' && 'text-red-400',
+                          selectedOutputStatusLabel === 'Paused' && 'text-blue-400',
+                        )}>{selectedOutputStatusLabel}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => { setOutputPanelVisible(false) }}
-                className="flex size-7 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 transition-colors"
+                className="flex size-7 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-800 hover:text-neutral-300 transition-colors"
                 aria-label="Close output panel"
               >
                 ✕
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            {/* Agent selector tabs (if multiple agents) */}
+            {team.length > 1 && missionActive && (
+              <div className="flex shrink-0 gap-0.5 border-b border-neutral-800 bg-neutral-900/80 px-2 py-1 overflow-x-auto">
+                {team.map((member) => {
+                  const isSelected = member.id === selectedOutputAgentId
+                  const agentStatus = agentSessionStatus[member.id]
+                  const hasSession = Boolean(agentSessionMap[member.id])
+                  return (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => setSelectedOutputAgentId(member.id)}
+                      className={cn(
+                        'shrink-0 rounded px-2 py-1 text-[10px] font-mono font-medium transition-colors',
+                        isSelected
+                          ? 'bg-neutral-700 text-neutral-100'
+                          : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800',
+                      )}
+                    >
+                      <span className={cn(
+                        'inline-flex size-1.5 rounded-full mr-1',
+                        hasSession && agentStatus?.status === 'active' && 'bg-emerald-500',
+                        hasSession && agentStatus?.status === 'idle' && 'bg-neutral-400',
+                        hasSession && agentStatus?.status === 'waiting_for_input' && 'bg-amber-400',
+                        hasSession && agentStatus?.status === 'error' && 'bg-red-500',
+                        !hasSession && 'bg-neutral-600',
+                      )} />
+                      {member.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            <div className="min-h-0 flex-1 overflow-y-auto bg-neutral-950">
               <AgentOutputPanel
                 agentName={selectedOutputAgentName}
                 sessionKey={agentSessionMap[selectedOutputAgentId] ?? null}
