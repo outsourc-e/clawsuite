@@ -2326,10 +2326,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     if (nextLines.length > 0) {
       const current = agentOutputLinesRef.current[agentId] ?? []
-      agentOutputLinesRef.current[agentId] = [...current, ...nextLines].slice(-8)
+      // Deduplicate: skip lines already present in the tail of the current buffer
+      const existingSet = new Set(current.slice(-8))
+      const freshLines = nextLines.filter((line) => !existingSet.has(line))
+      if (freshLines.length === 0) return
+
+      agentOutputLinesRef.current[agentId] = [...current, ...freshLines].slice(-8)
       setAgentOutputLines((prev) => ({
         ...prev,
-        [agentId]: [...(prev[agentId] ?? []), ...nextLines].slice(-8),
+        [agentId]: [...(prev[agentId] ?? []), ...freshLines].slice(-8),
       }))
     }
 
@@ -2927,6 +2932,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           const text = String(data.text ?? data.content ?? data.chunk ?? '').trim()
           if (text && data.fullReplace !== true) {
             setMissionTokenCount((current) => current + Math.ceil(text.length / 4))
+            captureAgentOutput(agentId, text)
           }
           handleUpdate(text, 'assistant')
           if (text.includes('APPROVAL_REQUIRED:')) {
@@ -6581,7 +6587,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         ) : null}
 
         {/* Desktop Agent Output Panel — slides in when an agent is selected */}
-        {outputPanelVisible && selectedOutputAgentId && (
+        {!isMobileHub && outputPanelVisible && selectedOutputAgentId && (
           <div className="flex w-80 shrink-0 flex-col border-l border-neutral-200 dark:border-slate-700 bg-white dark:bg-[var(--theme-panel,#111520)]">
             <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
               <div className="min-w-0">
@@ -6990,8 +6996,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       ) : null}
 
       {/* ── Mobile: Agent Output Bottom Sheet ──────────────────────────────── */}
-      {isMobileHub && missionActive && selectedOutputAgentId ? (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden" style={{ display: outputPanelVisible ? undefined : 'none' }}>
+      {isMobileHub && missionActive && outputPanelVisible && selectedOutputAgentId ? (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50"

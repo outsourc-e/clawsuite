@@ -153,6 +153,9 @@ function appendAssistantMessage(previous: OutputMessage[], text: string): Output
       ]
     }
   }
+  // Check recent messages for exact duplicate content (guards against SSE replay on reconnect)
+  const tail = previous.slice(-10)
+  if (tail.some((msg) => msg.role === 'assistant' && msg.content === text)) return previous
   return [...previous, { role: 'assistant', content: text, timestamp: Date.now() }]
 }
 
@@ -162,6 +165,11 @@ function trimMessages(messages: OutputMessage[]): OutputMessage[] {
 }
 
 function appendBoundedMessage(previous: OutputMessage[], message: OutputMessage): OutputMessage[] {
+  // Deduplicate: skip if an identical role+content message exists in the recent tail
+  const tail = previous.slice(-10)
+  if (tail.some((msg) => msg.role === message.role && msg.content === message.content)) {
+    return previous
+  }
   return [...trimMessages(previous), message].slice(-MAX_CACHED_MESSAGES)
 }
 
