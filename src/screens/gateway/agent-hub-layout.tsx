@@ -2125,10 +2125,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [newAgentDraft, setNewAgentDraft] = useState<(TeamMember & { backstory: string; roleDescription: string }) | null>(null)
   const [providerWizardStep, setProviderWizardStep] = useState<'select' | 'key'>('select')
   const [providerWizardSelected, setProviderWizardSelected] = useState('')
-  const [liveFeedVisible] = useState(false)
-  const [unreadFeedCount, setUnreadFeedCount] = useState(0)
-  // Suppress unused warnings — Live Feed UI removed but feed event tracking still uses these
-  void liveFeedVisible; void unreadFeedCount
+  // Live Feed UI removed — right panel is Live Output only. Feed event bus still runs internally.
   const [processType, setProcessType] = useState<'sequential' | 'hierarchical' | 'parallel'>('parallel')
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardStepIndex, setWizardStepIndex] = useState(0)
@@ -2282,10 +2279,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   // Stable ref for buildMissionCompletionSnapshot — kept in sync each render so
   // SSE closures (which can't list missionTasks etc. in their own deps) can call it.
   const buildMissionCompletionSnapshotRef = useRef<() => MissionReportPayload | null>(() => null)
-  // Stable ref for live feed visibility (used in feed-count effect)
-  const liveFeedVisibleRef = useRef(liveFeedVisible)
-  // Tracks whether the live feed sidebar has ever been opened (keeps it mounted once shown)
-  const liveFeedEverOpenedRef = useRef(false)
+  // (Live Feed refs removed — sidebar no longer exists)
   // Tracks which agent session keys have sent their 'done' SSE event
   const agentSessionsDoneRef = useRef<Set<string>>(new Set())
   // Tracks the number of agents expected to complete for the current mission
@@ -2294,7 +2288,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   teamRef.current = team
   missionGoalRef.current = missionGoal
   missionActiveRef.current = missionActive
-  liveFeedVisibleRef.current = liveFeedVisible
 
   const appendArtifacts = useCallback((nextArtifacts: MissionArtifact[]) => {
     if (nextArtifacts.length === 0) return
@@ -2812,24 +2805,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     wizardStep,
   ])
 
-  // ── Unread feed count ───────────────────────────────────────────────────────
-  // Increment when feed is hidden and a new event arrives; reset when feed opens
-  useEffect(() => {
-    const unsubscribe = onFeedEvent(() => {
-      if (!liveFeedVisibleRef.current) {
-        setUnreadFeedCount((prev) => prev + 1)
-      }
-    })
-    return unsubscribe
-  }, []) // uses liveFeedVisibleRef — stable
-
-  // Reset unread count when feed becomes visible; also track that it was ever opened
-  useEffect(() => {
-    if (liveFeedVisible) {
-      setUnreadFeedCount(0)
-      liveFeedEverOpenedRef.current = true
-    }
-  }, [liveFeedVisible])
+  // Feed event tracking (Live Feed UI removed — events still logged internally via feed-event-bus)
 
   // ── Feed event → agentActivity + approval parsing ─────────────────────────
   // Update last-line activity from feed events (agent_active, agent_spawned, etc.)
