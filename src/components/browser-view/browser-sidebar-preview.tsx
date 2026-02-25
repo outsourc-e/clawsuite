@@ -134,4 +134,37 @@ function BrowserSidebarPreview() {
   )
 }
 
-export { BrowserSidebarPreview }
+function BrowserSidebarSection({
+  expanded,
+  onExpandChange,
+}: {
+  expanded: boolean
+  onExpandChange: (v: boolean) => void
+}) {
+  const statusQuery = useQuery({
+    queryKey: ['browser', 'sidebar-section-status'],
+    queryFn: fetchBrowserStatus,
+    refetchInterval: 10_000,
+    retry: false,
+  })
+  const isActive = statusQuery.data?.active ?? false
+  if (!isActive) return null
+
+  return (
+    <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
+      <div className="flex items-center justify-between mb-1">
+        <button
+          type="button"
+          onClick={() => onExpandChange(!expanded)}
+          className="flex items-center gap-1 text-xs font-medium text-primary-700 hover:text-primary-900 transition-colors"
+        >
+          <span>{expanded ? '▾' : '▸'}</span>
+          <span>🌐 Browser</span>
+        </button>
+      </div>
+      {expanded && <BrowserSidebarPreview />}
+    </section>
+  )
+}
+
+export { BrowserSidebarPreview, BrowserSidebarSection }

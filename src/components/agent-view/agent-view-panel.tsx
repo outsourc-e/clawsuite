@@ -42,7 +42,7 @@ import { useSounds } from '@/hooks/use-sounds'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
-import { BrowserSidebarPreview } from '@/components/browser-view/browser-sidebar-preview'
+import { BrowserSidebarSection } from '@/components/browser-view/browser-sidebar-preview'
 import { cn } from '@/lib/utils'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
@@ -1196,30 +1196,10 @@ export function AgentViewPanel() {
                   </section>
                 ) : null}
 
-                <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
-                  <Collapsible
-                    open={browserPreviewExpanded}
-                    onOpenChange={setBrowserPreviewExpanded}
-                  >
-                    <div className="flex items-center justify-between">
-                      <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
-                        <HugeiconsIcon
-                          icon={
-                            browserPreviewExpanded
-                              ? ArrowDown01Icon
-                              : ArrowRight01Icon
-                          }
-                          size={20}
-                          strokeWidth={1.5}
-                        />
-                        🌐 Browser {browserPreviewExpanded ? '' : '— inactive'}
-                      </CollapsibleTrigger>
-                    </div>
-                    <CollapsiblePanel contentClassName="pt-1">
-                      <BrowserSidebarPreview />
-                    </CollapsiblePanel>
-                  </Collapsible>
-                </section>
+                <BrowserSidebarSection
+                  expanded={browserPreviewExpanded}
+                  onExpandChange={setBrowserPreviewExpanded}
+                />
               </div>
             </ScrollAreaViewport>
             <ScrollAreaScrollbar>
