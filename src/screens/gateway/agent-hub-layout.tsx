@@ -1055,6 +1055,63 @@ function cleanAgentOutputLines(lines: string[]): string[] {
 }
 
 /**
+ * Extract the last meaningful prose line from agent output for card preview.
+ * Filters out raw command flags, code snippets, and noise.
+ * Returns "Agent working..." as fallback if no prose is found.
+ */
+function extractPreviewLine(lines: string[]): string {
+  // Patterns that indicate a line is code/command/noise, not prose
+  const CODE_LINE_PATTERNS = [
+    /^\s*--\S/,              // command flags: --max-model-len
+    /^\s*\$\s/,              // shell prompts: $ command
+    /^\s*```/,               // fenced code blocks
+    /^\s*[|+][-=+|]+/,      // table borders
+    /^\s*[{}[\]]/,           // JSON/code brackets
+    /^\s*#!\//,              // shebangs
+    /^\s*\/\//,              // code comments
+    /^\s*\*/,                // code comments (block)
+    /^\s*import\s/,          // import statements
+    /^\s*export\s/,          // export statements
+    /^\s*const\s/,           // variable declarations
+    /^\s*function\s/,        // function declarations
+    /^\s*if\s*\(/,           // if statements
+    /^\s*for\s*\(/,          // for loops
+    /^\s*return\s/,          // return statements
+    /^[A-Z_]{3,}[:=]/,      // ENV_VAR=value or CONFIG:value
+    /^[a-z_]+\(/,            // function calls: someFunc(
+    /^\s*\\\s*$/,            // line continuations
+    /^[^\w\s]{4,}/,          // lines of mostly punctuation/symbols
+    /^\s*[<>]\s/,            // diff markers or XML tags
+    /^\s*\d+[.:]\d+/,       // timestamps or version numbers at start
+  ]
+
+  function isCodeOrCommand(line: string): boolean {
+    const trimmed = line.trim()
+    if (!trimmed) return true
+    if (trimmed.length < 3) return true
+    // All-caps with no spaces (likely a constant or marker)
+    if (/^[A-Z_]{4,}$/.test(trimmed)) return true
+    // Very short with no word characters
+    if (trimmed.length < 8 && !/[a-zA-Z]{3,}/.test(trimmed)) return true
+    return CODE_LINE_PATTERNS.some((pattern) => pattern.test(trimmed))
+  }
+
+  // Walk backwards through lines to find last meaningful prose
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 30); i--) {
+    const line = lines[i].trim()
+    if (!line) continue
+    if (isMetadataLine(line)) continue
+    if (isCodeOrCommand(line)) continue
+    // Must contain at least 2 word characters (basic prose check)
+    if (!/\w.*\s+\w/.test(line)) continue
+    // Truncate to reasonable preview length
+    return line.length > 120 ? `${line.slice(0, 117)}…` : line
+  }
+
+  return 'Agent working...'
+}
+
+/**
  * Smart truncation: if content exceeds maxWords, keep intro + conclusion with "..." in middle.
  */
 function smartTruncate(lines: string[], maxWords = 500): string[] {
@@ -1688,7 +1745,7 @@ const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
 }
 
 const DEFAULT_OFFICE_MODEL_BADGE =
-  'border border-neutral-200 bg-neutral-50 text-neutral-700'
+  'border border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
 
 function getOfficeModelBadge(modelId: string): string {
   return OFFICE_MODEL_BADGE[modelId as ModelPresetId] ?? DEFAULT_OFFICE_MODEL_BADGE
@@ -1792,7 +1849,7 @@ function OfficeView({
                                      'border-emerald-300 bg-emerald-50 text-emerald-700'
 
   return (
-    <div className="h-full min-h-[420px] overflow-y-auto bg-neutral-50 p-4">
+    <div className="h-full min-h-[420px] overflow-y-auto bg-neutral-50 dark:bg-neutral-900 p-4">
       {/* ── Crew strip ─────────────────────────────────────────────────── */}
       <div className="mb-4 flex items-center gap-3 rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-3 shadow-sm">
         {/* Overlapping agent avatars */}
@@ -1821,7 +1878,7 @@ function OfficeView({
 
         {/* Labels */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-sm font-semibold text-neutral-800">
+          <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
             {agentRows.length} agent{agentRows.length !== 1 ? 's' : ''}
           </span>
           {activeTemplateName ? (
@@ -1897,7 +1954,7 @@ function OfficeView({
             <div
               key={agent.id}
               className={cn(
-            'relative flex h-full min-h-[248px] cursor-pointer flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md hover:ring-1 hover:ring-orange-200',
+            'relative flex h-full min-h-[248px] cursor-pointer flex-col overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md hover:ring-1 hover:ring-orange-200',
             isSelected
                   ? 'shadow-md ring-1 ring-orange-300'
                   : '',
@@ -1981,7 +2038,7 @@ function OfficeView({
                     'mt-auto w-full cursor-pointer rounded-lg border px-2 py-2 text-[11px] font-medium transition-colors',
                     isSelected
                       ? 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
-                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700',
+                      : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700',
                   )}
                 >
                   Edit agent
@@ -2082,7 +2139,7 @@ function HistoryView() {
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
           <p className="mb-3 text-4xl opacity-30">📋</p>
-          <p className="text-sm font-medium text-neutral-700">No mission history yet</p>
+          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">No mission history yet</p>
           <p className="mt-1 font-mono text-[10px] text-neutral-500 dark:text-slate-400">// start a mission to see it recorded here</p>
         </div>
       </div>
@@ -2109,7 +2166,7 @@ function HistoryView() {
       {/* Local checkpoint history */}
       {hasLocalHistory ? (
         <div className="space-y-3">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700">📦 Local Checkpoints</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700 dark:text-neutral-300">📦 Local Checkpoints</p>
           {localHistory.map((cp) => {
             const completedTasks = cp.tasks.filter(t => t.status === 'done' || t.status === 'completed').length
             const totalTasks = cp.tasks.length
@@ -2158,7 +2215,7 @@ function HistoryView() {
                   </div>
                 ) : null}
 
-                <div className="flex items-center gap-3 font-mono text-[9px] text-neutral-700">
+                <div className="flex items-center gap-3 font-mono text-[9px] text-neutral-700 dark:text-neutral-400">
                   {totalTasks > 0 ? (
                     <span>{completedTasks}/{totalTasks} tasks</span>
                   ) : null}
@@ -2174,7 +2231,7 @@ function HistoryView() {
       {hasApiSessions ? (
         <div className="space-y-3">
           {hasLocalHistory ? (
-            <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700">🌐 Gateway Sessions</p>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700 dark:text-neutral-300">🌐 Gateway Sessions</p>
           ) : null}
           {sessions.map((session) => {
             const sessionId = readSessionId(session)
@@ -2225,7 +2282,7 @@ function HistoryView() {
                         {lastMessage}
                       </p>
                     ) : null}
-                    <div className="mt-2 flex items-center gap-3 font-mono text-[9px] text-neutral-700">
+                    <div className="mt-2 flex items-center gap-3 font-mono text-[9px] text-neutral-700 dark:text-neutral-400">
                       {updatedAt > 0 ? <span>{timeAgoFromMs(updatedAt)}</span> : null}
                       {tokenCount !== undefined ? (
                         <span>{tokenCount.toLocaleString()} tokens</span>
@@ -2253,7 +2310,7 @@ function HistoryView() {
                       </div>
                       {lastMessage ? (
                         <div className="flex flex-col gap-0.5">
-                          <dt className="font-mono text-[9px] text-neutral-700">Last output</dt>
+                          <dt className="font-mono text-[9px] text-neutral-700 dark:text-neutral-400">Last output</dt>
                           <dd className="line-clamp-4 font-mono text-[9px] text-neutral-500 dark:text-slate-400">{lastMessage}</dd>
                         </div>
                       ) : null}
@@ -4068,11 +4125,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             setAgentSessionStatus((prev) => {
               const next: Record<string, AgentSessionStatusEntry> = {}
 
-              // Apply matched sessions — but don't override waiting_for_input
-              // (that status is set by the SSE done handler and should only be
-              // cleared when the user sends a reply to the agent)
+              // Apply matched sessions — but don't override waiting_for_input or
+              // agents whose SSE stream has already sent a 'done' event (their
+              // session may still look 'active' to the poller for up to 30s).
               for (const [agentId, entry] of matchedEntries) {
-                if (prev[agentId]?.status === 'waiting_for_input' && entry.status !== 'active') {
+                const sessionKeyForAgent = agentSessionMap[agentId]
+                const agentIsDone = sessionKeyForAgent && agentSessionsDoneRef.current.has(sessionKeyForAgent)
+                if (agentIsDone && prev[agentId]?.status === 'idle') {
+                  // Don't override 'idle' set by SSE done handler
+                  next[agentId] = prev[agentId]
+                } else if (prev[agentId]?.status === 'waiting_for_input' && entry.status !== 'active') {
                   next[agentId] = prev[agentId]
                 } else {
                   next[agentId] = entry
@@ -4207,8 +4269,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       missionCompletionSnapshotRef.current = null
       // Reload mission history to pick up any new checkpoints
       setMissionHistory(loadMissionHistory())
+      // Archive checkpoint and clean up
+      const currentCp = loadMissionCheckpoint()
+      if (currentCp) {
+        archiveMissionToHistory({ ...currentCp, status: 'completed' })
+        clearMissionCheckpoint()
+      }
       // Mark mission as inactive so the card moves from Running to Review column
       setMissionActive(false)
+      // Clean up running state: kill sessions, clear maps (mirrors stopMissionAndCleanup)
+      setMissionTasks([])
+      setDispatchedTaskIdsByAgent({})
+      setPausedByAgentId({})
+      setSelectedOutputAgentId(undefined)
+      dispatchingRef.current = false
+      pendingTaskMovesRef.current = []
+      sessionActivityRef.current = new Map()
+      missionIdRef.current = ''
+      agentSessionsDoneRef.current = new Set()
+      expectedAgentCountRef.current = 0
     }
     prevMissionStateRef.current = missionState
   }, [missionState])
@@ -5958,7 +6037,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           <div className="divide-y divide-neutral-100 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50">
                             {agentWorkingRows.map((row) => {
                               const statusMeta = getAgentStatusMeta(row.status)
-                              const lastOutput = (agentOutputLines[row.id] ?? []).slice(-1)[0]
+                              const lastOutput = extractPreviewLine(agentOutputLines[row.id] ?? [])
                               return (
                                 <div key={row.id} className="flex items-center gap-2 px-3 py-2">
                                   <span className={cn('size-2 shrink-0 rounded-full', statusMeta.dotClassName, statusMeta.pulse && 'animate-pulse')} />
@@ -5966,9 +6045,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                   <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold', statusMeta.className)}>
                                     {statusMeta.label}
                                   </span>
-                                  {lastOutput && (
+                                  {lastOutput !== 'Agent working...' ? (
                                     <span className="ml-auto truncate text-[10px] text-neutral-400 max-w-[300px] font-mono">{lastOutput}</span>
-                                  )}
+                                  ) : (agentOutputLines[row.id]?.length ?? 0) > 0 ? (
+                                    <span className="ml-auto truncate text-[10px] text-neutral-500 max-w-[300px] font-mono italic">{lastOutput}</span>
+                                  ) : null}
                                 </div>
                               )
                             })}
@@ -6077,7 +6158,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 {missionWizardStep === 0 ? (
                   <div className="space-y-4">
                     <label className="block">
-                      <span className="text-xs font-medium text-neutral-700">Mission Name</span>
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Mission Name</span>
                       <input
                         value={newMissionName}
                         onChange={(event) => setNewMissionName(event.target.value)}
@@ -6086,7 +6167,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-xs font-medium text-neutral-700">Goal</span>
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Goal</span>
                       <textarea
                         value={newMissionGoal}
                         onChange={(event) => setNewMissionGoal(event.target.value)}
@@ -6101,7 +6182,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 {/* Step 1: Team */}
                 {missionWizardStep === 1 ? (
                   <div className="space-y-3">
-                    <p className="text-xs font-medium text-neutral-700">Select a team for this mission</p>
+                    <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Select a team for this mission</p>
                     <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
                       {missionTeamOptions.map((option) => {
                         const teamBudget = getTeamBudgetSummary(option.team)
@@ -6149,7 +6230,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 {missionWizardStep === 2 ? (
                   <div className="space-y-4">
                     <label className="block">
-                      <span className="text-xs font-medium text-neutral-700">Process Type</span>
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Process Type</span>
                       <div className="mt-2 grid grid-cols-3 gap-2">
                         {(['sequential', 'hierarchical', 'parallel'] as const).map((pt) => (
                           <button
@@ -6172,7 +6253,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       </div>
                     </label>
                     <label className="block">
-                      <span className="text-xs font-medium text-neutral-700">Token Budget (max)</span>
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Token Budget (max)</span>
                       <input
                         value={newMissionBudgetLimit}
                         onChange={(event) => setNewMissionBudgetLimit(event.target.value.replace(/[^\d]/g, ''))}
@@ -6213,14 +6294,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </div>
                     <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Goal</p>
-                      <p className="mt-1 text-xs text-neutral-700">{newMissionGoal || 'No goal set'}</p>
+                      <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-300">{newMissionGoal || 'No goal set'}</p>
                     </div>
                     <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Team Lineup</p>
                       <div className="mt-2 space-y-1">
                         {selectedMissionTeamMembers.map((member) => (
                           <div key={member.id} className="flex items-center justify-between rounded-md bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1.5">
-                            <span className="text-xs font-medium text-neutral-800">{member.name}</span>
+                            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">{member.name}</span>
                             <span className="text-[10px] text-neutral-500 dark:text-slate-400">{getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}</span>
                           </div>
                         ))}
@@ -6829,7 +6910,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         {configuredProviders.map((provider) => (
                           <span
                             key={provider}
-                            className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-700"
+                            className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-700 dark:text-neutral-300"
                           >
                             {provider}
                           </span>
@@ -6862,7 +6943,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             'rounded-xl border px-3 py-2 text-left text-xs transition-colors',
                             activeTemplateId === template.id
                               ? 'border-accent-400 bg-accent-50 text-accent-700'
-                              : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300',
+                              : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300',
                           )}
                         >
                           <p className="font-semibold">
@@ -6887,7 +6968,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         team.map((member) => (
                           <li
                             key={member.id}
-                            className="truncate text-xs text-neutral-700"
+                            className="truncate text-xs text-neutral-700 dark:text-neutral-300"
                           >
                             {member.name} · {member.roleDescription || 'No role set'}
                           </li>
@@ -6978,21 +7059,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <dl className="mt-2 space-y-1.5 text-xs">
                       <div className="flex gap-2">
                         <dt className="w-24 text-neutral-500 dark:text-slate-400">Gateway</dt>
-                        <dd className="text-neutral-800">
+                        <dd className="text-neutral-800 dark:text-neutral-200">
                           {gatewayStatus === 'disconnected' ? 'Disconnected' : 'Connected'}
                         </dd>
                       </div>
                       <div className="flex gap-2">
                         <dt className="w-24 text-neutral-500 dark:text-slate-400">Team size</dt>
-                        <dd className="text-neutral-800">{team.length}</dd>
+                        <dd className="text-neutral-800 dark:text-neutral-200">{team.length}</dd>
                       </div>
                       <div className="flex gap-2">
                         <dt className="w-24 text-neutral-500 dark:text-slate-400">Process</dt>
-                        <dd className="capitalize text-neutral-800">{processType}</dd>
+                        <dd className="capitalize text-neutral-800 dark:text-neutral-200">{processType}</dd>
                       </div>
                       <div className="flex gap-2">
                         <dt className="w-24 text-neutral-500 dark:text-slate-400">Goal</dt>
-                        <dd className="line-clamp-3 text-neutral-800">
+                        <dd className="line-clamp-3 text-neutral-800 dark:text-neutral-200">
                           {missionGoal.trim() || 'No mission goal provided'}
                         </dd>
                       </div>
@@ -7070,11 +7151,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {artifactPreview.type === 'code' ? (
-                <pre className="overflow-x-auto rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-800">
+                <pre className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 p-4 text-xs text-neutral-800 dark:text-neutral-200">
                   <code>{artifactPreview.content}</code>
                 </pre>
               ) : (
-                <Markdown className="prose prose-sm max-w-none text-neutral-900 [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-neutral-200 [&_pre]:bg-neutral-50">
+                <Markdown className="prose prose-sm dark:prose-invert max-w-none text-neutral-900 dark:text-neutral-200 [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-neutral-200 dark:[&_pre]:border-neutral-700 [&_pre]:bg-neutral-50 dark:[&_pre]:bg-neutral-800">
                   {artifactPreview.content}
                 </Markdown>
               )}
