@@ -2401,6 +2401,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [selectedAgentId, setSelectedAgentId] = useState<string>()
   const [selectedOutputAgentId, setSelectedOutputAgentId] = useState<string>()
   const [outputPanelVisible, setOutputPanelVisible] = useState(false)
+  const [compactionBanner, setCompactionBanner] = useState<string | null>(null)
   const [boardTasks, _setBoardTasks] = useState<Array<HubTask>>([])
   const [missionTasks, setMissionTasks] = useState<Array<HubTask>>([])
   const [dispatchedTaskIdsByAgent, setDispatchedTaskIdsByAgent] = useState<Record<string, Array<string>>>({})
@@ -2532,6 +2533,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (!member) return
     const cleaned = text.trim()
     if (!cleaned) return
+
+    // ── Content-tail dedup guard ──────────────────────────────────────────
+    // If the tail of the current buffer already ends with this exact text,
+    // skip the append entirely. Prevents duplicate content from multiple
+    // SSE connections (desktop panel + mobile panel + main useEffect).
+    const currentBuffer = agentOutputLinesRef.current[agentId] ?? []
+    const bufferTail = currentBuffer.slice(-10).join('\n')
+    if (bufferTail.length > 0 && cleaned.length > 0) {
+      // Exact tail match — incoming text is already at the end of the buffer
+      if (bufferTail.endsWith(cleaned) || bufferTail === cleaned) return
+      // Or the incoming text ends with the buffer tail (superset — still dup)
+      if (cleaned.length <= bufferTail.length && bufferTail.endsWith(cleaned)) return
+    }
 
     const nextLines = cleaned
       .split(/\r?\n/)
@@ -3073,12 +3087,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const lastAtMap = agentStreamLastAtRef.current
     const currentTeam = teamRef.current
 
-    // Determine which agents are active and have sessions (capped at MAX_AGENT_STREAMS)
+    // Determine which agents have known sessions (capped at MAX_AGENT_STREAMS).
+    // Open the SSE stream as soon as a sessionKey exists — don't gate on
+    // agentSessionStatus being 'active' because agents start as 'spawning'/'ready'
+    // and the stream needs to be open to receive the first events.
     const activeAgentIds = currentTeam
-      .filter((m) => {
-        const status = agentSessionStatus[m.id]
-        return status && status.status === 'active' && agentSessionMap[m.id]
-      })
+      .filter((m) => agentSessionMap[m.id] != null)
       .slice(0, MAX_AGENT_STREAMS)
       .map((m) => m.id)
 
@@ -3122,6 +3136,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             lastEventType: type,
           },
         }))
+        // ── Compaction detection ────────────────────────────────────────
+        const lower = text.toLowerCase()
+        if (lower.includes('compaction') || lower.includes('context compacted') || lower.includes('pre-compaction')) {
+          const agentName = currentTeam.find((m) => m.id === agentId)?.name ?? agentId
+          setCompactionBanner(`Context compacted for ${agentName} — session history summarized`)
+          window.setTimeout(() => setCompactionBanner(null), 8_000)
+        }
       }
 
       source.addEventListener('chunk', (event) => {
@@ -3276,7 +3297,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentSessionStatus, agentSessionMap, captureAgentOutput]) // intentionally omit teamRef (stable ref)
+  }, [agentSessionMap, captureAgentOutput]) // intentionally omit teamRef (stable ref); agentSessionStatus no longer gates stream open
 
   // Stale SSE stream pruner (60s inactivity → close) + unmount cleanup
   useEffect(() => {
@@ -5858,21 +5879,37 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
 	        <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
 	          {/* ── Header ──────────────────────────────────────────────────── */}
-	          <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card,#ffffff)] p-4 shadow-sm dark:bg-[var(--theme-card,#161b27)]">
-	            <div>
-	              <h2 className="text-lg font-bold text-[var(--theme-text)]">Mission Control</h2>
-	              <p className="text-xs text-[var(--theme-text)] opacity-70">Track active runs, review history, and launch new missions</p>
-	            </div>
-	            <div className="flex items-center gap-2">
-	              <button
-	                type="button"
-	                onClick={() => openNewMissionModal()}
+          <div className="flex w-full items-center justify-between gap-3 px-1 py-2">
+            <div>
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Mission Control</h2>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">Track active runs, review history, and launch new missions</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openNewMissionModal()}
                 className="min-h-11 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white hover:bg-accent-600"
               >
                 + New Mission
               </button>
             </div>
           </div>
+
+          {/* ── Compaction Banner ──────────────────────────────────────── */}
+          {compactionBanner && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300">
+              <span className="animate-spin">⚙️</span>
+              <span>{compactionBanner}</span>
+              <button
+                type="button"
+                onClick={() => setCompactionBanner(null)}
+                className="ml-auto text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* ── Filter Bar ──────────────────────────────────────────────── */}
           <div className="flex w-full items-center gap-1 rounded-xl bg-neutral-100 dark:bg-neutral-900/80 dark:border dark:border-neutral-700/50 p-1">
@@ -6846,6 +6883,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 modelId={selectedOutputModelId}
                 statusLabel={selectedOutputStatusLabel}
                 compact
+                externalStream
               />
             </div>
           </div>
@@ -7260,6 +7298,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 onClose={() => setOutputPanelVisible(false)}
                 modelId={selectedOutputModelId}
                 statusLabel={selectedOutputStatusLabel}
+                externalStream
               />
             </div>
           </div>

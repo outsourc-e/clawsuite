@@ -31,6 +31,12 @@ export type AgentOutputPanelProps = {
   statusLabel?: string
   /** Compact mode: no outer border/padding and no internal header. Use inside LiveActivityPanel. */
   compact?: boolean
+  /**
+   * When true, skip opening an internal SSE connection.
+   * The parent component manages the SSE stream to avoid duplicate connections
+   * (triple-subscribe regression). Messages are fed via the shared state instead.
+   */
+  externalStream?: boolean
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -193,6 +199,7 @@ export function AgentOutputPanel({
   modelId,
   statusLabel,
   compact = false,
+  externalStream = false,
 }: AgentOutputPanelProps) {
   const cachedInitial = readCachedSessionState(sessionKey)
   const [messages, setMessages] = useState<OutputMessage[]>(cachedInitial?.messages ?? [])
@@ -247,9 +254,9 @@ export function AgentOutputPanel({
     setStreamReconnectNonce((n) => n + 1)
   }, [])
 
-  // SSE stream consumption
+  // SSE stream consumption — skip when parent manages the stream (externalStream)
   useEffect(() => {
-    if (!sessionKey) return
+    if (!sessionKey || externalStream) return
 
     const source = new EventSource(`/api/chat-events?sessionKey=${encodeURIComponent(sessionKey)}`)
     source.onopen = () => {
@@ -355,7 +362,7 @@ export function AgentOutputPanel({
     return () => {
       source.close()
     }
-  }, [onLine, sessionKey, streamReconnectNonce])
+  }, [onLine, sessionKey, streamReconnectNonce, externalStream])
 
   const inner = (
     <div className="flex min-h-0 flex-1 flex-col">
