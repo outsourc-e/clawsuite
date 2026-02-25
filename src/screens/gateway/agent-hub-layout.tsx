@@ -1029,57 +1029,218 @@ function parseTokenBudget(value: string): number | null {
   return parsed
 }
 
+/** Lines that are metadata / noise — strip from per-agent summaries. */
+const METADATA_LINE_PATTERNS = [
+  /^session ended/i,
+  /^session aborted/i,
+  /^session ended with error/i,
+  /^mission complete\.?$/i,
+  /^\[?TASK_COMPLETE\]?$/i,
+  /^\[?DONE\]?$/i,
+  /^\[?MISSION_COMPLETE\]?$/i,
+  /^task \d+:/i,
+  /^Dispatching to /i,
+  /^Waiting for response/i,
+]
+
+function isMetadataLine(line: string): boolean {
+  const trimmed = line.trim()
+  if (!trimmed) return true
+  return METADATA_LINE_PATTERNS.some((pattern) => pattern.test(trimmed))
+}
+
+/** Strip metadata lines from agent output, preserving markdown formatting. */
+function cleanAgentOutputLines(lines: string[]): string[] {
+  return lines.filter((line) => !isMetadataLine(line))
+}
+
+/**
+ * Smart truncation: if content exceeds maxWords, keep intro + conclusion with "..." in middle.
+ */
+function smartTruncate(lines: string[], maxWords = 500): string[] {
+  const fullText = lines.join('\n')
+  const wc = fullText.split(/\s+/).filter(Boolean).length
+  if (wc <= maxWords) return lines
+
+  // Keep first ~40% and last ~40% of lines
+  const keepHead = Math.max(3, Math.floor(lines.length * 0.4))
+  const keepTail = Math.max(3, Math.floor(lines.length * 0.4))
+  const head = lines.slice(0, keepHead)
+  const tail = lines.slice(-keepTail)
+  return [...head, '', '...*(truncated — full output was ~' + wc + ' words)*...', '', ...tail]
+}
+
+/**
+ * Auto-detect artifacts from agent output text.
+ * Finds: fenced code blocks, URLs, markdown tables.
+ */
+function detectArtifactsFromText(params: {
+  agentId: string
+  agentName: string
+  lines: string[]
+}): MissionArtifact[] {
+  const { agentId, agentName, lines } = params
+  const text = lines.join('\n')
+  const artifacts: MissionArtifact[] = []
+  const timestamp = Date.now()
+
+  // Code blocks (``` fenced)
+  const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g
+  for (const match of text.matchAll(codeBlockRegex)) {
+    const lang = (match[1] ?? '').trim() || 'code'
+    const content = (match[2] ?? '').trim()
+    if (!content || content.length < 10) continue
+    const preview = content.split('\n')[0]?.slice(0, 40) ?? 'code block'
+    artifacts.push({
+      id: createTaskId(),
+      agentId,
+      agentName,
+      type: 'code',
+      title: `${lang}: ${preview}`,
+      content,
+      timestamp,
+    })
+  }
+
+  // URLs
+  const urlRegex = /https?:\/\/[^\s)<>"]+/g
+  const seenUrls = new Set<string>()
+  for (const match of text.matchAll(urlRegex)) {
+    const url = match[0].replace(/[.,;:!?)]+$/, '')
+    if (seenUrls.has(url)) continue
+    seenUrls.add(url)
+    artifacts.push({
+      id: createTaskId(),
+      agentId,
+      agentName,
+      type: 'text',
+      title: url.length > 60 ? `${url.slice(0, 57)}…` : url,
+      content: url,
+      timestamp,
+    })
+  }
+
+  // Markdown tables (lines starting with |)
+  const tableLines: string[] = []
+  let inTable = false
+  for (const line of lines) {
+    if (/^\|/.test(line.trim())) {
+      inTable = true
+      tableLines.push(line)
+    } else if (inTable) {
+      // End of table
+      if (tableLines.length >= 3) {
+        artifacts.push({
+          id: createTaskId(),
+          agentId,
+          agentName,
+          type: 'text',
+          title: `Table (${tableLines.length - 1} rows)`,
+          content: tableLines.join('\n'),
+          timestamp,
+        })
+      }
+      tableLines.length = 0
+      inTable = false
+    }
+  }
+  // Flush final table
+  if (inTable && tableLines.length >= 3) {
+    artifacts.push({
+      id: createTaskId(),
+      agentId,
+      agentName,
+      type: 'text',
+      title: `Table (${tableLines.length - 1} rows)`,
+      content: tableLines.join('\n'),
+      timestamp,
+    })
+  }
+
+  return artifacts
+}
+
 function generateMissionReport(payload: MissionReportPayload): string {
   const durationMs = Math.max(0, payload.completedAt - payload.startedAt)
   const taskStats = computeMissionTaskStats(payload.tasks)
   const costEstimate = estimateMissionCost(payload.tokenCount)
   const lines: string[] = []
 
+  // Clean goal text — strip leading "Mission" if duplicated
+  const rawGoal = payload.goal || 'Untitled mission'
+  const cleanGoal = rawGoal.replace(/^Mission\s+/i, '').trim() || rawGoal
+
   lines.push('# Mission Report')
   lines.push('')
-  lines.push(`## Mission`)
-  lines.push(`- Goal: ${payload.goal || 'Untitled mission'}`)
-  lines.push(`- Team: ${payload.teamName}`)
-  lines.push(`- Started: ${new Date(payload.startedAt).toLocaleString()}`)
-  lines.push(`- Completed: ${new Date(payload.completedAt).toLocaleString()}`)
-  lines.push(`- Duration: ${formatDuration(durationMs)}`)
+  lines.push(`**Goal:** ${cleanGoal}`)
+  lines.push(`**Team:** ${payload.teamName}`)
+  lines.push(`**Started:** ${new Date(payload.startedAt).toLocaleString()}`)
+  lines.push(`**Completed:** ${new Date(payload.completedAt).toLocaleString()}`)
+  lines.push(`**Duration:** ${formatDuration(durationMs)}`)
   lines.push('')
   lines.push('## Team')
   if (payload.team.length === 0) {
     lines.push('- No agents')
   } else {
     payload.team.forEach((member) => {
-      lines.push(`- ${member.name} (${member.modelId})`)
+      lines.push(`- **${member.name}** — ${member.modelId}`)
     })
   }
   lines.push('')
   lines.push('## Tasks')
   lines.push(`- Total: ${taskStats.total}`)
   lines.push(`- Completed: ${taskStats.completed}`)
-  lines.push(`- Failed: ${taskStats.failed}`)
+  if (taskStats.failed > 0) lines.push(`- Failed: ${taskStats.failed}`)
   lines.push('')
+
+  // Collect auto-detected artifacts from agent output
+  const autoDetectedArtifacts: MissionArtifact[] = []
+
   lines.push('## Per-Agent Summary')
   if (payload.agentSummaries.length === 0) {
-    lines.push('- No agent output captured')
+    lines.push('*No agent output captured*')
   } else {
     payload.agentSummaries.forEach((summary) => {
       lines.push(`### ${summary.agentName} (${summary.modelId || 'unknown'})`)
-      if (summary.lines.length === 0) {
-        lines.push('- No output captured')
+      const cleanedLines = cleanAgentOutputLines(summary.lines)
+      if (cleanedLines.length === 0) {
+        lines.push('*No output captured*')
       } else {
-        summary.lines.forEach((line) => {
-          lines.push(`- ${line}`)
+        const truncated = smartTruncate(cleanedLines)
+        // Render as markdown content (preserve formatting)
+        truncated.forEach((line) => {
+          lines.push(line)
         })
       }
       lines.push('')
+
+      // Auto-detect artifacts from this agent's output
+      const detectedFromAgent = detectArtifactsFromText({
+        agentId: summary.agentId,
+        agentName: summary.agentName,
+        lines: cleanedLines,
+      })
+      autoDetectedArtifacts.push(...detectedFromAgent)
     })
   }
+
+  // Merge explicit artifacts + auto-detected (deduped by title)
+  const allArtifacts = [...payload.artifacts]
+  const existingTitles = new Set(allArtifacts.map((a) => a.title.toLowerCase()))
+  autoDetectedArtifacts.forEach((a) => {
+    if (!existingTitles.has(a.title.toLowerCase())) {
+      existingTitles.add(a.title.toLowerCase())
+      allArtifacts.push(a)
+    }
+  })
+
   lines.push('## Artifacts')
-  if (payload.artifacts.length === 0) {
-    lines.push('- None')
+  if (allArtifacts.length === 0) {
+    lines.push('*None*')
   } else {
-    payload.artifacts.forEach((artifact) => {
-      lines.push(`- ${artifact.title} [${artifact.type}] by ${artifact.agentName}`)
+    allArtifacts.forEach((artifact) => {
+      const typeEmoji = artifact.type === 'code' ? '📄' : artifact.type === 'html' ? '🌐' : '📝'
+      lines.push(`- ${typeEmoji} **${artifact.title}** [${artifact.type}] — ${artifact.agentName}`)
     })
   }
   lines.push('')
@@ -2324,14 +2485,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (nextLines.length > 0) {
       const current = agentOutputLinesRef.current[agentId] ?? []
       // Deduplicate: skip lines already present in the tail of the current buffer
-      const existingSet = new Set(current.slice(-8))
+      const existingSet = new Set(current.slice(-20))
       const freshLines = nextLines.filter((line) => !existingSet.has(line))
       if (freshLines.length === 0) return
 
-      agentOutputLinesRef.current[agentId] = [...current, ...freshLines].slice(-8)
+      agentOutputLinesRef.current[agentId] = [...current, ...freshLines].slice(-200)
       setAgentOutputLines((prev) => ({
         ...prev,
-        [agentId]: [...(prev[agentId] ?? []), ...freshLines].slice(-8),
+        [agentId]: [...(prev[agentId] ?? []), ...freshLines].slice(-200),
       }))
     }
 
@@ -2359,7 +2520,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       agentId: member.id,
       agentName: member.name,
       modelId: member.modelId,
-      lines: (agentOutputLinesRef.current[member.id] ?? []).slice(-20),
+      lines: agentOutputLinesRef.current[member.id] ?? [],
     }))
     const resolvedTemplate = resolveActiveTemplate(teamSnapshot)
     const teamName = resolvedTemplate ? TEMPLATE_DISPLAY_NAMES[resolvedTemplate] : `Custom Team (${teamSnapshot.length})`
@@ -3994,6 +4155,24 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (previous === 'running' && missionState === 'stopped') {
       const snapshot = missionCompletionSnapshotRef.current
       if (snapshot && lastReportedMissionIdRef.current !== snapshot.missionId) {
+        // Auto-detect artifacts from agent output before generating report
+        const autoDetected: MissionArtifact[] = []
+        const existingTitles = new Set(snapshot.artifacts.map((a) => a.title.toLowerCase()))
+        snapshot.agentSummaries.forEach((summary) => {
+          const cleanedLines = cleanAgentOutputLines(summary.lines)
+          detectArtifactsFromText({
+            agentId: summary.agentId,
+            agentName: summary.agentName,
+            lines: cleanedLines,
+          }).forEach((a) => {
+            if (!existingTitles.has(a.title.toLowerCase())) {
+              existingTitles.add(a.title.toLowerCase())
+              autoDetected.push(a)
+            }
+          })
+        })
+        const allArtifacts = [...snapshot.artifacts, ...autoDetected]
+
         const reportText = generateMissionReport(snapshot)
         const taskStats = computeMissionTaskStats(snapshot.tasks)
         const duration = Math.max(0, snapshot.completedAt - snapshot.startedAt)
@@ -4012,7 +4191,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           duration,
           tokenCount: snapshot.tokenCount,
           costEstimate,
-          artifacts: snapshot.artifacts,
+          artifacts: allArtifacts,
           report: reportText,
           completedAt: snapshot.completedAt,
         }

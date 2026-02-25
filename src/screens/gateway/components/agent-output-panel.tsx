@@ -501,7 +501,7 @@ export function AgentOutputPanel({
             {agentName}
           </h3>
           {modelId ? (
-            <span className="shrink-0 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-0.5 font-mono text-[10px] font-semibold text-neutral-700">
+            <span className="shrink-0 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-0.5 font-mono text-[10px] font-semibold text-neutral-400">
               {modelId}
             </span>
           ) : null}
@@ -514,7 +514,7 @@ export function AgentOutputPanel({
                   ? 'border-amber-200 bg-amber-50 text-amber-700'
                 : headerStatus === 'Streaming'
                     ? 'border-sky-200 bg-sky-50 text-sky-700'
-                    : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-neutral-700',
+                    : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-neutral-400',
             )}
           >
             {headerStatus}
