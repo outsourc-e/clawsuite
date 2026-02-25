@@ -1576,8 +1576,8 @@ function getAgentStatusMeta(status: AgentWorkingStatus): {
     case 'paused':
       return {
         label: 'Paused',
-        className: 'text-amber-700',
-        dotClassName: 'bg-amber-500',
+        className: 'text-blue-600',
+        dotClassName: 'bg-blue-400',
       }
     case 'waiting_for_input':
       return {
