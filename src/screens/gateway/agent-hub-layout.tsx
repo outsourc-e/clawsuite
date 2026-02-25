@@ -4931,13 +4931,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 />
                 <button
                   type="button"
-                  disabled={!missionGoal.trim()}
-                  onClick={() => {
-                    if (missionGoal.trim()) {
-                      openNewMissionModal({ goal: missionGoal.trim() })
-                    }
-                  }}
-                  className="shrink-0 rounded-lg bg-accent-500 px-4 py-2 text-xs font-semibold text-white hover:bg-accent-600 disabled:opacity-40 transition-colors"
+                  onClick={() => openNewMissionModal(missionGoal.trim() ? { goal: missionGoal.trim() } : undefined)}
+                  className="shrink-0 rounded-lg bg-accent-500 px-4 py-2 text-xs font-semibold text-white hover:bg-accent-600 transition-colors"
                 >
                   Launch
                 </button>
@@ -6714,7 +6709,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     <AgentHubErrorBoundary>
     <div className="flex h-full min-h-0 flex-col bg-white dark:bg-[var(--theme-bg,#0b0e14)]">
       {/* ── Brand top accent border ──────────────────────────────────────── */}
-      <div className="h-[2px] w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
+      <div className="shrink-0 px-3 sm:px-4">
+        <div className="mx-auto h-[2px] w-full max-w-[1600px] bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400" />
+      </div>
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div
