@@ -8,19 +8,11 @@ type DispatchGatewayResponse = {
   runId?: string
 }
 
-type SessionsPatchResponse = {
-  ok?: boolean
-}
-
 async function dispatchViaGateway(payload: {
   sessionKey: string
   message: string
   idempotencyKey: string
 }) {
-  await gatewayRpc<SessionsPatchResponse>('sessions.patch', {
-    key: payload.sessionKey,
-  })
-
   return gatewayRpc<DispatchGatewayResponse>('sessions.send', {
     sessionKey: payload.sessionKey,
     message: payload.message,
