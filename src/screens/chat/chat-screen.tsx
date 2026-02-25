@@ -249,6 +249,9 @@ export function ChatScreen({
 
   const pendingStartRef = useRef(false)
   const composerHandleRef = useRef<ChatComposerHandle | null>(null)
+  // BUG-4: idempotency guard — prevents duplicate sends on paste/attach double-fire
+  const lastSendKeyRef = useRef('')
+  const lastSendAtRef = useRef(0)
   const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
     const stored = localStorage.getItem('clawsuite-file-explorer-collapsed')
@@ -1448,6 +1451,16 @@ export function ChatScreen({
     ) => {
       const trimmedBody = body.trim()
       if (trimmedBody.length === 0 && attachments.length === 0) return
+
+      // BUG-4 fix: idempotency guard — deduplicate sends with identical content
+      // within a 500ms window. This prevents double-fire from paste events that
+      // simultaneously trigger onChange + onSubmit, or events that bubble twice.
+      const sendKey = `${trimmedBody}|${attachments.map((a) => `${a.name}:${a.size}`).join(',')}`
+      const now = Date.now()
+      if (sendKey === lastSendKeyRef.current && now - lastSendAtRef.current < 500) return
+      lastSendKeyRef.current = sendKey
+      lastSendAtRef.current = now
+
       helpers.reset()
 
       const attachmentPayload: Array<GatewayAttachment> = attachments.map(

@@ -4953,7 +4953,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
         <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-[1600px] flex-1 min-h-0 px-3 sm:px-4 flex flex-col">
-          <div className="flex-1 min-h-[420px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
+          {/* Desktop: isometric office view */}
+          <div className="hidden sm:flex flex-1 min-h-[420px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
@@ -4974,6 +4975,86 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               processType={processType}
               containerHeight={520}
             />
+          </div>
+
+          {/* Mobile: agent status cards grid (replaces isometric canvas) */}
+          <div className="flex sm:hidden flex-col gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+                {agentWorkingRows.length} agent{agentWorkingRows.length !== 1 ? 's' : ''}
+                {isMissionRunning && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 normal-case font-medium">
+                    <span className="relative flex size-1.5">
+                      <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+                      <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                    </span>
+                    Mission Active
+                  </span>
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={() => openNewMissionModal()}
+                className="rounded-lg bg-accent-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-accent-600 transition-colors"
+              >
+                + Mission
+              </button>
+            </div>
+            {agentWorkingRows.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <span className="text-3xl">🏢</span>
+                <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">No agents active</p>
+                <p className="text-xs text-neutral-400">Configure a team and launch a mission</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {agentWorkingRows.map((row, idx) => {
+                  const accent = AGENT_ACCENT_COLORS[idx % AGENT_ACCENT_COLORS.length]
+                  const statusMeta = getAgentStatusMeta(row.status)
+                  return (
+                    <button
+                      key={row.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedOutputAgentId(row.id)
+                        setOutputPanelVisible(true)
+                      }}
+                      className="flex flex-col gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 p-3 text-left transition-all hover:border-orange-200 hover:shadow-sm active:scale-[0.98]"
+                    >
+                      {/* Top accent bar */}
+                      <div className={cn('h-[3px] w-full rounded-full', accent.bar)} />
+                      {/* Avatar + status dot */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className={cn('flex size-8 items-center justify-center rounded-full', accent.avatar)}>
+                          <AgentAvatar index={idx} color={accent.hex} size={20} />
+                        </div>
+                        <span className={cn(
+                          'size-2 rounded-full',
+                          statusMeta.dotClassName,
+                          statusMeta.pulse && 'animate-pulse',
+                        )} />
+                      </div>
+                      {/* Name */}
+                      <p className="truncate text-xs font-semibold text-neutral-900 dark:text-white">{row.name}</p>
+                      {/* Status */}
+                      <p className={cn('text-[10px] font-medium', statusMeta.className)}>
+                        {statusMeta.label}
+                      </p>
+                      {/* Current task */}
+                      {row.currentTask ? (
+                        <p className="line-clamp-2 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono leading-relaxed">
+                          {row.currentTask}
+                        </p>
+                      ) : row.lastLine ? (
+                        <p className="line-clamp-2 text-[10px] text-neutral-400 dark:text-neutral-500 font-mono leading-relaxed">
+                          {row.lastLine}
+                        </p>
+                      ) : null}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 
