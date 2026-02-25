@@ -2158,6 +2158,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const [missionHistory, setMissionHistory] = useState<MissionCheckpoint[]>(() => loadMissionHistory())
   const [artifactPreview, setArtifactPreview] = useState<MissionArtifact | null>(null)
   const [selectedReport, setSelectedReport] = useState<StoredMissionReport | null>(null)
+  const [completionReportVisible, setCompletionReportVisible] = useState(false)
+  const [completionReport, setCompletionReport] = useState<StoredMissionReport | null>(null)
   const [missionTokenCount, setMissionTokenCount] = useState(0)
   const [pausedByAgentId, setPausedByAgentId] = useState<Record<string, boolean>>({})
   const [steerAgentId, setSteerAgentId] = useState<string | null>(null)
@@ -3898,6 +3900,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         }
         setMissionReports(saveStoredMissionReport(record))
         lastReportedMissionIdRef.current = snapshot.missionId
+        // Auto-show completion report modal
+        setCompletionReport(record)
+        setCompletionReportVisible(true)
+        // Switch to missions tab / history so user sees the result
+        setActiveTab('missions')
+        setMissionSubTab('history')
       }
       missionCompletionSnapshotRef.current = null
       // Reload mission history to pick up any new checkpoints
@@ -4198,8 +4206,48 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
         </div>
 
+          {/* ── Quick Launch Bar ── */}
+          {!missionActive && (
+            <div className="relative mx-auto mt-6 w-full max-w-7xl shrink-0 px-3 sm:px-4">
+              <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[var(--theme-card,#161b27)] p-3 shadow-sm">
+                <span className="text-xl">🚀</span>
+                <input
+                  type="text"
+                  value={missionGoal}
+                  onChange={(e) => setMissionGoal(e.target.value)}
+                  placeholder="What should your agents work on?"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && missionGoal.trim()) {
+                      setActiveTab('missions')
+                      setMissionSubTab('overview')
+                      window.setTimeout(() => handleCreateMissionRef.current(), 0)
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!missionGoal.trim()}
+                  onClick={() => {
+                    if (missionGoal.trim()) {
+                      handleCreateMissionRef.current()
+                    }
+                  }}
+                  className="shrink-0 rounded-lg bg-accent-500 px-4 py-2 text-xs font-semibold text-white hover:bg-accent-600 disabled:opacity-40 transition-colors"
+                >
+                  Launch
+                </button>
+                {suggestedTemplateName && (
+                  <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-2.5 py-1 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+                    Suggested: {suggestedTemplateName}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── 3-card row — shrink-0, anchored at bottom ── */}
-          <section className="relative mx-auto mb-4 mt-8 w-full max-w-7xl shrink-0 grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
+          <section className="relative mx-auto mb-4 mt-4 w-full max-w-7xl shrink-0 grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
@@ -5423,7 +5471,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <button
                       type="button"
                       onClick={() => setMissionSubTab('active')}
-                      className="mt-4 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-medium text-red-600"
+                      className="mt-4 rounded-lg bg-accent-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-600 transition-colors"
                     >
                       View Active Mission →
                     </button>
@@ -5431,16 +5479,31 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 ) : (
                   <section className={cn('flex min-h-[200px] items-center justify-center p-12 text-center', missionCardCls)}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
-                    <div>
-                      <p className="text-base font-semibold text-neutral-900 dark:text-neutral-100">No active mission</p>
-                      <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Launch a mission to view live timeline activity.</p>
+                    <div className="max-w-md">
+                      <span className="text-3xl">🚀</span>
+                      <p className="mt-2 text-base font-semibold text-neutral-900 dark:text-neutral-100">Ready to launch</p>
+                      <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Start a mission to coordinate your AI agents on a goal.</p>
                       <button
                         type="button"
                         onClick={() => openNewMissionModal()}
-                        className="mt-4 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white hover:bg-accent-600"
+                        className="mt-4 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-600 transition-colors shadow-sm"
                       >
                         + New Mission
                       </button>
+                      {EXAMPLE_MISSIONS.length > 0 && (
+                        <div className="mt-4 flex flex-wrap justify-center gap-2">
+                          {EXAMPLE_MISSIONS.map((ex) => (
+                            <button
+                              key={ex.label}
+                              type="button"
+                              onClick={() => openNewMissionModal({ goal: ex.text, name: ex.label })}
+                              className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3 py-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:border-accent-400 hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
+                            >
+                              {ex.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </section>
                 )}
@@ -5582,14 +5645,79 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </div>
                   </section>
 
+                  {/* ── Inline Agent Output Feed ─────────────────────────── */}
                   <section className={missionCardCls}>
                     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-base font-bold text-neutral-900 dark:text-neutral-100">Live Feed</p>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Last 5 events</p>
+                        <p className="text-base font-bold text-neutral-900 dark:text-neutral-100">Agent Output</p>
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Live streaming output from all agents</p>
                       </div>
-                      <button type="button" className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm text-neutral-600">View All</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOutputPanelVisible(true)
+                          if (!selectedOutputAgentId && team.length > 0) {
+                            setSelectedOutputAgentId(team[0].id)
+                          }
+                        }}
+                        className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        Expand ↗
+                      </button>
+                    </div>
+                    <div className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 divide-y divide-neutral-100 dark:divide-neutral-700/50">
+                      {agentWorkingRows.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-sm text-neutral-400">Waiting for agents to start...</div>
+                      ) : (
+                        agentWorkingRows.map((row) => {
+                          const lines = agentOutputLines[row.id] ?? []
+                          const statusMeta = getAgentStatusMeta(row.status)
+                          return (
+                            <div key={row.id} className="px-4 py-3">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className={cn('size-2 shrink-0 rounded-full', statusMeta.dotClassName, statusMeta.pulse && 'animate-pulse')} />
+                                <span className="text-xs font-semibold text-neutral-900 dark:text-white">{row.name}</span>
+                                <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-semibold', statusMeta.className)}>
+                                  {row.status}
+                                </span>
+                                {row.currentTask && (
+                                  <span className="ml-auto truncate text-[10px] text-neutral-400 max-w-[200px]">
+                                    📋 {row.currentTask}
+                                  </span>
+                                )}
+                              </div>
+                              {lines.length > 0 ? (
+                                <div className="ml-4 space-y-0.5 font-mono text-[11px] leading-relaxed text-neutral-600 dark:text-slate-400">
+                                  {lines.slice(-4).map((line, idx) => (
+                                    <p key={idx} className="truncate">{line}</p>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="ml-4 text-[11px] text-neutral-400 italic">No output yet</p>
+                              )}
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </section>
+
+                  {/* ── Live Event Feed ──────────────────────────────────── */}
+                  <section className={missionCardCls}>
+                    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-base font-bold text-neutral-900 dark:text-neutral-100">Event Log</p>
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400">System events and activity</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setLiveFeedVisible(true)}
+                        className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        View All
+                      </button>
                     </div>
                     <div className="mt-3 h-56 overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700">
                       <LiveFeedPanel />
@@ -5612,33 +5740,47 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {historyCards.map((entry) => (
+                  {historyCards.map((entry) => {
+                    const matchingReport = missionReports.find((r) => r.id === entry.id)
+                    return (
                     <div key={entry.id} className={missionCardCls}>
                       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                       <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{entry.title}</p>
                           <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{entry.subtitle}</p>
                         </div>
                         <span className={cn(
-                          'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
-                          entry.status === 'done' && 'bg-emerald-100 text-emerald-700',
-                          entry.status === 'aborted' && 'bg-red-100 text-red-700',
-                          entry.status === 'partial' && 'bg-amber-100 text-amber-700',
+                          'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
+                          entry.status === 'done' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+                          entry.status === 'aborted' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+                          entry.status === 'partial' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
                         )}>
                           {entry.status}
                         </span>
                       </div>
                       <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">Updated {timeAgoFromMs(entry.updatedAt)}</p>
-                      <button
-                        type="button"
-                        onClick={() => openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal })}
-                        className="mt-3 rounded-md border border-accent-200 bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-700 hover:bg-accent-100"
-                      >
-                        Re-run
-                      </button>
+                      <div className="mt-3 flex gap-2">
+                        {matchingReport ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedReport(matchingReport)}
+                            className="rounded-md bg-accent-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-accent-600 transition-colors"
+                          >
+                            View Report
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal })}
+                          className="rounded-md border border-accent-200 dark:border-accent-800/50 bg-accent-50 dark:bg-accent-900/20 px-2.5 py-1 text-xs font-medium text-accent-700 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900/40 transition-colors"
+                        >
+                          Re-run
+                        </button>
+                      </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
             ) : null}
@@ -6943,6 +7085,186 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
       </div>
     </div>
+    {/* ── Mission Completion Report Modal ─────────────────────────────── */}
+    {completionReportVisible && completionReport ? (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        onClick={() => setCompletionReportVisible(false)}
+      >
+        <div
+          className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden border border-neutral-200 dark:border-slate-700"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Celebratory accent */}
+          <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 shrink-0" />
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-6 py-4 shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-2xl">✅</span>
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-neutral-900 dark:text-white truncate">
+                  Mission Complete
+                </h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                  {completionReport.name || completionReport.goal}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCompletionReportVisible(false)}
+              className="flex size-8 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          {/* Stats row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-4 border-b border-neutral-200 dark:border-neutral-700 shrink-0">
+            {[
+              { label: 'Duration', value: formatDuration(completionReport.duration) },
+              { label: 'Tasks', value: `${completionReport.taskStats.completed}/${completionReport.taskStats.total}` },
+              { label: 'Tokens', value: completionReport.tokenCount.toLocaleString() },
+              { label: 'Est. Cost', value: `$${completionReport.costEstimate.toFixed(2)}` },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-3 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{label}</p>
+                <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+          {/* Agents used */}
+          {completionReport.agents.length > 0 && (
+            <div className="px-6 pt-4 shrink-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400 mb-2">Agents Used</p>
+              <div className="flex flex-wrap gap-1.5">
+                {completionReport.agents.map((agent) => (
+                  <span key={agent.id} className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                    {agent.name}
+                    <span className="text-[9px] text-neutral-400">· {getModelDisplayLabel(agent.modelId)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Report body */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <Markdown>{completionReport.report}</Markdown>
+            </div>
+          </div>
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 border-t border-neutral-200 dark:border-neutral-700 px-6 py-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setCompletionReportVisible(false)
+                setSelectedReport(completionReport)
+              }}
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+            >
+              View in History
+            </button>
+            <button
+              type="button"
+              onClick={() => setCompletionReportVisible(false)}
+              className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+
+    {/* ── Selected Report Detail Modal (from History) ─────────────────── */}
+    {selectedReport ? (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        onClick={() => setSelectedReport(null)}
+      >
+        <div
+          className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden border border-neutral-200 dark:border-slate-700"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400 shrink-0" />
+          <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-6 py-4 shrink-0">
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white truncate">
+                {selectedReport.name || selectedReport.goal}
+              </h2>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                {selectedReport.teamName} · {new Date(selectedReport.completedAt).toLocaleDateString()}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedReport(null)}
+              className="flex size-8 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-4 border-b border-neutral-200 dark:border-neutral-700 shrink-0">
+            {[
+              { label: 'Duration', value: formatDuration(selectedReport.duration) },
+              { label: 'Tasks', value: `${selectedReport.taskStats.completed}/${selectedReport.taskStats.total}` },
+              { label: 'Tokens', value: selectedReport.tokenCount.toLocaleString() },
+              { label: 'Est. Cost', value: `$${selectedReport.costEstimate.toFixed(2)}` },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-3 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{label}</p>
+                <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+          {selectedReport.agents.length > 0 && (
+            <div className="px-6 pt-4 shrink-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400 mb-2">Agents</p>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedReport.agents.map((agent) => (
+                  <span key={agent.id} className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                    {agent.name}
+                    <span className="text-[9px] text-neutral-400">· {getModelDisplayLabel(agent.modelId)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {selectedReport.artifacts.length > 0 && (
+            <div className="px-6 pt-3 shrink-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400 mb-2">Artifacts</p>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedReport.artifacts.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => setArtifactPreview(a)}
+                    className="inline-flex items-center gap-1 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 hover:border-accent-300 transition-colors"
+                  >
+                    {a.type === 'code' ? '📄' : a.type === 'html' ? '🌐' : '📝'} {a.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <Markdown>{selectedReport.report}</Markdown>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 border-t border-neutral-200 dark:border-neutral-700 px-6 py-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setSelectedReport(null)}
+              className="rounded-lg bg-accent-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent-600 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+
     </AgentHubErrorBoundary>
   )
 }
