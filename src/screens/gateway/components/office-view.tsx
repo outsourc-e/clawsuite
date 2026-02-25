@@ -576,7 +576,7 @@ export function OfficeView({
           )}
         </div>
       </div>
-      <div className={cn('relative hidden flex-1 overflow-hidden md:flex', !compact && 'min-h-[440px]')}>
+      <div className={cn('relative hidden flex-1 md:flex', !compact && 'min-h-[440px]')}>
         <style>{`
           @keyframes office-idle-float {
             0%, 100% { transform: translateY(-3px); }
@@ -634,7 +634,7 @@ export function OfficeView({
         <svg
           viewBox={`0 0 ${sceneW} ${sceneH}`}
           className="absolute inset-0 h-full w-full"
-          preserveAspectRatio="xMidYMid meet"
+          preserveAspectRatio="xMidYMid slice"
           aria-hidden
         >
           {/* Floor zones */}

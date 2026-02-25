@@ -4962,12 +4962,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="relative flex flex-col h-full min-h-0 bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex flex-col h-full min-h-0 bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
         <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-[1600px] flex-1 min-h-0 px-3 sm:px-4 flex flex-col">
           {/* Desktop: isometric office view — fixed aspect ratio, no overflow */}
-          <div className="hidden sm:flex flex-1 min-h-[380px] max-h-[600px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm" style={{ aspectRatio: '16/9' }}>
+          <div className="hidden sm:flex flex-1 min-h-[380px] overflow-visible rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm" style={{ aspectRatio: '16/9' }}>
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
@@ -5345,12 +5345,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   function renderConfigureContent() {
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 p-4 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex h-full min-h-0 flex-col bg-primary-100/45 p-4 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-4">
 
         {/* ── Header + horizontal pill tabs ── */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
           <div>
             <h2 className="text-lg font-bold text-neutral-900 dark:text-white">Settings</h2>
             <p className="text-xs text-neutral-500 dark:text-slate-400">Configure agents, teams, API keys, and approvals</p>
@@ -5399,7 +5399,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div className="min-w-0 overflow-y-auto">
           {configSection === 'agents' ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
                 <div>
                   <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Configured Agents</h2>
                   <p className="text-xs text-neutral-500 dark:text-slate-400">
@@ -5425,7 +5425,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 return (
                   <div
                     key={member.id}
-                    className={cn('relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md cursor-default', ac.border, !isInActiveTeam && 'opacity-60')}
+                    className={cn('relative rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60 transition-all hover:shadow-md cursor-default', !isInActiveTeam && 'opacity-60')}
                   >
                     {/* Top-right action: edit if in team, add-to-team if not */}
                     {isInActiveTeam ? (
@@ -5617,7 +5617,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               {/* Saved team configs */}
               <div>
-                <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center justify-between gap-3 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
                   <div>
                     <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">My Teams</h2>
                     <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{teamConfigs.length} saved · {team.length} agents active</p>
@@ -5986,7 +5986,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
               {/* Connected providers section */}
               <div>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
                   <div>
                     <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Connected Providers</h2>
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{configuredProviders.length} active · {gatewayModels.length} models available</p>
@@ -6229,13 +6229,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: 'Failed' },
     }
 
-	    const missionCardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm'
+	    const missionCardCls = 'relative overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 p-4'
 	    return (
-	      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-neutral-950">
+	      <div className="relative flex h-full min-h-0 flex-col bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
 	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
 	        <div className="relative mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
 	          {/* ── Header ──────────────────────────────────────────────────── */}
-          <div className="flex w-full items-center justify-between gap-3 px-1 py-2">
+          <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
             <div>
               <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Mission Control</h2>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">Track active runs, review history, and launch new missions</p>
@@ -6800,17 +6800,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   return (
     <AgentHubErrorBoundary>
-    <div className="flex h-full min-h-0 flex-col bg-white dark:bg-[var(--theme-bg,#0b0e14)]">
+    <div className="flex h-full min-h-0 flex-col bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
       {/* ── Header — matches dashboard card style ─────────────────────────── */}
       <div className="shrink-0 px-3 pt-3 sm:px-4 sm:pt-4">
         <div className="mx-auto w-full max-w-[1600px]">
           <header
-            className={cn(
-              'relative z-20 overflow-hidden rounded-xl border border-primary-200 px-3 py-2 shadow-sm dark:border-slate-700 md:px-5 md:py-3',
-              isMobileHub
-                ? 'bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:bg-slate-900/70'
-                : 'bg-primary-50/95 dark:bg-[var(--theme-panel,#111520)]',
-            )}
+            className="relative z-20 mb-3 overflow-hidden rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel,#111520)] md:mb-5 md:px-5 md:py-3"
           >
             {/* Orange top accent — inside the card, flush with rounded corners */}
             <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400" />
@@ -6883,19 +6878,19 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         {/* ── Tab content area ── */}
         <div className="min-w-0 flex-1 overflow-hidden">
           {activeTab === 'overview' && (
-            <div className="h-full min-h-0 bg-white">
+            <div className="h-full min-h-0">
               {renderOverviewContent()}
             </div>
           )}
 
           {activeTab === 'configure' && (
-            <div className="h-full min-h-0 bg-white">
+            <div className="h-full min-h-0">
               {renderConfigureContent()}
             </div>
           )}
 
           {activeTab === 'missions' && (
-            <div className="h-full min-h-0 bg-white">
+            <div className="h-full min-h-0">
               {renderMissionsTabContent()}
             </div>
           )}
