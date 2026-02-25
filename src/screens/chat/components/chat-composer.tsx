@@ -1401,12 +1401,12 @@ function ChatComposerComponent({
   return (
     <div
       className={cn(
-        'no-swipe pointer-events-auto mx-auto w-full bg-surface px-3 pt-2 sm:px-5 touch-manipulation',
+        'no-swipe pointer-events-auto mx-auto w-full bg-[var(--theme-card)] px-3 pt-2 sm:px-5 touch-manipulation',
         isMobileViewport
           ? 'fixed inset-x-0 bottom-0 z-[70] transition-transform duration-200'
           : 'relative z-40 shrink-0',
         'pb-[max(var(--safe-b),0px)] md:pb-[calc(var(--safe-b)+0.75rem)]',
-        'md:bg-surface/95 md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
+        'md:bg-[var(--theme-bg)] md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
       )}
       style={composerWrapperStyle}
       ref={setWrapperRefs}
@@ -1428,7 +1428,7 @@ function ChatComposerComponent({
         className={cn(
           'relative z-50 transition-all duration-300',
           isDraggingOver &&
-            'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
+            'outline-primary-500 ring-2 ring-[var(--theme-border)] bg-[var(--theme-bg)]',
           isLoading &&
             'ring-2 ring-accent-400/50 shadow-[0_0_15px_rgba(249,115,22,0.15)]',
         )}
