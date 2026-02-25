@@ -897,7 +897,7 @@ function ChatSidebarComponent({
     },
   ]
 
-  // Auto-expand sections if any child route is active
+  // Auto-expand mobile System section if any child route is active.
   const mobileSystemLabels = [
     'Files',
     'Memory',
@@ -911,9 +911,7 @@ function ChatSidebarComponent({
   const mobileSecondarySuite = mobileSystemLabels
     .map((label) => suiteItems.find((item) => item.label === label))
     .filter((item): item is NavItemDef => Boolean(item))
-  const isAnySuiteActive = suiteItems.some((i) => i.active)
   const isAnySystemActive = mobileSecondarySuite.some((item) => item.active)
-  const isAnyGatewayActive = gatewayItems.some((i) => i.active)
 
   return (
     <motion.aside
@@ -1054,12 +1052,12 @@ function ChatSidebarComponent({
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 collapsible
-                expanded={suiteExpanded || isAnySuiteActive}
+                expanded={suiteExpanded}
                 onToggle={toggleSuite}
                 navigateTo={suiteNav}
               />
               <CollapsibleSection
-                expanded={suiteExpanded || isAnySuiteActive || isCollapsed}
+                expanded={suiteExpanded || isCollapsed}
                 items={suiteItems}
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
@@ -1094,12 +1092,12 @@ function ChatSidebarComponent({
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             collapsible
-            expanded={gatewayExpanded || isAnyGatewayActive}
+            expanded={gatewayExpanded}
             onToggle={toggleGateway}
             navigateTo={gatewayNav}
           />
           <CollapsibleSection
-            expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
+            expanded={gatewayExpanded || isCollapsed}
             items={gatewayItems}
             isCollapsed={isVisuallyCollapsed}
             transition={transition}

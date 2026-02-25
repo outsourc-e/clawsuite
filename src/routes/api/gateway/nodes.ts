@@ -3,19 +3,6 @@ import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '@/server/gateway'
 import { isAuthenticated } from '@/server/auth-middleware'
 
-function gatewayRpcWithTimeout<TPayload>(
-  method: string,
-  params?: unknown,
-  timeoutMs = 10_000,
-): Promise<TPayload> {
-  return Promise.race([
-    gatewayRpc<TPayload>(method, params),
-    new Promise<TPayload>((_, reject) => {
-      setTimeout(() => reject(new Error('Gateway RPC timed out')), timeoutMs)
-    }),
-  ])
-}
-
 export const Route = createFileRoute('/api/gateway/nodes')({
   server: {
     handlers: {
@@ -25,19 +12,14 @@ export const Route = createFileRoute('/api/gateway/nodes')({
         }
 
         try {
-          const result = await gatewayRpcWithTimeout<Record<string, unknown>>(
-            'node.list',
+          const result = await gatewayRpc<Record<string, unknown>>(
+            'nodes.list',
             {},
           )
           return json({ ok: true, data: result })
         } catch (err) {
-          return json(
-            {
-              ok: false,
-              error: err instanceof Error ? err.message : String(err),
-            },
-            { status: 500 },
-          )
+          console.error('gateway nodes.list failed:', err)
+          return json({ ok: true, data: { nodes: [] } })
         }
       },
     },
