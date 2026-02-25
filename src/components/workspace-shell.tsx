@@ -25,7 +25,7 @@ import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
-// System metrics footer removed — not needed in production UI
+import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
 
@@ -219,7 +219,7 @@ export function WorkspaceShell() {
               isMobile && !isOnChatRoute
                 ? 'pb-[calc(var(--tabbar-h,64px)+1.5rem)]'
                 : !isMobile && !isOnChatRoute
-                  ? 'pb-6'
+                  ? 'pb-[calc(1.5rem+1.75rem)]'
                   : '',
             ].join(' ')}
             data-tour="chat-area"
@@ -253,6 +253,7 @@ export function WorkspaceShell() {
       </div>
 
       {isMobile ? <MobileTabBar /> : null}
+      <SystemMetricsFooter />
     </>
   )
 }

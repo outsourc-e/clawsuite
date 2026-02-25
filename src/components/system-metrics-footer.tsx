@@ -1,94 +1,138 @@
-import { useSystemMetrics } from '@/hooks/use-system-metrics'
-import { useSettings } from '@/hooks/use-settings'
-import { cn } from '@/lib/utils'
+'use client'
 
-function usageColorClass(value: number): string {
-  if (value > 85) return 'bg-red-500'
-  if (value >= 60) return 'bg-amber-400'
-  return 'bg-emerald-500'
+import { useEffect, useState } from 'react'
+
+interface SystemMetrics {
+  cpu: number
+  ramUsed: number
+  ramTotal: number
+  diskPercent: number
+  uptime: number
+  gatewayConnected: boolean
 }
 
-function textColorClass(value: number): string {
-  if (value > 85) return 'text-red-400'
-  if (value >= 60) return 'text-amber-300'
+function formatUptime(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
+}
+
+function bytesToGB(bytes: number): string {
+  return (bytes / 1024 / 1024 / 1024).toFixed(1)
+}
+
+function cpuColor(pct: number): string {
+  if (pct >= 80) return 'text-red-400'
+  if (pct >= 50) return 'text-amber-400'
   return 'text-emerald-400'
 }
 
-function MetricDot({ className }: { className: string }) {
-  return <span className={cn('inline-block size-1.5 rounded-full', className)} />
+function ramColor(used: number, total: number): string {
+  if (total === 0) return 'text-neutral-400'
+  const pct = (used / total) * 100
+  if (pct >= 80) return 'text-red-400'
+  if (pct >= 50) return 'text-amber-400'
+  return 'text-emerald-400'
+}
+
+function diskColor(pct: number): string {
+  if (pct >= 80) return 'text-red-400'
+  if (pct >= 50) return 'text-amber-400'
+  return 'text-emerald-400'
+}
+
+async function fetchMetrics(): Promise<SystemMetrics> {
+  const res = await fetch('/api/system-metrics', { signal: AbortSignal.timeout(4000) })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<SystemMetrics>
 }
 
 export function SystemMetricsFooter() {
-  const { settings } = useSettings()
-  const { metrics } = useSystemMetrics()
+  const [metrics, setMetrics] = useState<SystemMetrics | null>(null)
 
-  if (!settings.showSystemMetricsFooter) return null
+  useEffect(() => {
+    let cancelled = false
 
-  const cpuDot = usageColorClass(metrics?.cpu ?? 0)
-  const ramDot = usageColorClass(metrics?.ramPercent ?? 0)
-  const diskDot = usageColorClass(metrics?.diskPercent ?? 0)
-  const gatewayDot = metrics?.gatewayConnected === false ? 'bg-red-500' : 'bg-emerald-500'
-  const uptimeDot = 'bg-sky-400'
+    async function poll() {
+      try {
+        const data = await fetchMetrics()
+        if (!cancelled) setMetrics(data)
+      } catch {
+        // silently ignore — stale data stays
+      }
+    }
+
+    void poll()
+    const id = setInterval(() => void poll(), 5_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [])
+
+  if (!metrics) return null
+
+  const { cpu, ramUsed, ramTotal, diskPercent, uptime, gatewayConnected } = metrics
 
   return (
-    <footer className="pointer-events-none fixed inset-x-0 z-30 hidden h-6 border-t border-neutral-800 bg-neutral-950 md:block md:bottom-0">
-      <div className="flex h-full items-center justify-between px-2 md:px-3">
-        <div className="flex items-center gap-2 md:hidden" aria-label="System status indicators">
-          <MetricDot className={cpuDot} />
-          <MetricDot className={ramDot} />
-          <MetricDot className={diskDot} />
-          <MetricDot className={gatewayDot} />
-          <MetricDot className={uptimeDot} />
-        </div>
+    <div
+      className={[
+        'fixed bottom-0 left-0 right-0 z-40',
+        'h-7 hidden md:flex items-center',
+        'bg-neutral-900/95 backdrop-blur-sm border-t border-neutral-800',
+        'text-neutral-400 text-[10px] font-mono',
+        'px-3 gap-4 select-none',
+      ].join(' ')}
+      aria-label="System metrics"
+    >
+      {/* CPU */}
+      <span className="flex items-center gap-1">
+        <span className="text-neutral-500">CPU</span>
+        <span className={cpuColor(cpu)}>{cpu.toFixed(1)}%</span>
+      </span>
 
-        <div className="hidden h-full items-center gap-2 text-[10px] text-neutral-400 md:flex">
-          <span className="inline-flex items-center gap-1">
-            <MetricDot className={cpuDot} />
-            <span>CPU</span>
-            <span className={cn('font-mono', textColorClass(metrics?.cpu ?? 0))}>
-              {metrics?.cpuLabel ?? '...'}
-            </span>
-          </span>
-          <span className="text-neutral-700">|</span>
-          <span className="inline-flex items-center gap-1">
-            <MetricDot className={ramDot} />
-            <span>RAM</span>
-            <span className={cn('font-mono', textColorClass(metrics?.ramPercent ?? 0))}>
-              {metrics?.ramLabel ?? '...'}
-            </span>
-          </span>
-          <span className="text-neutral-700">|</span>
-          <span className="inline-flex items-center gap-1">
-            <MetricDot className={diskDot} />
-            <span>Disk</span>
-            <span className={cn('font-mono', textColorClass(metrics?.diskPercent ?? 0))}>
-              {metrics?.diskLabel ?? '...'}
-            </span>
-          </span>
-          <span className="text-neutral-700">|</span>
-          <span className="inline-flex items-center gap-1">
-            <MetricDot className={gatewayDot} />
-            <span>Gateway:</span>
-            <span
-              className={cn(
-                'font-mono',
-                metrics?.gatewayConnected === false ? 'text-red-400' : 'text-emerald-400',
-              )}
-            >
-              {metrics?.gatewayLabel ?? '...'}
-            </span>
-          </span>
-          <span className="text-neutral-700">|</span>
-          <span className="inline-flex items-center gap-1">
-            <MetricDot className={uptimeDot} />
-            <span>Uptime</span>
-            <span className="font-mono text-neutral-300">
-              {metrics?.uptimeLabel ?? '...'}
-            </span>
-          </span>
-        </div>
-      </div>
-    </footer>
+      <span className="text-neutral-700">·</span>
+
+      {/* RAM */}
+      <span className="flex items-center gap-1">
+        <span className="text-neutral-500">RAM</span>
+        <span className={ramColor(ramUsed, ramTotal)}>
+          {bytesToGB(ramUsed)}/{bytesToGB(ramTotal)}GB
+        </span>
+      </span>
+
+      <span className="text-neutral-700">·</span>
+
+      {/* Disk */}
+      <span className="flex items-center gap-1">
+        <span className="text-neutral-500">Disk</span>
+        <span className={diskColor(diskPercent)}>{diskPercent}%</span>
+      </span>
+
+      <span className="text-neutral-700">·</span>
+
+      {/* Gateway */}
+      <span className="flex items-center gap-1.5">
+        <span
+          className={[
+            'w-1.5 h-1.5 rounded-full flex-shrink-0',
+            gatewayConnected ? 'bg-emerald-400' : 'bg-red-400',
+          ].join(' ')}
+          title={gatewayConnected ? 'Gateway connected' : 'Gateway disconnected'}
+        />
+        <span className={gatewayConnected ? 'text-emerald-400' : 'text-red-400'}>
+          {gatewayConnected ? 'GW' : 'GW✗'}
+        </span>
+      </span>
+
+      <span className="text-neutral-700">·</span>
+
+      {/* Uptime */}
+      <span className="flex items-center gap-1">
+        <span className="text-neutral-500">up</span>
+        <span className="text-neutral-300">{formatUptime(uptime)}</span>
+      </span>
+    </div>
   )
 }
-
