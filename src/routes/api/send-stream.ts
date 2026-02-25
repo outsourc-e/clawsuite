@@ -4,6 +4,7 @@ import { gatewayRpc, onGatewayEvent, gatewayConnectCheck } from '../../server/ga
 import type { GatewayFrame } from '../../server/gateway'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -90,6 +91,8 @@ export const Route = createFileRoute('/api/send-stream')({
             { status: 401, headers: { 'Content-Type': 'application/json' } },
           )
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         const body = (await request.json().catch(() => ({}))) as Record<
           string,

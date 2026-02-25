@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import WebSocket from 'ws'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 
 type GatewayFrame =
   | { type: 'req'; id: string; method: string; params?: unknown }
@@ -76,6 +77,8 @@ export const Route = createFileRoute('/api/stream')({
             { status: 401, headers: { 'Content-Type': 'application/json' } },
           )
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         try {
           const body = (await request.json().catch(() => ({}))) as Record<

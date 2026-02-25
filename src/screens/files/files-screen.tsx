@@ -1,0 +1,776 @@
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import { cn } from '@/lib/utils'
+import { usePageTitle } from '@/hooks/use-page-title'
+import {
+  ScrollAreaCorner,
+  ScrollAreaRoot,
+  ScrollAreaScrollbar,
+  ScrollAreaThumb,
+  ScrollAreaViewport,
+} from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Types
+// ──────────────────────────────────────────────────────────────────────────────
+
+type FileEntry = {
+  name: string
+  path: string
+  type: 'file' | 'folder'
+  size?: number
+  modifiedAt?: string
+  children?: Array<FileEntry>
+}
+
+type FilesListResponse = {
+  root: string
+  base: string
+  entries: Array<FileEntry>
+}
+
+type FileReadResponse = {
+  type: 'text' | 'image'
+  path: string
+  content: string
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Constants
+// ──────────────────────────────────────────────────────────────────────────────
+
+const IGNORED_DIRS = new Set([
+  'node_modules',
+  '.git',
+  '.next',
+  '.turbo',
+  '.cache',
+  '__pycache__',
+  '.venv',
+  'dist',
+])
+
+const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'])
+const CODE_EXTS = new Set([
+  'ts', 'tsx', 'js', 'jsx', 'json', 'css', 'html',
+  'yml', 'yaml', 'sh', 'py', 'env',
+])
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────────────────
+
+function getExt(name: string): string {
+  const dot = name.lastIndexOf('.')
+  return dot >= 0 ? name.slice(dot + 1).toLowerCase() : ''
+}
+
+function isImageFile(name: string): boolean {
+  return IMAGE_EXTS.has(getExt(name))
+}
+
+function isCodeFile(name: string): boolean {
+  return CODE_EXTS.has(getExt(name))
+}
+
+function isMarkdownFile(name: string): boolean {
+  const ext = getExt(name)
+  return ext === 'md' || ext === 'mdx'
+}
+
+function isEditableFile(name: string): boolean {
+  return !isImageFile(name)
+}
+
+function getFileIcon(entry: FileEntry): string {
+  if (entry.type === 'folder') return '📁'
+  const ext = getExt(entry.name)
+  if (ext === 'md' || ext === 'mdx') return '📄'
+  if (ext === 'json') return '📋'
+  if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx') return '📜'
+  if (IMAGE_EXTS.has(ext)) return '🖼'
+  return '📃'
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Simple markdown → HTML (no deps)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function markdownToHtml(md: string): string {
+  let html = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  // Fenced code blocks
+  html = html.replace(/```[\w]*\n([\s\S]*?)```/g, (_m, code: string) => {
+    return `<pre class="md-code-block"><code>${code}</code></pre>`
+  })
+
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>')
+
+  // Headers
+  html = html.replace(/^#{6}\s+(.+)$/gm, '<h6 class="md-h6">$1</h6>')
+  html = html.replace(/^#{5}\s+(.+)$/gm, '<h5 class="md-h5">$1</h5>')
+  html = html.replace(/^#{4}\s+(.+)$/gm, '<h4 class="md-h4">$1</h4>')
+  html = html.replace(/^#{3}\s+(.+)$/gm, '<h3 class="md-h3">$1</h3>')
+  html = html.replace(/^#{2}\s+(.+)$/gm, '<h2 class="md-h2">$1</h2>')
+  html = html.replace(/^#{1}\s+(.+)$/gm, '<h1 class="md-h1">$1</h1>')
+
+  // Bold / italic
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>')
+  html = html.replace(/_(.+?)_/g, '<em>$1</em>')
+
+  // Strikethrough
+  html = html.replace(/~~(.+?)~~/g, '<del>$1</del>')
+
+  // Horizontal rules
+  html = html.replace(/^---+$/gm, '<hr class="md-hr" />')
+
+  // Blockquotes (re-escaped)
+  html = html.replace(/^&gt;\s+(.+)$/gm, '<blockquote class="md-blockquote">$1</blockquote>')
+
+  // Unordered lists
+  html = html.replace(/^[-*+]\s+(.+)$/gm, '<li class="md-li">$1</li>')
+  html = html.replace(/(<li[^>]*>.*<\/li>\n?)+/g, (m) => `<ul class="md-ul">${m}</ul>`)
+
+  // Links
+  html = html.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>',
+  )
+
+  // Paragraphs
+  const lines = html.split('\n')
+  const result: string[] = []
+  for (const line of lines) {
+    if (
+      line.trim() === '' ||
+      line.startsWith('<h') ||
+      line.startsWith('<ul') ||
+      line.startsWith('<ol') ||
+      line.startsWith('<li') ||
+      line.startsWith('<pre') ||
+      line.startsWith('<blockquote') ||
+      line.startsWith('<hr')
+    ) {
+      result.push(line)
+    } else {
+      result.push(`<p class="md-p">${line}</p>`)
+    }
+  }
+  return result.join('\n')
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Basic syntax highlighting (CSS-class only, no library)
+// ──────────────────────────────────────────────────────────────────────────────
+
+const KEYWORDS = new Set([
+  'import', 'export', 'default', 'from', 'const', 'let', 'var', 'function',
+  'return', 'if', 'else', 'for', 'while', 'class', 'extends', 'new', 'this',
+  'type', 'interface', 'async', 'await', 'try', 'catch', 'throw', 'null',
+  'undefined', 'true', 'false', 'typeof', 'instanceof', 'void', 'in', 'of',
+  'break', 'continue', 'switch', 'case', 'delete',
+])
+
+function highlightCode(code: string, ext: string): string {
+  if (ext === 'json') {
+    return code
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/("(?:[^"\\]|\\.)*")(\s*:)/g, '<span class="hl-key">$1</span>$2')
+      .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="hl-str">$1</span>')
+      .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="hl-num">$1</span>')
+      .replace(/:\s*(true|false|null)/g, ': <span class="hl-kw">$1</span>')
+  }
+
+  const escaped = code
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  // Strings (single + double + template)
+  let out = escaped.replace(
+    /(["'`])(?:(?!\1)[^\\]|\\.)*?\1/g,
+    '<span class="hl-str">$&</span>',
+  )
+
+  // Line comments
+  out = out.replace(/(\/\/[^\n]*)/g, '<span class="hl-comment">$1</span>')
+
+  // Block comments
+  out = out.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="hl-comment">$1</span>')
+
+  // Keywords and type names
+  out = out.replace(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g, (match) => {
+    if (KEYWORDS.has(match)) return `<span class="hl-kw">${match}</span>`
+    if (/^[A-Z]/.test(match)) return `<span class="hl-type">${match}</span>`
+    return match
+  })
+
+  // Numbers
+  out = out.replace(
+    /(?<![a-zA-Z_$])\b(\d+\.?\d*)\b/g,
+    '<span class="hl-num">$1</span>',
+  )
+
+  return out
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Directory tree node
+// ──────────────────────────────────────────────────────────────────────────────
+
+type TreeNodeProps = {
+  entry: FileEntry
+  depth: number
+  expanded: Set<string>
+  selectedPath: string | null
+  onToggle: (path: string) => void
+  onSelect: (entry: FileEntry) => void
+}
+
+function TreeNode({
+  entry,
+  depth,
+  expanded,
+  selectedPath,
+  onToggle,
+  onSelect,
+}: TreeNodeProps) {
+  const isExpanded = expanded.has(entry.path)
+  const isSelected = selectedPath === entry.path
+  const icon = getFileIcon(entry)
+  const paddingLeft = 12 + depth * 16
+
+  const handleClick = () => {
+    if (entry.type === 'folder') {
+      onToggle(entry.path)
+    } else {
+      onSelect(entry)
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={handleClick}
+        className={cn(
+          'flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left text-sm transition-colors',
+          isSelected
+            ? 'bg-accent-500/15 text-accent-600 dark:text-accent-400'
+            : 'text-primary-900 dark:text-neutral-200 hover:bg-primary-200 dark:hover:bg-neutral-800',
+        )}
+        style={{ paddingLeft }}
+      >
+        {entry.type === 'folder' ? (
+          <span
+            className={cn(
+              'shrink-0 text-primary-400 transition-transform duration-150 text-xs',
+              isExpanded ? 'rotate-90' : 'rotate-0',
+            )}
+          >
+            ▶
+          </span>
+        ) : (
+          <span className="w-3 shrink-0" />
+        )}
+        <span className="shrink-0 text-base leading-none">{icon}</span>
+        <span className="truncate">{entry.name}</span>
+      </button>
+
+      {entry.type === 'folder' && isExpanded && entry.children ? (
+        <div>
+          {entry.children
+            .filter((c) => !IGNORED_DIRS.has(c.name))
+            .map((child) => (
+              <TreeNode
+                key={child.path}
+                entry={child}
+                depth={depth + 1}
+                expanded={expanded}
+                selectedPath={selectedPath}
+                onToggle={onToggle}
+                onSelect={onSelect}
+              />
+            ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Breadcrumb
+// ──────────────────────────────────────────────────────────────────────────────
+
+function Breadcrumb({ path }: { path: string }) {
+  const parts = path ? path.split('/').filter(Boolean) : []
+  return (
+    <div className="flex items-center gap-1 truncate text-xs text-primary-500 dark:text-neutral-400 min-w-0">
+      <span className="shrink-0">workspace</span>
+      {parts.map((part, i) => (
+        <span key={i} className="flex items-center gap-1 min-w-0">
+          <span className="shrink-0 text-primary-300 dark:text-neutral-600">/</span>
+          <span
+            className={cn(
+              'truncate',
+              i === parts.length - 1
+                ? 'text-primary-700 dark:text-neutral-300 font-medium'
+                : '',
+            )}
+          >
+            {part}
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// File panel — viewer / editor
+// All hooks are called unconditionally at the top.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type FilePanelProps = {
+  selectedEntry: FileEntry | null
+}
+
+function FilePanel({ selectedEntry }: FilePanelProps) {
+  const [loadingFile, setLoadingFile] = useState(false)
+  const [fileError, setFileError] = useState<string | null>(null)
+  const [content, setContent] = useState('')
+  const [dataUrl, setDataUrl] = useState('')
+  const [editValue, setEditValue] = useState('')
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedOk, setSavedOk] = useState(false)
+  const [rawMode, setRawMode] = useState(false)
+  const prevPathRef = useRef<string | null>(null)
+
+  // Derive file type info (safe regardless of selectedEntry nullity)
+  const fileName = selectedEntry?.name ?? ''
+  const ext = getExt(fileName)
+  const isImage = isImageFile(fileName)
+  const isMd = isMarkdownFile(fileName)
+  const isCode = isCodeFile(fileName)
+  const isEditable = isEditableFile(fileName)
+
+  // Always call useMemo unconditionally
+  const mdHtml = useMemo(
+    () => (isMd && !rawMode && content ? markdownToHtml(content) : ''),
+    [isMd, rawMode, content],
+  )
+
+  const highlighted = useMemo(
+    () => (isCode && !isMd && content ? highlightCode(content, ext) : ''),
+    [isCode, isMd, content, ext],
+  )
+
+  const loadFile = useCallback(async (path: string) => {
+    setLoadingFile(true)
+    setFileError(null)
+    setContent('')
+    setDataUrl('')
+    setDirty(false)
+    setRawMode(false)
+    try {
+      const res = await fetch(
+        `/api/files?action=read&path=${encodeURIComponent(path)}`,
+      )
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = (await res.json()) as FileReadResponse
+      if (data.type === 'image') {
+        setDataUrl(data.content)
+      } else {
+        setContent(data.content)
+        setEditValue(data.content)
+      }
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoadingFile(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!selectedEntry || selectedEntry.type === 'folder') return
+    if (prevPathRef.current === selectedEntry.path) return
+    prevPathRef.current = selectedEntry.path
+    void loadFile(selectedEntry.path)
+  }, [selectedEntry, loadFile])
+
+  const handleSave = useCallback(async () => {
+    if (!selectedEntry || !dirty) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/files', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'write',
+          path: selectedEntry.path,
+          content: editValue,
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setContent(editValue)
+      setDirty(false)
+      setSavedOk(true)
+      setTimeout(() => setSavedOk(false), 2000)
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSaving(false)
+    }
+  }, [selectedEntry, dirty, editValue])
+
+  // ── Empty / folder states ──────────────────────────────────────────────────
+
+  if (!selectedEntry) {
+    return (
+      <div className="flex h-full items-center justify-center text-center text-primary-400 dark:text-neutral-600">
+        <div>
+          <div className="text-5xl mb-3 opacity-40">📂</div>
+          <p className="text-sm">Select a file to preview or edit</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (selectedEntry.type === 'folder') {
+    return (
+      <div className="flex h-full items-center justify-center text-center text-primary-400 dark:text-neutral-600">
+        <div>
+          <div className="text-5xl mb-3 opacity-40">📁</div>
+          <p className="text-sm font-medium">{selectedEntry.name}</p>
+          <p className="text-xs mt-1 opacity-70">Select a file inside to preview</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Shared header / footer ─────────────────────────────────────────────────
+
+  const header = (
+    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-primary-200 dark:border-neutral-800 px-4 py-2.5">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-lg">{getFileIcon(selectedEntry)}</span>
+        <span className="truncate text-sm font-semibold text-primary-900 dark:text-neutral-100">
+          {selectedEntry.name}
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {isMd && !isImage && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setRawMode((v) => !v)}
+          >
+            {rawMode ? 'Preview' : 'Raw'}
+          </Button>
+        )}
+        {isEditable && (
+          <Button
+            size="sm"
+            variant={savedOk ? 'outline' : 'default'}
+            disabled={!dirty || saving}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Saving…' : savedOk ? '✓ Saved' : 'Save'}
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+
+  const footer = (
+    <div className="flex shrink-0 items-center gap-4 border-t border-primary-200 dark:border-neutral-800 px-4 py-1.5 text-xs text-primary-400 dark:text-neutral-500">
+      {selectedEntry.size !== undefined && (
+        <span>{formatBytes(selectedEntry.size)}</span>
+      )}
+      {selectedEntry.modifiedAt && (
+        <span>Modified {formatDate(selectedEntry.modifiedAt)}</span>
+      )}
+      {dirty && (
+        <span className="text-accent-500 font-medium">Unsaved changes</span>
+      )}
+    </div>
+  )
+
+  // ── Loading / error ────────────────────────────────────────────────────────
+
+  if (loadingFile) {
+    return (
+      <div className="flex h-full flex-col">
+        {header}
+        <div className="flex flex-1 items-center justify-center text-sm text-primary-400 dark:text-neutral-500">
+          Loading…
+        </div>
+        {footer}
+      </div>
+    )
+  }
+
+  if (fileError) {
+    return (
+      <div className="flex h-full flex-col">
+        {header}
+        <div className="flex flex-1 items-center justify-center p-4 text-sm text-red-600 dark:text-red-400">
+          {fileError}
+        </div>
+        {footer}
+      </div>
+    )
+  }
+
+  // ── Image ──────────────────────────────────────────────────────────────────
+
+  if (isImage) {
+    return (
+      <div className="flex h-full flex-col">
+        {header}
+        <div className="flex flex-1 min-h-0 items-center justify-center overflow-auto p-6">
+          {dataUrl ? (
+            <img
+              src={dataUrl}
+              alt={selectedEntry.name}
+              className="max-h-full max-w-full rounded-lg border border-primary-200 dark:border-neutral-800 shadow-sm object-contain"
+            />
+          ) : (
+            <div className="text-sm text-primary-400">No preview</div>
+          )}
+        </div>
+        {footer}
+      </div>
+    )
+  }
+
+  // ── Markdown preview ───────────────────────────────────────────────────────
+
+  if (isMd && !rawMode) {
+    return (
+      <div className="flex h-full flex-col">
+        {header}
+        <ScrollAreaRoot className="flex-1 min-h-0">
+          <ScrollAreaViewport>
+            {/* eslint-disable-next-line react/no-danger */}
+            <div
+              className="markdown-preview px-6 py-5 text-sm text-primary-900 dark:text-neutral-200"
+              dangerouslySetInnerHTML={{ __html: mdHtml }}
+            />
+          </ScrollAreaViewport>
+          <ScrollAreaScrollbar orientation="vertical">
+            <ScrollAreaThumb />
+          </ScrollAreaScrollbar>
+          <ScrollAreaCorner />
+        </ScrollAreaRoot>
+        {footer}
+      </div>
+    )
+  }
+
+  // ── Code viewer (syntax highlighted) — also raw mode for md ───────────────
+
+  if (isCode) {
+    const displayHtml = isMd ? highlightCode(content, 'md') : highlighted
+    return (
+      <div className="flex h-full flex-col">
+        {header}
+        <ScrollAreaRoot className="flex-1 min-h-0">
+          <ScrollAreaViewport>
+            <pre
+              className="code-viewer px-4 py-4 text-xs font-mono leading-relaxed text-primary-800 dark:text-neutral-300"
+              // eslint-disable-next-line react/no-danger
+              dangerouslySetInnerHTML={{ __html: displayHtml }}
+            />
+          </ScrollAreaViewport>
+          <ScrollAreaScrollbar orientation="vertical">
+            <ScrollAreaThumb />
+          </ScrollAreaScrollbar>
+          <ScrollAreaScrollbar orientation="horizontal">
+            <ScrollAreaThumb />
+          </ScrollAreaScrollbar>
+          <ScrollAreaCorner />
+        </ScrollAreaRoot>
+        {footer}
+      </div>
+    )
+  }
+
+  // ── Editable textarea (plain text, raw md, etc.) ───────────────────────────
+
+  return (
+    <div className="flex h-full flex-col">
+      {header}
+      <div className="flex-1 min-h-0 p-3">
+        <textarea
+          className={cn(
+            'h-full w-full resize-none rounded-lg border border-primary-200 dark:border-neutral-800',
+            'bg-white dark:bg-neutral-900 px-3 py-2 font-mono text-xs leading-relaxed',
+            'text-primary-900 dark:text-neutral-200 placeholder:text-primary-300',
+            'focus:outline-none focus:ring-2 focus:ring-accent-500/30',
+          )}
+          value={editValue}
+          onChange={(e) => {
+            setEditValue(e.target.value)
+            setDirty(e.target.value !== content)
+          }}
+          spellCheck={false}
+        />
+      </div>
+      {footer}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Main FilesScreen
+// ──────────────────────────────────────────────────────────────────────────────
+
+export function FilesScreen() {
+  usePageTitle('Files')
+
+  const [entries, setEntries] = useState<Array<FileEntry>>([])
+  const [treeLoading, setTreeLoading] = useState(false)
+  const [treeError, setTreeError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const [selectedEntry, setSelectedEntry] = useState<FileEntry | null>(null)
+
+  const loadTree = useCallback(async () => {
+    setTreeLoading(true)
+    setTreeError(null)
+    try {
+      const res = await fetch('/api/files?action=list')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = (await res.json()) as FilesListResponse
+      setEntries(Array.isArray(data.entries) ? data.entries : [])
+    } catch (err) {
+      setTreeError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setTreeLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadTree()
+  }, [loadTree])
+
+  const handleToggle = useCallback((path: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+
+  const handleSelect = useCallback((entry: FileEntry) => {
+    setSelectedEntry(entry)
+  }, [])
+
+  const selectedPath = selectedEntry?.path ?? null
+
+  return (
+    <div className="flex h-full min-h-0 overflow-hidden bg-primary-50/95 dark:bg-neutral-950">
+      {/* ── Left panel — directory tree ─────────────────────────────────── */}
+      <aside
+        className={cn(
+          'flex h-full w-[260px] shrink-0 flex-col overflow-hidden',
+          'rounded-xl border border-primary-200 bg-primary-50/95 shadow-sm',
+          'dark:border-neutral-800 dark:bg-neutral-900/80',
+          'm-2 mr-0',
+        )}
+      >
+        {/* Tree header */}
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-primary-200 dark:border-neutral-800 px-3">
+          <Breadcrumb path={selectedEntry?.path ?? ''} />
+          <button
+            type="button"
+            onClick={() => void loadTree()}
+            title="Refresh"
+            className="ml-2 shrink-0 rounded p-1 text-lg text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors leading-none"
+          >
+            ↺
+          </button>
+        </div>
+
+        {/* Tree body */}
+        <ScrollAreaRoot className="flex-1 min-h-0">
+          <ScrollAreaViewport className="px-1 py-1">
+            {treeLoading ? (
+              <div className="px-3 py-2 text-xs text-primary-400 dark:text-neutral-500">
+                Loading…
+              </div>
+            ) : treeError ? (
+              <div className="px-3 py-2 text-xs text-red-500">{treeError}</div>
+            ) : entries.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-primary-400 dark:text-neutral-500">
+                Workspace is empty
+              </div>
+            ) : (
+              entries
+                .filter((e) => !IGNORED_DIRS.has(e.name))
+                .map((entry) => (
+                  <TreeNode
+                    key={entry.path}
+                    entry={entry}
+                    depth={0}
+                    expanded={expanded}
+                    selectedPath={selectedPath}
+                    onToggle={handleToggle}
+                    onSelect={handleSelect}
+                  />
+                ))
+            )}
+          </ScrollAreaViewport>
+          <ScrollAreaScrollbar orientation="vertical">
+            <ScrollAreaThumb />
+          </ScrollAreaScrollbar>
+          <ScrollAreaCorner />
+        </ScrollAreaRoot>
+      </aside>
+
+      {/* ── Right panel — file viewer / editor ─────────────────────────── */}
+      <main
+        className={cn(
+          'flex h-full flex-1 min-w-0 flex-col overflow-hidden',
+          'rounded-xl border border-primary-200 bg-primary-50/95 shadow-sm',
+          'dark:border-neutral-800 dark:bg-neutral-900/80',
+          'm-2',
+        )}
+      >
+        <FilePanel selectedEntry={selectedEntry} />
+      </main>
+    </div>
+  )
+}
