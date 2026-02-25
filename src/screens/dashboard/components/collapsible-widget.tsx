@@ -34,7 +34,7 @@ export function CollapsibleWidget({
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <section
         className={cn(
-          'rounded-xl border border-primary-200 bg-primary-50/85 p-2.5 shadow-sm',
+          'rounded-xl border border-primary-200 bg-primary-50/85 p-2.5 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]',
           className,
         )}
       >

@@ -91,7 +91,7 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
   return (
     <section
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 p-4 text-primary-900 dark:text-neutral-100 shadow-[0_12px_36px_rgba(0,0,0,0.28)]',
+        'relative overflow-hidden rounded-xl border border-primary-200 bg-primary-50/95 p-4 text-primary-900 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)] dark:text-neutral-100',
         className,
       )}
     >
@@ -117,7 +117,7 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="rounded-xl border border-primary-200 dark:border-neutral-800 bg-primary-50/80 dark:bg-neutral-900/60 p-3">
+        <div className="rounded-xl border bg-white p-3 shadow-sm dark:bg-neutral-900">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-semibold tracking-[0.14em] text-primary-500 dark:text-neutral-400">COST</p>
             <p className="font-mono text-sm tabular-nums text-primary-900 dark:text-neutral-100">{formatMoney(totalCostToday)}</p>
@@ -127,7 +127,7 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-primary-200 dark:border-neutral-800 bg-primary-50/80 dark:bg-neutral-900/60 p-3">
+        <div className="rounded-xl border bg-white p-3 shadow-sm dark:bg-neutral-900">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-semibold tracking-[0.14em] text-primary-500 dark:text-neutral-400">ACTIVE SESSIONS</p>
             <p className="font-mono text-sm tabular-nums text-primary-900 dark:text-neutral-100">{formatCompactInt(activeSessions)}</p>
@@ -138,7 +138,7 @@ export function TokenUsageHero({ data, className }: TokenUsageHeroProps) {
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/40 p-3">
+      <div className="mt-4 rounded-xl border bg-white p-3 shadow-sm dark:bg-neutral-900">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] font-semibold tracking-[0.14em] text-primary-500 dark:text-neutral-400">TOP MODELS</p>
           <p className="text-[11px] text-primary-400 dark:text-neutral-500">sorted by cost</p>

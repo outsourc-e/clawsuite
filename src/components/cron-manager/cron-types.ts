@@ -25,6 +25,7 @@ export type CronJob = {
   status?: string
   description?: string
   lastRun?: CronRun
+  nextRunAt?: string | null
 }
 
 export type CronJobUpsertInput = {

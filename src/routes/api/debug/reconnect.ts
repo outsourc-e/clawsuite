@@ -6,6 +6,7 @@ import {
   sanitizeText,
 } from '../../../server/activity-stream'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireJsonContentType } from '../../../server/rate-limit'
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) return sanitizeText(error.message)
@@ -19,6 +20,8 @@ export const Route = createFileRoute('/api/debug/reconnect')({
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         try {
           await reconnectActivityStream()

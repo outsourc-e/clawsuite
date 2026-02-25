@@ -8,6 +8,7 @@ import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
 
@@ -52,6 +53,8 @@ export const Route = createFileRoute('/api/tasks/$taskId')({
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheckPatch = requireJsonContentType(request)
+        if (csrfCheckPatch) return csrfCheckPatch
 
         const ip = getClientIp(request)
         if (!rateLimit(`tasks-patch:${ip}`, 30, 60_000))

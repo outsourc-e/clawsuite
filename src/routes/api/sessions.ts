@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 
 type SessionsListGatewayResponse = {
   sessions?: Array<Record<string, unknown>>
@@ -92,6 +93,8 @@ export const Route = createFileRoute('/api/sessions')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheckPost = requireJsonContentType(request)
+        if (csrfCheckPost) return csrfCheckPost
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
@@ -172,6 +175,8 @@ export const Route = createFileRoute('/api/sessions')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheckPatch = requireJsonContentType(request)
+        if (csrfCheckPatch) return csrfCheckPatch
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,

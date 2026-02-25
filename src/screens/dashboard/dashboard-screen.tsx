@@ -601,7 +601,7 @@ export function DashboardScreen() {
     <>
       <main
         ref={mainScrollRef as RefObject<HTMLElement>}
-        className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-4 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8"
+        className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)] px-4 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 dark:text-neutral-100 md:px-6 md:pt-8 md:pb-8"
       >
         {/* Pull-to-refresh indicator (mobile) */}
         {isMobile && isPulling ? (

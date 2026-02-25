@@ -64,6 +64,25 @@ export function rateLimitResponse(): Response {
 }
 
 /**
+ * Lightweight CSRF check: reject POST/PUT/PATCH/DELETE that don't send
+ * `Content-Type: application/json`. Browsers won't set this header on
+ * a simple form/navigation request, so its presence indicates a
+ * programmatic call (JS fetch, curl, etc.).
+ *
+ * Returns `null` when the check passes, or a 415 Response to send back.
+ */
+export function requireJsonContentType(request: Request): Response | null {
+  const method = request.method.toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return null
+  const ct = request.headers.get('content-type') ?? ''
+  if (ct.includes('application/json')) return null
+  return new Response(
+    JSON.stringify({ error: 'Content-Type must be application/json' }),
+    { status: 415, headers: { 'Content-Type': 'application/json' } },
+  )
+}
+
+/**
  * Sanitize error for response — hide details in production.
  */
 export function safeErrorMessage(err: unknown): string {

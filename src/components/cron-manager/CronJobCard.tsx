@@ -76,22 +76,37 @@ export function CronJobCard({
       </header>
 
       <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-100/45 p-2.5">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-xs text-primary-600 tabular-nums">
-            <HugeiconsIcon icon={Clock01Icon} size={20} strokeWidth={1.5} />
-            <span>Last Run</span>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs text-primary-600 tabular-nums">
+                <HugeiconsIcon icon={Clock01Icon} size={20} strokeWidth={1.5} />
+                <span>Last Run</span>
+              </div>
+              <p className="mt-0.5 truncate text-sm text-primary-900 tabular-nums">
+                {formatDateTime(job.lastRun?.startedAt)}
+              </p>
+              <span
+                className={cn(
+                  'mt-0.5 inline-flex rounded-md border px-1.5 py-0.5 text-[11px] tabular-nums',
+                  statusBadgeClass(job.lastRun?.status ?? 'unknown'),
+                )}
+              >
+                {statusLabel(job.lastRun?.status ?? 'unknown')}
+              </span>
+            </div>
+            {job.nextRunAt ? (
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-xs text-primary-600 tabular-nums">
+                  <HugeiconsIcon icon={Clock01Icon} size={20} strokeWidth={1.5} />
+                  <span>Next Run</span>
+                </div>
+                <p className="mt-0.5 truncate text-sm text-primary-900 tabular-nums">
+                  {formatDateTime(job.nextRunAt)}
+                </p>
+              </div>
+            ) : null}
           </div>
-          <p className="mt-1 truncate text-sm text-primary-900 tabular-nums">
-            {formatDateTime(job.lastRun?.startedAt)}
-          </p>
-          <span
-            className={cn(
-              'mt-1 inline-flex rounded-md border px-1.5 py-0.5 text-[11px] tabular-nums',
-              statusBadgeClass(job.lastRun?.status ?? 'unknown'),
-            )}
-          >
-            {statusLabel(job.lastRun?.status ?? 'unknown')}
-          </span>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">

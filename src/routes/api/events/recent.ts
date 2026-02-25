@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../../server/auth-middleware'
 import { getRecentEvents } from '../../../server/activity-events'
 import {
   ensureActivityStreamStarted,
@@ -13,6 +14,10 @@ export const Route = createFileRoute('/api/events/recent')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
         void ensureActivityStreamStarted().catch(function ignoreStartError() {
           // recent endpoint still returns buffered data while disconnected
         })

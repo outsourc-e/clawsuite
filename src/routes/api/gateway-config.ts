@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { gatewayReconnect } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { invalidateCache } from '../../server/providers'
+import { requireJsonContentType } from '../../server/rate-limit'
 
 function sanitizeEnvValue(value: unknown, field: string): string {
   if (typeof value !== 'string') {
@@ -101,6 +102,8 @@ export const Route = createFileRoute('/api/gateway-config')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         try {
           const rawBody = (await request.json().catch(() => ({}))) as Record<

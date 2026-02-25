@@ -95,7 +95,7 @@ function getStepIndex(step: WizardStep): number {
 }
 
 export function ProviderWizard({ open, onOpenChange }: ProviderWizardProps) {
-  const { triggerRestart: _triggerRestart } = useGatewayRestart()
+  const { triggerRestart } = useGatewayRestart()
 
   const [step, setStep] = useState<WizardStep>('provider')
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(

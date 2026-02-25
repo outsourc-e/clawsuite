@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { gatewayRpc } from '../../server/gateway'
+import { requireJsonContentType } from '../../server/rate-limit'
 
 type SessionsPatchResponse = {
   ok?: boolean
@@ -19,6 +20,8 @@ export const Route = createFileRoute('/api/model-switch')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,

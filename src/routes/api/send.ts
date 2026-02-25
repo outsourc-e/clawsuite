@@ -7,6 +7,7 @@ import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -109,6 +110,8 @@ export const Route = createFileRoute('/api/send')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         // Rate limit: 30 requests per minute per IP
         const ip = getClientIp(request)
