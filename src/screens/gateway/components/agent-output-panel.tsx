@@ -351,15 +351,15 @@ export function AgentOutputPanel({
           {tasks.map((task) => (
             <div
               key={task.id}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2"
+              className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2"
             >
               <div className="flex items-center gap-2">
                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100">
+                <span className="text-xs font-medium text-[var(--theme-text)]">
                   {task.title}
                 </span>
               </div>
-              <p className="mt-1 text-[10px] text-neutral-500">
+              <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
                 {task.status === 'in_progress'
                   ? 'Working...'
                   : task.status === 'done'
@@ -388,29 +388,29 @@ export function AgentOutputPanel({
         <div
           ref={scrollRef}
           className={cn(
-            'min-h-0 flex-1 overflow-y-auto rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-[11px] leading-relaxed text-neutral-900 dark:text-neutral-100',
+            'min-h-0 flex-1 overflow-y-auto rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 text-[11px] leading-relaxed text-[var(--theme-text)]',
             compact ? 'min-h-0 flex-1' : 'mt-1 min-h-[300px] flex-1 text-sm leading-6',
           )}
         >
           {messages.length === 0 && !sessionEnded ? (
-            <p className="animate-pulse text-neutral-500">Waiting for response...</p>
+            <p className="animate-pulse text-[var(--theme-muted)]">Waiting for response...</p>
           ) : (
             <>
               {messages.map((msg, index) =>
                 msg.role === 'tool' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="mb-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-2 py-1 font-mono text-xs leading-5 text-neutral-700"
+                    className="mb-1 rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 font-mono text-xs leading-5 text-neutral-700"
                   >
-                    <span className="text-neutral-400">▶ </span>
+                    <span className="text-[var(--theme-muted)]">▶ </span>
                     {msg.content}
                   </div>
                 ) : msg.role === 'user' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="my-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3 py-2 text-sm leading-6 text-neutral-800"
+                    className="my-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm leading-6 text-neutral-800"
                   >
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                       You
                     </div>
                     <Markdown className="text-sm leading-6 text-neutral-800 [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2">
@@ -420,16 +420,16 @@ export function AgentOutputPanel({
                 ) : msg.done ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="mt-2 border-t border-neutral-200 dark:border-neutral-700 pt-2 text-sm font-medium text-emerald-700"
+                    className="mt-2 border-t border-[var(--theme-border)] pt-2 text-sm font-medium text-emerald-700"
                   >
                     {msg.content}
                   </div>
                 ) : (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="my-2 rounded-lg border border-neutral-100 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
+                    className="my-2 rounded-lg border border-neutral-100 bg-[var(--theme-card)] text-[var(--theme-text)]"
                   >
-                    <Markdown className="text-sm leading-6 text-neutral-900 dark:text-neutral-100 [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_pre]:my-2">
+                    <Markdown className="text-sm leading-6 text-[var(--theme-text)] [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_pre]:my-2">
                       {stripThinkBlocks(msg.content)}
                     </Markdown>
                   </div>
@@ -443,9 +443,9 @@ export function AgentOutputPanel({
         </div>
       ) : (
         // Fallback placeholder when no sessionKey
-        <div className={cn('min-h-0 flex-1 overflow-y-auto rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-sm leading-6 text-neutral-900 dark:text-neutral-100', compact ? 'min-h-0 flex-1 overflow-y-auto' : 'mt-1 min-h-[300px]')}>
+        <div className={cn('min-h-0 flex-1 overflow-y-auto rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 text-sm leading-6 text-[var(--theme-text)]', compact ? 'min-h-0 flex-1 overflow-y-auto' : 'mt-1 min-h-[300px]')}>
           {tasks.length === 0 ? (
-            <p className="text-neutral-500">No dispatched tasks yet.</p>
+            <p className="text-[var(--theme-muted)]">No dispatched tasks yet.</p>
           ) : (
             <>
               <p>$ Dispatching to {agentName}…</p>
@@ -466,14 +466,14 @@ export function AgentOutputPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
-      <div className="flex items-center justify-between gap-2 border-b border-neutral-200 dark:border-neutral-700 px-4 py-3">
+    <div className="flex h-full min-h-0 flex-col border border-[var(--theme-border)] bg-[var(--theme-card)]">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--theme-border)] px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+          <h3 className="truncate text-sm font-semibold text-[var(--theme-text)]">
             {agentName}
           </h3>
           {modelId ? (
-            <span className="shrink-0 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-2 py-0.5 font-mono text-[10px] font-semibold text-neutral-700">
+            <span className="shrink-0 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-0.5 font-mono text-[10px] font-semibold text-neutral-700">
               {modelId}
             </span>
           ) : null}
@@ -486,13 +486,13 @@ export function AgentOutputPanel({
                   ? 'border-amber-200 bg-amber-50 text-amber-700'
                 : headerStatus === 'Streaming'
                     ? 'border-sky-200 bg-sky-50 text-sky-700'
-                    : 'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-700',
+                    : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-neutral-700',
             )}
           >
             {headerStatus}
           </span>
           {tokenCount > 0 ? (
-            <span className="shrink-0 font-mono text-[10px] text-neutral-400 tabular-nums">
+            <span className="shrink-0 font-mono text-[10px] text-[var(--theme-muted)] tabular-nums">
               ~{tokenCount.toLocaleString()} tok
             </span>
           ) : null}
@@ -500,7 +500,7 @@ export function AgentOutputPanel({
         <button
           type="button"
           onClick={onClose}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-500 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800 hover:text-neutral-700"
+          className="flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--theme-border)] text-sm text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
           aria-label="Close agent output"
         >
           ✕

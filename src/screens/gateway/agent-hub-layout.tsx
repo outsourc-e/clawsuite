@@ -1068,7 +1068,10 @@ function formatDuration(ms: number): string {
 function computeMissionTaskStats(tasks: HubTask[]): MissionTaskStats {
   const total = tasks.length
   const completed = tasks.filter((task) => task.status === 'done' || (task.status as string) === 'completed').length
-  const failed = tasks.filter((task) => (task.status as string) === 'blocked').length
+  const failed = tasks.filter((task) => {
+    const status = (task.status as string).toLowerCase()
+    return status === 'blocked' || status === 'failed'
+  }).length
   return { total, completed, failed }
 }
 
@@ -1341,7 +1344,10 @@ function synthesizeActionableRecommendations(
 }
 
 function buildNextActionsChecklist(payload: MissionReportPayload, recommendations: string[], unresolvedRisks: string[]): string[] {
-  const blockedTasks = payload.tasks.filter((task) => String(task.status).toLowerCase() === 'blocked')
+  const blockedTasks = payload.tasks.filter((task) => {
+    const status = String(task.status).toLowerCase()
+    return status === 'blocked' || status === 'failed'
+  })
   const incompleteTasks = payload.tasks.filter((task) => !['done', 'completed'].includes(String(task.status).toLowerCase()))
   const actions: string[] = []
 
@@ -2149,8 +2155,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   teamRef.current = team
   missionGoalRef.current = missionGoal
   missionActiveRef.current = missionActive
-  missionStateRef.current = missionState
   liveFeedVisibleRef.current = liveFeedVisible
+
+  useEffect(() => {
+    missionStateRef.current = missionState
+  }, [missionState])
 
   const mentionSuggestions = useMemo(() => {
     if (mentionQuery === null) return []
@@ -3324,7 +3333,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return pool
   }, [team, teamConfigs])
 
-  const moveTasksToStatus = useCallback((taskIds: Array<string>, status: TaskStatus) => {
+  const moveTasksToStatus = useCallback((taskIds: Array<string>, status: TaskStatus | 'failed') => {
     if (taskIds.length === 0) return
     const uniqueTaskIds = Array.from(new Set(taskIds))
     const ids = new Set(uniqueTaskIds)
@@ -3332,7 +3341,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionTasks((previous) => {
       const updated = previous.map((task) => {
         if (!ids.has(task.id) || task.status === status) return task
-        return { ...task, status, updatedAt: Date.now() }
+        return { ...task, status: status as TaskStatus, updatedAt: Date.now() }
       })
 
       // Save checkpoint with updated task statuses
@@ -3354,11 +3363,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
     const boardApi = taskBoardRef.current
     if (boardApi) {
-      boardApi.moveTasks(uniqueTaskIds, status)
+      if (status !== 'failed') {
+        boardApi.moveTasks(uniqueTaskIds, status)
+      }
       return
     }
 
-    pendingTaskMovesRef.current.push({ taskIds: uniqueTaskIds, status })
+    if (status !== 'failed') {
+      pendingTaskMovesRef.current.push({ taskIds: uniqueTaskIds, status })
+    }
   }, [])
 
 
@@ -3904,6 +3917,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           type: 'system',
           message: `Failed to dispatch to ${member?.name || agentId}: ${errorMessage}`,
         })
+        const taskIds = agentTasks.map((task) => task.id)
+        moveTasksToStatus(taskIds, 'failed')
         agentSessionsDoneRef.current.add(sessionKey)
         setAgentSessionStatus((prev) => ({
           ...prev,
@@ -4660,7 +4675,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       const completedTasks = cp.tasks.filter((t) => t.status === 'done' || t.status === 'completed').length
       const totalTasks = cp.tasks.length
       const duration = cp.completedAt ? cp.completedAt - cp.startedAt : Date.now() - cp.startedAt
-      const failed = cp.status === 'aborted' || cp.tasks.some((t) => t.status === 'blocked')
+      const failed = cp.status === 'aborted' || cp.tasks.some((t) => t.status === 'blocked' || t.status === 'failed')
       return {
         id: cp.id,
         name: cp.label,
@@ -4713,15 +4728,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .slice(0, 3)
 
     // Shared card style
-    const cardCls = 'relative overflow-hidden rounded-xl border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)] min-h-[320px]'
-    const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
+    const cardCls = 'relative overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-4 shadow-sm min-h-[320px]'
+    const insetCls = 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-2'
 
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 px-1 pb-4 pt-3 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex h-full min-h-0 flex-col bg-[var(--theme-bg)] px-1 pb-4 pt-3">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
         <div className="relative flex w-full min-h-0 flex-1 flex-col">
-          <div className="flex-1 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900" style={{ minHeight: '480px' }}>
+          <div className="flex-1 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-sm" style={{ minHeight: '480px' }}>
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
@@ -4748,11 +4763,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <article className={cardCls}>
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Active Team</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">Active Team</h2>
                 <button
                   type="button"
                   onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
-                  className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400 hover:border-neutral-300 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+                  className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors"
                 >
                   Switch Team
                 </button>
@@ -4761,7 +4776,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {team.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-5 text-center">
                   <span className="text-2xl">👥</span>
-                  <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">No team active</p>
+                  <p className="text-xs font-medium text-[var(--theme-muted)]">No team active</p>
                   <button
                     type="button"
                     onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
@@ -4778,8 +4793,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       {activeTeamIcon ?? '👥'}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-neutral-900 dark:text-white">{activeTeamName ?? `Custom Team`}</p>
-                      <p className="text-[10px] text-neutral-400">
+                      <p className="truncate text-sm font-bold text-[var(--theme-text)]">{activeTeamName ?? `Custom Team`}</p>
+                      <p className="text-[10px] text-[var(--theme-muted)]">
                         {activeTeamDescription || `${team.length} agent${team.length !== 1 ? 's' : ''}`}
                       </p>
                     </div>
@@ -4796,7 +4811,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <AgentAvatar index={resolveAgentAvatarIndex(member, index)} color={ac.hex} size={14} />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">{member.name}</div>
+                            <div className="truncate text-xs font-medium text-[var(--theme-text)]">{member.name}</div>
                           </div>
                           <span className={cn('shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-medium', getOfficeModelBadge(member.modelId))}>
                             {getModelShortLabel(member.modelId, gatewayModelLabelById)}
@@ -4810,7 +4825,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       )
                     })}
                     {team.length > 5 ? (
-                      <li className="text-center text-[10px] text-neutral-400">+{team.length - 5} more agents</li>
+                      <li className="text-center text-[10px] text-[var(--theme-muted)]">+{team.length - 5} more agents</li>
                     ) : null}
                   </ul>
                 </>
@@ -4821,7 +4836,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <article className={cardCls}>
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Recent Missions</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">Recent Missions</h2>
                 <button
                   type="button"
                   onClick={() => {
@@ -4857,7 +4872,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {recentMissions.length === 0 && !missionActive ? (
                 <div className="flex flex-col items-center gap-2 py-5 text-center">
                   <span className="text-2xl opacity-30">🚀</span>
-                  <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">No missions yet</p>
+                  <p className="text-xs font-medium text-[var(--theme-muted)]">No missions yet</p>
                   <button
                     type="button"
                     onClick={() => openNewMissionModal()}
@@ -4876,10 +4891,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       <li key={mission.id} className={cn('flex items-center gap-2', insetCls)}>
                         <span className={cn('shrink-0 text-[11px] font-bold', statusCls)}>{statusIcon}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">
+                          <p className="truncate text-xs font-medium text-[var(--theme-text)]">
                             {truncateMissionGoal(mission.name || mission.goal, 44)}
                           </p>
-                          <p className="text-[10px] text-neutral-400">
+                          <p className="text-[10px] text-[var(--theme-muted)]">
                             {mission.agentCount} agents · {durationStr} · {mission.successRate}%
                           </p>
                         </div>
@@ -4900,8 +4915,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <article className={cardCls}>
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Usage &amp; Cost</h2>
-                <span className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">Usage &amp; Cost</h2>
+                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-muted)]">
                   Today
                 </span>
               </div>
@@ -4909,12 +4924,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {/* Key metrics row */}
               <div className="mb-3 grid grid-cols-3 gap-2">
                 <div className={cn(insetCls, 'text-center')}>
-                  <p className="text-[9px] uppercase tracking-wide text-neutral-400 mb-0.5">Sessions</p>
-                  <p className="text-sm font-bold text-neutral-900 dark:text-white">{todaySessions > 0 ? todaySessions : '—'}</p>
+                  <p className="text-[9px] uppercase tracking-wide text-[var(--theme-muted)] mb-0.5">Sessions</p>
+                  <p className="text-sm font-bold text-[var(--theme-text)]">{todaySessions > 0 ? todaySessions : '—'}</p>
                 </div>
                 <div className={cn(insetCls, 'text-center')}>
-                  <p className="text-[9px] uppercase tracking-wide text-neutral-400 mb-0.5">Tokens</p>
-                  <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                  <p className="text-[9px] uppercase tracking-wide text-[var(--theme-muted)] mb-0.5">Tokens</p>
+                  <p className="text-sm font-bold text-[var(--theme-text)]">
                     {todayTokens > 0 ? (todayTokens >= 1000 ? `${Math.round(todayTokens / 1000)}k` : todayTokens) : '—'}
                   </p>
                 </div>
@@ -4929,13 +4944,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {/* Live mission cost (if running) */}
               {missionActive ? (
                 <div className={cn('mb-2 flex items-center justify-between gap-2', insetCls)}>
-                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400">Live mission</span>
+                  <span className="text-[10px] text-[var(--theme-muted)]">Live mission</span>
                   <div className="flex items-center gap-1.5">
                     <span className="relative flex size-1.5 shrink-0">
                       <span className="absolute inset-0 animate-ping rounded-full bg-accent-400/60" />
                       <span className="relative inline-flex size-1.5 rounded-full bg-accent-500" />
                     </span>
-                    <span className="font-mono text-[11px] font-semibold text-neutral-800 dark:text-white">
+                    <span className="font-mono text-[11px] font-semibold text-[var(--theme-text)]">
                       ${runningCost.toFixed(2)} · {missionElapsed}
                     </span>
                   </div>
@@ -4945,20 +4960,20 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {/* Provider breakdown */}
               {providerBreakdown.length > 0 ? (
                 <div>
-                  <p className="mb-1.5 text-[9px] uppercase tracking-wide text-neutral-400">Providers in Use</p>
+                  <p className="mb-1.5 text-[9px] uppercase tracking-wide text-[var(--theme-muted)]">Providers in Use</p>
                   <div className="space-y-1.5">
                     {providerBreakdown.map(([provider, count]) => {
                       const pct = team.length > 0 ? Math.round((count / team.length) * 100) : 0
                       return (
                         <div key={provider} className="flex items-center gap-2">
-                          <span className="w-16 shrink-0 truncate text-[10px] font-medium text-neutral-600 dark:text-neutral-400 capitalize">{provider}</span>
-                          <div className="flex-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800 h-1.5">
+                          <span className="w-16 shrink-0 truncate text-[10px] font-medium text-[var(--theme-muted)] capitalize">{provider}</span>
+                          <div className="flex-1 overflow-hidden rounded-full bg-[var(--theme-bg)] h-1.5">
                             <div
                               className="h-full rounded-full bg-accent-400 transition-all"
                               style={{ width: `${Math.max(10, pct)}%` }}
                             />
                           </div>
-                          <span className="w-8 shrink-0 text-right text-[9px] text-neutral-400">{count}×</span>
+                          <span className="w-8 shrink-0 text-right text-[9px] text-[var(--theme-muted)]">{count}×</span>
                         </div>
                       )
                     })}
@@ -4966,8 +4981,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </div>
               ) : (
                 <div className={cn('flex items-center justify-between gap-2', insetCls)}>
-                  <span className="text-[10px] text-neutral-400">No usage data yet</span>
-                  <span className="text-[10px] font-mono text-neutral-400">$0.00</span>
+                  <span className="text-[10px] text-[var(--theme-muted)]">No usage data yet</span>
+                  <span className="text-[10px] font-mono text-[var(--theme-muted)]">$0.00</span>
                 </div>
               )}
             </article>
@@ -6737,7 +6752,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 }}
               />
               <div className="mt-3 flex justify-end gap-2">
-                <button type="button" onClick={() => setSteerAgentId(null)} className="rounded-lg border border-neutral-200 dark:border-neutral-600 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800">Cancel</button>
+                <button type="button" onClick={() => setSteerAgentId(null)} className="rounded-lg border border-[var(--theme-border)] px-3 py-1.5 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-bg)]">Cancel</button>
                 <button
                   type="button"
                   disabled={!steerInput.trim()}
@@ -6868,7 +6883,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               <button
                                 type="button"
                                 onClick={() => { setConfirmAction({ kind: 'kill', agentId: row.id, label: `Kill ${row.name}` }); setMaximizedMissionId(null) }}
-                                className="flex size-7 items-center justify-center rounded-lg border border-red-200 dark:border-red-900 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors text-sm"
+                                className="flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-red-500 hover:bg-[var(--theme-bg)] transition-colors text-sm"
                                 title="Kill agent"
                               >
                                 ✕

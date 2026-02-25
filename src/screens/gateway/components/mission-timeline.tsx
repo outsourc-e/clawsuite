@@ -73,9 +73,14 @@ export function MissionTimeline({
   const missionCompletedSuccessfully =
     missionState === 'completed' ||
     (missionState === 'stopped' && totalTasks > 0 && completedTasks === totalTasks)
-  const missionCompletionLabel = missionCompletedSuccessfully ? 'Mission complete' : 'Mission stopped'
+  const missionCompletionLabel =
+    missionCompletedSuccessfully
+      ? 'Mission complete'
+      : missionState === 'aborted'
+        ? 'Mission aborted'
+        : 'Mission stopped'
   const missionCardCls =
-    'relative overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/50'
+    'relative overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4 shadow-sm'
 
   return (
     <section className={cn('mx-auto w-full max-w-[960px]', missionCardCls)}>
@@ -84,8 +89,8 @@ export function MissionTimeline({
         <li className="flex items-start gap-3">
           <span className="mt-1 h-[14px] w-[14px] rounded-full bg-accent-400" />
           <div>
-            <p className="text-[16px] font-bold text-neutral-900 dark:text-neutral-100">Mission started</p>
-            <p className="text-xs text-neutral-500">{new Date(startedAt).toLocaleString()}</p>
+            <p className="text-[16px] font-bold text-[var(--theme-text)]">Mission started</p>
+            <p className="text-xs text-[var(--theme-muted)]">{new Date(startedAt).toLocaleString()}</p>
           </div>
         </li>
 
@@ -98,10 +103,10 @@ export function MissionTimeline({
               <li key={`dispatch-${task.id}`} className="flex items-start gap-3">
                 <span className="mt-1 h-3 w-3 rounded-full bg-blue-500" />
                 <div className="min-w-0">
-                  <p className="break-words text-base font-bold text-neutral-900 dark:text-neutral-100">
+                  <p className="break-words text-base font-bold text-[var(--theme-text)]">
                     Agent dispatched: {member?.name ?? task.agentId}
                   </p>
-                  <p className="break-words text-sm text-neutral-500">
+                  <p className="break-words text-sm text-[var(--theme-muted)]">
                     {task.title} · {member?.modelId || 'Unknown model'}
                   </p>
                 </div>
@@ -113,13 +118,6 @@ export function MissionTimeline({
           const status = agentStatuses.get(member.id)
           const assignedTasks = tasks.filter((task) => task.agentId === member.id)
           const assignedTaskCount = assignedTasks.length
-          const hasCompletedAssignedTasks =
-            assignedTaskCount > 0 &&
-            assignedTasks.every((task) =>
-              task.status === 'done' ||
-              (task.status as string) === 'completed' ||
-              (task.status as string) === 'complete',
-            )
           const outputLines = agentOutputs.get(member.id) ?? agentOutputs.get(member.name) ?? []
           const agentStatus = (status?.status ?? '').toLowerCase()
           const isActive = agentStatus === 'active'
@@ -133,32 +131,32 @@ export function MissionTimeline({
                   : agentStatus === 'done' || agentStatus === 'complete' || agentStatus === 'completed'
                     ? 'Done'
                     : agentStatus === 'stopped'
-                      ? hasCompletedAssignedTasks
-                        ? 'Done'
-                        : 'Idle'
+                      ? assignedTaskCount > 0
+                        ? 'Idle'
+                        : 'Not started'
                       : agentStatus === 'idle' || agentStatus === 'ready'
                         ? 'Idle'
                         : !agentStatus || agentStatus === 'spawning' || agentStatus === 'waiting' || agentStatus === 'not-started'
-                          ? 'Waiting'
-                          : 'Waiting'
+                          ? 'Not started'
+                          : 'Not started'
           const statusBadgeClass =
             normalizedStatusLabel === 'Active'
               ? 'bg-emerald-700 text-white'
               : normalizedStatusLabel === 'Paused'
                 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
-                : normalizedStatusLabel === 'Waiting'
+                : normalizedStatusLabel === 'Not started'
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
                   : normalizedStatusLabel === 'Done'
                     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
                     : normalizedStatusLabel === 'Error'
                       ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
-                      : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+                      : 'bg-[var(--theme-bg)] text-[var(--theme-muted)]'
           const statusDotClass =
             normalizedStatusLabel === 'Active'
               ? 'bg-emerald-500'
               : normalizedStatusLabel === 'Paused'
                 ? 'bg-amber-500'
-                : normalizedStatusLabel === 'Waiting'
+                : normalizedStatusLabel === 'Not started'
                   ? 'bg-blue-500'
                   : normalizedStatusLabel === 'Done'
                     ? 'bg-emerald-500'
@@ -170,7 +168,7 @@ export function MissionTimeline({
               ? 'Agent is actively working'
               : normalizedStatusLabel === 'Idle'
                 ? 'Agent is connected and waiting for tasks'
-                : normalizedStatusLabel === 'Waiting'
+                : normalizedStatusLabel === 'Not started'
                   ? 'Agent is starting up'
                   : normalizedStatusLabel === 'Paused'
                     ? 'Mission is paused'
@@ -183,12 +181,12 @@ export function MissionTimeline({
               <div className={cn('min-w-0 flex-1', missionCardCls)}>
                 <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-accent-500 via-accent-400/40 to-transparent" />
                 <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-base font-bold text-neutral-900 dark:text-neutral-100">{member.name}</p>
+                  <p className="truncate text-base font-bold text-[var(--theme-text)]">{member.name}</p>
                   <span className={cn('rounded-full px-2.5 py-1 text-xs', statusBadgeClass)} title={statusTitle}>
                     {normalizedStatusLabel}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-neutral-500">Assigned tasks: {assignedTaskCount}</p>
+                <p className="mt-1 text-sm text-[var(--theme-muted)]">Assigned tasks: {assignedTaskCount}</p>
 
                 {isActive ? (
                   <div className="mt-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 max-w-full">
@@ -208,8 +206,8 @@ export function MissionTimeline({
                 </button>
 
                 {(isExpanded || isActive || outputLines.length > 0) ? (
-                  <div className="mt-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-2">
-                    <div className="max-h-[240px] overflow-y-auto rounded-lg bg-neutral-50 dark:bg-neutral-800/50 p-3 font-mono text-xs text-neutral-700 dark:text-neutral-300">
+                  <div className="mt-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-2">
+                    <div className="max-h-[240px] overflow-y-auto rounded-lg bg-[var(--theme-bg)] p-3 font-mono text-xs text-[var(--theme-text)]">
                       {outputLines.length > 0 ? (
                         <div className="space-y-1">
                           {outputLines.map((line, index) => (
@@ -219,7 +217,7 @@ export function MissionTimeline({
                           ))}
                         </div>
                       ) : (
-                        <p className="break-words text-[11px] text-neutral-400">
+                        <p className="break-words text-[11px] text-[var(--theme-muted)]">
                           {agentSessionMap?.[member.id] ? 'Live output will appear here shortly...' : 'Waiting for agent session...'}
                         </p>
                       )}
@@ -236,8 +234,8 @@ export function MissionTimeline({
           <li className="flex items-start gap-3">
             <span className="mt-1 h-3 w-3 rounded-full bg-neutral-300" />
             <div>
-              <p className="text-base font-bold text-neutral-900 dark:text-neutral-100">{missionCompletionLabel}</p>
-              <p className="text-xs text-neutral-500">
+              <p className="text-base font-bold text-[var(--theme-text)]">{missionCompletionLabel}</p>
+              <p className="text-xs text-[var(--theme-muted)]">
                 {completedTasks}/{totalTasks} tasks complete · total time {formatElapsed(elapsedTime)}
               </p>
             </div>

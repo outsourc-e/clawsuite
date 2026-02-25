@@ -73,22 +73,21 @@ const themeScript = `
     const media = window.matchMedia('(prefers-color-scheme: dark)')
     // ClawSuite theme class + data-theme attribute
     const enterpriseTheme = localStorage.getItem('clawsuite-theme')
-    if (enterpriseTheme && (
+    const isValidEnterpriseTheme =
       enterpriseTheme === 'ops-dark' ||
       enterpriseTheme === 'premium-dark' ||
       enterpriseTheme === 'paper-light'
-    )) {
+    root.classList.remove('paper-light', 'ops-dark', 'premium-dark')
+    if (isValidEnterpriseTheme) {
       root.setAttribute('data-theme', enterpriseTheme)
-      root.classList.remove('paper-light', 'ops-dark', 'premium-dark')
       root.classList.add(enterpriseTheme)
-      if (
-        enterpriseTheme === 'ops-dark' ||
-        enterpriseTheme === 'premium-dark'
-      ) {
+      if (enterpriseTheme === 'ops-dark' || enterpriseTheme === 'premium-dark') {
         theme = 'dark'
       } else {
         theme = 'light'
       }
+    } else {
+      root.removeAttribute('data-theme')
     }
     const apply = () => {
       root.classList.remove('light', 'dark', 'system')
