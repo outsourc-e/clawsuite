@@ -4903,9 +4903,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && missionGoal.trim()) {
-                      // Open mission wizard on the Missions tab with pre-filled goal
-                      setActiveTab('missions')
-                      window.setTimeout(() => openNewMissionModal({ goal: missionGoal.trim() }), 0)
+                      openNewMissionModal({ goal: missionGoal.trim() })
                     }
                   }}
                 />
@@ -4914,9 +4912,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   disabled={!missionGoal.trim()}
                   onClick={() => {
                     if (missionGoal.trim()) {
-                      // Open mission wizard on the Missions tab with pre-filled goal
-                      setActiveTab('missions')
-                      window.setTimeout(() => openNewMissionModal({ goal: missionGoal.trim() }), 0)
+                      openNewMissionModal({ goal: missionGoal.trim() })
                     }
                   }}
                   className="shrink-0 rounded-lg bg-accent-500 px-4 py-2 text-xs font-semibold text-white hover:bg-accent-600 disabled:opacity-40 transition-colors"
@@ -5049,11 +5045,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">No missions yet</p>
                   <button
                     type="button"
-                    onClick={() => {
-                      setActiveTab('missions')
-                      // Open mission wizard after switching tab
-                      window.setTimeout(() => openNewMissionModal(), 0)
-                    }}
+                    onClick={() => openNewMissionModal()}
                     className="mt-1 rounded-lg bg-orange-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-orange-600 transition-colors"
                   >
                     + New Mission
@@ -5179,7 +5171,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return (
       <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 p-4 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
-        <div className="relative mx-auto flex w-full max-w-[1200px] flex-col gap-4">
+        <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-4">
 
         {/* ── Header + horizontal pill tabs ── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -6132,7 +6124,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 	    return (
 	      <div className="relative flex h-full min-h-0 flex-col bg-neutral-50/80 dark:bg-neutral-950">
 	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
-	        <div className="relative mx-auto flex w-full max-w-[1200px] min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
+	        <div className="relative mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
 	          {/* ── Header ──────────────────────────────────────────────────── */}
           <div className="flex w-full items-center justify-between gap-3 px-1 py-2">
             <div>
