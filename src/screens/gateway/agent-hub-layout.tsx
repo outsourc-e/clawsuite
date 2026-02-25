@@ -4865,7 +4865,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="relative flex flex-col h-full min-h-0 bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
-        <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-7xl flex-1 min-h-0 px-3 sm:px-4 flex flex-col">
+        <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-[1600px] flex-1 min-h-0 px-3 sm:px-4 flex flex-col">
           <div className="flex-1 min-h-[420px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
             <PixelOfficeView
               agentRows={agentWorkingRows}
@@ -4892,7 +4892,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* ── Quick Launch Bar ── */}
           {!missionActive && (
-            <div className="relative mx-auto mt-6 w-full max-w-7xl shrink-0 px-3 sm:px-4">
+            <div className="relative mx-auto mt-6 w-full max-w-[1600px] shrink-0 px-3 sm:px-4">
               <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[var(--theme-card,#161b27)] p-3 shadow-sm">
                 <span className="text-xl">🚀</span>
                 <input
@@ -4933,7 +4933,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           )}
 
           {/* ── 3-card row — shrink-0, anchored at bottom ── */}
-          <section className="relative mx-auto mb-4 mt-4 w-full max-w-7xl shrink-0 grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
+          <section className="relative mx-auto mb-4 mt-4 w-full max-w-[1600px] shrink-0 grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
@@ -6967,7 +6967,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             : 'bg-white dark:bg-slate-800',
         )}
       >
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4">
           <div className="flex min-w-0 items-baseline gap-2">
             <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-900 dark:text-white">Agent Hub</h1>
             <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
@@ -6986,7 +6986,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
       <div className="shrink-0 border-b border-neutral-200 bg-neutral-50/80 px-5 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
-        <div className="mx-auto w-full max-w-7xl overflow-x-auto">
+        <div className="mx-auto w-full max-w-[1600px] overflow-x-auto">
           <div className="flex min-w-max items-center">
             {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'configure'
@@ -7141,6 +7141,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 statusLabel={selectedOutputStatusLabel}
                 compact
                 externalStream
+                outputLines={agentOutputLines[selectedOutputAgentId]}
               />
             </div>
           </div>
@@ -7556,6 +7557,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 modelId={selectedOutputModelId}
                 statusLabel={selectedOutputStatusLabel}
                 externalStream
+                outputLines={selectedOutputAgentId ? agentOutputLines[selectedOutputAgentId] : undefined}
               />
             </div>
           </div>
