@@ -19,6 +19,7 @@ export type AgentWorkingStatus =
   | 'paused'
   | 'error'
   | 'none'
+  | 'waiting_for_input'
 
 export type AgentWorkingRow = {
   id: string
@@ -94,13 +95,14 @@ function getModelLabel(modelId: string): string {
 }
 
 const STATUS_TEXT: Record<AgentWorkingStatus, string> = {
-  active:   '● working',
-  spawning: '◌ spawning...',
-  ready:    '○ ready',
-  idle:     '○ idle',
-  paused:   '⏸ paused',
-  error:    '✕ error',
-  none:     '— no session',
+  active:            '● working',
+  spawning:          '◌ spawning...',
+  ready:             '○ ready',
+  idle:              '○ idle',
+  paused:            '⏸ paused',
+  error:             '✕ error',
+  none:              '— no session',
+  waiting_for_input: '⏳ waiting for input',
 }
 
 function SpinnerIcon({ className }: { className?: string }) {

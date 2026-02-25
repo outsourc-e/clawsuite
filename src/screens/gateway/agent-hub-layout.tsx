@@ -885,6 +885,20 @@ function parseSsePayload(raw: string): Record<string, unknown> | null {
   }
 }
 
+/** Extract text content from a chat message object (handles string and content-block arrays). */
+function extractTextFromMessage(message: unknown): string {
+  if (!message || typeof message !== 'object') return ''
+  const msg = message as Record<string, unknown>
+  if (typeof msg.content === 'string') return msg.content
+  if (Array.isArray(msg.content)) {
+    return (msg.content as Array<Record<string, unknown>>)
+      .filter((block) => block?.type === 'text' && typeof block.text === 'string')
+      .map((block) => block.text as string)
+      .join('')
+  }
+  return ''
+}
+
 function readEventText(payload: Record<string, unknown>): string {
   const direct = readString(payload.text) || readString(payload.content) || readString(payload.chunk)
   if (direct) return direct
@@ -1109,6 +1123,59 @@ const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
   coding: 'Coding Sprint',
   content: 'Content Pipeline',
   'pc1-loop': 'PC1 Agent Loop',
+}
+
+/**
+ * Detect whether an agent's final message signals that it has genuinely
+ * completed its work, versus ending a turn mid-conversation (e.g. asking a
+ * clarifying question).
+ *
+ * Returns `'completed'` when the output looks like a finished deliverable,
+ * `'waiting_for_input'` when the agent appears to be asking the user something.
+ *
+ * Heuristic order:
+ *  1. Explicit structured markers always win.
+ *  2. Question-like endings → waiting_for_input.
+ *  3. Short responses (< 60 chars) that aren't markers → waiting_for_input
+ *     (likely a clarification, not a deliverable).
+ *  4. Everything else → completed (long-form output = deliverable).
+ */
+function classifyAgentTurnEnd(text: string | undefined | null): 'completed' | 'waiting_for_input' {
+  if (!text) return 'completed' // no output → nothing to wait for
+
+  const trimmed = text.trim()
+  if (!trimmed) return 'completed'
+
+  // ── 1. Explicit completion markers (case-insensitive) ──────────────────
+  const completionMarkers = [
+    '[TASK_COMPLETE]', '[DONE]', '[MISSION_COMPLETE]', '[COMPLETED]',
+    'TASK_COMPLETE', 'MISSION_COMPLETE',
+  ]
+  const upper = trimmed.toUpperCase()
+  for (const marker of completionMarkers) {
+    if (upper.includes(marker)) return 'completed'
+  }
+
+  // ── 2. Explicit waiting markers ────────────────────────────────────────
+  const waitingMarkers = [
+    '[WAITING_FOR_INPUT]', '[NEEDS_INPUT]', '[QUESTION]',
+    'APPROVAL_REQUIRED:',
+  ]
+  for (const marker of waitingMarkers) {
+    if (upper.includes(marker.toUpperCase())) return 'waiting_for_input'
+  }
+
+  // ── 3. Ends with a question → likely asking for input ──────────────────
+  // Look at the last meaningful line (skip blank lines and trailing whitespace)
+  const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean)
+  const lastLine = lines[lines.length - 1] ?? ''
+  if (/\?\s*$/.test(lastLine)) return 'waiting_for_input'
+
+  // ── 4. Very short output without markers → probably a question/note ────
+  if (trimmed.length < 60) return 'waiting_for_input'
+
+  // ── 5. Default: treat long output as a completed deliverable ───────────
+  return 'completed'
 }
 
 const LEGACY_AGENT_AVATARS = ['🔍', '✍️', '📝', '🧪', '🎨', '📊', '🛡️', '⚡', '🔬', '🎯'] as const
@@ -1509,6 +1576,13 @@ function getAgentStatusMeta(status: AgentWorkingStatus): {
         label: 'Paused',
         className: 'text-amber-700',
         dotClassName: 'bg-amber-500',
+      }
+    case 'waiting_for_input':
+      return {
+        label: 'Awaiting Input',
+        className: 'text-amber-600',
+        dotClassName: 'bg-amber-400',
+        pulse: true,
       }
     default:
       return {
@@ -2892,12 +2966,44 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         if (!text) return
         captureAgentOutput(agentId, text)
       })
-      source.addEventListener('done', () => {
+      source.addEventListener('done', (event) => {
         markStreamAlive()
-        // Track this session as done
+
+        // ── Extract the final message text from the done event ────────────
+        let finalText = ''
+        if (event instanceof MessageEvent) {
+          try {
+            const data = JSON.parse(event.data as string) as Record<string, unknown>
+            finalText = extractTextFromMessage(data.message) || String(data.text ?? data.content ?? '')
+          } catch { /* ignore parse errors */ }
+        }
+        // Also check the last captured output lines for this agent
+        if (!finalText) {
+          const captured = agentOutputLinesRef.current[agentId]
+          finalText = captured?.[captured.length - 1] ?? ''
+        }
+
+        const turnResult = classifyAgentTurnEnd(finalText)
+        const agentName = teamRef.current.find((m) => m.id === agentId)?.name ?? agentId
+
+        if (turnResult === 'waiting_for_input') {
+          // ── Agent is asking a question / needs input — do NOT mark as done ──
+          setAgentSessionStatus((prev) => ({
+            ...prev,
+            [agentId]: { status: 'waiting_for_input', lastSeen: Date.now(), lastMessage: finalText },
+          }))
+          emitFeedEvent({
+            type: 'agent_active',
+            message: `${agentName} is waiting for input`,
+            agentName,
+          })
+          return // Do NOT mark tasks done or trigger auto-completion
+        }
+
+        // ── Agent has genuinely completed its work ──────────────────────────
         agentSessionsDoneRef.current.add(sessionKey)
 
-        // Mark agent status as idle
+        // Mark agent status as idle (completed)
         setAgentSessionStatus((prev) => ({
           ...prev,
           [agentId]: { status: 'idle', lastSeen: Date.now() },
@@ -2914,7 +3020,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             (t, i) => t.status === 'done' && prev[i]?.status !== 'done',
           )
           if (justCompleted.length > 0) {
-            const agentName = teamRef.current.find((m) => m.id === agentId)?.name ?? agentId
             justCompleted.forEach((task) => {
               emitFeedEvent({
                 type: 'task_completed',
@@ -3114,6 +3219,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         status = 'ready'
       } else if (sessionStatus.status === 'error') {
         status = 'error'
+      } else if (sessionStatus.status === 'waiting_for_input') {
+        status = 'waiting_for_input'
       } else if (sessionStatus.status === 'active') {
         status = 'active'
       } else {
@@ -3157,10 +3264,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return row ? toTitleCase(row.status) : undefined
   }, [agentWorkingRows, selectedOutputAgentId])
 
-  // Safety net: auto-complete mission if all agents reach terminal state (handles missed SSE done events)
+  // Safety net: auto-complete mission if all agents reach terminal state (handles missed SSE done events).
+  // Agents in 'waiting_for_input' are NOT terminal — the mission stays open for human input.
   useEffect(() => {
     if (!missionActive || missionState !== 'running') return
     if (agentWorkingRows.length === 0) return
+    const anyWaiting = agentWorkingRows.some((r) => r.status === 'waiting_for_input')
+    if (anyWaiting) return // Mission needs human input — don't auto-close
     const allTerminal = agentWorkingRows.every((r) =>
       r.status === 'idle' || r.status === 'none' || r.status === 'error'
     )
@@ -3370,6 +3480,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       const agentName = member?.name ?? agentId
       try {
         await steerAgent(sessionKey, directive)
+        // Clear waiting_for_input — user has provided input, agent will resume
+        setAgentSessionStatus((prev) => {
+          if (prev[agentId]?.status !== 'waiting_for_input') return prev
+          return { ...prev, [agentId]: { ...prev[agentId], status: 'active', lastSeen: Date.now() } }
+        })
+        // Remove from done set so agent can be re-evaluated on next turn end
+        agentSessionsDoneRef.current.delete(sessionKey)
         emitFeedEvent({
           type: 'system',
           message: `Directive sent to ${agentName}: ${directive.slice(0, 80)}`,
@@ -3442,6 +3559,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             message: `[APPROVED] You may proceed with: ${approval.action}`,
           }),
         }).catch(() => { /* best-effort */ })
+        // Clear waiting_for_input — approval is a form of human input
+        setAgentSessionStatus((prev) => {
+          if (prev[approval.agentId]?.status !== 'waiting_for_input') return prev
+          return { ...prev, [approval.agentId]: { ...prev[approval.agentId], status: 'active', lastSeen: Date.now() } }
+        })
+        agentSessionsDoneRef.current.delete(sessionKey)
       }
     }
 
@@ -3795,9 +3918,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             setAgentSessionStatus((prev) => {
               const next: Record<string, AgentSessionStatusEntry> = {}
 
-              // Apply matched sessions
+              // Apply matched sessions — but don't override waiting_for_input
+              // (that status is set by the SSE done handler and should only be
+              // cleared when the user sends a reply to the agent)
               for (const [agentId, entry] of matchedEntries) {
-                next[agentId] = entry
+                if (prev[agentId]?.status === 'waiting_for_input' && entry.status !== 'active') {
+                  next[agentId] = prev[agentId]
+                } else {
+                  next[agentId] = entry
+                }
               }
 
               // Handle agents whose session key wasn't returned by the API

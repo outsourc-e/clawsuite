@@ -69,7 +69,7 @@ export type TeamMember = {
 }
 
 export type AgentSessionStatusEntry = {
-  status: 'active' | 'idle' | 'stopped' | 'error'
+  status: 'active' | 'idle' | 'stopped' | 'error' | 'waiting_for_input'
   lastSeen: number
   lastMessage?: string
 }
@@ -139,6 +139,7 @@ function resolveSessionDotState(
   }
   if (!sessionStatus) return 'none'
   if (sessionStatus.status === 'error' || sessionStatus.status === 'stopped') return 'dead'
+  if (sessionStatus.status === 'waiting_for_input') return 'idle' // treat as idle dot (amber badge shows in working panel)
   const ageMs = Date.now() - sessionStatus.lastSeen
   if (ageMs < 30_000) return 'active'
   if (ageMs < 300_000) return 'idle'
