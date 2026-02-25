@@ -368,7 +368,7 @@ export function AgentOutputPanel({
               className={cn(
                 'rounded-lg px-3 py-2',
                 compact
-                  ? 'border border-neutral-800 bg-neutral-900/70'
+                  ? 'border border-[var(--theme-border)] bg-[var(--theme-card2)]'
                   : 'border border-[var(--theme-border)] bg-[var(--theme-card)]',
               )}
             >
@@ -377,11 +377,11 @@ export function AgentOutputPanel({
                   'size-1.5 rounded-full',
                   task.status === 'done' ? 'bg-emerald-500' : task.status === 'in_progress' ? 'bg-blue-500 animate-pulse' : 'bg-neutral-500',
                 )} />
-                <span className={cn('text-xs font-medium', compact ? 'text-neutral-300' : 'text-[var(--theme-text)]')}>
+                <span className={cn('text-xs font-medium', compact ? 'text-[var(--theme-text)]' : 'text-[var(--theme-text)]')}>
                   {task.title}
                 </span>
               </div>
-              <p className={cn('mt-1 text-[10px]', compact ? 'text-neutral-500' : 'text-[var(--theme-muted)]')}>
+              <p className={cn('mt-1 text-[10px]', compact ? 'text-[var(--theme-muted)]' : 'text-[var(--theme-muted)]')}>
                 {task.status === 'in_progress'
                   ? 'Working...'
                   : task.status === 'done'
@@ -395,12 +395,12 @@ export function AgentOutputPanel({
 
       {/* Terminal output */}
       {sessionKey && streamDisconnected && !sessionEnded ? (
-        <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-amber-800/50 bg-amber-950/40 px-2 py-1 text-[10px] font-medium text-amber-400">
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-400">
           <span>Stream disconnected</span>
           <button
             type="button"
             onClick={handleReconnect}
-            className="rounded border border-amber-700 px-2 py-0.5 text-[10px] font-semibold text-amber-300 transition-colors hover:bg-amber-900/40"
+            className="rounded border border-amber-400 px-2 py-0.5 text-[10px] font-semibold text-amber-600 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40"
           >
             Reconnect
           </button>
@@ -412,43 +412,43 @@ export function AgentOutputPanel({
           className={cn(
             'min-h-0 flex-1 overflow-y-auto p-3 font-mono',
             compact
-              ? 'min-h-0 flex-1 rounded-lg bg-neutral-950 text-[11px] leading-relaxed text-neutral-300'
-              : 'mt-1 min-h-[300px] flex-1 rounded-lg border border-neutral-800 bg-neutral-950 text-sm leading-6 text-neutral-300',
+              ? 'min-h-0 flex-1 rounded-lg bg-[var(--theme-card2)] text-[11px] leading-relaxed text-[var(--theme-text)]'
+              : 'mt-1 min-h-[300px] flex-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] text-sm leading-6 text-[var(--theme-text)]',
           )}
         >
           {messages.length === 0 && !sessionEnded ? (
-            <p className="animate-pulse text-neutral-500">Waiting for response…</p>
+            <p className="animate-pulse text-[var(--theme-muted)]">Waiting for response…</p>
           ) : (
             <>
               {messages.map((msg, index) =>
                 msg.role === 'tool' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="mb-1 rounded-md border border-neutral-800 bg-neutral-900/50 px-2 py-1 font-mono text-xs leading-5 text-neutral-400"
+                    className="mb-1 rounded-md border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-1 font-mono text-xs leading-5 text-[var(--theme-muted)]"
                   >
-                    <span className="text-neutral-600 mr-2 text-[10px] tabular-nums">{formatTimestamp(msg.timestamp)}</span>
-                    <span className="text-neutral-500">▶ </span>
+                    <span className="text-[var(--theme-muted)] mr-2 text-[10px] tabular-nums opacity-60">{formatTimestamp(msg.timestamp)}</span>
+                    <span className="text-[var(--theme-muted)] opacity-70">▶ </span>
                     {msg.content}
                   </div>
                 ) : msg.role === 'user' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="my-2 rounded-lg border border-blue-900/30 bg-blue-950/20 px-3 py-2 text-sm leading-6 text-blue-200"
+                    className="my-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm leading-6 text-blue-900 dark:border-blue-900/30 dark:bg-blue-950/20 dark:text-blue-200"
                   >
                     <div className="mb-1 flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">You</span>
-                      <span className="text-[10px] text-neutral-600 tabular-nums">{formatTimestamp(msg.timestamp)}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">You</span>
+                      <span className="text-[10px] text-[var(--theme-muted)] tabular-nums">{formatTimestamp(msg.timestamp)}</span>
                     </div>
-                    <Markdown className="text-sm leading-6 text-blue-100 [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2">
+                    <Markdown className="text-sm leading-6 text-blue-800 dark:text-blue-100 [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2">
                       {msg.content}
                     </Markdown>
                   </div>
                 ) : msg.done ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
-                    className="mt-2 border-t border-neutral-800 pt-2 text-sm font-medium text-emerald-400 font-mono"
+                    className="mt-2 border-t border-[var(--theme-border)] pt-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 font-mono"
                   >
-                    <span className="text-neutral-600 mr-2 text-[10px] tabular-nums">{formatTimestamp(msg.timestamp)}</span>
+                    <span className="text-[var(--theme-muted)] mr-2 text-[10px] tabular-nums">{formatTimestamp(msg.timestamp)}</span>
                     {msg.content}
                   </div>
                 ) : (
@@ -456,28 +456,28 @@ export function AgentOutputPanel({
                     key={`${msg.timestamp}-${index}`}
                     className="my-2"
                   >
-                    <span className="text-neutral-600 text-[10px] font-mono tabular-nums block mb-0.5">{formatTimestamp(msg.timestamp)}</span>
-                    <Markdown className="text-sm leading-6 text-neutral-200 [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_pre]:my-2 [&_pre]:bg-neutral-900 [&_pre]:border-neutral-800 [&_code]:text-emerald-300">
+                    <span className="text-[var(--theme-muted)] text-[10px] font-mono tabular-nums block mb-0.5">{formatTimestamp(msg.timestamp)}</span>
+                    <Markdown className="text-sm leading-6 text-[var(--theme-text)] [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_pre]:my-2 [&_pre]:bg-[var(--theme-card2)] [&_pre]:border-[var(--theme-border)] [&_code]:text-emerald-600 dark:[&_code]:text-emerald-300">
                       {stripThinkBlocks(msg.content)}
                     </Markdown>
                   </div>
                 ),
               )}
               {!sessionEnded && messages.length > 0 && (
-                <span className="animate-pulse text-emerald-400">▊</span>
+                <span className="animate-pulse text-emerald-600 dark:text-emerald-400">▊</span>
               )}
             </>
           )}
         </div>
       ) : (
         // Fallback placeholder when no sessionKey
-        <div className={cn('min-h-0 flex-1 overflow-y-auto rounded-lg bg-neutral-950 p-3 font-mono text-sm leading-6 text-neutral-300', compact ? 'min-h-0 flex-1 overflow-y-auto' : 'mt-1 min-h-[300px]')}>
+        <div className={cn('min-h-0 flex-1 overflow-y-auto rounded-lg bg-[var(--theme-card2)] p-3 font-mono text-sm leading-6 text-[var(--theme-text)]', compact ? 'min-h-0 flex-1 overflow-y-auto' : 'mt-1 min-h-[300px]')}>
           {tasks.length === 0 ? (
-            <p className="text-neutral-500">No dispatched tasks yet.</p>
+            <p className="text-[var(--theme-muted)]">No dispatched tasks yet.</p>
           ) : (
             <>
-              <p className="text-neutral-400">$ Dispatching to {agentName}…</p>
-              <p className="animate-pulse text-emerald-400">▊</p>
+              <p className="text-[var(--theme-muted)]">$ Dispatching to {agentName}…</p>
+              <p className="animate-pulse text-emerald-600 dark:text-emerald-400">▊</p>
             </>
           )}
         </div>
@@ -501,7 +501,7 @@ export function AgentOutputPanel({
             {agentName}
           </h3>
           {modelId ? (
-            <span className="shrink-0 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-0.5 font-mono text-[10px] font-semibold text-neutral-400">
+            <span className="shrink-0 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 font-mono text-[10px] font-semibold text-[var(--theme-muted)]">
               {modelId}
             </span>
           ) : null}
@@ -514,7 +514,7 @@ export function AgentOutputPanel({
                   ? 'border-amber-200 bg-amber-50 text-amber-700'
                 : headerStatus === 'Streaming'
                     ? 'border-sky-200 bg-sky-50 text-sky-700'
-                    : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-neutral-400',
+                    : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)]',
             )}
           >
             {headerStatus}

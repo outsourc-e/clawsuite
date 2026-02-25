@@ -2633,6 +2633,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setPausedByAgentId({})
     setSelectedOutputAgentId(undefined)
     setActiveTab('missions')
+    // Auto-switch filter tab based on abort/complete reason
+    setMissionSubTab(reason === 'aborted' ? 'failed' : 'complete')
     dispatchingRef.current = false
     pendingTaskMovesRef.current = []
     sessionActivityRef.current = new Map()
@@ -3197,6 +3199,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             ...prev,
             [agentId]: { status: 'waiting_for_input', lastSeen: Date.now(), lastMessage: finalText },
           }))
+          // Auto-switch to Needs Input tab so user sees the prompt
+          setMissionSubTab('needs_input')
           emitFeedEvent({
             type: 'agent_active',
             message: `${agentName} is waiting for input`,
@@ -4438,8 +4442,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     if (firstAssignedAgentId) setOutputPanelVisible(true)
     setPausedByAgentId({})
     sessionActivityRef.current = new Map()
-    // ── Auto-switch to Mission tab and open Live Output panel ──────────────
+    // ── Auto-switch to Mission tab → Running filter and open Live Output panel ──
     setActiveTab('missions')
+    setMissionSubTab('running')
     setOutputPanelVisible(true)
     setWizardOpen(false)
     emitFeedEvent({
@@ -4596,7 +4601,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && missionGoal.trim()) {
                       setActiveTab('missions')
-                      setMissionSubTab('all')
+                      setMissionSubTab('running')
                       window.setTimeout(() => handleCreateMissionRef.current(), 0)
                     }
                   }}
@@ -6700,31 +6705,31 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
         {/* ── Right Panel: Live Output (single purpose — terminal-style agent output) ── */}
         {!isMobileHub && outputPanelVisible && selectedOutputAgentId && (
-          <div className="flex w-96 shrink-0 flex-col border-l border-neutral-200 dark:border-neutral-700 bg-neutral-950 dark:bg-[#0a0d12]">
-            {/* Terminal-style header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 px-3 py-2.5 bg-neutral-900">
+          <div className="flex w-96 shrink-0 flex-col border-l border-[var(--theme-border)] bg-[var(--theme-card)] dark:bg-[var(--theme-card,#161b27)]">
+            {/* Output panel header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--theme-border)] px-3 py-2.5 bg-[var(--theme-bg)]">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="flex size-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-neutral-100 font-mono">
+                  <p className="truncate text-sm font-semibold text-[var(--theme-text)] font-mono">
                     {selectedOutputAgentName}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     {selectedOutputModelId && (
-                      <span className="text-[10px] text-neutral-500 font-mono">{getModelDisplayLabel(selectedOutputModelId)}</span>
+                      <span className="text-[10px] text-[var(--theme-muted)] font-mono">{getModelDisplayLabel(selectedOutputModelId)}</span>
                     )}
-                    <span className="text-[10px] text-neutral-600 font-mono">·</span>
-                    <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{missionTokenCount.toLocaleString()} tokens</span>
+                    <span className="text-[10px] text-[var(--theme-muted)] font-mono opacity-50">·</span>
+                    <span className="text-[10px] text-[var(--theme-muted)] font-mono tabular-nums">{missionTokenCount.toLocaleString()} tokens</span>
                     {selectedOutputStatusLabel && (
                       <>
-                        <span className="text-[10px] text-neutral-600 font-mono">·</span>
+                        <span className="text-[10px] text-[var(--theme-muted)] font-mono opacity-50">·</span>
                         <span className={cn(
                           'text-[10px] font-mono font-semibold',
-                          selectedOutputStatusLabel === 'Active' && 'text-emerald-400',
-                          selectedOutputStatusLabel === 'Idle' && 'text-neutral-400',
-                          selectedOutputStatusLabel === 'Waiting For Input' && 'text-amber-400',
-                          selectedOutputStatusLabel === 'Error' && 'text-red-400',
-                          selectedOutputStatusLabel === 'Paused' && 'text-blue-400',
+                          selectedOutputStatusLabel === 'Active' && 'text-emerald-600 dark:text-emerald-400',
+                          selectedOutputStatusLabel === 'Idle' && 'text-[var(--theme-muted)]',
+                          selectedOutputStatusLabel === 'Waiting For Input' && 'text-amber-600 dark:text-amber-400',
+                          selectedOutputStatusLabel === 'Error' && 'text-red-600 dark:text-red-400',
+                          selectedOutputStatusLabel === 'Paused' && 'text-blue-600 dark:text-blue-400',
                         )}>{selectedOutputStatusLabel}</span>
                       </>
                     )}
@@ -6734,7 +6739,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <button
                 type="button"
                 onClick={() => { setOutputPanelVisible(false) }}
-                className="flex size-7 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-800 hover:text-neutral-300 transition-colors"
+                className="flex size-7 items-center justify-center rounded-full text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] transition-colors"
                 aria-label="Close output panel"
               >
                 ✕
@@ -6742,7 +6747,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
             {/* Agent selector tabs (if multiple agents) */}
             {team.length > 1 && missionActive && (
-              <div className="flex shrink-0 gap-0.5 border-b border-neutral-800 bg-neutral-900/80 px-2 py-1 overflow-x-auto">
+              <div className="flex shrink-0 gap-0.5 border-b border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 overflow-x-auto">
                 {team.map((member) => {
                   const isSelected = member.id === selectedOutputAgentId
                   const agentStatus = agentSessionStatus[member.id]
@@ -6755,8 +6760,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       className={cn(
                         'shrink-0 rounded px-2 py-1 text-[10px] font-mono font-medium transition-colors',
                         isSelected
-                          ? 'bg-neutral-700 text-neutral-100'
-                          : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800',
+                          ? 'bg-[var(--theme-card2)] text-[var(--theme-text)]'
+                          : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-card2)]',
                       )}
                     >
                       <span className={cn(
@@ -6765,7 +6770,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         hasSession && agentStatus?.status === 'idle' && 'bg-neutral-400',
                         hasSession && agentStatus?.status === 'waiting_for_input' && 'bg-amber-400',
                         hasSession && agentStatus?.status === 'error' && 'bg-red-500',
-                        !hasSession && 'bg-neutral-600',
+                        !hasSession && 'bg-neutral-300 dark:bg-neutral-600',
                       )} />
                       {member.name}
                     </button>
@@ -6773,7 +6778,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 })}
               </div>
             )}
-            <div className="min-h-0 flex-1 overflow-y-auto bg-neutral-950">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--theme-card)]">
               <AgentOutputPanel
                 agentName={selectedOutputAgentName}
                 sessionKey={agentSessionMap[selectedOutputAgentId] ?? null}
