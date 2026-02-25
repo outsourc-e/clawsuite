@@ -1,6 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { createTerminalSession } from '../../server/terminal-sessions'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/terminal-stream')({
   server: {
@@ -14,6 +20,12 @@ export const Route = createFileRoute('/api/terminal-stream')({
               headers: { 'Content-Type': 'application/json' },
             },
           )
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        const ip = getClientIp(request)
+        if (!rateLimit(`terminal-stream:${ip}`, 10, 60_000)) {
+          return rateLimitResponse()
         }
 
         const body = (await request.json().catch(() => ({}))) as Record<

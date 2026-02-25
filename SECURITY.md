@@ -54,6 +54,19 @@ We will acknowledge your report within 48 hours and aim to provide a fix within 
 - Config endpoints redact credentials in responses
 - Example configs use placeholder keys only
 
+## Security Audit Passes
+
+### SEC-3 (2026-02-25)
+
+- Completed full API audit for auth coverage; no new private route auth gaps found (`/api/config-get`, `/api/debug-analyze`, `/api/context-usage`, `/api/paths` verified authenticated).
+- Added CSRF content-type enforcement (`requireJsonContentType`) to remaining POST handlers, including auth and terminal management endpoints.
+- Tightened rate limiting to 10 requests/minute per IP (sliding window) on high-risk endpoints:
+  - `/api/terminal-input`
+  - `/api/terminal-stream`
+  - `/api/gateway-restart`
+  - `/api/update-check` (POST)
+  - `/api/openclaw-update` (POST)
+
 ## Supported Versions
 
 | Version | Supported |

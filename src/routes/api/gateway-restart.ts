@@ -19,8 +19,8 @@ export const Route = createFileRoute('/api/gateway-restart')({
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         const ip = getClientIp(request)
-        // gateway-restart triggers service disruption — limit to 5 per minute per IP
-        if (!rateLimit(`gateway-restart:${ip}`, 5, 60_000)) {
+        // gateway-restart triggers service disruption — limit to 10 per minute per IP
+        if (!rateLimit(`gateway-restart:${ip}`, 10, 60_000)) {
           return rateLimitResponse()
         }
 

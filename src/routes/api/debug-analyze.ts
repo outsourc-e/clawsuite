@@ -6,6 +6,7 @@ import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
 
@@ -16,6 +17,8 @@ export const Route = createFileRoute('/api/debug-analyze')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         const ip = getClientIp(request)
         if (!rateLimit(`debug:${ip}`, 10, 60_000)) {
           return rateLimitResponse()

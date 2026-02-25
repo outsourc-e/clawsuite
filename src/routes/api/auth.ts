@@ -12,6 +12,7 @@ import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
 } from '../../server/rate-limit'
 
 const AuthSchema = z.object({
@@ -22,6 +23,9 @@ export const Route = createFileRoute('/api/auth')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+
         // If password protection is disabled, reject auth attempts
         if (!isPasswordProtectionEnabled()) {
           return json(

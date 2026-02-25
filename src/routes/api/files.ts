@@ -10,6 +10,7 @@ import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
 
@@ -304,6 +305,10 @@ export const Route = createFileRoute('/api/files')({
 
         try {
           const contentType = request.headers.get('content-type') || ''
+          if (!contentType.includes('multipart/form-data')) {
+            const csrfCheck = requireJsonContentType(request)
+            if (csrfCheck) return csrfCheck
+          }
           if (contentType.includes('multipart/form-data')) {
             const form = await request.formData()
             const action = String(form.get('action') || 'upload')

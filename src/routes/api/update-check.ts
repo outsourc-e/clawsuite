@@ -222,7 +222,7 @@ export const Route = createFileRoute('/api/update-check')({
         if (csrfCheck) return csrfCheck
         const ip = getClientIp(request)
         // update-check POST triggers git pull + npm install — high RCE risk, strict limit
-        if (!rateLimit(`update-check-post:${ip}`, 3, 60_000)) {
+        if (!rateLimit(`update-check-post:${ip}`, 10, 60_000)) {
           return rateLimitResponse()
         }
         try {

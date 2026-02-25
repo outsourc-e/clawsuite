@@ -139,7 +139,7 @@ export const Route = createFileRoute('/api/openclaw-update')({
         if (csrfCheck) return csrfCheck
         const ip = getClientIp(request)
         // openclaw-update POST triggers gateway update + restart — strict rate limit
-        if (!rateLimit(`openclaw-update-post:${ip}`, 3, 60_000)) {
+        if (!rateLimit(`openclaw-update-post:${ip}`, 10, 60_000)) {
           return rateLimitResponse()
         }
 

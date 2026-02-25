@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { closeTerminalSession } from '../../server/terminal-sessions'
+import { requireJsonContentType } from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/terminal-close')({
   server: {
@@ -12,6 +13,8 @@ export const Route = createFileRoute('/api/terminal-close')({
             headers: { 'Content-Type': 'application/json' },
           })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         const body = (await request.json().catch(() => ({}))) as Record<
           string,

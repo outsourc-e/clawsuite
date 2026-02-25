@@ -23,7 +23,7 @@ export const Route = createFileRoute('/api/terminal-input')({
         if (csrfCheck) return csrfCheck
 
         const ip = getClientIp(request)
-        if (!rateLimit(`terminal:${ip}`, 60, 60_000)) {
+        if (!rateLimit(`terminal:${ip}`, 10, 60_000)) {
           return rateLimitResponse()
         }
 
