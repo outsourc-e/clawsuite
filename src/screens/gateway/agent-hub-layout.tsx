@@ -4966,8 +4966,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
         <div className="relative mx-auto mt-4 sm:mt-5 w-full max-w-[1600px] flex-1 min-h-0 px-3 sm:px-4 flex flex-col">
-          {/* Desktop: isometric office view */}
-          <div className="hidden sm:flex flex-1 min-h-[420px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
+          {/* Desktop: isometric office view — fixed aspect ratio, no overflow */}
+          <div className="hidden sm:flex flex-1 min-h-[380px] max-h-[600px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm" style={{ aspectRatio: '16/9' }}>
             <PixelOfficeView
               agentRows={agentWorkingRows}
               missionRunning={isMissionRunning}
@@ -6446,12 +6446,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       {/* ── Inline expansion for running/needs_input missions ── */}
                       {isLive && (
                         <div className="mt-3 space-y-3 border-t border-neutral-100 dark:border-neutral-800 pt-3">
-                          {/* Progress bar */}
+                          {/* Progress bar — prominent */}
                           <div className="flex items-center gap-3">
-                            <div className="h-1.5 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700">
-                              <div className="h-1.5 rounded-full bg-accent-500 transition-all duration-300" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
+                            <div className="h-2.5 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
+                              <div className="h-2.5 rounded-full bg-accent-500 transition-all duration-500 ease-out" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
                             </div>
-                            <span className="shrink-0 text-[11px] text-neutral-500">{runningTaskStats.completed}/{runningTaskStats.total} tasks</span>
+                            <span className="shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300 tabular-nums">{runningProgressPct}%</span>
+                            <span className="shrink-0 text-[11px] text-neutral-500 dark:text-neutral-400 tabular-nums">{runningTaskStats.completed}/{runningTaskStats.total}</span>
                           </div>
 
                           {/* Agent status rows */}
@@ -6875,8 +6876,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
         </div>
 
-        {/* Spacer — approvals moved to header bell */}
-        <div className="shrink-0 py-1" />
       </div>
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
@@ -6906,32 +6905,36 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         {!isMobileHub && outputPanelVisible && selectedOutputAgentId && (
           <div className="flex w-96 shrink-0 flex-col border-l border-[var(--theme-border)] bg-[var(--theme-card)] dark:bg-[var(--theme-card,#161b27)]">
             {/* Output panel header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-[var(--theme-border)] px-3 py-2.5 bg-[var(--theme-bg)]">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="flex size-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--theme-border)] px-3 py-2 bg-[var(--theme-bg)]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="relative shrink-0">
+                  <span className="flex size-2 rounded-full bg-emerald-500" />
+                  {selectedOutputStatusLabel === 'Active' && (
+                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
+                  )}
+                </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[var(--theme-text)] font-mono">
-                    {selectedOutputAgentName}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-sm font-semibold text-[var(--theme-text)]">
+                      {selectedOutputAgentName}
+                    </p>
+                    {selectedOutputStatusLabel && (
+                      <span className={cn(
+                        'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                        selectedOutputStatusLabel === 'Active' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+                        selectedOutputStatusLabel === 'Idle' && 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
+                        selectedOutputStatusLabel === 'Waiting For Input' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+                        selectedOutputStatusLabel === 'Error' && 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+                        selectedOutputStatusLabel === 'Paused' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
+                      )}>{selectedOutputStatusLabel}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
                     {selectedOutputModelId && (
                       <span className="text-[10px] text-[var(--theme-muted)] font-mono">{getModelDisplayLabel(selectedOutputModelId)}</span>
                     )}
-                    <span className="text-[10px] text-[var(--theme-muted)] font-mono opacity-50">·</span>
-                    <span className="text-[10px] text-[var(--theme-muted)] font-mono tabular-nums">{missionTokenCount.toLocaleString()} tokens</span>
-                    {selectedOutputStatusLabel && (
-                      <>
-                        <span className="text-[10px] text-[var(--theme-muted)] font-mono opacity-50">·</span>
-                        <span className={cn(
-                          'text-[10px] font-mono font-semibold',
-                          selectedOutputStatusLabel === 'Active' && 'text-emerald-600 dark:text-emerald-400',
-                          selectedOutputStatusLabel === 'Idle' && 'text-[var(--theme-muted)]',
-                          selectedOutputStatusLabel === 'Waiting For Input' && 'text-amber-600 dark:text-amber-400',
-                          selectedOutputStatusLabel === 'Error' && 'text-red-600 dark:text-red-400',
-                          selectedOutputStatusLabel === 'Paused' && 'text-blue-600 dark:text-blue-400',
-                        )}>{selectedOutputStatusLabel}</span>
-                      </>
-                    )}
+                    <span className="text-[10px] text-[var(--theme-muted)] opacity-40">·</span>
+                    <span className="text-[10px] text-[var(--theme-muted)] font-mono tabular-nums">{missionTokenCount.toLocaleString()} tok</span>
                   </div>
                 </div>
               </div>

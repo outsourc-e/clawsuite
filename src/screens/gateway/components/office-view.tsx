@@ -486,7 +486,11 @@ export function OfficeView({
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white/80 px-5 py-3 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-neutral-900 dark:text-white md:text-base">ClawSuite Office</span>
-          <span className="truncate text-[11px] text-neutral-500 dark:text-slate-400">{agentRows.length} agents · {activeCount} working · {sessionCount} sessions</span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-600 dark:text-neutral-400 tabular-nums">{agentRows.length} agents</span>
+            <span className="rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400 tabular-nums">{activeCount} working</span>
+            <span className="rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400 tabular-nums">{sessionCount} sessions</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {missionRunning ? (

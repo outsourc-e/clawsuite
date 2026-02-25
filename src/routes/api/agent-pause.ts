@@ -34,21 +34,35 @@ export const Route = createFileRoute('/api/agent-pause')({
             )
           }
 
+          // Try dedicated pause RPC first, then fall back to steer with
+          // a [PAUSE]/[RESUME] directive so the agent actually receives the
+          // signal even when the gateway doesn't expose an agent.pause RPC.
           const methodCandidates = ['agent.pause', 'agents.pause']
-          let lastError: unknown = null
+          let rpcSucceeded = false
 
           for (const method of methodCandidates) {
             try {
               await gatewayRpc(method, { sessionKey, pause })
-              lastError = null
+              rpcSucceeded = true
               break
-            } catch (error) {
-              lastError = error
+            } catch {
+              // method not available — try next
             }
           }
 
-          if (lastError) {
-            throw lastError
+          if (!rpcSucceeded) {
+            // Fallback: steer the agent with a pause/resume directive
+            const { randomUUID } = await import('node:crypto')
+            const directive = pause
+              ? '[PAUSE] Stop processing and wait for further instructions.'
+              : '[RESUME] Continue working on your current task.'
+            await gatewayRpc('chat.send', {
+              sessionKey,
+              message: `[System Directive] ${directive}`,
+              deliver: false,
+              timeoutMs: 30_000,
+              idempotencyKey: randomUUID(),
+            })
           }
 
           return json({ ok: true, paused: pause })
