@@ -70,7 +70,7 @@ function parseOptionalJson(rawValue: string): {
   try {
     return { value: JSON.parse(trimmed) as unknown }
   } catch {
-    return { error: 'Payload and delivery config must be valid JSON.' }
+    return { error: 'Delivery config must be valid JSON.' }
   }
 }
 
@@ -84,6 +84,21 @@ function detectScheduleKind(schedule: string): ScheduleKind {
     return 'at'
   }
   return 'cron'
+}
+
+function getAtDatetimeValue(schedule: string): string {
+  const trimmed = schedule.trim()
+  if (trimmed.startsWith('at ')) return trimmed.slice(3).trim()
+  return trimmed
+}
+
+function getEveryMinutesValue(schedule: string): string {
+  const trimmed = schedule.trim()
+  const fromEveryPrefix = trimmed.match(/^every\s+(\d+)\s*(m|min|minute|minutes)?$/i)
+  if (fromEveryPrefix?.[1]) return fromEveryPrefix[1]
+  const shorthand = trimmed.match(/^(\d+)\s*(m|min|minute|minutes)$/i)
+  if (shorthand?.[1]) return shorthand[1]
+  return ''
 }
 
 /** Detect payload kind from existing payload. */
@@ -157,41 +172,33 @@ export function CronJobForm({
   )
   const [cronError, setCronError] = useState<string | null>(null)
   // every kind
-  const [everyInterval, setEveryInterval] = useState(
-    scheduleKind === 'every' ? (initialJob?.schedule ?? '') : '',
+  const [everyIntervalMinutes, setEveryIntervalMinutes] = useState(
+    scheduleKind === 'every'
+      ? getEveryMinutesValue(initialJob?.schedule ?? '')
+      : '',
   )
   // at kind
   const [atDatetime, setAtDatetime] = useState(
-    scheduleKind === 'at' ? (initialJob?.schedule ?? '') : '',
+    scheduleKind === 'at' ? getAtDatetimeValue(initialJob?.schedule ?? '') : '',
   )
 
   // ── Payload state ───────────────────────────────────────────────────────────
   const [payloadKind, setPayloadKind] = useState<PayloadKind>(
     detectPayloadKind(initialJob?.payload),
   )
-  // systemEvent
-  const [systemEventText, setSystemEventText] = useState<string>(() => {
+  const [payloadMessage, setPayloadMessage] = useState<string>(() => {
     if (initialJob?.payload && typeof initialJob.payload === 'object') {
       const p = initialJob.payload as Record<string, unknown>
-      if (p.kind === 'systemEvent' && typeof p.text === 'string') return p.text
+      if (typeof p.message === 'string') return p.message
+      if (typeof p.text === 'string') return p.text
     }
-    return initialJob?.name ?? ''
+    return ''
   })
-  // agentTurn
-  const [agentSessionKey, setAgentSessionKey] = useState<string>(() => {
+  const [agentModel, setAgentModel] = useState<string>(() => {
     if (initialJob?.payload && typeof initialJob.payload === 'object') {
       const p = initialJob.payload as Record<string, unknown>
-      if (p.kind === 'agentTurn' && typeof p.sessionKey === 'string') {
-        return p.sessionKey
-      }
-    }
-    return 'main'
-  })
-  const [agentMessage, setAgentMessage] = useState<string>(() => {
-    if (initialJob?.payload && typeof initialJob.payload === 'object') {
-      const p = initialJob.payload as Record<string, unknown>
-      if (p.kind === 'agentTurn' && typeof p.message === 'string') {
-        return p.message
+      if (p.kind === 'agentTurn' && typeof p.model === 'string') {
+        return p.model
       }
     }
     return ''
@@ -200,19 +207,20 @@ export function CronJobForm({
   // ── Build schedule string from current kind + fields ────────────────────────
   function buildSchedule(): string {
     if (scheduleKind === 'cron') return cronExpr.trim()
-    if (scheduleKind === 'every') return everyInterval.trim()
+    if (scheduleKind === 'every') return `every ${everyIntervalMinutes.trim()}m`
     return atDatetime.trim()
   }
 
   // ── Build payload object from current kind + fields ──────────────────────────
   function buildPayload(): unknown {
+    const message = payloadMessage.trim()
     if (payloadKind === 'systemEvent') {
-      return { kind: 'systemEvent', text: systemEventText.trim() || name.trim() }
+      return { kind: 'systemEvent', message, text: message }
     }
     return {
       kind: 'agentTurn',
-      sessionKey: agentSessionKey.trim() || 'main',
-      message: agentMessage.trim(),
+      message,
+      model: agentModel.trim() || undefined,
     }
   }
 
@@ -255,8 +263,16 @@ export function CronJobForm({
       }
     }
 
-    if (payloadKind === 'agentTurn' && !agentMessage.trim()) {
-      setLocalError('Agent message is required for Agent Turn payload.')
+    if (scheduleKind === 'every') {
+      const minutes = Number(everyIntervalMinutes)
+      if (!Number.isInteger(minutes) || minutes <= 0) {
+        setLocalError('Every interval must be a positive whole number of minutes.')
+        return
+      }
+    }
+
+    if (!payloadMessage.trim()) {
+      setLocalError('Message is required.')
       return
     }
 
@@ -327,7 +343,7 @@ export function CronJobForm({
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <span className="text-xs font-medium text-primary-600 tabular-nums">Schedule</span>
             <SegmentedControl<ScheduleKind>
-              options={['cron', 'every', 'at']}
+              options={['at', 'every', 'cron']}
               labels={SCHEDULE_LABELS}
               value={scheduleKind}
               onChange={handleScheduleKindChange}
@@ -357,12 +373,16 @@ export function CronJobForm({
           {scheduleKind === 'every' && (
             <div className="space-y-1">
               <input
-                value={everyInterval}
-                onChange={function onChangeEvery(e) { setEveryInterval(e.target.value) }}
-                placeholder="30m  or  2h  or  every 5 minutes"
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                value={everyIntervalMinutes}
+                onChange={function onChangeEvery(e) { setEveryIntervalMinutes(e.target.value) }}
+                placeholder="15"
                 className="h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-primary-400 tabular-nums"
               />
-              <p className="text-xs text-primary-500">Interval — e.g. <code>30m</code>, <code>1h</code>, <code>every 15 minutes</code></p>
+              <p className="text-xs text-primary-500">Interval in minutes</p>
             </div>
           )}
 
@@ -394,42 +414,30 @@ export function CronJobForm({
             />
           </div>
 
-          {payloadKind === 'systemEvent' && (
-            <div className="space-y-1">
-              <label className="space-y-1 block">
-                <span className="text-xs text-primary-600">Event Text</span>
-                <input
-                  value={systemEventText}
-                  onChange={function onChangeSystemText(e) { setSystemEventText(e.target.value) }}
-                  placeholder="Event text / message"
-                  className="h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-primary-400"
-                />
-              </label>
-            </div>
-          )}
+          <label className="space-y-1 block">
+            <span className="text-xs text-primary-600">Message</span>
+            <textarea
+              value={payloadMessage}
+              onChange={function onChangePayloadMessage(e) { setPayloadMessage(e.target.value) }}
+              placeholder="Message payload"
+              rows={3}
+              className="w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 py-2 text-sm text-primary-900 outline-none transition-colors focus:border-primary-400"
+            />
+          </label>
 
-          {payloadKind === 'agentTurn' && (
-            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-              <label className="space-y-1">
-                <span className="text-xs text-primary-600">Session Key</span>
-                <input
-                  value={agentSessionKey}
-                  onChange={function onChangeSessionKey(e) { setAgentSessionKey(e.target.value) }}
-                  placeholder="main"
-                  className="h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-primary-400 tabular-nums"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-xs text-primary-600">Message</span>
-                <input
-                  value={agentMessage}
-                  onChange={function onChangeAgentMessage(e) { setAgentMessage(e.target.value) }}
-                  placeholder="Run daily digest"
-                  className="h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-primary-400"
-                />
-              </label>
-            </div>
-          )}
+          {payloadKind === 'agentTurn' ? (
+            <label className="space-y-1 block">
+              <span className="text-xs text-primary-600">
+                Model <span className="text-primary-400">(optional)</span>
+              </span>
+              <input
+                value={agentModel}
+                onChange={function onChangeAgentModel(e) { setAgentModel(e.target.value) }}
+                placeholder="openai/gpt-5"
+                className="h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-primary-400"
+              />
+            </label>
+          ) : null}
         </div>
 
         {/* ── Delivery Config ───────────────────────────────────────────────── */}
