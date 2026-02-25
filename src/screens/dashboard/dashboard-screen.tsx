@@ -138,6 +138,7 @@ export function DashboardScreen() {
     useVisibleWidgets()
   const { order: widgetOrder, moveWidget, resetOrder } = useWidgetReorder()
   const theme = useSettingsStore((state) => state.settings.theme)
+  const showSystemMetricsFooter = useSettingsStore((state) => state.settings.showSystemMetricsFooter)
   const updateSettings = useSettingsStore((state) => state.updateSettings)
   const [isMobile, setIsMobile] = useState(false)
   const [mobileEditMode, setMobileEditMode] = useState(false)
@@ -1128,7 +1129,7 @@ export function DashboardScreen() {
         </section>
       </main>
 
-      <SystemMetricsFooter />
+      {showSystemMetricsFooter ? <SystemMetricsFooter /> : null}
 
       <SettingsDialog
         open={dashSettingsOpen}

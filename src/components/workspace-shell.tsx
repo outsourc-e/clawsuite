@@ -26,6 +26,7 @@ import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
+import { useSettings } from '@/hooks/use-settings'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
 
@@ -50,6 +51,7 @@ export function WorkspaceShell() {
     select: (state) => state.location.pathname,
   })
 
+  const { settings } = useSettings()
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
@@ -253,7 +255,7 @@ export function WorkspaceShell() {
       </div>
 
       {isMobile ? <MobileTabBar /> : null}
-      <SystemMetricsFooter />
+      {settings.showSystemMetricsFooter ? <SystemMetricsFooter /> : null}
     </>
   )
 }
