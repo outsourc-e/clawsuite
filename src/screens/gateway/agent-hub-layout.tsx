@@ -4220,10 +4220,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       const member = teamMembers.find((entry) => entry.id === agentId)
 
       try {
-        const response = await fetch('/api/sessions/send', {
+        const response = await fetch('/api/agent-dispatch', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionKey, message: messageText }),
+          body: JSON.stringify({
+            sessionKey,
+            message: messageText,
+            agentId,
+            idempotencyKey: crypto.randomUUID(),
+          }),
         })
 
         if (!response.ok) {
@@ -4784,6 +4789,23 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionBoardModalOpen(true)
     setMissionWizardStep(0)
   }
+
+  // ── Mission modal derived data (hoisted so modal renders on any tab) ──────
+  const _modalCurrentTeamLabel = `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · ${team.length} agents`
+  const _modalMissionTeamOptions = [
+    { id: '__current__', label: _modalCurrentTeamLabel, team },
+    ...teamConfigs.map((config) => ({
+      id: config.id,
+      label: `${config.name} · ${config.team.length} agents`,
+      team: config.team,
+    })),
+  ]
+  const _modalSelectedTeamOption =
+    _modalMissionTeamOptions.find((option) => option.id === newMissionTeamConfigId)
+    ?? _modalMissionTeamOptions[0]
+  const _modalSelectedTeamMembers = _modalSelectedTeamOption?.team ?? []
+  const _modalSelectedBudgetTokens = parseTokenBudget(newMissionBudgetLimit)
+  const _modalSelectedTotalBudgetCost = _modalSelectedBudgetTokens ? estimateMissionCost(_modalSelectedBudgetTokens) : null
 
   function renderOverviewContent() {
     // ── Derived data ───────────────────────────────────────────────────────
@@ -6450,262 +6472,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             )}
           </div>
         </div>
-        {missionBoardModalOpen ? (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/35 px-4 py-6 backdrop-blur-[1px]"
-            onClick={() => setMissionBoardModalOpen(false)}
-          >
-            <div
-              className="flex w-full max-w-2xl flex-col rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {/* Wizard Step Indicator */}
-              <div className="border-b border-neutral-200 px-6 pt-5 pb-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-base font-semibold text-neutral-900 dark:text-white">New Mission</h3>
-                  <button
-                    type="button"
-                    onClick={() => { setMissionBoardModalOpen(false); setMissionWizardStep(0) }}
-                    className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-[11px] text-neutral-600 hover:bg-neutral-50"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="mt-3 flex items-center gap-1">
-                  {['Scope', 'Team', 'Settings', 'Review'].map((stepLabel, stepIdx) => (
-                    <div key={stepLabel} className="flex flex-1 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setMissionWizardStep(stepIdx)}
-                        className={cn(
-                          'flex size-7 items-center justify-center rounded-full text-[11px] font-semibold transition-colors',
-                          stepIdx === missionWizardStep
-                            ? 'bg-accent-500 text-white'
-                            : stepIdx < missionWizardStep
-                              ? 'bg-accent-100 text-accent-700'
-                              : 'bg-neutral-100 text-neutral-400',
-                        )}
-                      >
-                        {stepIdx < missionWizardStep ? '✓' : stepIdx + 1}
-                      </button>
-                      <span className={cn(
-                        'text-[11px] font-medium',
-                        stepIdx === missionWizardStep ? 'text-neutral-900 dark:text-white' : 'text-neutral-400',
-                      )}>
-                        {stepLabel}
-                      </span>
-                      {stepIdx < 3 ? <div className="mx-1 h-px flex-1 bg-neutral-200" /> : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Step Content */}
-              <div className="min-h-[320px] px-6 py-5">
-                {/* Step 0: Scope */}
-                {missionWizardStep === 0 ? (
-                  <div className="space-y-4">
-                    <label className="block">
-                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Mission Name</span>
-                      <input
-                        value={newMissionName}
-                        onChange={(event) => setNewMissionName(event.target.value)}
-                        placeholder="e.g. Q1 competitor analysis"
-                        className="mt-1.5 h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Goal</span>
-                      <textarea
-                        value={newMissionGoal}
-                        onChange={(event) => setNewMissionGoal(event.target.value)}
-                        rows={6}
-                        placeholder="Describe the mission goal, output format, and constraints..."
-                        className="mt-1.5 w-full resize-y rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
-                      />
-                    </label>
-                  </div>
-                ) : null}
-
-                {/* Step 1: Team */}
-                {missionWizardStep === 1 ? (
-                  <div className="space-y-3">
-                    <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Select a team for this mission</p>
-                    <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
-                      {missionTeamOptions.map((option) => {
-                        const teamBudget = getTeamBudgetSummary(option.team)
-                        return (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => setNewMissionTeamConfigId(option.id)}
-                            className={cn(
-                              'w-full rounded-xl border p-3 text-left transition-colors',
-                              newMissionTeamConfigId === option.id
-                                ? 'border-accent-300 bg-accent-50/70'
-                                : 'border-neutral-200 bg-white hover:border-neutral-300',
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{option.label}</p>
-                                <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-slate-400">
-                                  {option.team.length} agents
-                                  {teamBudget.avgCost !== null ? ` · ~$${teamBudget.avgCost.toFixed(2)}/agent` : ''}
-                                </p>
-                              </div>
-                              {teamBudget.totalCost !== null ? (
-                                <span className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] font-semibold text-neutral-700">
-                                  ~${teamBudget.totalCost.toFixed(2)}
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {option.team.map((member) => (
-                                <span key={member.id} className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] text-neutral-600 dark:text-slate-400">
-                                  {member.name} · {getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}
-                                </span>
-                              ))}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Step 2: Settings */}
-                {missionWizardStep === 2 ? (
-                  <div className="space-y-4">
-                    <label className="block">
-                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Process Type</span>
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        {(['sequential', 'hierarchical', 'parallel'] as const).map((pt) => (
-                          <button
-                            key={pt}
-                            type="button"
-                            onClick={() => setNewMissionProcessType(pt)}
-                            className={cn(
-                              'rounded-lg border px-3 py-3 text-center transition-colors',
-                              newMissionProcessType === pt
-                                ? 'border-accent-300 bg-accent-50 text-accent-700'
-                                : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300',
-                            )}
-                          >
-                            <p className="text-xs font-semibold capitalize">{pt}</p>
-                            <p className="mt-0.5 text-[10px] text-neutral-500 dark:text-slate-400">
-                              {pt === 'sequential' ? 'One at a time' : pt === 'hierarchical' ? 'Manager delegates' : 'All at once'}
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                    </label>
-                    <label className="block">
-                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Token Budget (max)</span>
-                      <input
-                        value={newMissionBudgetLimit}
-                        onChange={(event) => setNewMissionBudgetLimit(event.target.value.replace(/[^\d]/g, ''))}
-                        inputMode="numeric"
-                        placeholder="120000"
-                        className="mt-1.5 h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
-                      />
-                      <p className="mt-1 text-[11px] text-neutral-400">
-                        {selectedBudgetTokens ? `~$${(selectedTotalBudgetCost ?? 0).toFixed(2)} estimated cost` : 'No budget limit'}
-                      </p>
-                    </label>
-                  </div>
-                ) : null}
-
-                {/* Step 3: Review & Launch */}
-                {missionWizardStep === 3 ? (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Launch Summary</h4>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600 dark:text-slate-400">Mission</span>
-                          <span className="font-medium text-neutral-900 dark:text-white">{newMissionName || 'Untitled'}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600 dark:text-slate-400">Team</span>
-                          <span className="font-medium text-neutral-900 dark:text-white">{selectedMissionTeamMembers.length} agents</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600 dark:text-slate-400">Process</span>
-                          <span className="font-medium capitalize text-neutral-900 dark:text-white">{newMissionProcessType}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600 dark:text-slate-400">Budget</span>
-                          <span className="font-medium text-neutral-900 dark:text-white">{selectedBudgetTokens ? `${selectedBudgetTokens.toLocaleString()} tokens (~$${(selectedTotalBudgetCost ?? 0).toFixed(2)})` : 'Unlimited'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Goal</p>
-                      <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-300">{newMissionGoal || 'No goal set'}</p>
-                    </div>
-                    <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Team Lineup</p>
-                      <div className="mt-2 space-y-1">
-                        {selectedMissionTeamMembers.map((member) => (
-                          <div key={member.id} className="flex items-center justify-between rounded-md bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1.5">
-                            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">{member.name}</span>
-                            <span className="text-[10px] text-neutral-500 dark:text-slate-400">{getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Wizard Footer */}
-              <div className="flex items-center justify-between border-t border-neutral-200 px-6 py-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (missionWizardStep === 0) { setMissionBoardModalOpen(false); setMissionWizardStep(0) }
-                    else setMissionWizardStep((s) => Math.max(0, s - 1))
-                  }}
-                  className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
-                >
-                  {missionWizardStep === 0 ? 'Cancel' : '← Back'}
-                </button>
-                <div className="flex gap-2">
-                  {missionWizardStep === 3 ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => { handleSaveMissionDraft(); setMissionWizardStep(0) }}
-                        disabled={!newMissionGoal.trim()}
-                        className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50"
-                      >
-                        Save Draft
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { handleLaunchMissionFromModal(); setMissionWizardStep(0) }}
-                        disabled={!newMissionGoal.trim()}
-                        className="rounded-lg bg-accent-500 px-5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600 disabled:opacity-50"
-                      >
-                        🚀 Launch Mission
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setMissionWizardStep((s) => Math.min(3, s + 1))}
-                      className="rounded-lg bg-accent-500 px-5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600"
-                    >
-                      Next →
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
       {/* ── Steer Agent Modal ────────────────────────────────────────────── */}
       {steerAgentId ? (() => {
         const steerMember = team.find((m) => m.id === steerAgentId)
@@ -6953,13 +6719,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div
         className={cn(
-          'shrink-0 border-b border-neutral-200 px-3 py-3 sm:px-4 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
+          'shrink-0 border-b border-neutral-200 py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
           isMobileHub
             ? 'bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:bg-slate-900/70'
             : 'bg-white dark:bg-slate-800',
         )}
       >
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-3 sm:px-4">
           <div className="flex min-w-0 items-baseline gap-2">
             <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-900 dark:text-white">Agent Hub</h1>
             <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
@@ -6977,8 +6743,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       </div>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="shrink-0 border-b border-neutral-200 bg-neutral-50/80 px-3 sm:px-4 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
-        <div className="mx-auto w-full max-w-[1600px] overflow-x-auto">
+      <div className="shrink-0 border-b border-neutral-200 bg-neutral-50/80 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+        <div className="mx-auto w-full max-w-[1600px] overflow-x-auto px-3 sm:px-4">
           <div className="flex min-w-max items-center">
             {TAB_DEFS.map((tab) => {
           const pendingApprovals = tab.id === 'configure'
@@ -7139,6 +6905,263 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
         )}
       </div>
+
+      {/* ── New Mission Modal (global — renders on any tab) ───────────────── */}
+      {missionBoardModalOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/35 px-4 py-6 backdrop-blur-[1px]"
+            onClick={() => setMissionBoardModalOpen(false)}
+          >
+            <div
+              className="flex w-full max-w-2xl flex-col rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {/* Wizard Step Indicator */}
+              <div className="border-b border-neutral-200 px-6 pt-5 pb-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-base font-semibold text-neutral-900 dark:text-white">New Mission</h3>
+                  <button
+                    type="button"
+                    onClick={() => { setMissionBoardModalOpen(false); setMissionWizardStep(0) }}
+                    className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-[11px] text-neutral-600 hover:bg-neutral-50"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="mt-3 flex items-center gap-1">
+                  {['Scope', 'Team', 'Settings', 'Review'].map((stepLabel, stepIdx) => (
+                    <div key={stepLabel} className="flex flex-1 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setMissionWizardStep(stepIdx)}
+                        className={cn(
+                          'flex size-7 items-center justify-center rounded-full text-[11px] font-semibold transition-colors',
+                          stepIdx === missionWizardStep
+                            ? 'bg-accent-500 text-white'
+                            : stepIdx < missionWizardStep
+                              ? 'bg-accent-100 text-accent-700'
+                              : 'bg-neutral-100 text-neutral-400',
+                        )}
+                      >
+                        {stepIdx < missionWizardStep ? '✓' : stepIdx + 1}
+                      </button>
+                      <span className={cn(
+                        'text-[11px] font-medium',
+                        stepIdx === missionWizardStep ? 'text-neutral-900 dark:text-white' : 'text-neutral-400',
+                      )}>
+                        {stepLabel}
+                      </span>
+                      {stepIdx < 3 ? <div className="mx-1 h-px flex-1 bg-neutral-200" /> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step Content */}
+              <div className="min-h-[320px] px-6 py-5">
+                {/* Step 0: Scope */}
+                {missionWizardStep === 0 ? (
+                  <div className="space-y-4">
+                    <label className="block">
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Mission Name</span>
+                      <input
+                        value={newMissionName}
+                        onChange={(event) => setNewMissionName(event.target.value)}
+                        placeholder="e.g. Q1 competitor analysis"
+                        className="mt-1.5 h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Goal</span>
+                      <textarea
+                        value={newMissionGoal}
+                        onChange={(event) => setNewMissionGoal(event.target.value)}
+                        rows={6}
+                        placeholder="Describe the mission goal, output format, and constraints..."
+                        className="mt-1.5 w-full resize-y rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
+                      />
+                    </label>
+                  </div>
+                ) : null}
+
+                {/* Step 1: Team */}
+                {missionWizardStep === 1 ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Select a team for this mission</p>
+                    <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
+                      {_modalMissionTeamOptions.map((option) => {
+                        const teamBudget = getTeamBudgetSummary(option.team)
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setNewMissionTeamConfigId(option.id)}
+                            className={cn(
+                              'w-full rounded-xl border p-3 text-left transition-colors',
+                              newMissionTeamConfigId === option.id
+                                ? 'border-accent-300 bg-accent-50/70'
+                                : 'border-neutral-200 bg-white hover:border-neutral-300',
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{option.label}</p>
+                                <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-slate-400">
+                                  {option.team.length} agents
+                                  {teamBudget.avgCost !== null ? ` · ~$${teamBudget.avgCost.toFixed(2)}/agent` : ''}
+                                </p>
+                              </div>
+                              {teamBudget.totalCost !== null ? (
+                                <span className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] font-semibold text-neutral-700">
+                                  ~${teamBudget.totalCost.toFixed(2)}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {option.team.map((member) => (
+                                <span key={member.id} className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] text-neutral-600 dark:text-slate-400">
+                                  {member.name} · {getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}
+                                </span>
+                              ))}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Step 2: Settings */}
+                {missionWizardStep === 2 ? (
+                  <div className="space-y-4">
+                    <label className="block">
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Process Type</span>
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        {(['sequential', 'hierarchical', 'parallel'] as const).map((pt) => (
+                          <button
+                            key={pt}
+                            type="button"
+                            onClick={() => setNewMissionProcessType(pt)}
+                            className={cn(
+                              'rounded-lg border px-3 py-3 text-center transition-colors',
+                              newMissionProcessType === pt
+                                ? 'border-accent-300 bg-accent-50 text-accent-700'
+                                : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300',
+                            )}
+                          >
+                            <p className="text-xs font-semibold capitalize">{pt}</p>
+                            <p className="mt-0.5 text-[10px] text-neutral-500 dark:text-slate-400">
+                              {pt === 'sequential' ? 'One at a time' : pt === 'hierarchical' ? 'Manager delegates' : 'All at once'}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Token Budget (max)</span>
+                      <input
+                        value={newMissionBudgetLimit}
+                        onChange={(event) => setNewMissionBudgetLimit(event.target.value.replace(/[^\d]/g, ''))}
+                        inputMode="numeric"
+                        placeholder="120000"
+                        className="mt-1.5 h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
+                      />
+                      <p className="mt-1 text-[11px] text-neutral-400">
+                        {_modalSelectedBudgetTokens ? `~$${(_modalSelectedTotalBudgetCost ?? 0).toFixed(2)} estimated cost` : 'No budget limit'}
+                      </p>
+                    </label>
+                  </div>
+                ) : null}
+
+                {/* Step 3: Review & Launch */}
+                {missionWizardStep === 3 ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Launch Summary</h4>
+                      <div className="mt-3 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-neutral-600 dark:text-slate-400">Mission</span>
+                          <span className="font-medium text-neutral-900 dark:text-white">{newMissionName || 'Untitled'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-neutral-600 dark:text-slate-400">Team</span>
+                          <span className="font-medium text-neutral-900 dark:text-white">{_modalSelectedTeamMembers.length} agents</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-neutral-600 dark:text-slate-400">Process</span>
+                          <span className="font-medium capitalize text-neutral-900 dark:text-white">{newMissionProcessType}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-neutral-600 dark:text-slate-400">Budget</span>
+                          <span className="font-medium text-neutral-900 dark:text-white">{_modalSelectedBudgetTokens ? `${_modalSelectedBudgetTokens.toLocaleString()} tokens (~$${(_modalSelectedTotalBudgetCost ?? 0).toFixed(2)})` : 'Unlimited'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Goal</p>
+                      <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-300">{newMissionGoal || 'No goal set'}</p>
+                    </div>
+                    <div className="rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">Team Lineup</p>
+                      <div className="mt-2 space-y-1">
+                        {_modalSelectedTeamMembers.map((member) => (
+                          <div key={member.id} className="flex items-center justify-between rounded-md bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1.5">
+                            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">{member.name}</span>
+                            <span className="text-[10px] text-neutral-500 dark:text-slate-400">{getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Wizard Footer */}
+              <div className="flex items-center justify-between border-t border-neutral-200 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (missionWizardStep === 0) { setMissionBoardModalOpen(false); setMissionWizardStep(0) }
+                    else setMissionWizardStep((s) => Math.max(0, s - 1))
+                  }}
+                  className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                >
+                  {missionWizardStep === 0 ? 'Cancel' : '← Back'}
+                </button>
+                <div className="flex gap-2">
+                  {missionWizardStep === 3 ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { handleSaveMissionDraft(); setMissionWizardStep(0) }}
+                        disabled={!newMissionGoal.trim()}
+                        className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+                      >
+                        Save Draft
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { handleLaunchMissionFromModal(); setMissionWizardStep(0) }}
+                        disabled={!newMissionGoal.trim()}
+                        className="rounded-lg bg-accent-500 px-5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600 disabled:opacity-50"
+                      >
+                        🚀 Launch Mission
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setMissionWizardStep((s) => Math.min(3, s + 1))}
+                      className="rounded-lg bg-accent-500 px-5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600"
+                    >
+                      Next →
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
       {/* ── Launch wizard ─────────────────────────────────────────────────── */}
       {wizardOpen ? (
