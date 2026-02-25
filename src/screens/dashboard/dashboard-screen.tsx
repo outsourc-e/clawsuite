@@ -35,7 +35,7 @@ import { TasksWidget } from './components/tasks-widget'
 import { UsageMeterWidget } from './components/usage-meter-widget'
 import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
-import { QuickActionsRow } from './components/quick-actions-row'
+// QuickActionsRow replaced by inline widget cards on mobile (MOB-5)
 import { TokenUsageHero } from './components/token-usage-hero'
 import { type WidgetGridItem } from './components/widget-grid'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
@@ -850,7 +850,72 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
-              <QuickActionsRow />
+              {/* MOB-5: Widget cards replacing quick actions — matches desktop layout */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })}
+                  className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 text-left shadow-sm active:scale-[0.98] hover:border-accent-300 transition-all dark:border-neutral-800 dark:bg-neutral-900/60"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M18 10c0 4.418-3.582 8-8 8a8.036 8.036 0 0 1-3.9-1L2 18l1.2-4A7.959 7.959 0 0 1 2 10c0-4.418 3.582-8 8-8s8 3.582 8 8Z"/></svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-ink truncate">Chat</p>
+                    <p className="text-[10px] text-primary-500 dark:text-neutral-400">Start a session</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: '/agent-swarm' })}
+                  className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 text-left shadow-sm active:scale-[0.98] hover:border-orange-300 transition-all dark:border-neutral-800 dark:bg-neutral-900/60"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="6" height="8" rx="1"/><rect x="12" y="6" width="6" height="8" rx="1"/><path d="M8 10h4M10 8v4"/></svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-ink truncate">Agent Hub</p>
+                    <p className="text-[10px] text-primary-500 dark:text-neutral-400">
+                      {dashboardData.agents.active > 0
+                        ? `${dashboardData.agents.active} active`
+                        : 'Manage agents'}
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: '/skills' })}
+                  className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 text-left shadow-sm active:scale-[0.98] hover:border-violet-300 transition-all dark:border-neutral-800 dark:bg-neutral-900/60"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 9.5A6 6 0 0 1 10 4a6 6 0 0 1 6.5 5.5C16.5 13 14 16 10 17c-4-1-6.5-4-6.5-7.5Z"/><circle cx="10" cy="10" r="2"/></svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-ink truncate">Skills</p>
+                    <p className="text-[10px] text-primary-500 dark:text-neutral-400">
+                      {dashboardData.skills.enabled > 0
+                        ? `${dashboardData.skills.enabled} enabled`
+                        : 'Browse skills'}
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: '/costs' })}
+                  className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 text-left shadow-sm active:scale-[0.98] hover:border-emerald-300 transition-all dark:border-neutral-800 dark:bg-neutral-900/60"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v2m0 12v2m8-8h-2M4 10H2m12.24-5.76-1.42 1.42M5.18 14.82l-1.42 1.42M16.24 14.24l-1.42-1.42M5.18 5.18 3.76 3.76"/><circle cx="10" cy="10" r="4"/></svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-ink truncate">Costs</p>
+                    <p className="text-[10px] text-primary-500 dark:text-neutral-400">{costTodayDisplay} today</p>
+                  </div>
+                </button>
+              </div>
 
               <CollapsibleWidget
                 title="Token Usage"

@@ -2,11 +2,11 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowUp02Icon,
+  BotIcon,
   Chat01Icon,
   Home01Icon,
   PuzzleIcon,
   Settings01Icon,
-  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { TouchEvent } from 'react'
@@ -44,7 +44,7 @@ const TABS: TabItem[] = [
   {
     id: 'agents',
     label: 'Agent Hub',
-    icon: UserMultipleIcon,
+    icon: BotIcon,
     to: '/agent-swarm',
     match: (p) => p.startsWith('/agent-swarm') || p.startsWith('/agents'),
   },
@@ -138,14 +138,19 @@ export function MobileTabBar() {
       <nav
         ref={navRef}
         className={cn(
-          'fixed inset-x-0 bottom-0 z-40 isolate border-t border-neutral-200/50 bg-white/95 pb-[max(var(--safe-b),env(safe-area-inset-bottom))] dark:border-neutral-700/50 dark:bg-neutral-950/95 md:hidden transition-all duration-200',
+          'fixed inset-x-0 bottom-0 z-40 isolate',
+          'border-t border-white/20 dark:border-white/10',
+          'bg-white/80 dark:bg-neutral-900/80',
+          'supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-neutral-900/70',
+          'pb-[max(var(--safe-b),env(safe-area-inset-bottom))]',
+          'md:hidden transition-all duration-200',
           hideTabBar
             ? 'translate-y-[110%] opacity-0 pointer-events-none'
             : 'translate-y-0 opacity-100',
         )}
         aria-label="Mobile navigation"
       >
-        <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-neutral-200/70 px-1 py-1.5 shadow-[0_2px_20px_rgba(0,0,0,0.08)] dark:border-neutral-700/70">
+        <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-white/30 dark:border-white/10 px-1 py-1.5 shadow-[0_4px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-sm">
           {TABS.map((tab) => {
             const isActive = tab.match(pathname)
             const isCenterChat = tab.id === 'chat'

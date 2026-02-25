@@ -1377,10 +1377,17 @@ function ChatComposerComponent({
   const keyboardOrFocusActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const composerWrapperStyle = useMemo(
     () => {
+      // When keyboard is active, lift by keyboard inset only (tab bar hides itself).
+      // When keyboard is inactive, lift by tab bar height + safe area so the input
+      // sits visually above the bottom nav bar.
       const tabBarOffset = keyboardOrFocusActive
         ? '0px'
-        : 'max(0px, calc(var(--mobile-tab-bar-offset) - 0.375rem))'
-      const mobileTranslate = `translateY(calc(-1 * (${tabBarOffset} + var(--kb-inset, 0px))))`
+        : 'max(0px, var(--mobile-tab-bar-offset, 3.75rem))'
+      const safeAreaInset = 'env(safe-area-inset-bottom, 0px)'
+      const kbInset = 'var(--kb-inset, 0px)'
+      const mobileTranslate = keyboardOrFocusActive
+        ? `translateY(calc(-1 * (${kbInset})))`
+        : `translateY(calc(-1 * (${tabBarOffset} + ${safeAreaInset})))`
       return {
         maxWidth: 'min(768px, 100%)',
         '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
@@ -1398,7 +1405,10 @@ function ChatComposerComponent({
         isMobileViewport
           ? 'fixed inset-x-0 bottom-0 z-[70] transition-transform duration-200'
           : 'relative z-40 shrink-0',
-        'pb-[max(var(--safe-b),0px)] md:pb-[calc(var(--safe-b)+0.75rem)]',
+        // Mobile: pin above tab bar + safe-area inset. Desktop: normal bottom padding.
+        isMobileViewport
+          ? 'pb-[calc(max(var(--safe-b),env(safe-area-inset-bottom))+0.25rem)]'
+          : 'pb-[max(var(--safe-b),0px)] md:pb-[calc(var(--safe-b)+0.75rem)]',
         'md:bg-surface/95 md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
       )}
       style={composerWrapperStyle}

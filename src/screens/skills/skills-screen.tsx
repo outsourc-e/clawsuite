@@ -307,20 +307,18 @@ export function SkillsScreen() {
     <div className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
         <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="space-y-1 md:space-y-1.5">
-                <p className="text-[10px] font-medium uppercase text-primary-500 tabular-nums">
-                  ClawSuite Marketplace
-                </p>
-                <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
-                  Skills Browser
-                </h1>
-                <p className="line-clamp-1 text-xs text-primary-500 text-pretty md:line-clamp-none dark:text-neutral-400">
-                  Discover, install, and manage skills across your local
-                  workspace and ClawHub registry.
-                </p>
-              </div>
+          <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase text-primary-500 tabular-nums">
+                ClawSuite Marketplace
+              </p>
+              <h1 className="truncate text-base font-semibold text-primary-900 dark:text-neutral-100">
+                Skills Browser
+              </h1>
+              <p className="mt-0.5 line-clamp-2 text-xs text-primary-500 text-pretty dark:text-neutral-400 sm:line-clamp-none">
+                Discover, install, and manage skills across your local
+                workspace and ClawHub registry.
+              </p>
             </div>
           </div>
         </header>
