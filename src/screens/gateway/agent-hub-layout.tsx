@@ -6961,7 +6961,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div
         className={cn(
-          'shrink-0 border-b border-neutral-200 px-5 py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
+          'shrink-0 border-b border-neutral-200 px-3 py-3 sm:px-4 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
           isMobileHub
             ? 'bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:bg-slate-900/70'
             : 'bg-white dark:bg-slate-800',
@@ -6985,7 +6985,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       </div>
 
       {/* ── Tab Navigation Bar ────────────────────────────────────────────── */}
-      <div className="shrink-0 border-b border-neutral-200 bg-neutral-50/80 px-5 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
+      <div className="shrink-0 border-b border-neutral-200 bg-neutral-50/80 px-3 sm:px-4 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]">
         <div className="mx-auto w-full max-w-[1600px] overflow-x-auto">
           <div className="flex min-w-max items-center">
             {TAB_DEFS.map((tab) => {
