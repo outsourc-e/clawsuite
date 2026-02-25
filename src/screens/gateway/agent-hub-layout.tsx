@@ -1314,6 +1314,141 @@ function detectArtifactsFromText(params: {
   return artifacts
 }
 
+/**
+ * Extract an executive summary from agent output lines.
+ * Looks for a dedicated summary/overview heading first, then falls back to first prose sentences.
+ * Returns up to 200 chars ending on a sentence boundary, or empty string if nothing found.
+ */
+function extractExecutiveSummary(agentSummaries: MissionAgentSummary[]): string {
+  // Combine all cleaned output from all agents (primary = first agent)
+  const allLines: string[] = []
+  for (const summary of agentSummaries) {
+    allLines.push(...cleanAgentOutputLines(summary.lines))
+  }
+  if (allLines.length === 0) return ''
+
+  // 1. Check for a dedicated summary/overview section
+  const summaryHeaderPattern = /^#{1,3}\s+(Summary|Overview|Executive Summary)/i
+  for (let i = 0; i < allLines.length; i++) {
+    if (summaryHeaderPattern.test(allLines[i].trim())) {
+      const sectionProse: string[] = []
+      for (let j = i + 1; j < allLines.length; j++) {
+        const trimmed = allLines[j].trim()
+        if (/^#{1,3}\s+/.test(trimmed)) break // next heading
+        if (!trimmed) continue
+        if (/^[-*]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) continue // skip bullets/lists
+        if (trimmed.length < 10) continue
+        sectionProse.push(trimmed)
+        if (sectionProse.join(' ').length >= 200) break
+      }
+      if (sectionProse.length > 0) {
+        return truncateOnSentence(sectionProse.join(' '), 200)
+      }
+    }
+  }
+
+  // 2. Fallback: first 2-3 prose lines (not headers, commands, bullets)
+  const proseLines: string[] = []
+  for (const line of allLines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    if (/^#{1,6}\s/.test(trimmed)) continue // heading
+    if (/^[-*]\s/.test(trimmed)) continue // bullet
+    if (/^\d+\.\s/.test(trimmed)) continue // numbered list
+    if (/^```/.test(trimmed)) continue // code fence
+    if (/^[>$|]/.test(trimmed)) continue // blockquote, shell, table
+    if (trimmed.length < 15) continue // too short to be prose
+    proseLines.push(trimmed)
+    if (proseLines.length >= 3) break
+  }
+  if (proseLines.length === 0) return ''
+  return truncateOnSentence(proseLines.join(' '), 200)
+}
+
+/** Truncate text to maxLen characters, ending on a sentence boundary. */
+function truncateOnSentence(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text
+  const truncated = text.slice(0, maxLen)
+  // Find last sentence-ending punctuation
+  const lastSentenceEnd = Math.max(
+    truncated.lastIndexOf('. '),
+    truncated.lastIndexOf('! '),
+    truncated.lastIndexOf('? '),
+    truncated.lastIndexOf('.'),
+    truncated.lastIndexOf('!'),
+    truncated.lastIndexOf('?'),
+  )
+  if (lastSentenceEnd > maxLen * 0.4) {
+    return truncated.slice(0, lastSentenceEnd + 1)
+  }
+  return truncated.trimEnd() + '…'
+}
+
+/**
+ * Extract key findings from agent output: bullet lists, numbered lists, or known heading sections.
+ * Returns up to 5 items, or empty array if nothing meaningful found.
+ */
+function extractKeyFindings(agentSummaries: MissionAgentSummary[]): string[] {
+  const allLines: string[] = []
+  for (const summary of agentSummaries) {
+    allLines.push(...cleanAgentOutputLines(summary.lines))
+  }
+  if (allLines.length === 0) return []
+
+  const findings: string[] = []
+
+  // 1. Look for known heading sections first
+  const keyHeadingPattern = /^#{1,3}\s+(Key Findings|Summary|Recommendations|Conclusion|Results)/i
+  for (let i = 0; i < allLines.length; i++) {
+    if (keyHeadingPattern.test(allLines[i].trim())) {
+      for (let j = i + 1; j < allLines.length && findings.length < 5; j++) {
+        const trimmed = allLines[j].trim()
+        if (/^#{1,3}\s+/.test(trimmed)) break // next heading
+        if (/^[-*]\s+/.test(trimmed)) {
+          findings.push(trimmed)
+        } else if (/^\d+\.\s+/.test(trimmed)) {
+          findings.push(trimmed)
+        }
+      }
+      if (findings.length > 0) return findings.slice(0, 5)
+    }
+  }
+
+  // 2. Fallback: collect bullet/numbered items from anywhere, pick top 5 longest (most informative)
+  const candidates: string[] = []
+  for (const line of allLines) {
+    const trimmed = line.trim()
+    if (/^[-*]\s+.{10,}/.test(trimmed) || /^\d+\.\s+.{10,}/.test(trimmed)) {
+      candidates.push(trimmed)
+    }
+  }
+  if (candidates.length === 0) return []
+
+  // Sort by length (longer = more informative) and take top 5
+  candidates.sort((a, b) => b.length - a.length)
+  return candidates.slice(0, 5)
+}
+
+/**
+ * Determine mission outcome from task stats and agent output.
+ */
+function determineMissionOutcome(
+  taskStats: MissionTaskStats,
+  agentSummaries: MissionAgentSummary[],
+): string {
+  const hasOutput = agentSummaries.some((s) => cleanAgentOutputLines(s.lines).length > 0)
+  const hasAbortMarker = agentSummaries.some((s) =>
+    s.lines.some((line) => /session aborted|mission aborted/i.test(line)),
+  )
+
+  if (hasAbortMarker) return '**Outcome:** 🛑 Aborted'
+  if (!hasOutput) return '**Outcome:** ❌ No output'
+  if (taskStats.failed > 0) return '**Outcome:** ⚠️ Partial'
+  if (taskStats.total > 0 && taskStats.completed >= taskStats.total) return '**Outcome:** ✅ Complete'
+  if (taskStats.total === 0 && hasOutput) return '**Outcome:** ✅ Complete'
+  return '**Outcome:** ⚠️ Partial'
+}
+
 function generateMissionReport(payload: MissionReportPayload): string {
   const durationMs = Math.max(0, payload.completedAt - payload.startedAt)
   const taskStats = computeMissionTaskStats(payload.tasks)
@@ -1331,7 +1466,17 @@ function generateMissionReport(payload: MissionReportPayload): string {
   lines.push(`**Started:** ${new Date(payload.startedAt).toLocaleString()}`)
   lines.push(`**Completed:** ${new Date(payload.completedAt).toLocaleString()}`)
   lines.push(`**Duration:** ${formatDuration(durationMs)}`)
+  lines.push(determineMissionOutcome(taskStats, payload.agentSummaries))
   lines.push('')
+
+  // Executive Summary
+  const execSummary = extractExecutiveSummary(payload.agentSummaries)
+  if (execSummary) {
+    lines.push('## Executive Summary')
+    lines.push(execSummary)
+    lines.push('')
+  }
+
   lines.push('## Team')
   if (payload.team.length === 0) {
     lines.push('- No agents')
@@ -1346,6 +1491,18 @@ function generateMissionReport(payload: MissionReportPayload): string {
   lines.push(`- Completed: ${taskStats.completed}`)
   if (taskStats.failed > 0) lines.push(`- Failed: ${taskStats.failed}`)
   lines.push('')
+
+  // Key Findings
+  const keyFindings = extractKeyFindings(payload.agentSummaries)
+  if (keyFindings.length > 0) {
+    lines.push('## Key Findings')
+    keyFindings.forEach((finding) => {
+      // Normalize to bullet if it's a numbered item
+      const normalized = finding.replace(/^\d+\.\s+/, '- ')
+      lines.push(normalized.startsWith('- ') || normalized.startsWith('* ') ? normalized : `- ${normalized}`)
+    })
+    lines.push('')
+  }
 
   // Collect auto-detected artifacts from agent output
   const autoDetectedArtifacts: MissionArtifact[] = []
