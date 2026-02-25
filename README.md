@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./public/logo-final.svg" alt="ClawSuite" width="80" />
+<img src="./public/logo-icon.jpg" alt="ClawSuite" width="80" style="border-radius: 18px;" />
 
 # ClawSuite
 
