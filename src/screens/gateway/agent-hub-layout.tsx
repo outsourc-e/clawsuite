@@ -6521,6 +6521,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 onClose={() => setOutputPanelVisible(false)}
                 modelId={selectedOutputModelId}
                 statusLabel={selectedOutputStatusLabel}
+                compact
               />
             </div>
           </div>
