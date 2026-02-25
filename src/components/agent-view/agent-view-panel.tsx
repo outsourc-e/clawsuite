@@ -402,8 +402,8 @@ function OrchestratorCard({
       </div>
 
       {/* ── Usage section — seamless inside the card ── */}
-      {!compact && displayRows.length > 0 && (
-        <div className="mt-2 border-t border-primary-300/40 pt-2 px-4 space-y-1">
+      {displayRows.length > 0 && (
+        <div className={cn('border-t border-primary-300/40 pt-2 space-y-1', compact ? 'mt-1.5 px-2' : 'mt-2 px-4')}>
           {/* Header: provider name (click to cycle) | chevron (click to collapse) */}
           <div className="flex w-full items-center justify-between">
             <button
