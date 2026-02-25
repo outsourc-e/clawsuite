@@ -3938,15 +3938,28 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   )
 
   const handleMissionPause = useCallback(async (pause: boolean) => {
-    setMissionState(pause ? 'paused' : 'running')
+    // BUG-5 fix: do NOT set state optimistically before async calls settle.
+    // setMissionState fires AFTER Promise.allSettled confirms all pauses succeeded.
+    // If any settle with 'rejected', revert to the previous state instead.
+    const previousState: 'running' | 'paused' | 'stopped' = pause ? 'running' : 'paused'
     try {
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         team
           .filter((m) => agentSessionMap[m.id])
           .map((m) => _handleSetAgentPaused(m.id, pause))
       )
+      // Only update mission state when all pause/resume calls succeeded (or were no-ops)
+      const anyFailed = results.some((r) => r.status === 'rejected')
+      if (anyFailed) {
+        // At least one agent failed to pause/resume — leave state unchanged
+        // (individual agents already show their own error toasts via _handleSetAgentPaused)
+        setMissionState(previousState)
+      } else {
+        setMissionState(pause ? 'paused' : 'running')
+      }
     } catch {
-      // allSettled won't throw, but guard against unexpected errors
+      // Unexpected error — revert to previous state
+      setMissionState(previousState)
     }
   }, [team, agentSessionMap, _handleSetAgentPaused])
 
@@ -6111,9 +6124,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         team: config.team,
       })),
     ]
-    const selectedMissionTeamOption =
+    const _selectedMissionTeamOption =
       missionTeamOptions.find((option) => option.id === newMissionTeamConfigId)
       ?? missionTeamOptions[0]
+    void _selectedMissionTeamOption
     // ── Build unified mission list ─────────────────────────────────────────
     type MissionListStatus = 'running' | 'needs_input' | 'complete' | 'failed'
     type MissionListEntry = {
