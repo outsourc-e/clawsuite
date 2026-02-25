@@ -268,7 +268,14 @@ class GatewayClient {
         }
 
         const { url, token, password } = getGatewayConfig()
-        const ws = new WebSocket(url, { origin: 'http://localhost:3000', headers: { Origin: 'http://localhost:3000' } })
+        // B4: derive origin from gateway URL instead of hardcoded localhost:3000
+        const gatewayOrigin = (() => {
+          try {
+            const parsed = new URL(url.replace(/^ws/, 'http'))
+            return `${parsed.protocol}//${parsed.host}`
+          } catch { return 'http://127.0.0.1:18789' }
+        })()
+        const ws = new WebSocket(url, { origin: gatewayOrigin, headers: { Origin: gatewayOrigin } })
 
         this.clearReconnectTimer()
         this.attachSocket(ws)

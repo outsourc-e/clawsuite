@@ -90,10 +90,10 @@ export function WidgetShell({
           : undefined
       }
       className={cn(
-        // Base glass card
-        'group relative flex flex-col overflow-hidden rounded-2xl',
-        'border border-neutral-200 dark:border-neutral-700',
-        'bg-white dark:bg-neutral-900 backdrop-blur-md',
+        // Base glass card — C3: near-neutral dark, consistent card treatment
+        'group relative flex flex-col overflow-hidden rounded-xl',
+        'border border-primary-200 dark:border-neutral-800',
+        'bg-primary-50/95 dark:bg-[var(--theme-panel)] backdrop-blur-md',
         'shadow-sm transition-shadow',
         // Size
         SIZE_STYLES[size],

@@ -22,7 +22,7 @@ export function NowCard({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-xl border border-white/30 bg-white/60 px-3 py-2 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-neutral-950/60',
+        'flex items-center gap-2 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/60',
         className,
       )}
     >

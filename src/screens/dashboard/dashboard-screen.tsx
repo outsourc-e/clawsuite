@@ -628,7 +628,7 @@ export function DashboardScreen() {
 
         <section className="mx-auto w-full max-w-[1600px]">
           {/* ── Header ─────────────────────────────────────────────────────── */}
-          <header className="relative z-20 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm md:mb-5 md:px-5 md:py-3">
+          <header className="relative z-20 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)] px-3 py-2 md:mb-5 md:px-5 md:py-3">
             <div className="flex items-center justify-between gap-3">
               {/* Left: Logo + name + status */}
               <div className="flex min-w-0 items-center gap-2.5">
@@ -722,43 +722,11 @@ export function DashboardScreen() {
                 )}
                 {isMobile && (
                   <>
-                    {mobileEditMode ? (
-                      <>
-                        <AddWidgetPopover
-                          visibleIds={visibleIds}
-                          onAdd={addWidget}
-                          compact
-                          buttonClassName="size-8 !px-0 !py-0 justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-500 shadow-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleResetLayout}
-                          className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-500 shadow-sm transition-colors hover:text-primary-700 active:scale-95"
-                          aria-label="Reset Layout"
-                          title="Reset Layout"
-                        >
-                          <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.5} />
-                        </button>
-                      </>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => setMobileEditMode((p) => !p)}
-                      className={cn(
-                        'inline-flex size-8 items-center justify-center rounded-full border shadow-sm transition-colors active:scale-95',
-                        mobileEditMode
-                          ? 'border-accent-300 bg-accent-50 text-accent-600'
-                          : 'border-primary-200 bg-primary-100/80 text-primary-500 hover:text-primary-700',
-                      )}
-                      aria-label={mobileEditMode ? 'Done editing' : 'Edit layout'}
-                      title={mobileEditMode ? 'Done editing' : 'Edit layout'}
-                    >
-                      <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.6} />
-                    </button>
+                    {/* D1: Edit controls moved to inline row above grid — keep header clean */}
                     <button
                       type="button"
                       onClick={() => updateSettings({ theme: nextTheme })}
-                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 dark:hover:bg-primary-800 active:scale-95"
+                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-primary-800 active:scale-95"
                       aria-label={`Switch theme to ${nextTheme}`}
                       title={`Theme: ${theme} (tap for ${nextTheme})`}
                     >
@@ -771,7 +739,7 @@ export function DashboardScreen() {
                     <button
                       type="button"
                       onClick={() => setDashSettingsOpen(true)}
-                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 dark:hover:bg-primary-800 active:scale-95"
+                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-primary-800 active:scale-95"
                       aria-label="Dashboard settings"
                       title="Settings"
                     >
@@ -788,7 +756,7 @@ export function DashboardScreen() {
           </header>
 
           {dashboardData.status === 'error' ? (
-            <div className="mb-3 rounded-xl border border-red-200 bg-red-50/85 px-3 py-2 text-sm text-red-800 shadow-sm md:mb-4">
+            <div className="mb-3 rounded-xl border border-red-200 bg-red-50/85 px-3 py-2 text-sm text-red-800 shadow-sm dark:border-red-900 dark:bg-red-950/50 dark:text-red-300 md:mb-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="font-medium">Dashboard data failed to load</p>
@@ -931,6 +899,44 @@ export function DashboardScreen() {
               </CollapsibleWidget>
 
               {/* MetricCards intentionally omitted on mobile — SystemGlance above is the canonical hero */}
+
+              {/* D1: Inline widget control row above grid — replaces header edit button */}
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-primary-500 dark:text-neutral-400">Widgets</p>
+                <div className="flex items-center gap-1.5">
+                  <AddWidgetPopover
+                    visibleIds={visibleIds}
+                    onAdd={addWidget}
+                    compact
+                    buttonClassName="size-7 !px-0 !py-0 justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-500 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMobileEditMode((p) => !p)}
+                    className={cn(
+                      'inline-flex size-7 items-center justify-center rounded-full border shadow-sm transition-colors active:scale-95',
+                      mobileEditMode
+                        ? 'border-accent-300 bg-accent-50 text-accent-600 dark:border-accent-600 dark:bg-accent-950'
+                        : 'border-primary-200 bg-primary-100/80 text-primary-500 hover:text-primary-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+                    )}
+                    aria-label={mobileEditMode ? 'Done editing' : 'Edit layout'}
+                    title={mobileEditMode ? 'Done editing' : 'Edit layout'}
+                  >
+                    <HugeiconsIcon icon={PencilEdit02Icon} size={13} strokeWidth={1.6} />
+                  </button>
+                  {mobileEditMode ? (
+                    <button
+                      type="button"
+                      onClick={handleResetLayout}
+                      className="inline-flex size-7 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-500 shadow-sm transition-colors hover:text-primary-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 active:scale-95"
+                      aria-label="Reset Layout"
+                      title="Reset Layout"
+                    >
+                      <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.5} />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
 
               {/* Deep sections (reorderable) */}
               <div className="space-y-1.5">

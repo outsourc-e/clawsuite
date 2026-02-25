@@ -32,7 +32,7 @@ function SystemGlanceCompact({
   currentModel: _currentModel,
 }: SystemGlanceProps) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/70 px-3 py-2 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-neutral-950/60">
+    <div className="flex items-center gap-2 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/60">
       {/* Health dot */}
       <span
         className={cn(

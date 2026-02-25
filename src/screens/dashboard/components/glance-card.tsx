@@ -182,7 +182,7 @@ export function GlanceCard({ children, className }: GlanceCardProps) {
   return (
     <div
       className={cn(
-        'relative rounded-2xl border border-primary-200 bg-white p-4 shadow-sm dark:border-neutral-800/60 dark:bg-neutral-950/80',
+        'relative rounded-2xl border border-primary-200 bg-primary-50/95 p-4 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]',
         className,
       )}
     >
