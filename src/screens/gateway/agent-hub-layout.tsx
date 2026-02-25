@@ -4790,6 +4790,71 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     setMissionWizardStep(0)
   }
 
+  function handleSaveMissionDraft() {
+    const goal = newMissionGoal.trim()
+    const name = newMissionName.trim() || 'Untitled mission'
+    if (!goal) return
+    const selectedConfig = newMissionTeamConfigId === '__current__'
+      ? null
+      : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
+    const currentTeamLabel = `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · ${team.length} agents`
+    const teamName = selectedConfig ? `${selectedConfig.name} · ${selectedConfig.team.length} agents` : currentTeamLabel
+    const id = `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    setMissionBoardDrafts((prev) => [
+      {
+        id,
+        name,
+        goal,
+        teamConfigId: newMissionTeamConfigId,
+        teamName,
+        processType: newMissionProcessType,
+        budgetLimit: newMissionBudgetLimit.trim(),
+        createdAt: Date.now(),
+      },
+      ...prev,
+    ])
+    setMissionBoardModalOpen(false)
+    toast(`Saved draft: ${name}`, { type: 'success' })
+  }
+
+  function getTeamBudgetSummary(members: TeamMember[]) {
+    const budgetTokens = parseTokenBudget(newMissionBudgetLimit)
+    const totalCost = budgetTokens ? estimateMissionCost(budgetTokens) : null
+    const avgCost =
+      totalCost !== null && members.length > 0
+        ? Number((totalCost / members.length).toFixed(2))
+        : null
+    return { totalCost, avgCost }
+  }
+
+  function handleLaunchMissionFromModal() {
+    const goal = newMissionGoal.trim()
+    if (!goal) return
+    const selectedConfig = newMissionTeamConfigId === '__current__'
+      ? null
+      : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
+
+    if (selectedConfig) {
+      setTeam(selectedConfig.team.map((member, index) => ({
+        ...member,
+        avatar: member.avatar ?? getAgentAvatarForSlot(index),
+      })))
+      setSelectedTeamConfigId(selectedConfig.id)
+    }
+
+    pendingMissionNameRef.current = newMissionName.trim()
+    pendingMissionBudgetLimitRef.current = newMissionBudgetLimit.trim()
+    setMissionGoal(goal)
+    setProcessType(newMissionProcessType)
+    setBudgetLimit(newMissionBudgetLimit.trim())
+    setMissionBoardModalOpen(false)
+    setRestoreDismissed(true)
+
+    window.setTimeout(() => {
+      handleCreateMissionRef.current()
+    }, 0)
+  }
+
   // ── Mission modal derived data (hoisted so modal renders on any tab) ──────
   const _modalCurrentTeamLabel = `${activeTemplateId ? TEMPLATE_DISPLAY_NAMES[activeTemplateId] : 'Custom Team'} · ${team.length} agents`
   const _modalMissionTeamOptions = [
@@ -5968,74 +6033,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const selectedMissionTeamOption =
       missionTeamOptions.find((option) => option.id === newMissionTeamConfigId)
       ?? missionTeamOptions[0]
-    const selectedMissionTeamMembers = selectedMissionTeamOption?.team ?? []
-    const selectedBudgetTokens = parseTokenBudget(newMissionBudgetLimit)
-    const selectedTotalBudgetCost = selectedBudgetTokens ? estimateMissionCost(selectedBudgetTokens) : null
-    // (budget cost per agent — reserved for future budget display)
-
-    function getTeamBudgetSummary(members: TeamMember[]) {
-      const totalCost = selectedBudgetTokens ? estimateMissionCost(selectedBudgetTokens) : null
-      const avgCost =
-        totalCost !== null && members.length > 0
-          ? Number((totalCost / members.length).toFixed(2))
-          : null
-      return { totalCost, avgCost }
-    }
-
-    function handleSaveMissionDraft() {
-      const goal = newMissionGoal.trim()
-      const name = newMissionName.trim() || 'Untitled mission'
-      if (!goal) return
-      const selectedConfig = newMissionTeamConfigId === '__current__'
-        ? null
-        : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
-      const teamName = selectedConfig ? `${selectedConfig.name} · ${selectedConfig.team.length} agents` : currentTeamLabel
-      const id = `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-      setMissionBoardDrafts((prev) => [
-        {
-          id,
-          name,
-          goal,
-          teamConfigId: newMissionTeamConfigId,
-          teamName,
-          processType: newMissionProcessType,
-          budgetLimit: newMissionBudgetLimit.trim(),
-          createdAt: Date.now(),
-        },
-        ...prev,
-      ])
-      setMissionBoardModalOpen(false)
-      toast(`Saved draft: ${name}`, { type: 'success' })
-    }
-
-    function handleLaunchMissionFromModal() {
-      const goal = newMissionGoal.trim()
-      if (!goal) return
-      const selectedConfig = newMissionTeamConfigId === '__current__'
-        ? null
-        : teamConfigs.find((entry) => entry.id === newMissionTeamConfigId)
-
-      if (selectedConfig) {
-        setTeam(selectedConfig.team.map((member, index) => ({
-          ...member,
-          avatar: member.avatar ?? getAgentAvatarForSlot(index),
-        })))
-        setSelectedTeamConfigId(selectedConfig.id)
-      }
-
-      pendingMissionNameRef.current = newMissionName.trim()
-      pendingMissionBudgetLimitRef.current = newMissionBudgetLimit.trim()
-      setMissionGoal(goal)
-      setProcessType(newMissionProcessType)
-      setBudgetLimit(newMissionBudgetLimit.trim())
-      setMissionBoardModalOpen(false)
-      setRestoreDismissed(true)
-
-      window.setTimeout(() => {
-        handleCreateMissionRef.current()
-      }, 0)
-    }
-
     // ── Build unified mission list ─────────────────────────────────────────
     type MissionListStatus = 'running' | 'needs_input' | 'complete' | 'failed'
     type MissionListEntry = {
@@ -6708,34 +6705,33 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   return (
     <AgentHubErrorBoundary>
     <div className="flex h-full min-h-0 flex-col bg-white dark:bg-[var(--theme-bg,#0b0e14)]">
-      {/* ── Brand top accent border ──────────────────────────────────────── */}
-      <div className="shrink-0 px-3 sm:px-4">
-        <div className="mx-auto h-[2px] w-full max-w-[1600px] bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400" />
-      </div>
-
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div
-        className={cn(
-          'shrink-0 border-b border-neutral-200 py-3 dark:border-slate-700 dark:bg-[var(--theme-panel,#111520)]',
-          isMobileHub
-            ? 'bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:bg-slate-900/70'
-            : 'bg-white dark:bg-slate-800',
-        )}
-      >
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-3 sm:px-4">
-          <div className="flex min-w-0 items-baseline gap-2">
-            <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-900 dark:text-white">Agent Hub</h1>
-            <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
-          </div>
-          {/* Right-side header controls */}
-          <div className="flex items-center gap-2">
-            {/* Approvals Bell — always visible in header */}
-            <ApprovalsBell
-              approvals={approvals}
-              onApprove={handleApprove}
-              onDeny={handleDeny}
-            />
-          </div>
+      {/* ── Header — matches dashboard card style ─────────────────────────── */}
+      <div className="shrink-0 px-3 pt-3 sm:px-4 sm:pt-4">
+        <div className="mx-auto w-full max-w-[1600px]">
+          <header
+            className={cn(
+              'relative z-20 overflow-hidden rounded-xl border border-primary-200 px-3 py-2 shadow-sm dark:border-slate-700 md:px-5 md:py-3',
+              isMobileHub
+                ? 'bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:bg-slate-900/70'
+                : 'bg-primary-50/95 dark:bg-[var(--theme-panel,#111520)]',
+            )}
+          >
+            {/* Orange top accent — inside the card, flush with rounded corners */}
+            <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400" />
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex min-w-0 items-baseline gap-2">
+                <h1 className="shrink-0 text-sm font-semibold text-ink dark:text-white md:text-base">Agent Hub</h1>
+                <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <ApprovalsBell
+                  approvals={approvals}
+                  onApprove={handleApprove}
+                  onDeny={handleDeny}
+                />
+              </div>
+            </div>
+          </header>
         </div>
       </div>
 
