@@ -6460,7 +6460,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
         {missionBoardModalOpen ? (
           <div
-            className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-900/35 px-4 py-6 backdrop-blur-[1px]"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/35 px-4 py-6 backdrop-blur-[1px]"
             onClick={() => setMissionBoardModalOpen(false)}
           >
             <div
