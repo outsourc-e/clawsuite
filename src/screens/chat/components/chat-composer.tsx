@@ -33,6 +33,7 @@ import {
   type SlashCommandDefinition,
   type SlashCommandMenuHandle,
 } from '@/components/slash-command-menu'
+import { useSettings } from '@/hooks/use-settings'
 import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
@@ -541,6 +542,8 @@ function ChatComposerComponent({
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
+  const { settings: composerSettings } = useSettings()
+  const chatNavMode = composerSettings.mobileChatNavMode ?? 'dock'
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(max-width: 767px)').matches
@@ -1466,13 +1469,12 @@ function ChatComposerComponent({
   const composerWrapperStyle = useMemo(
     () => {
       if (!isMobileViewport) return { maxWidth: 'min(768px, 100%)' } as CSSProperties
-      // iMessage/Telegram model: composer always docks to bottom.
-      // Tab bar is hidden on chat routes so no need to pad above it.
       const safeArea = 'env(safe-area-inset-bottom, 0px)'
+      const tabBarH = 'var(--tabbar-h, 5rem)'
       const tf = effectiveScrollHidden ? 'translateY(110%)' : 'translateY(0)'
 
       if (keyboardOrFocusActive) {
-        // Keyboard up: flush at bottom, pad for keyboard inset
+        // All modes: keyboard up = flush at bottom with keyboard inset
         return {
           maxWidth: 'min(768px, 100%)',
           bottom: '0px',
@@ -1483,11 +1485,23 @@ function ChatComposerComponent({
         } as CSSProperties
       }
 
-      // At rest: sit at bottom, pad only for safe area (home indicator)
+      if (chatNavMode === 'dock') {
+        // iMessage mode: tab bar hidden, composer docks to bottom with safe area only
+        return {
+          maxWidth: 'min(768px, 100%)',
+          bottom: '0px',
+          paddingBottom: `max(var(--safe-b, 0px), ${safeArea})`,
+          transform: tf,
+          WebkitTransform: tf,
+          '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
+        } as CSSProperties
+      }
+
+      // scroll-hide / integrated: tab bar visible, composer sits above it
       return {
         maxWidth: 'min(768px, 100%)',
-        bottom: '0px',
-        paddingBottom: `max(var(--safe-b, 0px), ${safeArea})`,
+        bottom: `calc(${tabBarH} + 4px)`,
+        paddingBottom: '0px',
         transform: tf,
         WebkitTransform: tf,
         '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
@@ -1502,10 +1516,21 @@ function ChatComposerComponent({
         'no-swipe pointer-events-auto touch-manipulation',
         isMobileViewport
           ? [
-              // iMessage-style: always edge-to-edge, docked to bottom
-              'fixed left-0 right-0 z-[70] transition-transform duration-200',
-              'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl',
-              'border-t border-primary-200/60 dark:border-neutral-800',
+              'fixed z-[70] transition-all duration-200',
+              chatNavMode === 'dock'
+                ? [
+                    // iMessage-style: edge-to-edge, docked to bottom
+                    'left-0 right-0',
+                    'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl',
+                    'border-t border-primary-200/60 dark:border-neutral-800',
+                  ].join(' ')
+                : [
+                    // scroll-hide / integrated: floating pill above tab bar
+                    'left-4 right-4',
+                    'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl',
+                    'shadow-[0_8px_32px_rgba(0,0,0,0.15)]',
+                    'rounded-[22px]',
+                  ].join(' '),
             ].join(' ')
           : ['relative z-40 shrink-0 w-full mx-auto px-3 pt-2 sm:px-5', 'bg-surface'].join(' '),
         // Mobile: pin above tab bar + safe-area inset. Desktop: normal bottom padding.

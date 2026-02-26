@@ -20,6 +20,8 @@ export type StudioSettings = {
   preferredPremiumModel: string
   onlySuggestCheaper: boolean
   showSystemMetricsFooter: boolean
+  /** Mobile chat nav mode: 'dock' = iMessage (no nav in chat), 'integrated' = chat input in nav pill, 'scroll-hide' = nav shows on scroll up */
+  mobileChatNavMode: 'dock' | 'integrated' | 'scroll-hide'
 }
 
 type SettingsState = {
@@ -42,6 +44,7 @@ export const defaultStudioSettings: StudioSettings = {
   preferredPremiumModel: '',
   onlySuggestCheaper: false,
   showSystemMetricsFooter: false,
+  mobileChatNavMode: 'dock',
 }
 
 function resolveStoredAccent(value: string | null): AccentColor | null {

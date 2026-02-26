@@ -377,6 +377,21 @@ function AppearanceContent() {
             aria-label="Show system metrics footer"
           />
         </Row>
+
+        <Row
+          label="Mobile chat nav"
+          description="How the bottom nav behaves on chat screens."
+        >
+          <select
+            value={settings.mobileChatNavMode ?? 'dock'}
+            onChange={(e) => updateSettings({ mobileChatNavMode: e.target.value as 'dock' | 'integrated' | 'scroll-hide' })}
+            className="rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+          >
+            <option value="dock">Dock (iMessage)</option>
+            <option value="scroll-hide">Scroll-hide (B)</option>
+            <option value="integrated">Integrated (C)</option>
+          </select>
+        </Row>
       </div>
     </div>
   )

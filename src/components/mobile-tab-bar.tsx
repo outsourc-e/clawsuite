@@ -11,6 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { TouchEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
+import { useSettings } from '@/hooks/use-settings'
 
 /** Height constant for consistent bottom insets on mobile routes with tab bar */
 export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 80px)'
@@ -79,9 +80,14 @@ export function MobileTabBar() {
   const dragStartTimeRef = useRef<number | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  // isChatRoute = any chat screen (hide tab bar on all chat views)
-  const isChatRoute =
-    pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
+  const { settings } = useSettings()
+  const chatNavMode = settings.mobileChatNavMode ?? 'dock'
+  const isOnChat = pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
+
+  // 'dock' mode: hide tab bar on all chat routes (iMessage style)
+  // 'scroll-hide': tab bar always present, composer floats above it
+  // 'integrated': tab bar always present, has mini input
+  const isChatRoute = chatNavMode === 'dock' ? isOnChat : false
 
   // Drag-to-switch: horizontal swipe across pill switches tabs
   const handlePillTouchStart = useCallback(
