@@ -819,8 +819,8 @@ export function DashboardScreen() {
                 </div>
               ) : null}
 
-              {/* MOB-5: Widget cards replacing quick actions — matches desktop layout */}
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {/* MOB-5: Quick action cards — hidden on mobile (nav bar handles this) */}
+              <div className="hidden sm:grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <button
                   type="button"
                   onClick={() => void navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })}

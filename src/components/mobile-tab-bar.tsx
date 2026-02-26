@@ -111,8 +111,10 @@ export function MobileTabBar() {
       if (startX === null) return
       const endX = event.changedTouches[0]?.clientX ?? startX
       const delta = endX - startX
+      const elapsed = Date.now() - (dragStartTimeRef.current ?? Date.now())
       const pillWidth = navRef.current?.getBoundingClientRect().width ?? 200
-      const threshold = pillWidth * 0.3
+      // Fast flick (< 250ms) needs less distance, slow drag needs 20% of pill width
+      const threshold = elapsed < 250 ? 20 : pillWidth * 0.2
 
       if (Math.abs(delta) < threshold) return
 
