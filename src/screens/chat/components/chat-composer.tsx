@@ -1445,7 +1445,7 @@ function ChatComposerComponent({
       // fixed bottom-0 composer — use paddingBottom to clear tab bar or keyboard
       // never use translateY to lift, only to hide (scroll-hidden)
       const kbInset = 'var(--kb-inset, 0px)'
-      const tabBarH = 'var(--tabbar-h, 3.75rem)'
+      const tabBarH = 'var(--tabbar-h, 5rem)'
       const safeArea = 'env(safe-area-inset-bottom, 0px)'
       const pb = keyboardOrFocusActive
         ? `calc(${kbInset} + max(var(--safe-b, 0px), ${safeArea}))`

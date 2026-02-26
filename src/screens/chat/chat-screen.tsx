@@ -893,7 +893,7 @@ export function ChatScreen({
       return 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
     }
     // At rest: composer sits above tab bar, so pad by composer + tab bar + safe area
-    return 'calc(var(--chat-composer-height, 96px) + var(--tabbar-h, 3.75rem) + env(safe-area-inset-bottom, 0px))'
+    return 'calc(var(--chat-composer-height, 96px) + var(--tabbar-h, 5rem) + env(safe-area-inset-bottom, 0px))'
   }, [isMobile, mobileKeyboardActive])
 
   // Keep message list clear of composer, keyboard, and desktop terminal panel.
@@ -901,7 +901,7 @@ export function ChatScreen({
     if (isMobile) {
       const mobileBase = mobileKeyboardActive
         ? 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
-        : 'calc(var(--chat-composer-height, 96px) + var(--tabbar-h, 3.75rem) + env(safe-area-inset-bottom, 0px))'
+        : 'calc(var(--chat-composer-height, 96px) + var(--tabbar-h, 5rem) + env(safe-area-inset-bottom, 0px))'
       return {
         paddingBottom: `calc(${mobileBase} + 16px)`,
       }
