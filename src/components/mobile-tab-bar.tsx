@@ -173,7 +173,7 @@ export function MobileTabBar() {
         // Vertical position: above home indicator
         'mb-[calc(env(safe-area-inset-bottom,16px)+8px)]',
         // Frosted glass pill
-        'bg-white/85 dark:bg-neutral-900/85 backdrop-blur-2xl',
+        'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl',
         'rounded-full',
         'border border-white/40 dark:border-white/10',
         'shadow-[0_8px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
