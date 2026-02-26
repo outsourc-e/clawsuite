@@ -2103,7 +2103,7 @@ function OfficeView({
                                      'border-emerald-300 bg-emerald-50 text-emerald-700'
 
   return (
-    <div className="h-full min-h-[420px] overflow-y-auto bg-neutral-50 dark:bg-neutral-900 p-4">
+    <div className="min-h-full p-4 md:h-full md:overflow-y-auto md:bg-surface">
       {/* ── Crew strip ─────────────────────────────────────────────────── */}
       <div className="mb-4 flex items-center gap-3 rounded-xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-4 py-3 shadow-sm">
         {/* Overlapping agent avatars */}
@@ -2414,7 +2414,7 @@ function HistoryView() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4">
+    <div className="min-h-full p-4 md:h-full md:overflow-y-auto">
       <h2 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-neutral-600 dark:text-slate-400">Mission Reports</h2>
 
       {/* Local checkpoint history */}
@@ -4962,7 +4962,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="relative flex flex-col h-full min-h-0 overflow-y-auto sm:overflow-hidden bg-neutral-50/80 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex flex-col min-h-full sm:h-full sm:min-h-0 sm:overflow-hidden dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
         <div className="relative mx-auto mt-3 sm:mt-5 w-full max-w-[1600px] shrink-0 sm:flex-1 sm:min-h-0 px-3 sm:px-4 flex flex-col">
@@ -5264,7 +5264,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   function renderConfigureContent() {
     return (
-      <div className="relative flex h-full min-h-0 flex-col overflow-y-auto bg-primary-100/45 p-4 dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex min-h-full flex-col p-4 md:h-full md:min-h-0 md:overflow-y-auto dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-4">
 

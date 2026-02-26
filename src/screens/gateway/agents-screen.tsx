@@ -853,7 +853,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
 
   if (missionControlEnabled) {
     return (
-      <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden">
+      <div className="relative flex min-h-full flex-col overflow-x-hidden md:h-full md:min-h-0 md:bg-surface">
         {/* Pull-to-refresh indicator (mobile) */}
         {isMobile && agentHubPulling ? (
           <div

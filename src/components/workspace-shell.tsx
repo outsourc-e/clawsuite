@@ -250,7 +250,7 @@ export function WorkspaceShell() {
             onTouchMove={isMobile ? onTouchMove : undefined}
             onTouchEnd={isMobile ? onTouchEnd : undefined}
             className={[
-              'h-full min-h-0 min-w-0 overflow-x-hidden',
+              'h-full min-h-0 min-w-0 overflow-x-hidden bg-transparent',
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
               isMobile && !isOnChatRoute
                 ? 'pb-[calc(var(--tabbar-h,120px)+0.5rem)]'
