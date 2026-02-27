@@ -11,6 +11,12 @@ export function MobilePromptTrigger() {
   useEffect(() => {
     mountTimeRef.current = Date.now();
 
+    // ?mobile-preview forces modal open immediately (dev/review only)
+    if (new URLSearchParams(window.location.search).get('mobile-preview') === '1') {
+      setIsModalOpen(true);
+      return;
+    }
+
     const isDismissed = localStorage.getItem('clawsuite-mobile-prompt-dismissed') === 'true';
     const isSetup = localStorage.getItem('clawsuite-mobile-setup-seen') === 'true';
 
