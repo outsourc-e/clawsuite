@@ -132,7 +132,6 @@ type ChatMessageListProps = {
   streamingThinking?: string
   isStreaming?: boolean
   bottomOffset?: number | string
-  keyboardInset?: number
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
   liveToolActivity?: Array<{ name: string; timestamp: number }>
   hideSystemMessages?: boolean
@@ -158,7 +157,6 @@ function ChatMessageListComponent({
   streamingThinking,
   isStreaming = false,
   bottomOffset = 0,
-  keyboardInset = 0,
   activeToolCalls = [],
   liveToolActivity = [],
   hideSystemMessages = false,
@@ -192,7 +190,6 @@ function ChatMessageListComponent({
     return window.matchMedia('(max-width: 767px)').matches
   })
   // Pull-to-refresh removed (was buggy on mobile)
-  const keyboardInsetRef = useRef(keyboardInset)
   const [scrollMetrics] = useState({
     scrollTop: 0,
     scrollHeight: 0,
@@ -874,27 +871,6 @@ function ChatMessageListComponent({
     [isMobileViewport, scrollToBottom],
   )
 
-  useEffect(() => {
-    const previousInset = keyboardInsetRef.current
-    keyboardInsetRef.current = keyboardInset
-
-    if (keyboardInset <= previousInset || keyboardInset <= 0) return
-    if (!isNearBottomRef.current) return
-
-    let frameOne = 0
-    let frameTwo = 0
-    frameOne = window.requestAnimationFrame(() => {
-      frameTwo = window.requestAnimationFrame(() => {
-        scrollToBottom('auto')
-      })
-    })
-
-    return () => {
-      window.cancelAnimationFrame(frameOne)
-      window.cancelAnimationFrame(frameTwo)
-    }
-  }, [keyboardInset, scrollToBottom])
-
   const scrollToBottomOverlay = useMemo(() => {
     const isVisible = !isNearBottom && displayMessages.length > 0
     const overlayGap = isMobileViewport ? 32 : 24
@@ -1322,7 +1298,6 @@ function areChatMessageListEqual(
     prev.streamingThinking === next.streamingThinking &&
     prev.isStreaming === next.isStreaming &&
     prev.bottomOffset === next.bottomOffset &&
-    prev.keyboardInset === next.keyboardInset &&
     prev.activeToolCalls === next.activeToolCalls &&
     prev.liveToolActivity === next.liveToolActivity &&
     prev.hideSystemMessages === next.hideSystemMessages

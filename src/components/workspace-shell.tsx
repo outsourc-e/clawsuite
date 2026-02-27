@@ -220,7 +220,7 @@ export function WorkspaceShell() {
     <>
       <div
         className="relative overflow-hidden theme-bg theme-text"
-        style={{ height: 'calc(var(--vvh, 100dvh) + var(--kb-inset, 0px))' }}
+        style={{ height: 'var(--vvh, 100dvh)' }}
       >
         <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]">
           {/* Activity ticker bar */}

@@ -1802,7 +1802,6 @@ export function ChatScreen({
               headerHeight={headerHeight}
               contentStyle={stableContentStyle}
               bottomOffset={isMobile ? mobileScrollBottomOffset : terminalPanelInset}
-              keyboardInset={mobileKeyboardInset}
               isStreaming={derivedStreamingInfo.isStreaming}
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
               streamingText={
