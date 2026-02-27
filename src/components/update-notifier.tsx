@@ -157,7 +157,11 @@ export function UpdateNotifier() {
       setPhase('installing')
       setProgress(30)
 
-      const res = await fetch('/api/update-check', { method: 'POST' })
+      const res = await fetch('/api/update-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
       const result = (await res.json()) as { ok: boolean; output: string }
 
       clearInterval(progressTimer)
@@ -165,12 +169,13 @@ export function UpdateNotifier() {
       if (result.ok) {
         setPhase('restarting')
         setProgress(90)
+        setExpanded(true) // show changelog on success
         await new Promise((r) => setTimeout(r, 800))
         setPhase('done')
         setProgress(100)
         void queryClient.invalidateQueries({ queryKey: ['update-check'] })
-        // Auto-reload after showing success
-        setTimeout(() => window.location.reload(), 1500)
+        // Auto-reload after showing patch notes
+        setTimeout(() => window.location.reload(), 3000)
       } else {
         setPhase('error')
         setErrorMsg(result.output?.slice(0, 300) || 'Unknown error')
@@ -262,7 +267,7 @@ export function UpdateNotifier() {
                 {phase === 'error'
                   ? errorMsg
                   : phase === 'done'
-                    ? 'Reloading with latest version...'
+                    ? `Updated to ${data.remoteVersion} · reloading...`
                     : isUpdating
                       ? PHASE_LABELS[phase]
                       : `${data.behindBy} update${data.behindBy !== 1 ? 's' : ''} available · ${data.localVersion}`}
