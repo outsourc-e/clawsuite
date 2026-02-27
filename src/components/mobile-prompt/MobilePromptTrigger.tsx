@@ -74,7 +74,7 @@ export function MobilePromptTrigger() {
           >
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="flex shrink-0 items-center gap-2">
-                <OpenClawStudioIcon className="size-8 rounded-lg [&_animate]:hidden" />
+                <OpenClawStudioIcon className="size-8 overflow-hidden rounded-lg" />
                 <svg viewBox="0 0 100 100" className="size-5">
                   <circle cx="50" cy="10" r="10" fill="#fff" opacity="0.9" />
                   <circle cx="50" cy="50" r="10" fill="#fff" />
