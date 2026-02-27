@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Cancel01Icon, Copy01Icon, Tick01Icon } from '@hugeicons/core-free-icons';
+import { Cancel01Icon, Tick01Icon, Sent02Icon } from '@hugeicons/core-free-icons';
+import { OpenClawStudioIcon } from '@/components/icons/clawsuite';
 
 const STORAGE_KEY_SEEN = 'clawsuite-mobile-setup-seen';
 
@@ -30,12 +31,33 @@ function TailscaleIcon() {
 
 export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
   const [step, setStep] = useState(0);
-  const [copied, setCopied] = useState(false);
+  const [exposeSent, setExposeSent] = useState(false);
+  const [exposeSending, setExposeSending] = useState(false);
 
-  const copyExpose = () => {
-    navigator.clipboard.writeText('Expose yourself on the network so I can access you from my phone').catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const sendExpose = async () => {
+    setExposeSending(true);
+    try {
+      // Get the active session key
+      const sessionsRes = await fetch('/api/sessions');
+      const sessionsData = await sessionsRes.json() as { sessions?: Array<{ key: string; kind?: string }> };
+      const sessions = sessionsData.sessions ?? [];
+      const mainSession = sessions.find((s) => s.kind === 'main') ?? sessions[0];
+      if (!mainSession?.key) throw new Error('No active session');
+
+      await fetch('/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: mainSession.key,
+          message: 'Expose yourself on the network so I can access you from my phone',
+        }),
+      });
+      setExposeSent(true);
+    } catch {
+      setExposeSent(true); // still advance UX
+    } finally {
+      setExposeSending(false);
+    }
   };
 
   useEffect(() => {
@@ -68,21 +90,32 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
     },
     {
       title: 'Make OpenClaw discoverable',
-      body: 'Send this command to your OpenClaw to expose it on the network so your phone can reach it.',
+      body: 'Send this to your OpenClaw agent so it exposes itself on the network for your phone to find it.',
       showTailscaleIcon: false,
       action: (
-        <button
-          type="button"
-          onClick={copyExpose}
-          className="group flex w-full items-center justify-between rounded-lg border border-primary-700 bg-primary-950 px-4 py-3 text-left transition-colors hover:border-accent-500/50"
-        >
-          <span className="font-mono text-xs text-accent-300">
+        <div className="space-y-3">
+          <p className="rounded-lg border border-primary-700 bg-primary-950 px-4 py-3 font-mono text-xs text-accent-300">
             Expose yourself on the network so I can access you from my phone
-          </span>
-          <span className="ml-3 shrink-0 text-primary-400 group-hover:text-accent-400">
-            <HugeiconsIcon icon={copied ? Tick01Icon : Copy01Icon} size={16} strokeWidth={2} className={copied ? 'text-green-400' : ''} />
-          </span>
-        </button>
+          </p>
+          <button
+            type="button"
+            onClick={sendExpose}
+            disabled={exposeSent || exposeSending}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-400 disabled:cursor-default disabled:opacity-70"
+          >
+            {exposeSent ? (
+              <>
+                <HugeiconsIcon icon={Tick01Icon} size={16} strokeWidth={2} />
+                Sent — check your chat
+              </>
+            ) : (
+              <>
+                <HugeiconsIcon icon={Sent02Icon} size={16} strokeWidth={2} />
+                {exposeSending ? 'Sending…' : 'Send to OpenClaw'}
+              </>
+            )}
+          </button>
+        </div>
       ),
     },
     {
@@ -158,9 +191,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
         </button>
 
         <div className="mb-4 flex items-center gap-3 pr-10">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-accent-500 shadow-lg shadow-accent-500/20">
-            <img src="/logo-final.svg" className="size-6" alt="ClawSuite" />
-          </div>
+          <OpenClawStudioIcon className="size-9 overflow-hidden rounded-xl" />
           <div className="flex-1">
             <h2 className="text-lg font-semibold text-white">Mobile Setup</h2>
             <div className="mt-1 flex items-center gap-1.5">

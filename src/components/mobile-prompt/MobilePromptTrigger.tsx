@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import { MobileSetupModal } from './MobileSetupModal';
+import { OpenClawStudioIcon } from '@/components/icons/clawsuite';
 
 export function MobilePromptTrigger() {
   const [showPrompt, setShowPrompt] = useState(false);
@@ -73,9 +74,7 @@ export function MobilePromptTrigger() {
           >
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="flex shrink-0 items-center gap-2">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-accent-500 shadow-md shadow-accent-500/20">
-                  <img src="/logo-final.svg" className="size-5" alt="ClawSuite" />
-                </div>
+                <OpenClawStudioIcon className="size-8 overflow-hidden rounded-lg" />
                 <svg viewBox="0 0 100 100" className="size-5">
                   <circle cx="50" cy="10" r="10" fill="#fff" opacity="0.9" />
                   <circle cx="50" cy="50" r="10" fill="#fff" />
