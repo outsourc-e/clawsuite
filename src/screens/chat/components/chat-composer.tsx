@@ -1554,8 +1554,8 @@ function ChatComposerComponent({
         maxHeight={isMobileViewport ? 120 : 240}
         className={cn(
           'relative z-50 transition-all duration-300',
-          // On mobile, remove PromptInput's built-in py-3 gap-3 — layout is handled inline
-          isMobileViewport && 'py-0 gap-0',
+          // On mobile: remove PromptInput's built-in rounded/bg/padding — outer wrapper owns the container
+          isMobileViewport && 'py-0 gap-0 !rounded-none !bg-transparent shadow-none outline-none',
           isDraggingOver &&
             'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
           isLoading &&
