@@ -112,6 +112,7 @@ import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/nav
 import { Route as ApiGatewayApprovalsIndexRouteImport } from './routes/api/gateway/approvals/index'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
+import { Route as ApiCliAgentsPidKillRouteImport } from './routes/api/cli-agents.$pid.kill'
 import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
 const UsageRoute = UsageRouteImport.update({
@@ -631,6 +632,11 @@ const ApiCronRunsJobIdRoute = ApiCronRunsJobIdRouteImport.update({
   path: '/runs/$jobId',
   getParentRoute: () => ApiCronRoute,
 } as any)
+const ApiCliAgentsPidKillRoute = ApiCliAgentsPidKillRouteImport.update({
+  id: '/$pid/kill',
+  path: '/$pid/kill',
+  getParentRoute: () => ApiCliAgentsRoute,
+} as any)
 const ApiGatewayApprovalsApprovalIdActionRoute =
   ApiGatewayApprovalsApprovalIdActionRouteImport.update({
     id: '/api/gateway/approvals/$approvalId/$action',
@@ -673,7 +679,7 @@ export interface FileRoutesByFullPath {
   '/api/browser': typeof ApiBrowserRouteWithChildren
   '/api/chat-abort': typeof ApiChatAbortRoute
   '/api/chat-events': typeof ApiChatEventsRoute
-  '/api/cli-agents': typeof ApiCliAgentsRoute
+  '/api/cli-agents': typeof ApiCliAgentsRouteWithChildren
   '/api/config-get': typeof ApiConfigGetRoute
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
@@ -739,6 +745,7 @@ export interface FileRoutesByFullPath {
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
+  '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
@@ -778,7 +785,7 @@ export interface FileRoutesByTo {
   '/api/browser': typeof ApiBrowserRouteWithChildren
   '/api/chat-abort': typeof ApiChatAbortRoute
   '/api/chat-events': typeof ApiChatEventsRoute
-  '/api/cli-agents': typeof ApiCliAgentsRoute
+  '/api/cli-agents': typeof ApiCliAgentsRouteWithChildren
   '/api/config-get': typeof ApiConfigGetRoute
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
@@ -844,6 +851,7 @@ export interface FileRoutesByTo {
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks': typeof ApiTasksIndexRoute
+  '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/gateway/approvals': typeof ApiGatewayApprovalsIndexRoute
@@ -885,7 +893,7 @@ export interface FileRoutesById {
   '/api/browser': typeof ApiBrowserRouteWithChildren
   '/api/chat-abort': typeof ApiChatAbortRoute
   '/api/chat-events': typeof ApiChatEventsRoute
-  '/api/cli-agents': typeof ApiCliAgentsRoute
+  '/api/cli-agents': typeof ApiCliAgentsRouteWithChildren
   '/api/config-get': typeof ApiConfigGetRoute
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/context-usage': typeof ApiContextUsageRoute
@@ -951,6 +959,7 @@ export interface FileRoutesById {
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
+  '/api/cli-agents/$pid/kill': typeof ApiCliAgentsPidKillRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
@@ -1059,6 +1068,7 @@ export interface FileRouteTypes {
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks/'
+    | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
     | '/api/gateway/approvals/'
@@ -1164,6 +1174,7 @@ export interface FileRouteTypes {
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks'
+    | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
     | '/api/gateway/approvals'
@@ -1270,6 +1281,7 @@ export interface FileRouteTypes {
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks/'
+    | '/api/cli-agents/$pid/kill'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
     | '/api/gateway/approvals/'
@@ -1311,7 +1323,7 @@ export interface RootRouteChildren {
   ApiBrowserRoute: typeof ApiBrowserRouteWithChildren
   ApiChatAbortRoute: typeof ApiChatAbortRoute
   ApiChatEventsRoute: typeof ApiChatEventsRoute
-  ApiCliAgentsRoute: typeof ApiCliAgentsRoute
+  ApiCliAgentsRoute: typeof ApiCliAgentsRouteWithChildren
   ApiConfigGetRoute: typeof ApiConfigGetRoute
   ApiConfigPatchRoute: typeof ApiConfigPatchRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
@@ -2091,6 +2103,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCronRunsJobIdRouteImport
       parentRoute: typeof ApiCronRoute
     }
+    '/api/cli-agents/$pid/kill': {
+      id: '/api/cli-agents/$pid/kill'
+      path: '/$pid/kill'
+      fullPath: '/api/cli-agents/$pid/kill'
+      preLoaderRoute: typeof ApiCliAgentsPidKillRouteImport
+      parentRoute: typeof ApiCliAgentsRoute
+    }
     '/api/gateway/approvals/$approvalId/$action': {
       id: '/api/gateway/approvals/$approvalId/$action'
       path: '/api/gateway/approvals/$approvalId/$action'
@@ -2131,6 +2150,18 @@ const ApiBrowserRouteChildren: ApiBrowserRouteChildren = {
 
 const ApiBrowserRouteWithChildren = ApiBrowserRoute._addFileChildren(
   ApiBrowserRouteChildren,
+)
+
+interface ApiCliAgentsRouteChildren {
+  ApiCliAgentsPidKillRoute: typeof ApiCliAgentsPidKillRoute
+}
+
+const ApiCliAgentsRouteChildren: ApiCliAgentsRouteChildren = {
+  ApiCliAgentsPidKillRoute: ApiCliAgentsPidKillRoute,
+}
+
+const ApiCliAgentsRouteWithChildren = ApiCliAgentsRoute._addFileChildren(
+  ApiCliAgentsRouteChildren,
 )
 
 interface ApiCronRouteChildren {
@@ -2215,7 +2246,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBrowserRoute: ApiBrowserRouteWithChildren,
   ApiChatAbortRoute: ApiChatAbortRoute,
   ApiChatEventsRoute: ApiChatEventsRoute,
-  ApiCliAgentsRoute: ApiCliAgentsRoute,
+  ApiCliAgentsRoute: ApiCliAgentsRouteWithChildren,
   ApiConfigGetRoute: ApiConfigGetRoute,
   ApiConfigPatchRoute: ApiConfigPatchRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,

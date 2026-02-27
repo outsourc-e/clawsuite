@@ -1155,20 +1155,6 @@ function ChatComposerComponent({
     value,
   ])
 
-  // Cmd+Enter to send
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-        if (document.activeElement === promptRef.current) {
-          event.preventDefault()
-          handleSubmit()
-        }
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSubmit])
-
   // ⌘+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector
   useEffect(() => {
     const handleModelShortcut = (event: KeyboardEvent) => {

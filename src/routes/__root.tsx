@@ -9,6 +9,7 @@ import { WorkspaceShell } from '@/components/workspace-shell'
 import { useTaskReminders } from '@/hooks/use-task-reminders'
 import { UpdateNotifier } from '@/components/update-notifier'
 import { OpenClawUpdateNotifier } from '@/components/openclaw-update-notifier'
+import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
@@ -273,6 +274,7 @@ function RootLayout() {
       <TaskReminderRunner />
       <UpdateNotifier />
       <OpenClawUpdateNotifier />
+      <MobilePromptTrigger />
       <Toaster />
       <ExecApprovalToast />
       <WorkspaceShell />
