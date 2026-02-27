@@ -4990,39 +4990,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
         </div>
 
-          {/* ── Quick Launch Bar ── */}
-          {!missionActive && (
-            <div className="relative mx-auto mt-3 w-full max-w-[1600px] shrink-0 px-3 sm:mt-6 sm:px-4">
-              <div className="flex items-center gap-2 sm:gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[var(--theme-card,#161b27)] p-2 sm:p-3 shadow-sm">
-                <span className="hidden sm:inline text-xl">🚀</span>
-                <input
-                  type="text"
-                  value={missionGoal}
-                  onChange={(e) => setMissionGoal(e.target.value)}
-                  placeholder="What should your agents work on?"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && missionGoal.trim()) {
-                      openNewMissionModal({ goal: missionGoal.trim() })
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => openNewMissionModal(missionGoal.trim() ? { goal: missionGoal.trim() } : undefined)}
-                  className="shrink-0 rounded-lg bg-accent-500 text-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold hover:bg-accent-600 transition-colors"
-                >
-                  + Mission
-                </button>
-                {suggestedTemplateName && (
-                  <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-2.5 py-1 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
-                    Suggested: {suggestedTemplateName}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* ── 3-card row — shrink-0, anchored at bottom ── */}
           <section className="relative mx-auto mb-4 mt-3 w-full max-w-[1600px] shrink-0 grid grid-cols-1 gap-3 px-3 sm:grid-cols-2 sm:gap-4 sm:px-4 xl:grid-cols-3">
 
@@ -5331,7 +5298,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
                 <div>
-                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Configured Agents</h2>
+                  <h2 className="text-base font-bold text-neutral-900 dark:text-white">Configured Agents</h2>
                   <p className="hidden sm:block text-xs text-neutral-500 dark:text-slate-400">
                     Edit agent identity, model, role description, and system prompt.
                   </p>
@@ -5614,7 +5581,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <div>
                 <div className="flex items-center justify-between gap-3 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
                   <div>
-                    <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">My Teams</h2>
+                    <h2 className="text-base font-bold text-neutral-900 dark:text-white">My Teams</h2>
                     <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{teamConfigs.length} saved · {team.length} agents active</p>
                   </div>
                   <button
@@ -5983,7 +5950,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <div>
                 <div className="flex items-center justify-between mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
                   <div>
-                    <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Connected Providers</h2>
+                    <h2 className="text-base font-bold text-neutral-900 dark:text-white">Connected Providers</h2>
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{configuredProviders.length} active · {gatewayModels.length} models available</p>
                   </div>
                   <button
