@@ -53,7 +53,7 @@ export function ChatEmptyState({
           animate={{ scale: 1 }}
           transition={{ type: 'spring', damping: 20, stiffness: 300 }}
         >
-          <OpenClawStudioIcon className="mb-3 size-10 rounded-xl opacity-60 md:mb-4 md:size-12" />
+          <OpenClawStudioIcon className="mb-3 size-10 rounded-2xl overflow-hidden opacity-60 md:mb-4 md:size-12" />
         </motion.div>
 
         <h2 className="mb-4 text-sm font-semibold text-neutral-300">

@@ -35,13 +35,13 @@ export function OpenClawStudioIcon({
         </linearGradient>
       </defs>
 
-      {/* Orange background — edge to edge, clipped by className rounded-xl */}
+      {/* Orange background — edge to edge, shape controlled by container's rounded + overflow-hidden */}
       <rect
         x="0"
         y="0"
         width="100"
         height="95"
-        rx="16"
+        rx="0"
         fill={`url(#${gradId})`}
       />
 

@@ -639,7 +639,7 @@ export function DashboardScreen() {
                     className="shrink-0 cursor-pointer rounded-xl transition-transform active:scale-95"
                     aria-label="Open quick menu"
                   >
-                    <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
+                    <OpenClawStudioIcon className="size-8 rounded-2xl overflow-hidden shadow-sm" />
                     {shouldShowLogoTip ? (
                       <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duration-300">
                         <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md">
@@ -659,7 +659,7 @@ export function DashboardScreen() {
                     ) : null}
                   </button>
                 ) : (
-                  <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
+                  <OpenClawStudioIcon className="size-8 shrink-0 rounded-2xl overflow-hidden shadow-sm" />
                 )}
                 <div className="flex min-w-0 items-center gap-2">
                   <h1 className="text-sm font-semibold text-ink text-balance md:text-base truncate">
