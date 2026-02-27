@@ -73,19 +73,22 @@ export function MobilePromptTrigger() {
             className="fixed top-4 left-1/2 z-[9999] w-[90vw] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl border border-primary-800/60 bg-primary-950 text-white shadow-2xl shadow-black/40"
           >
             <div className="flex items-center gap-3 px-4 py-3">
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1.5">
                 <OpenClawStudioIcon className="size-8 overflow-hidden rounded-lg" />
-                <svg viewBox="0 0 100 100" className="size-5">
-                  <circle cx="50" cy="10" r="10" fill="#fff" opacity="0.9" />
-                  <circle cx="50" cy="50" r="10" fill="#fff" />
-                  <circle cx="50" cy="90" r="10" fill="#fff" opacity="0.9" />
-                  <circle cx="10" cy="30" r="10" fill="#fff" opacity="0.6" />
-                  <circle cx="90" cy="30" r="10" fill="#fff" opacity="0.6" />
-                  <circle cx="10" cy="70" r="10" fill="#fff" opacity="0.6" />
-                  <circle cx="90" cy="70" r="10" fill="#fff" opacity="0.6" />
-                  <circle cx="10" cy="50" r="10" fill="#fff" opacity="0.3" />
-                  <circle cx="90" cy="50" r="10" fill="#fff" opacity="0.3" />
-                </svg>
+                <span className="text-xs text-primary-600">+</span>
+                <div className="flex size-8 items-center justify-center rounded-lg bg-[#232b3b]">
+                  <svg viewBox="0 0 100 100" className="size-5">
+                    <circle cx="50" cy="10" r="10" fill="#fff" opacity="0.9" />
+                    <circle cx="50" cy="50" r="10" fill="#fff" />
+                    <circle cx="50" cy="90" r="10" fill="#fff" opacity="0.9" />
+                    <circle cx="10" cy="30" r="10" fill="#fff" opacity="0.6" />
+                    <circle cx="90" cy="30" r="10" fill="#fff" opacity="0.6" />
+                    <circle cx="10" cy="70" r="10" fill="#fff" opacity="0.6" />
+                    <circle cx="90" cy="70" r="10" fill="#fff" opacity="0.6" />
+                    <circle cx="10" cy="50" r="10" fill="#fff" opacity="0.3" />
+                    <circle cx="90" cy="50" r="10" fill="#fff" opacity="0.3" />
+                  </svg>
+                </div>
               </div>
 
               <div className="min-w-0 flex-1 text-center">
