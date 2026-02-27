@@ -33,6 +33,14 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
   const [step, setStep] = useState(0);
   const [exposeSent, setExposeSent] = useState(false);
   const [exposeSending, setExposeSending] = useState(false);
+  const [networkUrl, setNetworkUrl] = useState<{ url: string; source: 'tailscale' | 'lan' | 'localhost' } | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/network-url?port=${window.location.port || 3000}`)
+      .then((r) => r.json() as Promise<{ url: string; source: 'tailscale' | 'lan' | 'localhost' }>)
+      .then((data) => setNetworkUrl(data))
+      .catch(() => setNetworkUrl({ url: window.location.origin, source: 'localhost' }));
+  }, []);
 
   const sendExpose = async () => {
     setExposeSending(true);
@@ -61,11 +69,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
   };
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    setStep(0);
+    if (isOpen) setStep(0);
   }, [isOpen]);
 
   if (!isOpen) {
@@ -145,12 +149,35 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
     },
     {
       title: 'Open ClawSuite on your phone',
-      body: 'Use your desktop URL from your phone once both devices are on Tailscale.',
-      showTailscaleIcon: false,
+      body: networkUrl?.source === 'tailscale'
+        ? 'Your Tailscale address — open this on your phone browser.'
+        : networkUrl?.source === 'lan'
+        ? 'Your local network address — phone must be on the same WiFi.'
+        : 'Make sure Tailscale is running on this machine for a shareable link.',
+      showTailscaleIcon: networkUrl?.source === 'tailscale',
       action: (
-        <p className="break-all rounded-lg border border-primary-700 bg-primary-950 px-3 py-2 font-mono text-xs text-accent-300">
-          {typeof window === 'undefined' ? '' : window.location.origin}
-        </p>
+        <button
+          type="button"
+          onClick={() => networkUrl && navigator.clipboard.writeText(networkUrl.url).catch(() => {})}
+          className="group flex w-full items-center justify-between rounded-lg border border-primary-700 bg-primary-950 px-4 py-3 transition-colors hover:border-accent-500/50"
+        >
+          <span className="break-all font-mono text-sm text-accent-300">
+            {networkUrl?.url ?? '…'}
+          </span>
+          <span className="ml-3 shrink-0 text-primary-500 group-hover:text-accent-400">
+            {networkUrl?.source === 'tailscale' && (
+              <svg viewBox="0 0 100 100" className="size-4 opacity-60">
+                <circle cx="50" cy="10" r="10" fill="currentColor" opacity="0.9" />
+                <circle cx="50" cy="50" r="10" fill="currentColor" />
+                <circle cx="50" cy="90" r="10" fill="currentColor" opacity="0.9" />
+                <circle cx="10" cy="30" r="10" fill="currentColor" opacity="0.6" />
+                <circle cx="90" cy="30" r="10" fill="currentColor" opacity="0.6" />
+                <circle cx="10" cy="70" r="10" fill="currentColor" opacity="0.6" />
+                <circle cx="90" cy="70" r="10" fill="currentColor" opacity="0.6" />
+              </svg>
+            )}
+          </span>
+        </button>
       ),
     },
   ];

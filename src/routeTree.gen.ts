@@ -59,6 +59,7 @@ import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiOpenclawUpdateRouteImport } from './routes/api/openclaw-update'
 import { Route as ApiOllamaHealthRouteImport } from './routes/api/ollama-health'
+import { Route as ApiNetworkUrlRouteImport } from './routes/api/network-url'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
@@ -363,6 +364,11 @@ const ApiOpenclawUpdateRoute = ApiOpenclawUpdateRouteImport.update({
 const ApiOllamaHealthRoute = ApiOllamaHealthRouteImport.update({
   id: '/api/ollama-health',
   path: '/api/ollama-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNetworkUrlRoute = ApiNetworkUrlRouteImport.update({
+  id: '/api/network-url',
+  path: '/api/network-url',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
@@ -694,6 +700,7 @@ export interface FileRoutesByFullPath {
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/network-url': typeof ApiNetworkUrlRoute
   '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
@@ -800,6 +807,7 @@ export interface FileRoutesByTo {
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/network-url': typeof ApiNetworkUrlRoute
   '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
@@ -908,6 +916,7 @@ export interface FileRoutesById {
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/network-url': typeof ApiNetworkUrlRoute
   '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
@@ -1017,6 +1026,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/network-url'
     | '/api/ollama-health'
     | '/api/openclaw-update'
     | '/api/paths'
@@ -1123,6 +1133,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/network-url'
     | '/api/ollama-health'
     | '/api/openclaw-update'
     | '/api/paths'
@@ -1230,6 +1241,7 @@ export interface FileRouteTypes {
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/network-url'
     | '/api/ollama-health'
     | '/api/openclaw-update'
     | '/api/paths'
@@ -1338,6 +1350,7 @@ export interface RootRouteChildren {
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
+  ApiNetworkUrlRoute: typeof ApiNetworkUrlRoute
   ApiOllamaHealthRoute: typeof ApiOllamaHealthRoute
   ApiOpenclawUpdateRoute: typeof ApiOpenclawUpdateRoute
   ApiPathsRoute: typeof ApiPathsRoute
@@ -1730,6 +1743,13 @@ declare module '@tanstack/react-router' {
       path: '/api/ollama-health'
       fullPath: '/api/ollama-health'
       preLoaderRoute: typeof ApiOllamaHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/network-url': {
+      id: '/api/network-url'
+      path: '/api/network-url'
+      fullPath: '/api/network-url'
+      preLoaderRoute: typeof ApiNetworkUrlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/models': {
@@ -2261,6 +2281,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
+  ApiNetworkUrlRoute: ApiNetworkUrlRoute,
   ApiOllamaHealthRoute: ApiOllamaHealthRoute,
   ApiOpenclawUpdateRoute: ApiOpenclawUpdateRoute,
   ApiPathsRoute: ApiPathsRoute,
