@@ -16,7 +16,11 @@ export function MobilePromptTrigger() {
     mountTimeRef.current = Date.now();
 
     // ?mobile-preview forces modal open immediately (dev/review only)
+    // Strip the param from URL so navigation doesn't re-trigger it
     if (new URLSearchParams(window.location.search).get('mobile-preview') === '1') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('mobile-preview');
+      window.history.replaceState({}, '', url.toString());
       setIsModalOpen(true);
       return;
     }
@@ -59,6 +63,8 @@ export function MobilePromptTrigger() {
 
   const closeSetup = () => {
     setIsModalOpen(false);
+    // Treat any close (including Finish) as dismissed so it never re-shows
+    localStorage.setItem('clawsuite-mobile-prompt-dismissed', 'true');
   };
 
   return (
