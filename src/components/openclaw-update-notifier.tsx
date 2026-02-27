@@ -103,7 +103,7 @@ export function OpenClawUpdateNotifier() {
       setProgress(10)
       await new Promise((r) => setTimeout(r, 400))
 
-      const res = await fetch('/api/openclaw-update', { method: 'POST' })
+      const res = await fetch('/api/openclaw-update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
       const result = (await res.json()) as {
         ok: boolean
         error?: string
