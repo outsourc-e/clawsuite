@@ -6218,37 +6218,43 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           )}
 
           {/* ── Filter Bar — scrollable on mobile, full flex on desktop ── */}
-          <div className="flex w-full items-center gap-2 overflow-x-auto pr-3 scrollbar-none">
-            {filterTabs.map((tab) => {
-              const isActive = missionSubTab === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setMissionSubTab(tab.id)}
-                  className={cn(
-                    'min-h-11 shrink-0 rounded-lg px-3 py-2 text-sm font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors',
-                    isActive
-                      ? 'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
-                      : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
-                  )}
-                >
-                  <span className="whitespace-nowrap">{tab.label}</span>
-                  {tab.count > 0 && (
-                    <span
-                      className={cn(
-                        'inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none',
-                        isActive
-                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
-                          : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300',
-                      )}
-                    >
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
+          <div className="relative w-full overflow-hidden">
+            <div className="flex w-full items-center gap-2 overflow-x-auto pr-3 scrollbar-none">
+              {filterTabs.map((tab) => {
+                const isActive = missionSubTab === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setMissionSubTab(tab.id)}
+                    className={cn(
+                      'min-h-11 shrink-0 rounded-lg px-3 py-2 text-sm font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors',
+                      isActive
+                        ? 'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
+                        : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
+                    )}
+                  >
+                    <span className="whitespace-nowrap">{tab.label}</span>
+                    {tab.count > 0 && (
+                      <span
+                        className={cn(
+                          'inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none',
+                          isActive
+                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
+                            : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300',
+                        )}
+                      >
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-neutral-900"
+            />
           </div>
 
           {/* ── Mission List ────────────────────────────────────────────── */}

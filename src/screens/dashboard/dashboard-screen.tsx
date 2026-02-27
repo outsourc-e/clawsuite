@@ -736,19 +736,6 @@ export function DashboardScreen() {
                         strokeWidth={1.6}
                       />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setDashSettingsOpen(true)}
-                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-primary-800 active:scale-95"
-                      aria-label="Dashboard settings"
-                      title="Settings"
-                    >
-                      <HugeiconsIcon
-                        icon={Settings01Icon}
-                        size={16}
-                        strokeWidth={1.5}
-                      />
-                    </button>
                   </>
                 )}
               </div>
