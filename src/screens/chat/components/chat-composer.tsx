@@ -3,9 +3,12 @@ import {
   Add01Icon,
   ArrowDown01Icon,
   ArrowUp02Icon,
+  Camera01Icon,
   Cancel01Icon,
+  Delete01Icon,
   Mic01Icon,
   PinIcon,
+  Search01Icon,
   StopIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -71,6 +74,9 @@ type ChatComposerProps = {
   wrapperRef?: Ref<HTMLDivElement>
   composerRef?: Ref<ChatComposerHandle>
   focusKey?: string
+  onNewSession?: () => void
+  onToggleWebSearch?: (enabled: boolean) => void
+  webSearchEnabled?: boolean
 }
 
 type ChatComposerHelpers = {
@@ -525,6 +531,9 @@ function ChatComposerComponent({
   wrapperRef,
   composerRef,
   focusKey,
+  onNewSession,
+  onToggleWebSearch,
+  webSearchEnabled,
 }: ChatComposerProps) {
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
   const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
@@ -550,6 +559,7 @@ function ChatComposerComponent({
   })
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [isMobileActionsMenuOpen, setIsMobileActionsMenuOpen] = useState(false)
+  const [isWebSearchMode, setIsWebSearchMode] = useState(false)
   const [isSlashMenuDismissed, setIsSlashMenuDismissed] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
@@ -559,7 +569,6 @@ function ChatComposerComponent({
   const shouldRefocusAfterSendRef = useRef(false)
   const submittingRef = useRef(false)
   const modelSelectorRef = useRef<HTMLDivElement | null>(null)
-  const mobileActionsMenuRef = useRef<HTMLDivElement | null>(null)
   const composerWrapperRef = useRef<HTMLDivElement | null>(null)
   const focusFrameRef = useRef<number | null>(null)
 
@@ -1179,22 +1188,6 @@ function ChatComposerComponent({
     return () => window.removeEventListener('keydown', handleModelShortcut, true)
   }, [])
 
-  // Close mobile actions menu on outside click
-  useEffect(() => {
-    if (!isMobileActionsMenuOpen) return
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (
-        mobileActionsMenuRef.current &&
-        !mobileActionsMenuRef.current.contains(event.target as Node)
-      ) {
-        setIsMobileActionsMenuOpen(false)
-        setIsModelMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleOutsideClick)
-    return () => document.removeEventListener('mousedown', handleOutsideClick)
-  }, [isMobileActionsMenuOpen])
-
   const submitDisabled =
     disabled || (value.trim().length === 0 && attachments.length === 0)
 
@@ -1209,6 +1202,17 @@ function ChatComposerComponent({
   const handleClearDraft = useCallback(() => {
     reset()
   }, [reset])
+
+  const isWebSearchActive = webSearchEnabled ?? isWebSearchMode
+
+  const handleToggleWebSearch = useCallback(() => {
+    const nextEnabled = !isWebSearchActive
+    if (onToggleWebSearch) {
+      onToggleWebSearch(nextEnabled)
+    } else {
+      setIsWebSearchMode(nextEnabled)
+    }
+  }, [isWebSearchActive, onToggleWebSearch])
 
   // Voice input (tap = speech-to-text)
   const voiceInput = useVoiceInput({
@@ -1655,315 +1659,246 @@ function ChatComposerComponent({
         ) : null}
 
         {isMobileViewport ? (
-          /* ── Mobile: Telegram-style single-row bar ── */
-          <div className="flex items-center gap-2 px-3 py-2">
-            {/* + button — opens actions/model menu */}
-            <div className="relative shrink-0" ref={mobileActionsMenuRef}>
+          <>
+            <div className="flex items-end gap-2 px-3 py-2">
               <button
                 type="button"
                 aria-label="Actions"
                 disabled={disabled}
                 onClick={(event) => {
                   event.stopPropagation()
-                  setIsMobileActionsMenuOpen((prev) => {
-                    if (prev) setIsModelMenuOpen(false)
-                    return !prev
-                  })
+                  setIsModelMenuOpen(false)
+                  setIsMobileActionsMenuOpen((prev) => !prev)
                 }}
-                className="size-8 rounded-full bg-neutral-100 dark:bg-white/10 flex items-center justify-center text-primary-600 active:bg-neutral-200 dark:active:bg-white/20 transition-colors"
+                className="mb-0.5 size-10 shrink-0 rounded-full border border-neutral-200 bg-white shadow-sm flex items-center justify-center transition-colors active:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:active:bg-neutral-800"
               >
                 <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={1.5} />
               </button>
 
-              {/* Actions dropdown */}
-              {isMobileActionsMenuOpen ? (
-                <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-50 min-w-[16rem] max-w-[calc(100vw-2rem)] rounded-xl border border-primary-200 bg-surface shadow-lg overflow-hidden">
-                  {/* Model selector — first item */}
-                  <div className="border-b border-neutral-100 dark:border-neutral-800">
-                    <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400">
-                      Model
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        if (isModelSwitcherDisabled) return
-                        setIsModelMenuOpen((prev) => !prev)
-                      }}
-                      className={cn(
-                        'flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10',
-                        isModelSwitcherDisabled && 'cursor-not-allowed opacity-50',
-                      )}
-                      aria-haspopup="listbox"
-                      aria-expanded={!isModelSwitcherDisabled && isModelMenuOpen}
-                      aria-disabled={isModelSwitcherDisabled}
-                      disabled={isModelSwitcherDisabled}
-                      title={currentModel || modelAvailabilityLabel || 'Select model'}
-                    >
-                      <span className="flex-1 truncate font-medium">{modelButtonLabel}</span>
-                      <HugeiconsIcon icon={ArrowDown01Icon} size={14} strokeWidth={2} className="opacity-60 shrink-0" />
-                    </button>
-
-                    {/* Inline model list when open */}
-                    {!isModelSwitcherDisabled && isModelMenuOpen ? (
-                      <div className="border-t border-neutral-100 dark:border-neutral-800">
-                        {groupedModels.length === 0 && modelsUnavailable ? (
-                          <div className="p-4 text-center text-sm text-primary-500">
-                            <p className="font-medium text-primary-700 mb-1">Gateway not connected</p>
-                            <p className="text-xs">Make sure OpenClaw is running and the gateway URL is configured.</p>
-                          </div>
-                        ) : groupedModels.length === 0 ? (
-                          <div className="p-4 text-center text-sm text-primary-500">
-                            <p className="font-medium text-primary-700 mb-1">No models configured</p>
-                            <p className="text-xs mb-2">Add API keys for providers in your OpenClaw config to unlock more models.</p>
-                            <a href="https://docs.openclaw.ai/configuration" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600 hover:bg-accent-50 dark:hover:bg-accent-900/30 transition-colors">
-                              Setup Guide →
-                            </a>
-                          </div>
-                        ) : (
-                          <div className="max-h-[14rem] overflow-y-auto p-1">
-                            {/* Pinned models */}
-                            {(pinnedModels.length > 0 || unavailablePinnedModels.length > 0) && (
-                              <div className="mb-2 border-t border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 py-2">
-                                <div className="mb-1.5 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-                                  <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={1.5} className="text-accent-500" />
-                                  <span>Pinned</span>
-                                </div>
-                                {pinnedModels.map((option) => {
-                                  const optionActive = isSameModel(option, currentModel)
-                                  return (
-                                    <div key={option.value} className="group relative flex items-center">
-                                      <button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation()
-                                          setIsModelMenuOpen(false)
-                                          setIsMobileActionsMenuOpen(false)
-                                          handleModelSelect(option.value)
-                                        }}
-                                        className={cn(
-                                          'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10',
-                                          optionActive && 'border-l-2 border-accent-500 bg-neutral-100 dark:bg-neutral-700 text-neutral-900',
-                                        )}
-                                        role="option"
-                                        aria-selected={optionActive}
-                                        aria-label={`Select ${option.label}`}
-                                      >
-                                        <span className="flex-1 truncate font-medium">{option.label}</span>
-                                        {optionActive && <span className="h-1.5 w-1.5 rounded-full bg-accent-500" aria-label="Currently active" />}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(event) => { event.stopPropagation(); togglePin(option.value) }}
-                                        className="absolute right-3 rounded px-1 text-xs leading-none text-accent-500 opacity-80 transition-opacity hover:bg-accent-50 dark:hover:bg-accent-900/30 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300"
-                                        aria-label={`Unpin ${option.label}`}
-                                        title="Unpin"
-                                      >
-                                        <HugeiconsIcon icon={PinIcon} size={12} strokeWidth={2} />
-                                      </button>
-                                    </div>
-                                  )
-                                })}
-                                {unavailablePinnedModels.map((modelId) => (
-                                  <div key={modelId} className="group relative flex items-center">
-                                    <div className="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-400 opacity-60">
-                                      <span className="flex-1 truncate font-medium">{modelId}</span>
-                                      <span className="text-xs text-red-500">Unavailable</span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={(event) => { event.stopPropagation(); togglePin(modelId) }}
-                                      className="absolute right-3 rounded px-2 py-0.5 text-[10px] text-red-500 opacity-80 transition-opacity hover:bg-red-50 dark:hover:bg-red-900/30 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-red-300"
-                                      aria-label={`Remove unavailable pinned model ${modelId}`}
-                                      title="Remove"
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {/* Regular models grouped by provider */}
-                            {unpinnedGroupedModels.map(([provider, models]) => (
-                              <div key={provider} className="mb-2 last:mb-0">
-                                <div className="border-t border-neutral-100 dark:border-neutral-700 px-3 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-400">
-                                  {provider}
-                                </div>
-                                {models.map((option) => {
-                                  const optionActive = isSameModel(option, currentModel)
-                                  return (
-                                    <div key={option.value} className="group relative flex items-center">
-                                      <button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation()
-                                          setIsModelMenuOpen(false)
-                                          setIsMobileActionsMenuOpen(false)
-                                          handleModelSelect(option.value)
-                                        }}
-                                        className={cn(
-                                          'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10',
-                                          optionActive && 'border-l-2 border-accent-500 bg-neutral-100 dark:bg-neutral-700 text-neutral-900',
-                                        )}
-                                        role="option"
-                                        aria-selected={optionActive}
-                                        aria-label={`Select ${option.label}`}
-                                      >
-                                        <span className="flex-1 truncate font-medium">{option.label}</span>
-                                        {optionActive && <span className="h-1.5 w-1.5 rounded-full bg-accent-500" aria-label="Currently active" />}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(event) => { event.stopPropagation(); togglePin(option.value) }}
-                                        className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 dark:hover:bg-white/10 hover:text-accent-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300 group-hover:opacity-100"
-                                        aria-label={`Pin ${option.label}`}
-                                        title="Pin"
-                                      >
-                                        <HugeiconsIcon icon={PinIcon} size={12} strokeWidth={2} />
-                                      </button>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* Add attachment */}
-                  <button
-                    type="button"
-                    disabled={disabled}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setIsMobileActionsMenuOpen(false)
-                      handleOpenAttachmentPicker(event)
-                    }}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-sm text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={1.5} className="text-primary-500" />
-                    <span>Add attachment</span>
-                  </button>
-
-                  {/* Clear draft (only if hasDraft) */}
-                  {hasDraft && !isLoading ? (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        setIsMobileActionsMenuOpen(false)
-                        handleClearDraft()
-                      }}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20 border-t border-neutral-100 dark:border-neutral-800"
-                    >
-                      <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.5} />
-                      <span>Clear draft</span>
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-
-            {/* Textarea — flex-1, auto-growing */}
-            <PromptInputTextarea
-              placeholder={promptPlaceholder}
-              autoFocus
-              inputRef={promptRef}
-              onKeyDown={handlePromptKeyDown}
-              onFocus={() => {
-                setMobileComposerFocused(true)
-                if (!window.visualViewport) {
-                  setMobileKeyboardOpen(true)
-                  setMobileKeyboardInset(0)
-                }
-              }}
-              onBlur={() => {
-                setMobileComposerFocused(false)
-                if (!window.visualViewport) {
-                  setMobileKeyboardOpen(false)
-                  setMobileKeyboardInset(0)
-                }
-              }}
-              className="min-h-[36px] max-h-[120px] flex-1 text-base leading-snug"
-            />
-
-            {/* Right side: stop / send / mic */}
-            <div className="shrink-0">
-              {isLoading ? (
-                <button
-                  type="button"
-                  onClick={handleAbort}
-                  aria-label="Stop generation"
-                  className="size-9 rounded-full bg-red-500 flex items-center justify-center text-white transition-all duration-150"
-                >
-                  <HugeiconsIcon icon={StopIcon} size={18} strokeWidth={2} />
-                </button>
-              ) : value.trim().length > 0 || attachments.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitDisabled}
-                  aria-label="Send message"
-                  className="size-9 rounded-full bg-accent-500 flex items-center justify-center text-white transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                >
-                  <HugeiconsIcon icon={ArrowUp02Icon} size={18} strokeWidth={2} />
-                </button>
-              ) : (voiceInput.isSupported || voiceRecorder.isSupported) ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (voiceInput.isListening) {
-                      voiceInput.stop()
-                    } else if (voiceRecorder.isRecording) {
-                      voiceRecorder.stop()
-                    } else {
-                      voiceInput.start()
+              <div className="flex-1 rounded-3xl border border-neutral-200 bg-white px-3 dark:border-neutral-700 dark:bg-neutral-900">
+                <PromptInputTextarea
+                  placeholder={promptPlaceholder}
+                  autoFocus
+                  inputRef={promptRef}
+                  onKeyDown={handlePromptKeyDown}
+                  onFocus={() => {
+                    setMobileComposerFocused(true)
+                    if (!window.visualViewport) {
+                      setMobileKeyboardOpen(true)
+                      setMobileKeyboardInset(0)
                     }
                   }}
-                  onPointerDown={handleMicPointerDown}
-                  onPointerUp={handleMicPointerUp}
-                  onPointerLeave={handleMicPointerUp}
-                  aria-label={
-                    voiceRecorder.isRecording
-                      ? 'Recording voice note'
-                      : voiceInput.isListening
-                        ? 'Stop listening'
-                        : 'Voice input'
-                  }
-                  disabled={disabled}
-                  className={cn(
-                    'size-9 rounded-full flex items-center justify-center relative transition-all duration-150 select-none',
-                    voiceRecorder.isRecording
-                      ? 'text-red-600 bg-red-100 animate-pulse'
-                      : voiceInput.isListening
-                        ? 'text-red-500 bg-red-50 animate-pulse'
-                        : 'text-primary-500 bg-neutral-100 dark:bg-white/10',
-                  )}
-                >
-                  <HugeiconsIcon icon={Mic01Icon} size={20} strokeWidth={1.5} />
-                  {voiceRecorder.isRecording ? (
-                    <span className="absolute -top-1 -right-1 flex size-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex size-3 rounded-full bg-red-500" />
-                    </span>
-                  ) : null}
-                </button>
-              ) : (
-                /* No voice support — show faded send button */
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitDisabled}
-                  aria-label="Send message"
-                  className="size-9 rounded-full bg-accent-500 flex items-center justify-center text-white transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <HugeiconsIcon icon={ArrowUp02Icon} size={18} strokeWidth={2} />
-                </button>
-              )}
+                  onBlur={() => {
+                    setMobileComposerFocused(false)
+                    if (!window.visualViewport) {
+                      setMobileKeyboardOpen(false)
+                      setMobileKeyboardInset(0)
+                    }
+                  }}
+                  className="min-h-[36px] max-h-[120px] flex-1 text-base leading-snug !px-0 !py-2"
+                />
+              </div>
+
+              <div className="mb-0.5 shrink-0">
+                {isLoading ? (
+                  <button
+                    type="button"
+                    onClick={handleAbort}
+                    aria-label="Stop generation"
+                    className="size-9 rounded-full bg-red-500 flex items-center justify-center text-white transition-all duration-150"
+                  >
+                    <HugeiconsIcon icon={StopIcon} size={18} strokeWidth={2} />
+                  </button>
+                ) : value.trim().length > 0 || attachments.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={submitDisabled}
+                    aria-label="Send message"
+                    className="size-9 rounded-full bg-accent-500 flex items-center justify-center text-white transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                  >
+                    <HugeiconsIcon icon={ArrowUp02Icon} size={18} strokeWidth={2} />
+                  </button>
+                ) : (voiceInput.isSupported || voiceRecorder.isSupported) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (voiceInput.isListening) {
+                        voiceInput.stop()
+                      } else if (voiceRecorder.isRecording) {
+                        voiceRecorder.stop()
+                      } else {
+                        voiceInput.start()
+                      }
+                    }}
+                    onPointerDown={handleMicPointerDown}
+                    onPointerUp={handleMicPointerUp}
+                    onPointerLeave={handleMicPointerUp}
+                    aria-label={
+                      voiceRecorder.isRecording
+                        ? 'Recording voice note'
+                        : voiceInput.isListening
+                          ? 'Stop listening'
+                          : 'Voice input'
+                    }
+                    disabled={disabled}
+                    className={cn(
+                      'size-9 rounded-full flex items-center justify-center relative transition-all duration-150 select-none',
+                      voiceRecorder.isRecording
+                        ? 'text-red-600 bg-red-100 animate-pulse'
+                        : voiceInput.isListening
+                          ? 'text-red-500 bg-red-50 animate-pulse'
+                          : 'text-primary-500 bg-neutral-100 dark:bg-white/10',
+                    )}
+                  >
+                    <HugeiconsIcon icon={Mic01Icon} size={20} strokeWidth={1.5} />
+                    {voiceRecorder.isRecording ? (
+                      <span className="absolute -top-1 -right-1 flex size-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex size-3 rounded-full bg-red-500" />
+                      </span>
+                    ) : null}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={submitDisabled}
+                    aria-label="Send message"
+                    className="size-9 rounded-full bg-accent-500 flex items-center justify-center text-white transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <HugeiconsIcon icon={ArrowUp02Icon} size={18} strokeWidth={2} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+
+            {typeof document !== 'undefined' && isMobileActionsMenuOpen
+              ? createPortal(
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Close actions"
+                      className="fixed inset-0 z-[199] bg-black/30"
+                      onClick={() => {
+                        setIsMobileActionsMenuOpen(false)
+                        setIsModelMenuOpen(false)
+                      }}
+                    />
+                    <div
+                      className="fixed bottom-0 left-0 right-0 z-[200] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
+                      role="dialog"
+                      aria-label="Actions"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300" />
+                      <div className="px-4 pb-2 text-sm font-semibold text-neutral-500">
+                        Actions
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 px-4 pb-4">
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={(event) => {
+                            setIsMobileActionsMenuOpen(false)
+                            handleOpenAttachmentPicker(event)
+                          }}
+                          className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <span className="rounded-lg bg-orange-100 p-1.5 text-orange-600">
+                            <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={1.5} />
+                          </span>
+                          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                            Attach File
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={(event) => {
+                            setIsMobileActionsMenuOpen(false)
+                            handleOpenAttachmentPicker(event)
+                          }}
+                          className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <span className="rounded-lg bg-blue-100 p-1.5 text-blue-600">
+                            <HugeiconsIcon icon={Camera01Icon} size={24} strokeWidth={1.5} />
+                          </span>
+                          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                            Camera
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => {
+                            handleToggleWebSearch()
+                            setIsMobileActionsMenuOpen(false)
+                          }}
+                          className={cn(
+                            'rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50',
+                            isWebSearchActive &&
+                              'border-purple-200 bg-purple-50',
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'rounded-lg bg-purple-100 p-1.5 text-purple-600',
+                              isWebSearchActive &&
+                                'bg-purple-200 text-purple-700',
+                            )}
+                          >
+                            <HugeiconsIcon icon={Search01Icon} size={24} strokeWidth={1.5} />
+                          </span>
+                          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                            Web Search
+                          </span>
+                        </button>
+
+                        {hasDraft && !isLoading ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleClearDraft()
+                              setIsMobileActionsMenuOpen(false)
+                            }}
+                            className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left"
+                          >
+                            <span className="rounded-lg bg-red-100 p-1.5 text-red-600">
+                              <HugeiconsIcon icon={Delete01Icon} size={24} strokeWidth={1.5} />
+                            </span>
+                            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                              Clear Draft
+                            </span>
+                          </button>
+                        ) : null}
+
+                        {onNewSession ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onNewSession()
+                              setIsMobileActionsMenuOpen(false)
+                            }}
+                            className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left"
+                          >
+                            <span className="rounded-lg bg-green-100 p-1.5 text-green-600">
+                              <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={1.5} />
+                            </span>
+                            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                              New Session
+                            </span>
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </>,
+                  document.body,
+                )
+              : null}
+          </>
         ) : (
           /* ── Desktop: original layout ── */
           <>
