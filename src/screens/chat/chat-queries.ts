@@ -110,6 +110,34 @@ export function updateHistoryMessages(
   })
 }
 
+/**
+ * Extract normalized plain text content from a GatewayMessage for dedup
+ * comparison. Handles both content-array and legacy text/message fields.
+ */
+function normalizeMessageText(message: GatewayMessage): string {
+  const raw = message as Record<string, unknown>
+
+  // Prefer structured content array (canonical format)
+  if (Array.isArray(message.content)) {
+    const text = message.content
+      .map((part) => {
+        if (part.type === 'text') return String(part.text ?? '')
+        return ''
+      })
+      .join('')
+      .trim()
+    if (text.length > 0) return text
+  }
+
+  // Fall back to legacy top-level text/message fields
+  for (const key of ['text', 'message', 'body']) {
+    const val = raw[key]
+    if (typeof val === 'string' && val.trim().length > 0) return val.trim()
+  }
+
+  return ''
+}
+
 export function appendHistoryMessage(
   queryClient: QueryClient,
   friendlyId: string,
@@ -137,6 +165,36 @@ export function appendHistoryMessage(
         )
         if (alreadyExists) return messages
       }
+
+      // Fallback dedup for SSE-echoed user messages that arrive WITHOUT a
+      // clientId (gateway did not echo it back). Check if an existing optimistic
+      // user message with the same text content was added in the last 10 seconds.
+      // This prevents the duplicate without dropping legitimately repeated messages
+      // sent at longer intervals.
+      if (message.role === 'user' && !incomingClientId && !incomingOptimisticId) {
+        const incomingText = normalizeMessageText(message)
+        if (incomingText.length > 0) {
+          const nowMs = Date.now()
+          const TEN_SECONDS = 10_000
+          const isDuplicate = messages.some((m) => {
+            if (m.role !== 'user') return false
+            if (normalizeMessageText(m) !== incomingText) return false
+            // If we have timestamps, check recency; otherwise check the last
+            // few recent messages (optimistic messages are at the tail).
+            const msgTimestamp =
+              typeof m.timestamp === 'number' ? m.timestamp : null
+            if (msgTimestamp !== null) {
+              return nowMs - msgTimestamp < TEN_SECONDS
+            }
+            // No timestamps — check if this is one of the last 5 messages
+            // (optimistic messages are always appended at the end)
+            const idx = messages.indexOf(m)
+            return idx >= messages.length - 5
+          })
+          if (isDuplicate) return messages
+        }
+      }
+
       return [...messages, message]
     },
   )

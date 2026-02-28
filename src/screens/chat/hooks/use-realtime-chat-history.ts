@@ -7,6 +7,16 @@ import { toast } from '../../../components/ui/toast'
 import type { GatewayMessage } from '../types'
 import { textFromMessage } from '../utils'
 
+/** Read clientId from a message using either camelCase or snake_case field. */
+function readClientId(message: GatewayMessage): string {
+  const raw = message as Record<string, unknown>
+  for (const key of ['clientId', 'client_id']) {
+    const val = raw[key]
+    if (typeof val === 'string' && val.trim().length > 0) return val.trim()
+  }
+  return ''
+}
+
 const EMPTY_MESSAGES: GatewayMessage[] = []
 const EMPTY_TOOL_CALLS: Array<{ id: string; name: string; phase: string; args?: unknown }> = []
 
@@ -53,6 +63,33 @@ export function useRealtimeChatHistory({
         // When we receive a user message from an external channel,
         // append it to the query cache immediately for instant display
         if (sessionKey && sessionKey !== 'new') {
+          // Early-exit dedup: if the SSE echo has no clientId AND its text
+          // content matches an existing optimistic user message in the cache,
+          // skip the append entirely — the optimistic entry is already there.
+          const echoClientId = readClientId(message)
+          if (!echoClientId) {
+            const echoText = textFromMessage(message).trim()
+            if (echoText.length > 0) {
+              const key = chatQueryKeys.history(friendlyId, sessionKey)
+              const cached = queryClient.getQueryData(key) as
+                | { messages?: GatewayMessage[] }
+                | undefined
+              const existing = cached?.messages ?? []
+              const hasOptimistic = existing.some(
+                (m) =>
+                  m.role === 'user' &&
+                  typeof m.__optimisticId === 'string' &&
+                  m.__optimisticId.length > 0 &&
+                  textFromMessage(m).trim() === echoText,
+              )
+              if (hasOptimistic) {
+                // The optimistic message is already displayed — skip SSE echo
+                onUserMessage?.(message, source)
+                return
+              }
+            }
+          }
+
           appendHistoryMessage(queryClient, friendlyId, sessionKey, {
             ...message,
             __realtimeSource: source,
