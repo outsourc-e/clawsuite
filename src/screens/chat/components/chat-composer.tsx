@@ -567,6 +567,7 @@ function ChatComposerComponent({
   const dragCounterRef = useRef(0)
   const shouldRefocusAfterSendRef = useRef(false)
   const submittingRef = useRef(false)
+  const pendingSubmitAfterAttachmentsRef = useRef(false)
   const modelSelectorRef = useRef<HTMLDivElement | null>(null)
   const composerWrapperRef = useRef<HTMLDivElement | null>(null)
   const focusFrameRef = useRef<number | null>(null)
@@ -1127,7 +1128,11 @@ function ChatComposerComponent({
   const handleSubmit = useCallback(() => {
     if (disabled) return
     if (submittingRef.current) return
-    if (attachmentProcessingCount > 0) return
+    if (attachmentProcessingCount > 0) {
+      // Queue a submit to fire once all attachments finish processing
+      pendingSubmitAfterAttachmentsRef.current = true
+      return
+    }
     const body = value.trim()
     if (body.length === 0 && attachments.length === 0) return
     submittingRef.current = true
@@ -1162,6 +1167,14 @@ function ChatComposerComponent({
     setComposerValue,
     value,
   ])
+
+  // Fire queued submit once all in-flight attachment processing finishes
+  useEffect(() => {
+    if (attachmentProcessingCount !== 0) return
+    if (!pendingSubmitAfterAttachmentsRef.current) return
+    pendingSubmitAfterAttachmentsRef.current = false
+    handleSubmit()
+  }, [attachmentProcessingCount, handleSubmit])
 
   // ⌘+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector
   useEffect(() => {
@@ -1699,7 +1712,7 @@ function ChatComposerComponent({
                   >
                     <HugeiconsIcon icon={StopIcon} size={18} strokeWidth={2} />
                   </button>
-                ) : value.trim().length > 0 || attachments.length > 0 ? (
+                ) : value.trim().length > 0 || attachments.length > 0 || attachmentProcessingCount > 0 ? (
                   <button
                     type="button"
                     onClick={handleSubmit}
