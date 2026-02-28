@@ -446,7 +446,7 @@ export function AgentOutputPanel({
             <p className="animate-pulse text-[var(--theme-muted)]">Waiting for response…</p>
           ) : (
             <>
-              {messages.map((msg, index) =>
+              {[...messages].sort((a, b) => a.timestamp - b.timestamp).map((msg, index) =>
                 msg.role === 'tool' ? (
                   <div
                     key={`${msg.timestamp}-${index}`}
