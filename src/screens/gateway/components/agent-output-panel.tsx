@@ -163,19 +163,18 @@ function upsertAssistantStream(
 function appendAssistantMessage(previous: OutputMessage[], text: string): OutputMessage[] {
   const last = previous[previous.length - 1]
   if (last && last.role === 'assistant' && !last.done) {
-    // Avoid duplicate final frames when providers send both chunk stream and final message.
-    if (last.content === text) return previous
-    if (text.startsWith(last.content) || last.content.startsWith(text)) {
-      return [
-        ...previous.slice(0, -1),
-        { ...last, content: text },
-      ]
-    }
+    // Always finalize the last in-progress assistant message with the complete text.
+    // This handles providers (e.g. Gemini via OpenRouter) that emit both streaming
+    // chunks AND a final 'message' event — we update in place rather than appending.
+    return [
+      ...previous.slice(0, -1),
+      { ...last, content: text, done: true },
+    ]
   }
   // Check recent messages for exact duplicate content (guards against SSE replay on reconnect)
   const tail = previous.slice(-10)
   if (tail.some((msg) => msg.role === 'assistant' && msg.content === text)) return previous
-  return [...previous, { role: 'assistant', content: text, timestamp: Date.now() }]
+  return [...previous, { role: 'assistant', content: text, timestamp: Date.now(), done: true }]
 }
 
 function trimMessages(messages: OutputMessage[]): OutputMessage[] {
