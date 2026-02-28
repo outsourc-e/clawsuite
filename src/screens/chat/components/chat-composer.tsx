@@ -546,6 +546,7 @@ function ChatComposerComponent({
   const [attachments, setAttachments] = useState<Array<ChatComposerAttachment>>(
     [],
   )
+  const [attachmentProcessingCount, setAttachmentProcessingCount] = useState(0)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
@@ -956,6 +957,7 @@ function ChatComposerComponent({
   const addAttachments = useCallback(
     async (files: Array<File>) => {
       if (disabled) return
+      setAttachmentProcessingCount((n) => n + 1)
 
       const timestamp = Date.now()
       const prepared = await Promise.all(
@@ -1048,9 +1050,13 @@ function ChatComposerComponent({
         )
       }
 
-      if (valid.length === 0) return
+      if (valid.length === 0) {
+        setAttachmentProcessingCount((n) => Math.max(0, n - 1))
+        return
+      }
 
       setAttachments((prev) => [...prev, ...valid])
+      setAttachmentProcessingCount((n) => Math.max(0, n - 1))
       focusPrompt()
     },
     [disabled, focusPrompt],
@@ -1121,6 +1127,7 @@ function ChatComposerComponent({
   const handleSubmit = useCallback(() => {
     if (disabled) return
     if (submittingRef.current) return
+    if (attachmentProcessingCount > 0) return
     const body = value.trim()
     if (body.length === 0 && attachments.length === 0) return
     submittingRef.current = true
@@ -1144,6 +1151,7 @@ function ChatComposerComponent({
     setFocusAfterSubmitTick((prev) => prev + 1)
     focusPrompt()
   }, [
+    attachmentProcessingCount,
     attachments,
     clearDraft,
     disabled,
@@ -1173,7 +1181,10 @@ function ChatComposerComponent({
   }, [])
 
   const submitDisabled =
-    disabled || (value.trim().length === 0 && attachments.length === 0)
+    disabled ||
+    (value.trim().length === 0 &&
+      attachments.length === 0 &&
+      attachmentProcessingCount === 0)
 
   const hasDraft = value.trim().length > 0 || attachments.length > 0
   const promptPlaceholder = isMobileViewport
