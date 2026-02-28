@@ -9,13 +9,31 @@ export const Route = createFileRoute('/api/auth-check')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const authRequired = isPasswordProtectionEnabled()
-        const authenticated = isAuthenticated(request)
+        return Promise.race([
+          (async () => {
+            const authRequired = isPasswordProtectionEnabled()
+            const authenticated = isAuthenticated(request)
 
-        return json({
-          authenticated,
-          authRequired,
-        })
+            return json({
+              authenticated,
+              authRequired,
+            })
+          })(),
+          new Promise<Response>((resolve) => {
+            setTimeout(() => {
+              resolve(
+                json(
+                  {
+                    authenticated: false,
+                    authRequired: false,
+                    error: 'server_timeout',
+                  },
+                  { status: 200 },
+                ),
+              )
+            }, 4_000)
+          }),
+        ])
       },
     },
   },

@@ -185,6 +185,13 @@ class GatewayClient {
     }
   }
 
+  getConnectionSnapshot(): { readyState: number; authenticated: boolean } {
+    return {
+      readyState: this.ws?.readyState ?? WebSocket.CLOSED,
+      authenticated: this.authenticated,
+    }
+  }
+
   async request<TPayload = unknown>(
     method: string,
     params?: unknown,
@@ -639,6 +646,20 @@ function rawDataToString(data: RawData): string {
   return data.toString()
 }
 
+function readyStateName(readyState: number): string {
+  switch (readyState) {
+    case WebSocket.CONNECTING:
+      return 'CONNECTING'
+    case WebSocket.OPEN:
+      return 'OPEN'
+    case WebSocket.CLOSING:
+      return 'CLOSING'
+    case WebSocket.CLOSED:
+    default:
+      return 'CLOSED'
+  }
+}
+
 // Singleton guard: survive Vite SSR module reloads
 const GW_KEY = '__clawsuite_gateway_client__' as const
 declare global {
@@ -647,7 +668,18 @@ declare global {
 }
 const existingClient = (globalThis as any)[GW_KEY] as GatewayClient | undefined
 if (existingClient) {
-  console.log('[gateway] Reusing existing GatewayClient singleton (Vite SSR reload survived)')
+  const snapshot = existingClient.getConnectionSnapshot()
+  const state = readyStateName(snapshot.readyState)
+  console.log(
+    `[gateway] Reusing singleton — ws.readyState=${state} authenticated=${snapshot.authenticated}`,
+  )
+  if (!snapshot.authenticated || snapshot.readyState !== WebSocket.OPEN) {
+    console.warn('[gateway] WARNING: Reused singleton is disconnected — triggering reconnect')
+    existingClient.ensureConnected().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(`[gateway] Reconnect attempt after singleton reuse failed: ${message}`)
+    })
+  }
 }
 let gatewayClient: GatewayClient = existingClient ?? new GatewayClient()
 if (!existingClient) {
