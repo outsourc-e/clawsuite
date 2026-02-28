@@ -121,6 +121,22 @@ export function appendHistoryMessage(
     friendlyId,
     sessionKey,
     function append(messages) {
+      // Dedup: if a message with the same clientId (or optimistic id) already
+      // exists, skip appending — prevents double-display when an optimistic
+      // message is added on send and then echoed back via SSE onUserMessage.
+      const incomingClientId = getMessageClientId(message)
+      const incomingOptimisticId = getMessageOptimisticId(message)
+      if (incomingClientId || incomingOptimisticId) {
+        const optimisticKey = incomingClientId ? `opt-${incomingClientId}` : ''
+        const alreadyExists = messages.some((m) =>
+          isMatchingClientMessage(
+            m,
+            incomingClientId || incomingOptimisticId,
+            optimisticKey || incomingOptimisticId,
+          ),
+        )
+        if (alreadyExists) return messages
+      }
       return [...messages, message]
     },
   )
