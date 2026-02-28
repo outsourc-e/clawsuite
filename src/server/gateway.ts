@@ -673,12 +673,24 @@ if (existingClient) {
   console.log(
     `[gateway] Reusing singleton — ws.readyState=${state} authenticated=${snapshot.authenticated}`,
   )
-  if (!snapshot.authenticated || snapshot.readyState !== WebSocket.OPEN) {
+  // Only trigger reconnect if disconnected AND enough time has passed since last attempt.
+  // This prevents a race when two Vite SSR workers both load this module simultaneously —
+  // both would see a healthy singleton and both would fire ensureConnected(), causing an
+  // HTTPError on the first request before the doubled handshake settles.
+  const GW_LAST_RECONNECT_KEY = '__clawsuite_gateway_last_reconnect__' as const
+  const lastReconnect = (globalThis as any)[GW_LAST_RECONNECT_KEY] as number | undefined
+  const cooldownMs = 5_000
+  const now = Date.now()
+  const cooledDown = !lastReconnect || now - lastReconnect > cooldownMs
+  if ((!snapshot.authenticated || snapshot.readyState !== WebSocket.OPEN) && cooledDown) {
+    ;(globalThis as any)[GW_LAST_RECONNECT_KEY] = now
     console.warn('[gateway] WARNING: Reused singleton is disconnected — triggering reconnect')
     existingClient.ensureConnected().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       console.warn(`[gateway] Reconnect attempt after singleton reuse failed: ${message}`)
     })
+  } else if (!cooledDown) {
+    console.log('[gateway] Skipping reconnect — within cooldown window')
   }
 }
 let gatewayClient: GatewayClient = existingClient ?? new GatewayClient()
