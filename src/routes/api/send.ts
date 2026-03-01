@@ -102,6 +102,17 @@ function normalizeAttachments(
   return normalized.length > 0 ? normalized : undefined
 }
 
+function getGatewayMessage(
+  message: string,
+  attachments?: Array<Record<string, unknown>>,
+): string {
+  if (message.trim().length > 0) return message
+  if (attachments && attachments.length > 0) {
+    return 'Please review the attached content.'
+  }
+  return message
+}
+
 export const Route = createFileRoute('/api/send')({
   server: {
     handlers: {
@@ -143,12 +154,7 @@ export const Route = createFileRoute('/api/send')({
               { status: 400 },
             )
           }
-          const gatewayMessage =
-            message.trim().length === 0 &&
-            attachments &&
-            attachments.length > 0
-              ? ' '
-              : message
+          const gatewayMessage = getGatewayMessage(message, attachments)
 
           // Try to resolve session key — it might be a friendlyId that needs resolution
           const keysToResolve = [rawSessionKey, friendlyId].filter(

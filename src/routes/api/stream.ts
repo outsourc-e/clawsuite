@@ -4,6 +4,14 @@ import WebSocket from 'ws'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 
+function getGatewayMessage(message: string, attachments?: Array<unknown>): string {
+  if (message.trim().length > 0) return message
+  if (attachments && attachments.length > 0) {
+    return 'Please review the attached content.'
+  }
+  return message
+}
+
 type GatewayFrame =
   | { type: 'req'; id: string; method: string; params?: unknown }
   | {
@@ -174,7 +182,7 @@ export const Route = createFileRoute('/api/stream')({
                             params: {
                               sessionKey: sessionKey || 'main',
                               friendlyId: friendlyId || undefined,
-                              message,
+                              message: getGatewayMessage(message, attachments),
                               thinking,
                               attachments,
                               deliver: false,
