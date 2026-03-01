@@ -129,13 +129,31 @@ function normalizeMessageText(message: GatewayMessage): string {
     if (text.length > 0) return text
   }
 
-  // Fall back to legacy top-level text/message fields
+  // Fall back to legacy top-level text/message fields (some gateway / channel
+  // adapters use these instead of the content-array format)
   for (const key of ['text', 'message', 'body']) {
     const val = raw[key]
     if (typeof val === 'string' && val.trim().length > 0) return val.trim()
   }
 
   return ''
+}
+
+/**
+ * Build an attachment identity signature for image-only dedup.
+ * Uses name + size because those survive the round-trip through the gateway;
+ * the base64 content is stripped before storage/history.
+ */
+function normalizeAttachmentSignature(message: GatewayMessage): string {
+  const raw = message as Record<string, unknown>
+  const attachments = Array.isArray(raw.attachments)
+    ? (raw.attachments as Array<Record<string, unknown>>)
+    : []
+  if (attachments.length === 0) return ''
+  return attachments
+    .map((a) => `${String(a.name ?? '')}:${String(a.size ?? '')}`)
+    .sort()
+    .join('|')
 }
 
 export function appendHistoryMessage(
@@ -168,17 +186,37 @@ export function appendHistoryMessage(
 
       // Fallback dedup for SSE-echoed user messages that arrive WITHOUT a
       // clientId (gateway did not echo it back). Check if an existing optimistic
-      // user message with the same text content was added in the last 10 seconds.
-      // This prevents the duplicate without dropping legitimately repeated messages
-      // sent at longer intervals.
+      // user message with the same text content (or attachment signature for
+      // image-only sends) was added in the last 10 seconds. This prevents
+      // duplicates without dropping legitimately repeated messages sent at
+      // longer intervals.
       if (message.role === 'user' && !incomingClientId && !incomingOptimisticId) {
         const incomingText = normalizeMessageText(message)
-        if (incomingText.length > 0) {
+        const incomingAttachSig = normalizeAttachmentSignature(message)
+        // Only apply dedup if there is SOME identity to match against
+        if (incomingText.length > 0 || incomingAttachSig.length > 0) {
           const nowMs = Date.now()
           const TEN_SECONDS = 10_000
           const isDuplicate = messages.some((m) => {
             if (m.role !== 'user') return false
-            if (normalizeMessageText(m) !== incomingText) return false
+
+            // Determine if this candidate is a content match:
+            // • Text messages: compare normalised text
+            // • Image-only messages: compare attachment signatures
+            // • Mixed (text + image): text takes priority; attachment sig is a
+            //   secondary signal used only when text also matches
+            const textMatch =
+              incomingText.length > 0 && normalizeMessageText(m) === incomingText
+            const attachMatch =
+              incomingAttachSig.length > 0 &&
+              normalizeAttachmentSignature(m) === incomingAttachSig
+
+            const isContentMatch =
+              (incomingText.length > 0 && textMatch) ||
+              (incomingText.length === 0 && incomingAttachSig.length > 0 && attachMatch)
+
+            if (!isContentMatch) return false
+
             // If we have timestamps, check recency; otherwise check the last
             // few recent messages (optimistic messages are at the tail).
             const msgTimestamp =
