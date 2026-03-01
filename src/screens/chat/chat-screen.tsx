@@ -566,6 +566,21 @@ export function ChatScreen({
           : `${msg.role}:fallback:${messageFallbackSignature(msg)}`
 
       if (seen.has(primaryKey)) continue
+
+      // Text-based dedup for user messages: the optimistic message uses a
+      // content array while the SSE echo may use a top-level text field, and
+      // timestamps differ (client vs server).  This causes both the ID-based
+      // and fallback-signature dedup to miss.  A normalised text key catches
+      // the overlap regardless of message shape.
+      if (msg.role === 'user') {
+        const text = textFromMessage(msg).trim()
+        if (text.length > 0) {
+          const textKey = `user:text:${text}`
+          if (seen.has(textKey)) continue
+          seen.add(textKey)
+        }
+      }
+
       seen.add(primaryKey)
       // Register all candidate keys so later messages that share any ID are
       // collapsed (handles the optimistic-nonce = server-clientId overlap).
