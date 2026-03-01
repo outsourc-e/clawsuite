@@ -117,7 +117,7 @@ function getClientNonce(msg: GatewayMessage | null | undefined): string {
 
 function messageMultipartSignature(msg: GatewayMessage | null | undefined): string {
   if (!msg) return ''
-  const content = Array.isArray(msg.content)
+  let content = Array.isArray(msg.content)
     ? msg.content
         .map((part) => {
           if (part.type === 'text') return `t:${String((part as any).text ?? '').trim()}`
@@ -127,6 +127,18 @@ function messageMultipartSignature(msg: GatewayMessage | null | undefined): stri
         })
         .join('|')
     : ''
+  // Fallback: if content array is empty/missing, check top-level text fields
+  // so that legacy-format messages still produce a meaningful signature.
+  if (!content) {
+    const raw = msg as Record<string, unknown>
+    for (const key of ['text', 'body', 'message']) {
+      const val = raw[key]
+      if (typeof val === 'string' && val.trim().length > 0) {
+        content = `t:${val.trim()}`
+        break
+      }
+    }
+  }
   const attachments = Array.isArray((msg as any).attachments)
     ? (msg as any).attachments
         .map((attachment: any) => `${String(attachment?.name ?? '')}:${String(attachment?.size ?? '')}:${String(attachment?.contentType ?? '')}`)
@@ -411,10 +423,17 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
       return historyMessages
     }
 
-    // Find messages in realtime that aren't in history yet
+    // Find messages in realtime that aren't in history yet.
+    //
+    // CRITICAL: use extractMessageText() (not extractTextFromContent) so that
+    // SSE echoes with top-level text/body/message fields are matched against
+    // optimistic messages that use the content-array format. This was the root
+    // cause of the persistent duplicate-message bug — mergeHistoryMessages was
+    // the only layer that didn't handle the format mismatch, so the SSE echo
+    // always survived the merge and appeared alongside the optimistic copy.
     const newRealtimeMessages = realtimeMessages.filter((rtMsg) => {
       const rtId = getMessageId(rtMsg)
-      const rtText = extractTextFromContent(rtMsg.content)
+      const rtText = extractMessageText(rtMsg)
       const rtNonce = getClientNonce(rtMsg)
       const rtSignature = messageMultipartSignature(rtMsg)
 
@@ -429,17 +448,14 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           return true
         }
 
+        // Text match: use multi-format extraction for both sides so that
+        // content-array messages match top-level text field messages.
         if (histMsg.role === rtMsg.role && rtText) {
-          const histText = extractTextFromContent(histMsg.content)
+          const histText = extractMessageText(histMsg)
           if (histText === rtText) return true
         }
 
-        // Bug 1 fix: treat an optimistic/sending history message with same
-        // role + text content as matching the incoming realtime message, even
-        // when the gateway doesn't echo back clientId (e.g. paste/image sends
-        // where nonce is absent on the SSE event). This prevents the realtime
-        // message from being appended alongside the optimistic copy already in
-        // the history cache.
+        // Optimistic message match: same role + (text OR attachment sig)
         const histRaw = histMsg as Record<string, unknown>
         const histIsOptimistic =
           normalizeString(histRaw.status) === 'sending' ||
@@ -448,11 +464,14 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         if (histIsOptimistic && histMsg.role === rtMsg.role) {
           // Text-based match (plain text messages)
           if (rtText) {
-            const histText = extractTextFromContent(histMsg.content)
+            const histText = extractMessageText(histMsg)
             if (histText === rtText) return true
+            // Prefix match: the gateway may enrich the body with inline
+            // <attachment> tags that weren't in the original optimistic message.
+            // The enriched body starts with the original text.
+            if (histText && rtText.startsWith(histText)) return true
           }
-          // Attachment-based match for paste/image messages: compare
-          // attachment names + sizes, which survive round-trip to the gateway.
+          // Attachment-based match for paste/image messages
           const rtAttachments = Array.isArray((rtMsg as any).attachments)
             ? (rtMsg as any).attachments as Array<Record<string, unknown>>
             : []
@@ -509,4 +528,26 @@ function extractTextFromContent(
     .map((c) => c.text)
     .join('\n')
     .trim()
+}
+
+/**
+ * Extract text from a GatewayMessage using multiple strategies:
+ *   1. content array (canonical format)
+ *   2. top-level text/body/message fields (legacy / some gateway adapters)
+ *
+ * Some gateways echo user messages with a top-level `text` field instead of
+ * the `content` array. Using only extractTextFromContent() would return ''
+ * for those, causing dedup to fail in mergeHistoryMessages.
+ */
+function extractMessageText(msg: GatewayMessage | null | undefined): string {
+  if (!msg) return ''
+  const fromContent = extractTextFromContent(msg.content)
+  if (fromContent.length > 0) return fromContent
+
+  const raw = msg as Record<string, unknown>
+  for (const key of ['text', 'body', 'message']) {
+    const val = raw[key]
+    if (typeof val === 'string' && val.trim().length > 0) return val.trim()
+  }
+  return ''
 }
