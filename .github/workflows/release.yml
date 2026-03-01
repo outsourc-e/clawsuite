@@ -40,11 +40,11 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.version }}
-          name: OpenClaw Studio ${{ steps.version.outputs.version }}
+          name: ClawSuite ${{ steps.version.outputs.version }}
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') }}
           body: |
-            ## OpenClaw Studio ${{ steps.version.outputs.version }}
+            ## ClawSuite ${{ steps.version.outputs.version }}
 
             **VSCode for AI Agents** - Desktop interface for OpenClaw Gateway
 
@@ -52,14 +52,14 @@ jobs:
 
             | Platform | Architecture | Download |
             |----------|-------------|----------|
-            | macOS | Apple Silicon (M1/M2/M3) | `OpenClaw-Studio_*_aarch64.dmg` |
-            | macOS | Intel | `OpenClaw-Studio_*_x64.dmg` |
-            | Windows | 64-bit | `OpenClaw-Studio_*_x64-setup.exe` |
-            | Linux | 64-bit | `OpenClaw-Studio_*_amd64.AppImage` |
+            | macOS | Apple Silicon (M1/M2/M3) | `ClawSuite_*_aarch64.dmg` |
+            | macOS | Intel | `ClawSuite_*_x64.dmg` |
+            | Windows | 64-bit | `ClawSuite_*_x64-setup.exe` |
+            | Linux | 64-bit | `ClawSuite_*_amd64.AppImage` |
 
             ### Installation
 
-            **macOS:** Download the `.dmg`, open it, and drag OpenClaw Studio to Applications.
+            **macOS:** Download the `.dmg`, open it, and drag ClawSuite to Applications.
 
             **Windows:** Download and run the installer.
 

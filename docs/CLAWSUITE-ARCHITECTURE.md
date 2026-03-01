@@ -332,7 +332,7 @@ WS   /api/terminal/:id             // Terminal I/O stream
 ### Component Hierarchy
 
 ```
-OpenClawStudio (root)
+ClawSuite (root)
 ├── Header
 │   ├── Logo (clickable → /dashboard)
 │   ├── UsageMeter

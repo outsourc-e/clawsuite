@@ -16,7 +16,7 @@ type ProviderConfig = {
   apiKey?: string
 }
 
-type OpenClawConfig = {
+type ClawSuiteConfig = {
   models?: {
     providers?: {
       anthropic?: ProviderConfig
@@ -109,7 +109,7 @@ function buildPrompt(terminalOutput: string, logContent: string): string {
 }
 
 function readProviderApiKey(
-  config: OpenClawConfig,
+  config: ClawSuiteConfig,
   provider: 'anthropic' | 'openai',
 ): string {
   const providerConfig = config.models?.providers?.[provider]
@@ -129,12 +129,12 @@ function readProviderApiKey(
   return ''
 }
 
-async function readOpenClawConfig(): Promise<OpenClawConfig | null> {
+async function readClawSuiteConfig(): Promise<ClawSuiteConfig | null> {
   const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
 
   try {
     const raw = await fs.readFile(configPath, 'utf8')
-    return JSON.parse(raw) as OpenClawConfig
+    return JSON.parse(raw) as ClawSuiteConfig
   } catch {
     return null
   }
@@ -167,7 +167,7 @@ async function resolveProvider(): Promise<ResolvedProvider | null> {
     return { provider: 'openai', apiKey: openaiEnv }
   }
 
-  const config = await readOpenClawConfig()
+  const config = await readClawSuiteConfig()
   if (!config) return null
 
   const anthropicApiKey = readProviderApiKey(config, 'anthropic')
