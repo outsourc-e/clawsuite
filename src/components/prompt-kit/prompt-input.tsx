@@ -177,6 +177,7 @@ export type PromptInputTextareaProps = {
 function PromptInputTextarea({
   className,
   onKeyDown,
+  onPaste,
   disableAutosize = false,
   inputRef,
   ...props
@@ -242,6 +243,32 @@ function PromptInputTextarea({
     onKeyDown?.(e)
   }
 
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const hasFiles = Array.from(e.clipboardData.items).some(
+      (item) => item.kind === 'file',
+    )
+    if (!hasFiles) {
+      const pastedText = e.clipboardData.getData('text/plain')
+      if (pastedText.length > 0) {
+        e.preventDefault()
+        const el = e.currentTarget
+        const selectionStart = el.selectionStart ?? value.length
+        const selectionEnd = el.selectionEnd ?? selectionStart
+        const nextValue =
+          value.slice(0, selectionStart) +
+          pastedText +
+          value.slice(selectionEnd)
+        setValue(nextValue)
+        requestAnimationFrame(() => {
+          const cursor = selectionStart + pastedText.length
+          el.setSelectionRange(cursor, cursor)
+          adjustHeight(el)
+        })
+      }
+    }
+    onPaste?.(e)
+  }
+
   /**
    * iOS Safari fix: onPointerDown ensures the textarea gets focus even when
    * tapped from deep scroll positions or after the keyboard was recently dismissed.
@@ -268,6 +295,7 @@ function PromptInputTextarea({
       value={value}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
       onPointerDown={handlePointerDown}
       className={cn(
         'text-primary-950 min-h-[28px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 pl-4 pr-1 py-2 md:py-0 text-base placeholder:text-primary-500',
