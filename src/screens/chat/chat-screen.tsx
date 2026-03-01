@@ -575,7 +575,12 @@ export function ChatScreen({
       if (msg.role === 'user') {
         const text = textFromMessage(msg).trim()
         if (text.length > 0) {
-          const textKey = `user:text:${text}`
+          // Normalize all whitespace (newlines, tabs, multiple spaces) to a
+          // single space before comparing.  The gateway may collapse \n to
+          // spaces when echoing back, causing the optimistic (with newlines)
+          // and the echo (with spaces) to have different raw text.
+          const normalizedText = text.replace(/\s+/g, ' ')
+          const textKey = `user:text:${normalizedText}`
           if (seen.has(textKey)) continue
           seen.add(textKey)
         }

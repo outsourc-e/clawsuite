@@ -101,10 +101,24 @@ function cleanUserText(raw: string): string {
 
 export function textFromMessage(msg: GatewayMessage): string {
   const parts = Array.isArray(msg.content) ? msg.content : []
-  const raw = parts
+  let raw = parts
     .map((part) => (part.type === 'text' ? String(part.text ?? '') : ''))
     .join('')
     .trim()
+
+  // Fallback: some gateway / channel adapters echo messages with a top-level
+  // text/body/message field instead of the content array.  Without this
+  // fallback, textFromMessage returns '' for those echoes which breaks dedup.
+  if (raw.length === 0) {
+    const rawMsg = msg as Record<string, unknown>
+    for (const key of ['text', 'body', 'message']) {
+      const val = rawMsg[key]
+      if (typeof val === 'string' && val.trim().length > 0) {
+        raw = val.trim()
+        break
+      }
+    }
+  }
 
   // Clean user messages (strip system metadata)
   if (msg.role === 'user') {
