@@ -18,14 +18,18 @@ import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SessionsRouteImport } from './routes/sessions'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as NewProjectRouteImport } from './routes/new-project'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as MemoryRouteImport } from './routes/memory'
+import { Route as LogsRouteImport } from './routes/logs'
 import { Route as GatewayRouteImport } from './routes/gateway'
 import { Route as FilesRouteImport } from './routes/files'
+import { Route as DebugRouteImport } from './routes/debug'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CronRouteImport } from './routes/cron'
 import { Route as CostsRouteImport } from './routes/costs'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as AgentsRouteImport } from './routes/agents'
@@ -204,6 +208,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SessionsRoute = SessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
   path: '/review',
@@ -229,6 +238,11 @@ const MemoryRoute = MemoryRouteImport.update({
   path: '/memory',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LogsRoute = LogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GatewayRoute = GatewayRouteImport.update({
   id: '/gateway',
   path: '/gateway',
@@ -239,9 +253,19 @@ const FilesRoute = FilesRouteImport.update({
   path: '/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DebugRoute = DebugRouteImport.update({
+  id: '/debug',
+  path: '/debug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CronRoute = CronRouteImport.update({
+  id: '/cron',
+  path: '/cron',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CostsRoute = CostsRouteImport.update({
@@ -935,14 +959,18 @@ export interface FileRoutesByFullPath {
   '/agents': typeof AgentsRoute
   '/connect': typeof ConnectRoute
   '/costs': typeof CostsRoute
+  '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
+  '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
   '/gateway': typeof GatewayRouteWithChildren
+  '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/new-project': typeof NewProjectRoute
   '/projects': typeof ProjectsRoute
   '/review': typeof ReviewRoute
+  '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
@@ -1086,14 +1114,18 @@ export interface FileRoutesByTo {
   '/agents': typeof AgentsRoute
   '/connect': typeof ConnectRoute
   '/costs': typeof CostsRoute
+  '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
+  '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
   '/gateway': typeof GatewayRouteWithChildren
+  '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/new-project': typeof NewProjectRoute
   '/projects': typeof ProjectsRoute
   '/review': typeof ReviewRoute
+  '/sessions': typeof SessionsRoute
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
@@ -1237,14 +1269,18 @@ export interface FileRoutesById {
   '/agents': typeof AgentsRoute
   '/connect': typeof ConnectRoute
   '/costs': typeof CostsRoute
+  '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
+  '/debug': typeof DebugRoute
   '/files': typeof FilesRoute
   '/gateway': typeof GatewayRouteWithChildren
+  '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/new-project': typeof NewProjectRoute
   '/projects': typeof ProjectsRoute
   '/review': typeof ReviewRoute
+  '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
@@ -1390,14 +1426,18 @@ export interface FileRouteTypes {
     | '/agents'
     | '/connect'
     | '/costs'
+    | '/cron'
     | '/dashboard'
+    | '/debug'
     | '/files'
     | '/gateway'
+    | '/logs'
     | '/memory'
     | '/new'
     | '/new-project'
     | '/projects'
     | '/review'
+    | '/sessions'
     | '/settings'
     | '/skills'
     | '/terminal'
@@ -1541,14 +1581,18 @@ export interface FileRouteTypes {
     | '/agents'
     | '/connect'
     | '/costs'
+    | '/cron'
     | '/dashboard'
+    | '/debug'
     | '/files'
     | '/gateway'
+    | '/logs'
     | '/memory'
     | '/new'
     | '/new-project'
     | '/projects'
     | '/review'
+    | '/sessions'
     | '/skills'
     | '/terminal'
     | '/usage'
@@ -1691,14 +1735,18 @@ export interface FileRouteTypes {
     | '/agents'
     | '/connect'
     | '/costs'
+    | '/cron'
     | '/dashboard'
+    | '/debug'
     | '/files'
     | '/gateway'
+    | '/logs'
     | '/memory'
     | '/new'
     | '/new-project'
     | '/projects'
     | '/review'
+    | '/sessions'
     | '/settings'
     | '/skills'
     | '/terminal'
@@ -1843,14 +1891,18 @@ export interface RootRouteChildren {
   AgentsRoute: typeof AgentsRoute
   ConnectRoute: typeof ConnectRoute
   CostsRoute: typeof CostsRoute
+  CronRoute: typeof CronRoute
   DashboardRoute: typeof DashboardRoute
+  DebugRoute: typeof DebugRoute
   FilesRoute: typeof FilesRoute
   GatewayRoute: typeof GatewayRouteWithChildren
+  LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
   NewRoute: typeof NewRoute
   NewProjectRoute: typeof NewProjectRoute
   ProjectsRoute: typeof ProjectsRoute
   ReviewRoute: typeof ReviewRoute
+  SessionsRoute: typeof SessionsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
   TerminalRoute: typeof TerminalRoute
@@ -1999,6 +2051,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sessions': {
+      id: '/sessions'
+      path: '/sessions'
+      fullPath: '/sessions'
+      preLoaderRoute: typeof SessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/review': {
       id: '/review'
       path: '/review'
@@ -2034,6 +2093,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MemoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/logs': {
+      id: '/logs'
+      path: '/logs'
+      fullPath: '/logs'
+      preLoaderRoute: typeof LogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/gateway': {
       id: '/gateway'
       path: '/gateway'
@@ -2048,11 +2114,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/debug': {
+      id: '/debug'
+      path: '/debug'
+      fullPath: '/debug'
+      preLoaderRoute: typeof DebugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cron': {
+      id: '/cron'
+      path: '/cron'
+      fullPath: '/cron'
+      preLoaderRoute: typeof CronRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/costs': {
@@ -3269,14 +3349,18 @@ const rootRouteChildren: RootRouteChildren = {
   AgentsRoute: AgentsRoute,
   ConnectRoute: ConnectRoute,
   CostsRoute: CostsRoute,
+  CronRoute: CronRoute,
   DashboardRoute: DashboardRoute,
+  DebugRoute: DebugRoute,
   FilesRoute: FilesRoute,
   GatewayRoute: GatewayRouteWithChildren,
+  LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
   NewRoute: NewRoute,
   NewProjectRoute: NewProjectRoute,
   ProjectsRoute: ProjectsRoute,
   ReviewRoute: ReviewRoute,
+  SessionsRoute: SessionsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
   TerminalRoute: TerminalRoute,

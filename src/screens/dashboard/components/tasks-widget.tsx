@@ -196,7 +196,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
         <div className="mt-2 flex justify-end">
           <button
             type="button"
-            onClick={() => void navigate({ to: '/dashboard' })}
+            onClick={() => void navigate({ to: '/cron' })}
             className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-neutral-700 dark:hover:text-neutral-300"
           >
             View all ›
@@ -269,7 +269,7 @@ export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
           <div className="mt-2 flex justify-end">
             <button
               type="button"
-              onClick={() => void navigate({ to: '/dashboard' })}
+              onClick={() => void navigate({ to: '/cron' })}
               className="inline-flex items-center gap-1 text-xs font-medium text-primary-500 dark:text-neutral-400 transition-colors hover:text-neutral-700 dark:hover:text-neutral-300"
             >
               View all →

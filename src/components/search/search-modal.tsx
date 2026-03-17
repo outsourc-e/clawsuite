@@ -133,7 +133,7 @@ export function SearchModal() {
         description: 'Open the real-time activity log viewer',
         onSelect: () => {
           closeModal()
-          navigate({ to: '/gateway' })
+          navigate({ to: '/logs' })
         },
       },
       {
