@@ -761,11 +761,28 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         if (completeMessage) {
           const messages = new Map(state.realtimeMessages)
           const sessionMessages = [...(messages.get(sessionKey) ?? [])]
-          const existingIdx = findCompleteMessageIndex(
-            sessionMessages,
-            completeMessage,
-            event.runId ?? streaming?.runId ?? undefined,
-          )
+
+          // First priority: find the streaming partial message (marked with
+          // __streamingStatus === 'streaming'). This always wins over text/id
+          // matching because it's unambiguously the in-progress message for
+          // this session. Prevents duplicate messages when thinking text in
+          // the partial doesn't match the final response text.
+          let streamingPartialIdx = -1
+          for (let i = sessionMessages.length - 1; i >= 0; i--) {
+            const m = sessionMessages[i] as Record<string, unknown>
+            if (m.role === 'assistant' && m.__streamingStatus === 'streaming') {
+              streamingPartialIdx = i
+              break
+            }
+          }
+
+          const existingIdx = streamingPartialIdx >= 0
+            ? streamingPartialIdx
+            : findCompleteMessageIndex(
+                sessionMessages,
+                completeMessage,
+                event.runId ?? streaming?.runId ?? undefined,
+              )
 
           if (existingIdx >= 0) {
             sessionMessages[existingIdx] = {
