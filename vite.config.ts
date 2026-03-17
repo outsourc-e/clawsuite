@@ -54,8 +54,8 @@ const config = defineConfig(({ mode, command }) => {
         }
       : existsSync(daemonDistEntry)
         ? {
-            commandName: 'node',
-            args: ['dist/server.js'],
+            commandName: 'npx',
+            args: ['tsx', 'src/server.ts'],
             options: {
               cwd: daemonCwd,
               env: {
