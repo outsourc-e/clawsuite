@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { AgentRunner } from "./agent-runner";
 import { Scheduler } from "./scheduler";
@@ -329,16 +329,33 @@ export class Orchestrator extends EventEmitter {
     const retryEntry = this.state.retryAttempts.get(task.id);
     const attempt = options?.taskRun?.attempt ?? retryEntry?.attempt ?? 1;
     const projectPath = project.path;
-    if (!projectPath || !existsSync(projectPath)) {
+    if (!projectPath) {
       const taskRun =
         options?.taskRun ??
         this.tracker.createPendingTaskRun(task.id, agent.id, null, attempt);
-      const errorMessage = "Project path no longer exists";
+      const errorMessage = "Project path is not set";
       this.tracker.failTaskRun(taskRun.id, errorMessage);
       this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
       this.tracker.setTaskStatus(task.id, "failed");
       this.tracker.setAgentStatus(agent.id, "online");
       return;
+    }
+    // Auto-create workspace directory if it doesn't exist
+    if (!existsSync(projectPath)) {
+      try {
+        mkdirSync(projectPath, { recursive: true });
+        console.log(`[orchestrator] Created workspace directory: ${projectPath}`);
+      } catch (err) {
+        const taskRun =
+          options?.taskRun ??
+          this.tracker.createPendingTaskRun(task.id, agent.id, null, attempt);
+        const errorMessage = `Failed to create workspace: ${err instanceof Error ? err.message : String(err)}`;
+        this.tracker.failTaskRun(taskRun.id, errorMessage);
+        this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
+        this.tracker.setTaskStatus(task.id, "failed");
+        this.tracker.setAgentStatus(agent.id, "online");
+        return;
+      }
     }
 
     this.tracker.setTaskStatus(task.id, "running");
