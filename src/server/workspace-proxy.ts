@@ -29,16 +29,37 @@ export async function forwardWorkspaceRequest({
 
   const bodyText =
     method === 'GET' || method === 'HEAD' ? undefined : await request.text()
+  const isEventStream = accept?.includes('text/event-stream') ?? false
 
-  const daemonResponse = await fetch(targetUrl, {
-    method,
-    headers,
-    body: bodyText && bodyText.length > 0 ? bodyText : undefined,
-  })
+  let daemonResponse: Response
+  try {
+    daemonResponse = await fetch(targetUrl, {
+      method,
+      headers,
+      body: bodyText && bodyText.length > 0 ? bodyText : undefined,
+      signal: isEventStream ? undefined : AbortSignal.timeout(30_000),
+    })
+  } catch {
+    if (isEventStream) {
+      return new Response('', {
+        status: 502,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    }
+
+    return new Response(
+      JSON.stringify({ ok: false, error: 'Workspace daemon unavailable' }),
+      {
+        status: 502,
+        headers: { 'content-type': 'application/json' },
+      },
+    )
+  }
 
   const responseHeaders = new Headers()
   const contentTypeHeader = daemonResponse.headers.get('content-type')
-  const isEventStream = contentTypeHeader?.includes('text/event-stream') ?? false
+  const isDaemonEventStream =
+    contentTypeHeader?.includes('text/event-stream') ?? false
 
   for (const headerName of [
     'content-type',
@@ -55,7 +76,7 @@ export async function forwardWorkspaceRequest({
     }
   }
 
-  if (isEventStream) {
+  if (isDaemonEventStream) {
     return new Response(daemonResponse.body, {
       status: daemonResponse.status,
       headers: responseHeaders,
