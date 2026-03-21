@@ -168,8 +168,13 @@ export function useMissionOrchestrator() {
   const completedSessionKeysRef = useRef<Set<string>>(new Set())
   const dispatchTokenRef = useRef<string | null>(null)
 
-  missionRef.current = activeMission
-  sessionMapRef.current = agentSessionMap
+  useEffect(() => {
+    missionRef.current = activeMission
+  }, [activeMission])
+
+  useEffect(() => {
+    sessionMapRef.current = agentSessionMap
+  }, [agentSessionMap])
 
   const closeAllStreams = useCallback(() => {
     streamMapRef.current.forEach((source) => source.close())

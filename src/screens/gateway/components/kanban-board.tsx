@@ -13,9 +13,16 @@ type KanbanColumn = {
   label: string
 }
 
-const COLUMNS: KanbanColumn[] = [
+const DEFAULT_COLUMNS: KanbanColumn[] = [
   { key: 'backlog', label: 'Backlog' },
   { key: 'in_progress', label: 'In Progress' },
+  { key: 'review', label: 'Review' },
+  { key: 'done', label: 'Done' },
+]
+
+const COMPACT_COLUMNS: KanbanColumn[] = [
+  { key: 'backlog', label: 'Todo' },
+  { key: 'in_progress', label: 'WIP' },
   { key: 'review', label: 'Review' },
   { key: 'done', label: 'Done' },
 ]
@@ -35,7 +42,7 @@ const PRIORITY_BADGES: Record<TaskPriority, string> = {
 }
 
 function isKanbanColumnStatus(value: string): value is KanbanColumnStatus {
-  return COLUMNS.some((column) => column.key === value)
+  return DEFAULT_COLUMNS.some((column) => column.key === value)
 }
 
 function mapTaskStatusToColumn(status: TaskStatus): KanbanColumnStatus {
@@ -107,14 +114,24 @@ export type KanbanBoardProps = {
   agents: AgentOption[]
   missionId?: string
   onAssignAgent?: (taskId: string, agentId: string) => void
+  compact?: boolean
 }
 
-export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, missionId, onAssignAgent }: KanbanBoardProps) {
+export function KanbanBoard({
+  tasks,
+  onUpdateTask,
+  onDeleteTask,
+  agents,
+  missionId,
+  onAssignAgent,
+  compact = false,
+}: KanbanBoardProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<KanbanColumnStatus | null>(null)
   const [menuTaskId, setMenuTaskId] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [noteDraft, setNoteDraft] = useState('')
+  const columns = compact ? COMPACT_COLUMNS : DEFAULT_COLUMNS
   const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus)
   const allStoreTasks = useTaskStore((state) => state.tasks)
   const missionTasks = useMemo(() => {
@@ -202,7 +219,7 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, mission
     <div className="h-full min-h-0 bg-[var(--theme-bg)]">
       <div className="h-full min-h-0 overflow-x-auto pb-2">
         <div className="grid min-h-full w-full min-w-[52rem] grid-cols-4 gap-3 px-3 py-3 lg:min-w-0">
-          {COLUMNS.map((column) => {
+          {columns.map((column) => {
             const columnTasks = tasksByColumn[column.key]
 
             return (

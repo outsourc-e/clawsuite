@@ -290,6 +290,11 @@ export function Conductor() {
     [activeMission, agentSessionStatus],
   )
 
+  const rightSidebarMissionReports = useMemo(
+    () => (activeReport ? [activeReport] : missionReports.slice(0, 6)),
+    [activeReport, missionReports],
+  )
+
   const handleStartMission = () => {
     const trimmedGoal = goalDraft.trim()
     if (!trimmedGoal) return
@@ -523,11 +528,9 @@ export function Conductor() {
     )
   }
 
-  const rightSidebarMissionReports = activeReport ? [activeReport] : missionReports.slice(0, 6)
-
   return (
     <div className="flex h-full min-h-full flex-col overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-      <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_280px]">
+      <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_340px]">
         <aside className="flex min-h-0 flex-col border-r border-[var(--theme-border)] bg-[var(--theme-bg)]">
           <div className="border-b border-[var(--theme-border)] px-4 py-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">Missions</p>
@@ -614,6 +617,7 @@ export function Conductor() {
                 agents={activeMission.team.map((member) => ({ id: member.id, name: member.name }))}
                 missionId={activeMission.id}
                 onAssignAgent={handleAssignAgent}
+                compact
               />
             </div>
           </section>
@@ -669,7 +673,7 @@ export function Conductor() {
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Cost</h2>
             </div>
             <div className="h-[320px] overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
-              <CostAnalyticsDashboard missionReports={rightSidebarMissionReports} />
+              <CostAnalyticsDashboard missionReports={rightSidebarMissionReports} compact />
             </div>
           </section>
         </aside>

@@ -16,6 +16,7 @@ export type MissionReportEntry = {
 
 export type CostAnalyticsDashboardProps = {
   missionReports: MissionReportEntry[]
+  compact?: boolean
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ function CSSBarChart({ entries, unit = '', color = 'bg-accent-500' }: { entries:
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function CostAnalyticsDashboard({ missionReports }: CostAnalyticsDashboardProps) {
+export function CostAnalyticsDashboard({ missionReports, compact = false }: CostAnalyticsDashboardProps) {
   const stats = useMemo(() => {
     const now = Date.now()
     const todayStr = new Date().toISOString().slice(0, 10)
@@ -150,59 +151,67 @@ export function CostAnalyticsDashboard({ missionReports }: CostAnalyticsDashboar
     return { totalTokens, totalCost, todayTokens, todayCost, weekTokens, weekCost, avgCost, agentBars, modelBars, dayBars, missionCount: missionReports.length }
   }, [missionReports])
 
-  const CARD = 'rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-slate-900 p-4 shadow-sm'
-  const STAT_LABEL = 'text-[10px] uppercase tracking-wider text-neutral-500 dark:text-neutral-400'
-  const STAT_VALUE = 'text-xl font-bold text-neutral-900 dark:text-white tabular-nums'
+  const CARD = cn(
+    'rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-slate-900 shadow-sm',
+    compact ? 'p-3' : 'p-4',
+  )
+  const STAT_LABEL = cn(
+    'uppercase tracking-wider text-neutral-500 dark:text-neutral-400',
+    compact ? 'text-[9px]' : 'text-[10px]',
+  )
+  const STAT_VALUE = cn(
+    'font-bold text-neutral-900 dark:text-white tabular-nums',
+    compact ? 'text-base' : 'text-xl',
+  )
+  const summaryCards = compact
+    ? [
+        { label: 'Tot. Mis', value: String(stats.missionCount) },
+        { label: 'Tot. Tok', value: stats.totalTokens.toLocaleString() },
+        { label: 'Tot. Cost', value: `$${stats.totalCost.toFixed(4)}` },
+        { label: 'Avg/Mis', value: `$${stats.avgCost.toFixed(4)}` },
+        { label: 'Today', value: `$${stats.todayCost.toFixed(4)}`, detail: `${stats.todayTokens.toLocaleString()} tok` },
+        { label: '7d', value: `$${stats.weekCost.toFixed(4)}`, detail: `${stats.weekTokens.toLocaleString()} tok` },
+      ]
+    : [
+        { label: 'Total Missions', value: String(stats.missionCount) },
+        { label: 'Total Tokens', value: stats.totalTokens.toLocaleString() },
+        { label: 'Total Cost', value: `$${stats.totalCost.toFixed(4)}` },
+        { label: 'Avg / Mission', value: `$${stats.avgCost.toFixed(4)}` },
+        { label: 'Today', value: `$${stats.todayCost.toFixed(4)}`, detail: `${stats.todayTokens.toLocaleString()} tok` },
+        { label: 'This Week', value: `$${stats.weekCost.toFixed(4)}`, detail: `${stats.weekTokens.toLocaleString()} tok` },
+      ]
+  const chartTitleClass = compact ? 'mb-2 text-xs font-semibold text-neutral-900 dark:text-white' : 'mb-3 text-sm font-semibold text-neutral-900 dark:text-white'
 
   return (
-    <div className="space-y-4 p-4 overflow-y-auto">
+    <div className={cn('overflow-y-auto', compact ? 'space-y-3 p-3' : 'space-y-4 p-4')}>
       {/* ── Summary Cards ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <div className={CARD}>
-          <p className={STAT_LABEL}>Total Missions</p>
-          <p className={STAT_VALUE}>{stats.missionCount}</p>
-        </div>
-        <div className={CARD}>
-          <p className={STAT_LABEL}>Total Tokens</p>
-          <p className={STAT_VALUE}>{stats.totalTokens.toLocaleString()}</p>
-        </div>
-        <div className={CARD}>
-          <p className={STAT_LABEL}>Total Cost</p>
-          <p className={STAT_VALUE}>${stats.totalCost.toFixed(4)}</p>
-        </div>
-        <div className={CARD}>
-          <p className={STAT_LABEL}>Avg / Mission</p>
-          <p className={STAT_VALUE}>${stats.avgCost.toFixed(4)}</p>
-        </div>
-        <div className={CARD}>
-          <p className={STAT_LABEL}>Today</p>
-          <p className={STAT_VALUE}>${stats.todayCost.toFixed(4)}</p>
-          <p className="text-[10px] text-neutral-400">{stats.todayTokens.toLocaleString()} tok</p>
-        </div>
-        <div className={CARD}>
-          <p className={STAT_LABEL}>This Week</p>
-          <p className={STAT_VALUE}>${stats.weekCost.toFixed(4)}</p>
-          <p className="text-[10px] text-neutral-400">{stats.weekTokens.toLocaleString()} tok</p>
-        </div>
+      <div className={cn('grid gap-3', compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6')}>
+        {summaryCards.map((card) => (
+          <div key={card.label} className={CARD}>
+            <p className={STAT_LABEL}>{card.label}</p>
+            <p className={STAT_VALUE}>{card.value}</p>
+            {card.detail ? <p className="text-[10px] text-neutral-400">{card.detail}</p> : null}
+          </div>
+        ))}
       </div>
 
       {/* ── Charts Row ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* By Agent */}
         <div className={CARD}>
-          <h3 className="mb-3 text-sm font-semibold text-neutral-900 dark:text-white">Cost by Agent</h3>
+          <h3 className={chartTitleClass}>Cost by Agent</h3>
           <CSSBarChart entries={stats.agentBars} unit="$" color="bg-violet-500" />
         </div>
 
         {/* By Model */}
         <div className={CARD}>
-          <h3 className="mb-3 text-sm font-semibold text-neutral-900 dark:text-white">Cost by Model</h3>
+          <h3 className={chartTitleClass}>Cost by Model</h3>
           <CSSBarChart entries={stats.modelBars} unit="$" color="bg-sky-500" />
         </div>
 
         {/* Daily Timeline */}
         <div className={CARD}>
-          <h3 className="mb-3 text-sm font-semibold text-neutral-900 dark:text-white">Daily Cost (7d)</h3>
+          <h3 className={chartTitleClass}>Daily Cost (7d)</h3>
           <CSSBarChart entries={stats.dayBars} unit="$" color="bg-emerald-500" />
         </div>
       </div>
