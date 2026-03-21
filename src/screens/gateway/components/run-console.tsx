@@ -3,6 +3,9 @@ import { CheckmarkCircle02Icon, Copy01Icon, ViewIcon } from '@hugeicons/core-fre
 import { HugeiconsIcon } from '@hugeicons/react'
 import { fetchSessionHistory } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
+import { RunLearnings, type RunLearningsProps } from './run-learnings'
+import { MissionEventLog } from './mission-event-log'
+import type { MissionEvent } from '@/screens/gateway/lib/mission-events'
 
 type RunArtifact = {
   id: string
@@ -42,9 +45,12 @@ type RunConsoleProps = {
   agentNameMap?: Record<string, string>
   artifacts?: RunArtifact[]
   report?: RunReport
+  missionEvents?: MissionEvent[]
+  learnings?: RunLearningsProps['learnings']
+  onAddLearning?: RunLearningsProps['onAddLearning']
 }
 
-type ConsoleTab = 'stream' | 'timeline' | 'artifacts' | 'report'
+type ConsoleTab = 'stream' | 'timeline' | 'artifacts' | 'report' | 'events' | 'learnings'
 type StreamView = 'combined' | 'lanes'
 
 type LiveStreamEvent = {
@@ -61,6 +67,8 @@ const TAB_OPTIONS: Array<{ id: ConsoleTab; label: string }> = [
   { id: 'timeline', label: 'Timeline' },
   { id: 'artifacts', label: 'Artifacts' },
   { id: 'report', label: 'Report' },
+  { id: 'events', label: 'Events' },
+  { id: 'learnings', label: 'Learnings' },
 ]
 
 const STATUS_STYLES: Record<RunConsoleProps['runStatus'], string> = {
@@ -188,8 +196,13 @@ export function RunConsole({
   agentNameMap,
   artifacts,
   report,
+  missionEvents,
+  learnings,
+  onAddLearning,
 }: RunConsoleProps) {
   const [activeTab, setActiveTab] = useState<ConsoleTab>('stream')
+  // Default learnings state when no external learnings store is wired
+  const [localLearnings, setLocalLearnings] = useState<RunLearningsProps['learnings']>([])
   const [streamView, setStreamView] = useState<StreamView>('combined')
   const [steerTarget, setSteerTarget] = useState<string | null>(null)
   const [steerInput, setSteerInput] = useState('')
@@ -823,6 +836,36 @@ export function RunConsole({
                   })}
               </div>
             )}
+          </div>
+        ) : null}
+
+        {activeTab === 'events' ? (
+          <div className="min-h-[200px]">
+            {!missionEvents || missionEvents.length === 0 ? (
+              <p className="text-sm text-primary-300">No mission events recorded for this run yet.</p>
+            ) : (
+              <MissionEventLog
+                events={missionEvents}
+                agentNames={Object.fromEntries(agents.map((a) => [a.id, a.name]))}
+              />
+            )}
+          </div>
+        ) : null}
+
+        {activeTab === 'learnings' ? (
+          <div className="min-h-[200px]">
+            <RunLearnings
+              runId={runId}
+              runTitle={runTitle}
+              learnings={learnings ?? localLearnings}
+              onAddLearning={onAddLearning ?? ((learning) => {
+                setLocalLearnings((prev) => [
+                  ...prev,
+                  { ...learning, id: `learning-${Date.now()}`, createdAt: Date.now() },
+                ])
+              })}
+              onClose={() => setActiveTab('stream')}
+            />
           </div>
         ) : null}
 
