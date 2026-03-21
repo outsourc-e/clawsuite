@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowRight01Icon,
+  CancelCircleHalfDotIcon,
   PlayIcon,
   PlusSignIcon,
   Rocket01Icon,
@@ -10,11 +11,9 @@ import {
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { TeamPanel, TEAM_TEMPLATES, type TeamMember } from './components/team-panel'
+import { TEAM_TEMPLATES, type TeamMember } from './components/team-panel'
 import { RunConsole } from './components/run-console'
-import { KanbanBoard, type KanbanBoardProps } from './components/kanban-board'
 import { ApprovalsBell } from './components/approvals-bell'
-import { CostAnalyticsDashboard } from './components/cost-analytics'
 import { TerminalWorkspace } from '@/components/terminal/terminal-workspace'
 import { useMissionStore } from '@/stores/mission-store'
 import { loadApprovals, saveApprovals, type ApprovalRequest } from './lib/approvals-store'
@@ -250,14 +249,25 @@ function buildSummary(activeMission: NonNullable<ReturnType<typeof useMissionSto
   ]
 }
 
+function formatCompactCost(value?: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '$0.00'
+  return `$${value.toFixed(2)}`
+}
+
+function getTaskColumnMeta(status: HubTask['status']): { label: string; dotClass: string } {
+  if (status === 'done') return { label: 'Done', dotClass: 'bg-emerald-400' }
+  if (status === 'review') return { label: 'Review', dotClass: 'bg-amber-400' }
+  if (status === 'assigned' || status === 'in_progress') return { label: 'In Progress', dotClass: 'bg-sky-400' }
+  return { label: 'Backlog', dotClass: 'bg-[var(--theme-border2)]' }
+}
+
 export function Conductor() {
   const activeMission = useMissionStore((s) => s.activeMission)
   const missionHistory = useMissionStore((s) => s.missionHistory)
   const startMission = useMissionStore((s) => s.startMission)
   const completeMission = useMissionStore((s) => s.completeMission)
   const resetMission = useMissionStore((s) => s.resetMission)
-  const setMissionTasks = useMissionStore((s) => s.setMissionTasks)
-  const { dispatchMission, agentSessionStatus, isDispatching, retryAgent, abortMission } = useMissionOrchestrator()
+  const { dispatchMission, agentSessionStatus, isDispatching, abortMission, resetOrchestratorState } = useMissionOrchestrator()
 
   const [goalDraft, setGoalDraft] = useState('')
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
@@ -357,6 +367,30 @@ export function Conductor() {
     [activeReport, missionReports],
   )
 
+  const compactTasks = useMemo(
+    () =>
+      activeMission?.tasks
+        .slice()
+        .sort((left, right) => {
+          const leftDone = left.status === 'done' ? 1 : 0
+          const rightDone = right.status === 'done' ? 1 : 0
+          if (leftDone !== rightDone) return leftDone - rightDone
+          return right.updatedAt - left.updatedAt
+        })
+        .slice(0, 6) ?? [],
+    [activeMission],
+  )
+
+  const runStatus = useMemo(() => {
+    if (pendingApprovals.length > 0 || agentCards.some((agent) => agent.status === 'waiting_for_input')) {
+      return 'needs_input' as const
+    }
+    if (agentCards.some((agent) => agent.status === 'error')) {
+      return 'failed' as const
+    }
+    return 'running' as const
+  }, [agentCards, pendingApprovals.length])
+
   const handleStartMission = () => {
     const trimmedGoal = goalDraft.trim()
     if (!trimmedGoal) return
@@ -392,47 +426,30 @@ export function Conductor() {
     setApprovals(nextApprovals)
   }
 
-  const handleTaskUpdate: KanbanBoardProps['onUpdateTask'] = (updatedTask) => {
-    setMissionTasks((current) =>
-      current.map((task) => (task.id === updatedTask.id ? { ...updatedTask, updatedAt: Date.now() } : task)),
-    )
-  }
-
-  const handleTaskDelete: KanbanBoardProps['onDeleteTask'] = (taskId) => {
-    setMissionTasks((current) => current.filter((task) => task.id !== taskId))
-  }
-
-  const handleAssignAgent: NonNullable<KanbanBoardProps['onAssignAgent']> = (taskId, agentId) => {
-    setMissionTasks((current) =>
-      current.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              agentId,
-              status: task.status === 'inbox' ? 'assigned' : task.status,
-              updatedAt: Date.now(),
-            }
-          : task,
-      ),
-    )
-  }
-
   const handleNewMission = useCallback(() => {
+    resetOrchestratorState()
     resetMission()
     setGoalDraft('')
     setSelectedAction('build')
     setIsStopping(false)
-  }, [resetMission])
+  }, [resetMission, resetOrchestratorState])
 
-  const handleBackToHome = useCallback(() => {
+  const handleBackToHome = useCallback(async () => {
     if (!activeMission) {
       handleNewMission()
       return
     }
     if (window.confirm('Return to home and clear the current mission view?')) {
-      handleNewMission()
+      setIsStopping(true)
+      try {
+        await abortMission()
+      } catch {
+        /* stale session cleanup should not block reset */
+      } finally {
+        handleNewMission()
+      }
     }
-  }, [activeMission, handleNewMission])
+  }, [abortMission, activeMission, handleNewMission])
 
   const handleStopMission = useCallback(async () => {
     if (isStopping) return
@@ -446,6 +463,11 @@ export function Conductor() {
       setIsStopping(false)
     }
   }, [abortMission, handleNewMission, isStopping])
+
+  const handleDismissStaleMission = useCallback(() => {
+    if (!window.confirm('Clear this mission from the workspace and return home?')) return
+    handleNewMission()
+  }, [handleNewMission])
 
   if (phase === 'home') {
     return (
@@ -664,12 +686,12 @@ export function Conductor() {
         </aside>
 
         <section className="flex min-h-0 flex-col overflow-hidden">
-          <header className="border-b border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3">
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">
+          <header className="border-b border-[var(--theme-border)] bg-[var(--theme-card)]/70 px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">
                 <button
                   type="button"
-                  onClick={handleBackToHome}
+                  onClick={() => void handleBackToHome()}
                   className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
                 >
                   Back to Home
@@ -678,35 +700,44 @@ export function Conductor() {
                 <span className="text-[var(--theme-border2)]">&gt;</span>
                 <span className="max-w-[420px] truncate text-[var(--theme-text)]">{activeMission.name || activeMission.goal}</span>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h1 className="truncate text-lg font-semibold text-[var(--theme-text)]">{activeMission.name || activeMission.goal}</h1>
-                  <p className="truncate text-sm text-[var(--theme-muted)]">{activeMission.goal}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs font-medium text-[var(--theme-muted)]">
-                    Elapsed: {elapsedTime}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs font-medium text-[var(--theme-muted)]">
+                  Elapsed: {elapsedTime}
+                </span>
+                {isDispatching ? (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">
+                    <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
+                    Dispatching
                   </span>
-                  {isDispatching ? (
-                    <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">
-                      <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
-                      Dispatching sessions
-                    </span>
-                  ) : null}
-                  {isStopping ? (
-                    <span className="inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-300">
-                      <span className="size-2 rounded-full bg-red-400 animate-pulse" />
-                      Stopping mission
-                    </span>
-                  ) : null}
-                </div>
+                ) : null}
+                {runStatus === 'needs_input' ? (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">
+                    <span className="size-2 rounded-full bg-amber-400" />
+                    Needs input
+                  </span>
+                ) : null}
+                {isStopping ? (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-300">
+                    <span className="size-2 rounded-full bg-red-400 animate-pulse" />
+                    Stopping
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void handleStopMission()}
+                  disabled={isStopping}
+                  className="inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <HugeiconsIcon icon={CancelCircleHalfDotIcon} size={14} strokeWidth={1.7} />
+                  Stop
+                </button>
               </div>
             </div>
           </header>
           <RunConsole
             runId={activeMission.id}
             runTitle={activeMission.name || activeMission.goal}
-            runStatus="running"
+            runStatus={runStatus}
             agents={agentCards}
             pendingApprovals={pendingApprovals.map((entry) => ({
               id: entry.id,
@@ -731,10 +762,11 @@ export function Conductor() {
               content: artifact.content,
               timestamp: artifact.timestamp,
             }))}
-            onStopMission={() => void handleStopMission()}
             isStopping={isStopping}
             onApprove={(approvalId) => handleApprovalAction(approvalId, 'approved')}
             onDeny={(approvalId) => handleApprovalAction(approvalId, 'denied')}
+            tabs={['stream', 'timeline', 'artifacts']}
+            minimalChrome
           />
         </section>
 
@@ -759,78 +791,120 @@ export function Conductor() {
               </span>
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          <section className="border-b border-[var(--theme-border)] p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Board</h2>
-            </div>
-            <div className="h-[260px] overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
-              <KanbanBoard
-                tasks={activeMission.tasks}
-                onUpdateTask={handleTaskUpdate}
-                onDeleteTask={handleTaskDelete}
-                agents={activeMission.team.map((member) => ({ id: member.id, name: member.name }))}
-                missionId={activeMission.id}
-                onAssignAgent={handleAssignAgent}
-                compact
-              />
-            </div>
-          </section>
-
-          <section className="border-b border-[var(--theme-border)]">
-            <div className="px-3 pt-3">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Team</h2>
-            </div>
-            <div className="max-h-[320px] overflow-y-auto">
-              <TeamPanel
-                team={activeMission.team}
-                activeTemplateId="coding"
-                agentSessionStatus={agentSessionStatus}
-                agentSessionMap={activeMission.agentSessionMap}
-                tasks={activeMission.tasks}
-                onRetrySpawn={(member) => {
-                  void retryAgent(member.id)
-                }}
-                onApplyTemplate={() => {}}
-                onAddAgent={() => {}}
-                onUpdateAgent={() => {}}
-              />
-            </div>
-          </section>
-
-          <section className="border-b border-[var(--theme-border)] p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Approvals</h2>
-              <ApprovalsBell
-                approvals={approvals}
-                onApprove={(approvalId) => handleApprovalAction(approvalId, 'approved')}
-                onDeny={(approvalId) => handleApprovalAction(approvalId, 'denied')}
-              />
-            </div>
-            <div className="space-y-2">
-              {pendingApprovals.length === 0 ? (
-                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-4 text-xs text-[var(--theme-muted)]">
-                  No pending approvals.
+            <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Tasks</h2>
+                  <span className="text-[11px] text-[var(--theme-muted-2)]">{activeMission.tasks.length}</span>
                 </div>
-              ) : (
-                pendingApprovals.slice(0, 3).map((entry) => (
-                  <div key={entry.id} className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-3">
-                    <div className="text-xs font-semibold text-amber-300">{entry.agentName}</div>
-                    <div className="mt-1 text-xs text-[var(--theme-text)]">{entry.action}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+                <div className="space-y-2">
+                  {compactTasks.length === 0 ? (
+                    <div className="rounded-2xl bg-[var(--theme-card)] px-3 py-4 text-xs text-[var(--theme-muted)]">
+                      No tasks queued for this mission.
+                    </div>
+                  ) : (
+                    compactTasks.map((task) => {
+                      const taskMeta = getTaskColumnMeta(task.status)
+                      return (
+                        <div key={task.id} className="flex items-center gap-2 rounded-2xl bg-[var(--theme-card)] px-3 py-2.5">
+                          <span className={cn('size-2 shrink-0 rounded-full', taskMeta.dotClass)} />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm text-[var(--theme-text)]">{task.title}</div>
+                          </div>
+                          <span className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">
+                            {taskMeta.label}
+                          </span>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </section>
 
-          <section className="min-h-0 flex-1 p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Cost</h2>
-            </div>
-            <div className="h-[320px] overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
-              <CostAnalyticsDashboard missionReports={rightSidebarMissionReports} compact />
-            </div>
-          </section>
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Active Team</h2>
+                  <span className="text-[11px] text-[var(--theme-muted-2)]">{agentCards.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {agentCards.map((agent) => {
+                    const statusPresentation = getAgentStatusPresentation(agent.status)
+                    const assignedTask = activeMission.tasks.find((task) => task.agentId === agent.id && task.status !== 'done')
+                    return (
+                      <div key={agent.id} className="rounded-2xl bg-[var(--theme-card)] px-3 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="relative inline-flex size-2.5 shrink-0">
+                            {statusPresentation.pulseClass ? (
+                              <span className={cn('absolute inset-0 animate-ping rounded-full', statusPresentation.pulseClass)} />
+                            ) : null}
+                            <span className={cn('relative inline-flex size-2.5 rounded-full', statusPresentation.dotClass)} />
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--theme-text)]">{agent.name}</span>
+                          <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">{statusPresentation.label}</span>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-[var(--theme-muted)]">
+                          {assignedTask?.title ?? 'No active task assigned'}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Approvals</h2>
+                  <ApprovalsBell
+                    approvals={approvals}
+                    onApprove={(approvalId) => handleApprovalAction(approvalId, 'approved')}
+                    onDeny={(approvalId) => handleApprovalAction(approvalId, 'denied')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  {pendingApprovals.length === 0 ? (
+                    <div className="rounded-2xl bg-[var(--theme-card)] px-3 py-4 text-xs text-[var(--theme-muted)]">
+                      No pending approvals.
+                    </div>
+                  ) : (
+                    pendingApprovals.slice(0, 3).map((entry) => (
+                      <div key={entry.id} className="rounded-2xl border border-amber-500/25 bg-amber-500/5 px-3 py-3">
+                        <div className="text-xs font-semibold text-amber-300">{entry.agentName}</div>
+                        <div className="mt-1 text-xs text-[var(--theme-text)]">{entry.action}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Cost</h2>
+                <div className="space-y-2 rounded-2xl bg-[var(--theme-card)] px-3 py-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[var(--theme-muted)]">This mission</span>
+                    <span className="font-medium text-[var(--theme-text)]">{formatCompactCost(activeReport?.costEstimate)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[var(--theme-muted)]">Tokens</span>
+                    <span className="font-medium text-[var(--theme-text)]">{(activeReport?.tokenCount ?? 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[var(--theme-muted)]">Recent missions</span>
+                    <span className="font-medium text-[var(--theme-text)]">{rightSidebarMissionReports.length}</span>
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Controls</h2>
+                <button
+                  type="button"
+                  onClick={handleDismissStaleMission}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-3 text-sm text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
+                >
+                  <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.7} />
+                  Dismiss Stale Mission
+                </button>
+              </section>
             </div>
           )}
         </aside>

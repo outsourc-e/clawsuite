@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckmarkCircle02Icon, Copy01Icon, ViewIcon } from '@hugeicons/core-free-icons'
+import { CheckmarkCircle02Icon, Copy01Icon, Rocket01Icon, ViewIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { fetchSessionHistory } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
@@ -50,6 +50,8 @@ type RunConsoleProps = {
   missionEvents?: MissionEvent[]
   learnings?: RunLearningsProps['learnings']
   onAddLearning?: RunLearningsProps['onAddLearning']
+  tabs?: ConsoleTab[]
+  minimalChrome?: boolean
 }
 
 type ConsoleTab = 'stream' | 'timeline' | 'artifacts' | 'report' | 'events' | 'learnings'
@@ -211,6 +213,8 @@ export function RunConsole({
   missionEvents,
   learnings,
   onAddLearning,
+  tabs,
+  minimalChrome = false,
 }: RunConsoleProps) {
   const [activeTab, setActiveTab] = useState<ConsoleTab>('stream')
   // Default learnings state when no external learnings store is wired
@@ -225,6 +229,10 @@ export function RunConsole({
   const [expandedArtifactId, setExpandedArtifactId] = useState<string | null>(null)
   const streamEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const allowedTabs = useMemo<ConsoleTab[]>(
+    () => (tabs && tabs.length > 0 ? tabs : TAB_OPTIONS.map((tab) => tab.id)),
+    [tabs],
+  )
 
   // Fetch session history for all session keys
   const fetchAllHistory = useCallback(async () => {
@@ -282,6 +290,11 @@ export function RunConsole({
     })
     return unsubscribe
   }, [runId])
+
+  useEffect(() => {
+    if (allowedTabs.includes(activeTab)) return
+    setActiveTab(allowedTabs[0] ?? 'stream')
+  }, [activeTab, allowedTabs])
 
   // Auto-scroll
   useEffect(() => {
@@ -357,8 +370,14 @@ export function RunConsole({
   }, [])
 
   return (
-    <section className="flex h-full flex-col overflow-hidden bg-[var(--theme-bg,#0b0e14)] text-primary-100 dark:bg-slate-900">
-      <header className="border-b border-primary-800/80 px-4 py-3 sm:px-5">
+    <section className={cn(
+      'flex h-full flex-col overflow-hidden',
+      minimalChrome
+        ? 'bg-transparent text-[var(--theme-text)]'
+        : 'bg-[var(--theme-bg,#0b0e14)] text-primary-100 dark:bg-slate-900',
+    )}>
+      {!minimalChrome ? (
+        <header className="border-b border-primary-800/80 px-4 py-3 sm:px-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -403,11 +422,15 @@ export function RunConsole({
             ) : null}
           </div>
         </div>
-      </header>
+        </header>
+      ) : null}
 
-      <nav className="border-b border-primary-800/70 px-4 py-2 sm:px-5">
+      <nav className={cn(
+        'px-4 py-3 sm:px-5',
+        minimalChrome ? 'border-b border-[var(--theme-border)] bg-[var(--theme-card)]/50' : 'border-b border-primary-800/70',
+      )}>
         <div className="flex flex-wrap gap-2">
-          {TAB_OPTIONS.map((tab) => (
+          {TAB_OPTIONS.filter((tab) => allowedTabs.includes(tab.id)).map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -415,13 +438,20 @@ export function RunConsole({
               className={cn(
                 'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                 activeTab === tab.id
-                  ? 'bg-primary-800 text-primary-100 underline underline-offset-4'
-                  : 'bg-primary-900/60 text-primary-300 hover:bg-primary-800/80 hover:text-primary-100',
+                  ? minimalChrome
+                    ? 'bg-[var(--theme-card2)] text-[var(--theme-text)]'
+                    : 'bg-primary-800 text-primary-100 underline underline-offset-4'
+                  : minimalChrome
+                    ? 'bg-[var(--theme-card)] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]'
+                    : 'bg-primary-900/60 text-primary-300 hover:bg-primary-800/80 hover:text-primary-100',
               )}
             >
               {tab.label}
               {tab.id === 'stream' && displayEvents.length > 0 && (
-                <span className="ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full bg-primary-700 px-1 text-[9px] font-bold leading-none text-primary-200">
+                <span className={cn(
+                  'ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none',
+                  minimalChrome ? 'bg-[var(--theme-border)] text-[var(--theme-text)]' : 'bg-primary-700 text-primary-200',
+                )}>
                   {displayEvents.length}
                 </span>
               )}
@@ -431,7 +461,7 @@ export function RunConsole({
       </nav>
 
       {/* Agent control bar */}
-      {(runStatus === 'running' || runStatus === 'needs_input') && agents.length > 0 ? (
+      {!minimalChrome && (runStatus === 'running' || runStatus === 'needs_input') && agents.length > 0 ? (
         <div className="border-b border-primary-800/60 px-4 py-2 sm:px-5">
           <div className="flex flex-wrap items-center gap-2">
             {agents.map((agent) => (
@@ -514,20 +544,35 @@ export function RunConsole({
         </div>
       ) : null}
 
-      <div ref={scrollContainerRef} onScroll={handleStreamScroll} className="flex-1 overflow-auto px-4 py-4 sm:px-5">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleStreamScroll}
+        className={cn('flex-1 overflow-auto px-4 py-4 sm:px-5', minimalChrome && 'bg-transparent')}
+      >
         {activeTab === 'stream' ? (
           <div className="space-y-3 font-mono text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-medium text-primary-200">{displayEvents.length > 0 ? `${displayEvents.length} events` : 'Live event stream will appear here'}</p>
-              <div className="inline-flex items-center rounded-md border border-primary-700 bg-primary-900/60 p-0.5 text-xs">
+              <p className={cn('text-sm font-medium', minimalChrome ? 'text-[var(--theme-muted)]' : 'text-primary-200')}>
+                {displayEvents.length > 0 ? `${displayEvents.length} events` : 'Waiting for live agent output'}
+              </p>
+              <div className={cn(
+                'inline-flex items-center rounded-md p-0.5 text-xs',
+                minimalChrome
+                  ? 'border border-[var(--theme-border)] bg-[var(--theme-card)]'
+                  : 'border border-primary-700 bg-primary-900/60',
+              )}>
                 <button
                   type="button"
                   onClick={() => setStreamView('combined')}
                   className={cn(
                     'rounded px-2 py-1 text-xs transition-colors',
                     streamView === 'combined'
-                      ? 'bg-primary-800 text-primary-100'
-                      : 'bg-primary-900/60 text-primary-300 hover:text-primary-100',
+                      ? minimalChrome
+                        ? 'bg-[var(--theme-card2)] text-[var(--theme-text)]'
+                        : 'bg-primary-800 text-primary-100'
+                      : minimalChrome
+                        ? 'bg-transparent text-[var(--theme-muted)] hover:text-[var(--theme-text)]'
+                        : 'bg-primary-900/60 text-primary-300 hover:text-primary-100',
                   )}
                 >
                   Combined
@@ -538,8 +583,12 @@ export function RunConsole({
                   className={cn(
                     'rounded px-2 py-1 text-xs transition-colors',
                     streamView === 'lanes'
-                      ? 'bg-primary-800 text-primary-100'
-                      : 'bg-primary-900/60 text-primary-300 hover:text-primary-100',
+                      ? minimalChrome
+                        ? 'bg-[var(--theme-card2)] text-[var(--theme-text)]'
+                        : 'bg-primary-800 text-primary-100'
+                      : minimalChrome
+                        ? 'bg-transparent text-[var(--theme-muted)] hover:text-[var(--theme-text)]'
+                        : 'bg-primary-900/60 text-primary-300 hover:text-primary-100',
                   )}
                 >
                   Lanes
@@ -599,32 +648,71 @@ export function RunConsole({
               </div>
             ) : null}
 
-            {streamView === 'combined' ? (
+            {displayEvents.length === 0 ? (
+              <div className={cn(
+                'flex min-h-[28rem] flex-col items-center justify-center rounded-[28px] border border-dashed px-8 text-center',
+                minimalChrome
+                  ? 'border-[var(--theme-border)] bg-[var(--theme-card)]/35'
+                  : 'border-primary-800/80 bg-primary-950/40',
+              )}>
+                <div className={cn(
+                  'mb-4 flex size-14 items-center justify-center rounded-2xl border',
+                  minimalChrome
+                    ? 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-accent)]'
+                    : 'border-primary-700 bg-primary-900/70 text-primary-200',
+                )}>
+                  <HugeiconsIcon icon={Rocket01Icon} size={22} strokeWidth={1.8} />
+                </div>
+                <p className={cn('text-base font-semibold', minimalChrome ? 'text-[var(--theme-text)]' : 'text-primary-100')}>
+                  Stream is ready
+                </p>
+                <p className={cn(
+                  'mt-2 max-w-md text-sm leading-6',
+                  minimalChrome ? 'text-[var(--theme-muted)]' : 'text-primary-300',
+                )}>
+                  Agent output, approvals, and system events will appear here as work begins. Use timeline or artifacts to inspect the run once activity starts.
+                </p>
+              </div>
+            ) : null}
+
+            {streamView === 'combined' && displayEvents.length > 0 ? (
               <ol className="space-y-2">
                 {displayEvents.map((event) => (
                   <li
                     key={event.id}
-                    className="rounded-lg border border-primary-800/80 bg-primary-950/60 px-3 py-2"
+                    className={cn(
+                      'rounded-lg border px-3 py-2',
+                      minimalChrome
+                        ? 'border-[var(--theme-border)] bg-[var(--theme-card)]'
+                        : 'border-primary-800/80 bg-primary-950/60',
+                    )}
                   >
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-primary-400">[{event.timestamp}]</span>
-                      <span className="text-primary-200">{event.agentName}</span>
+                      <span className={cn(minimalChrome ? 'text-[var(--theme-muted)]' : 'text-primary-400')}>[{event.timestamp}]</span>
+                      <span className={cn(minimalChrome ? 'text-[var(--theme-text)]' : 'text-primary-200')}>{event.agentName}</span>
                       <span
                         className={cn(
                           'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase',
-                          EVENT_STYLES[event.eventType],
+                          minimalChrome
+                            ? 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)]'
+                            : EVENT_STYLES[event.eventType],
                         )}
                       >
                         {getEventPillLabel(event)}
                       </span>
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap break-words text-primary-300 line-clamp-3">{event.message}</p>
+                    <p className={cn(
+                      'mt-1 whitespace-pre-wrap break-words line-clamp-3',
+                      minimalChrome ? 'text-[var(--theme-text)]/80' : 'text-primary-300',
+                    )}>
+                      {event.message}
+                    </p>
                   </li>
                 ))}
               </ol>
             ) : null}
 
-            {streamView === 'lanes' ? (
+            {streamView === 'lanes' && displayEvents.length > 0 ? (
               eventsByAgent.length >= 3 ? (
                 <div className="flex gap-3 overflow-x-auto pb-2">
                   {eventsByAgent.map((lane) => {

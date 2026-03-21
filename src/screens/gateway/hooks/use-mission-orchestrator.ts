@@ -181,6 +181,17 @@ export function useMissionOrchestrator() {
     streamMapRef.current.clear()
   }, [])
 
+  const resetOrchestratorState = useCallback(() => {
+    closeAllStreams()
+    sessionMapRef.current = {}
+    lastOutputByAgentRef.current = {}
+    activityMarkerRef.current = new Map()
+    retryPayloadRef.current = {}
+    completedSessionKeysRef.current = new Set()
+    dispatchTokenRef.current = null
+    setIsDispatching(false)
+  }, [closeAllStreams])
+
   const updateTasksForAgent = useCallback((agentId: string, status: TaskStatus) => {
     let changedTasks: HubTask[] = []
 
@@ -855,14 +866,12 @@ export function useMissionOrchestrator() {
 
   useEffect(() => {
     if (missionState === 'running') return
-    closeAllStreams()
-    activityMarkerRef.current = new Map()
-    setIsDispatching(false)
-  }, [closeAllStreams, missionState])
+    resetOrchestratorState()
+  }, [missionState, resetOrchestratorState])
 
   useEffect(() => () => {
-    closeAllStreams()
-  }, [closeAllStreams])
+    resetOrchestratorState()
+  }, [resetOrchestratorState])
 
   return {
     dispatchMission,
@@ -870,5 +879,6 @@ export function useMissionOrchestrator() {
     isDispatching,
     retryAgent,
     abortMission,
+    resetOrchestratorState,
   }
 }
