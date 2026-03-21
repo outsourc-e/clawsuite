@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { HubTask, TaskStatus, TaskPriority } from './task-board'
 import { useTaskStore, type Task as StoreTask, type TaskStatus as StoreTaskStatus } from '@/stores/task-store'
+import { addApproval } from '../lib/approvals-store'
 
 type AgentOption = { id: string; name: string }
 
@@ -180,6 +181,21 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, mission
       updatedAt: Date.now(),
     }))
     updateTaskStatus(taskId, nextStoreStatus)
+
+    // Review gate: when a task is moved to Review, create a pending approval entry
+    if (nextColumn === 'review') {
+      const task = mergedTasks.find((t) => t.id === taskId)
+      if (task) {
+        const agentName = task.agentId ? (agentNameById.get(task.agentId) ?? task.agentId) : 'Unassigned'
+        addApproval({
+          agentId: task.agentId ?? 'unassigned',
+          agentName,
+          action: `Review task: ${task.title}`,
+          context: task.description || `Task "${task.title}" has been moved to Review and is awaiting approval.`,
+          source: 'agent',
+        })
+      }
+    }
   }
 
   return (
