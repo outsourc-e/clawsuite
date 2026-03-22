@@ -347,8 +347,8 @@ export function Conductor() {
 
     return (
       <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        {/* Hero — always vertically centered */}
-        <main className="mx-auto flex min-h-0 flex-1 max-w-[720px] flex-col items-center justify-center px-6">
+        {/* Hero + missions flow together, group is centered */}
+        <main className="mx-auto flex min-h-0 flex-1 max-w-[720px] flex-col items-center justify-center px-6 py-8">
           <div className="w-full space-y-8">
             <div className="space-y-3 text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
@@ -400,73 +400,73 @@ export function Conductor() {
               </div>
             </section>
           </div>
-        </main>
 
-        {/* Recent missions — compact footer with arrow pagination */}
-        {recentMissions.length > 0 && (
-          <footer className="mx-auto w-full max-w-[720px] shrink-0 px-6 pb-4">
-            <div className="flex items-center justify-between pb-2">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                Recent Missions
-              </h2>
-              <div className="flex items-center gap-1">
-                <span className="mr-2 text-[10px] text-[var(--theme-muted-2)]">
-                  {missionsPage + 1}/{totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={!canPrev}
-                  onClick={() => setMissionsPage((p) => p - 1)}
-                  className={cn(
-                    'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
-                    canPrev ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
-                  )}
-                >
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} className="rotate-180" />
-                </button>
-                <button
-                  type="button"
-                  disabled={!canNext}
-                  onClick={() => setMissionsPage((p) => p + 1)}
-                  className={cn(
-                    'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
-                    canNext ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
-                  )}
-                >
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} />
-                </button>
+          {/* Recent missions — flows right below input card */}
+          {recentMissions.length > 0 && (
+            <div className="mt-6 w-full">
+              <div className="flex items-center justify-between pb-2">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                  Recent Missions
+                </h2>
+                <div className="flex items-center gap-1">
+                  <span className="mr-2 text-[10px] text-[var(--theme-muted-2)]">
+                    {missionsPage + 1}/{totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!canPrev}
+                    onClick={() => setMissionsPage((p) => p - 1)}
+                    className={cn(
+                      'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
+                      canPrev ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
+                    )}
+                  >
+                    <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} className="rotate-180" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canNext}
+                    onClick={() => setMissionsPage((p) => p + 1)}
+                    className={cn(
+                      'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
+                      canNext ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
+                    )}
+                  >
+                    <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} />
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {pageMissions.map((mission) => {
+                  const statusDot = getTaskStatusDot(mission.status)
+                  const timeValue = mission.updated_at ?? mission.created_at
+                  return (
+                    <button
+                      key={mission.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveMissionId(mission.id)
+                        setActiveProjectId(mission.project_id ?? null)
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
+                    >
+                      <span className={cn('size-2 shrink-0 rounded-full', statusDot.dotClass)} />
+                      <p className="min-w-0 flex-1 truncate text-sm text-[var(--theme-text)]">
+                        {mission.name}
+                      </p>
+                      <span className="shrink-0 text-[10px] text-[var(--theme-muted-2)]">
+                        {statusDot.label}
+                      </span>
+                      <span className="shrink-0 text-[10px] text-[var(--theme-muted-2)]">
+                        {timeValue ? formatRelativeTime(timeValue) : ''}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
-            <div className="space-y-1.5">
-              {pageMissions.map((mission) => {
-                const statusDot = getTaskStatusDot(mission.status)
-                const timeValue = mission.updated_at ?? mission.created_at
-                return (
-                  <button
-                    key={mission.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveMissionId(mission.id)
-                      setActiveProjectId(mission.project_id ?? null)
-                    }}
-                    className="flex w-full items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
-                  >
-                    <span className={cn('size-2 shrink-0 rounded-full', statusDot.dotClass)} />
-                    <p className="min-w-0 flex-1 truncate text-sm text-[var(--theme-text)]">
-                      {mission.name}
-                    </p>
-                    <span className="shrink-0 text-[10px] text-[var(--theme-muted-2)]">
-                      {statusDot.label}
-                    </span>
-                    <span className="shrink-0 text-[10px] text-[var(--theme-muted-2)]">
-                      {timeValue ? formatRelativeTime(timeValue) : ''}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </footer>
-        )}
+          )}
+        </main>
       </div>
     )
   }
