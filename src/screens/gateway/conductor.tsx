@@ -320,7 +320,7 @@ export function Conductor() {
   )
 
   // ── Checkpoint diff expansion ─────────────────────────────────────────────
-  const [missionsExpanded, setMissionsExpanded] = useState(false)
+  const [missionsPage, setMissionsPage] = useState(0)
   const [expandedCheckpointId, setExpandedCheckpointId] = useState<string | null>(null)
   const checkpointDiffQuery = useQuery({
     queryKey: ['workspace', 'checkpoint-diff', expandedCheckpointId],
@@ -338,16 +338,18 @@ export function Conductor() {
   // ════════════════════════════════════════════════════════════════════════════
 
   if (phase === 'home') {
-    const VISIBLE_MISSIONS = 3
-    const visibleMissions = missionsExpanded ? recentMissions : recentMissions.slice(0, VISIBLE_MISSIONS)
-    const hasMore = recentMissions.length > VISIBLE_MISSIONS
+    const PAGE_SIZE = 3
+    const totalPages = Math.ceil(recentMissions.length / PAGE_SIZE)
+    const pageStart = missionsPage * PAGE_SIZE
+    const pageMissions = recentMissions.slice(pageStart, pageStart + PAGE_SIZE)
+    const canPrev = missionsPage > 0
+    const canNext = missionsPage < totalPages - 1
 
     return (
       <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        {/* Hero — always vertically centered in remaining space */}
+        {/* Hero — always vertically centered */}
         <main className="mx-auto flex min-h-0 flex-1 max-w-[720px] flex-col items-center justify-center px-6">
           <div className="w-full space-y-8">
-            {/* Title */}
             <div className="space-y-3 text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
                 Conductor
@@ -361,7 +363,6 @@ export function Conductor() {
               </p>
             </div>
 
-            {/* Input Card */}
             <section className="overflow-hidden rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]">
               <textarea
                 value={goalDraft}
@@ -401,25 +402,43 @@ export function Conductor() {
           </div>
         </main>
 
-        {/* Recent missions — pinned to bottom, doesn't push hero */}
+        {/* Recent missions — compact footer with arrow pagination */}
         {recentMissions.length > 0 && (
-          <footer className="mx-auto w-full max-w-[720px] shrink-0 space-y-3 px-6 pb-6 pt-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+          <footer className="mx-auto w-full max-w-[720px] shrink-0 px-6 pb-4">
+            <div className="flex items-center justify-between pb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
                 Recent Missions
               </h2>
-              {hasMore && (
+              <div className="flex items-center gap-1">
+                <span className="mr-2 text-[10px] text-[var(--theme-muted-2)]">
+                  {missionsPage + 1}/{totalPages}
+                </span>
                 <button
                   type="button"
-                  onClick={() => setMissionsExpanded((v) => !v)}
-                  className="text-xs font-medium text-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
+                  disabled={!canPrev}
+                  onClick={() => setMissionsPage((p) => p - 1)}
+                  className={cn(
+                    'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
+                    canPrev ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
+                  )}
                 >
-                  {missionsExpanded ? 'Show less' : `Show all ${recentMissions.length}`}
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} className="rotate-180" />
                 </button>
-              )}
+                <button
+                  type="button"
+                  disabled={!canNext}
+                  onClick={() => setMissionsPage((p) => p + 1)}
+                  className={cn(
+                    'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
+                    canNext ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
+                  )}
+                >
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} />
+                </button>
+              </div>
             </div>
-            <div className="space-y-2">
-              {visibleMissions.map((mission) => {
+            <div className="space-y-1.5">
+              {pageMissions.map((mission) => {
                 const statusDot = getTaskStatusDot(mission.status)
                 const timeValue = mission.updated_at ?? mission.created_at
                 return (
@@ -430,19 +449,17 @@ export function Conductor() {
                       setActiveMissionId(mission.id)
                       setActiveProjectId(mission.project_id ?? null)
                     }}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
+                    className="flex w-full items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
                   >
-                    <span className={cn('size-2.5 shrink-0 rounded-full', statusDot.dotClass)} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[var(--theme-text)]">
-                        {mission.name}
-                      </p>
-                      <p className="text-xs text-[var(--theme-muted-2)]">
-                        {statusDot.label}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-xs text-[var(--theme-muted-2)]">
-                      {timeValue ? formatRelativeTime(timeValue) : 'just now'}
+                    <span className={cn('size-2 shrink-0 rounded-full', statusDot.dotClass)} />
+                    <p className="min-w-0 flex-1 truncate text-sm text-[var(--theme-text)]">
+                      {mission.name}
+                    </p>
+                    <span className="shrink-0 text-[10px] text-[var(--theme-muted-2)]">
+                      {statusDot.label}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-[var(--theme-muted-2)]">
+                      {timeValue ? formatRelativeTime(timeValue) : ''}
                     </span>
                   </button>
                 )
