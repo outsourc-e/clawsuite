@@ -2,6 +2,19 @@ import { Router } from "express";
 import { Tracker } from "../tracker";
 import type { Mission } from "../types";
 
+function parseEventData(data: string | null): Record<string, unknown> | null {
+  if (!data) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(data) as Record<string, unknown>;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 const MISSION_STATUSES: Mission["status"][] = [
   "pending",
   "decomposing",
@@ -76,6 +89,54 @@ export function createMissionsRouter(tracker: Tracker): Router {
       return;
     }
     res.json(status);
+  });
+
+  router.get("/:id/live", (req, res) => {
+    const mission = tracker.getMission(req.params.id);
+    if (!mission) {
+      res.status(404).json({ error: "Mission not found" });
+      return;
+    }
+
+    const status = tracker.getMissionStatus(req.params.id);
+    if (!status) {
+      res.status(500).json({ error: "Internal error" });
+      return;
+    }
+
+    const tasks = tracker.listTasks({ mission_id: req.params.id });
+    const taskIds = new Set(tasks.map((task) => task.id));
+    const activeRuns = tracker
+      .listTaskRuns({})
+      .filter(
+        (run) =>
+          taskIds.has(run.task_id) &&
+          (run.status === "pending" ||
+            run.status === "running" ||
+            run.status === "awaiting_review" ||
+            run.status === "paused"),
+      )
+      .map((run) => ({
+        ...run,
+        session: run.session_id
+          ? {
+              session_id: run.session_id,
+              workspace_path: run.workspace_path,
+              started_at: run.started_at,
+            }
+          : null,
+        recent_events: tracker.listRunEvents(run.id).slice(-5).map((event) => ({
+          ...event,
+          data: parseEventData(event.data),
+        })),
+      }));
+
+    res.json({
+      mission: status.mission,
+      task_breakdown: status.task_breakdown,
+      tasks,
+      active_runs: activeRuns,
+    });
   });
 
   router.post("/:id/start", (req, res) => {

@@ -16,7 +16,7 @@ type PendingOverseerItem = {
   ageMinutes: number;
 };
 
-function getPendingOverseerItems(tracker: Tracker): PendingOverseerItem[] {
+export function getPendingOverseerItems(tracker: Tracker): PendingOverseerItem[] {
   const now = Date.now();
 
   return tracker
@@ -65,10 +65,7 @@ export function createOverseerRouter(
 ): Router {
   const router = Router();
 
-  // Recommended OpenClaw cron:
-  // Schedule: every 15 minutes
-  // Payload: POST http://localhost:3099/api/workspace/overseer/notify
-  // Model: not needed (HTTP-only cron)
+  // Reminder checks also run on an internal daemon interval in server.ts.
 
   router.get("/pending", (_req, res) => {
     res.json({
@@ -79,16 +76,9 @@ export function createOverseerRouter(
 
   router.post("/notify", async (_req, res) => {
     try {
-      const pendingItems = getPendingOverseerItems(tracker);
-
-      for (const item of pendingItems) {
-        await openclawClient.systemEvent(
-          `Overseer reminder: ${item.projectName} / ${item.taskName} has a pending checkpoint (ID: ${item.checkpointId}) waiting for review for ${item.ageMinutes} minutes`,
-        );
-      }
-
+      const count = await notifyPendingOverseerItems(tracker, openclawClient);
       res.json({
-        count: pendingItems.length,
+        count,
       });
     } catch {
       res.status(500).json({ error: "Internal error" });
@@ -96,4 +86,19 @@ export function createOverseerRouter(
   });
 
   return router;
+}
+
+export async function notifyPendingOverseerItems(
+  tracker: Tracker,
+  openclawClient: OpenClawClient,
+): Promise<number> {
+  const pendingItems = getPendingOverseerItems(tracker);
+
+  for (const item of pendingItems) {
+    await openclawClient.systemEvent(
+      `Overseer reminder for ${item.overseer}: ${item.projectName} / ${item.taskName} has checkpoint ${item.checkpointId} pending for ${item.ageMinutes} minutes`,
+    );
+  }
+
+  return pendingItems.length;
 }

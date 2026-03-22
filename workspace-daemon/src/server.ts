@@ -20,7 +20,10 @@ import { createDecomposeRouter } from "./routes/decompose";
 import { createAdhocTaskRunsRouter, createTaskRunsRouter } from "./routes/task-runs";
 import { createTeamsRouter } from "./routes/teams";
 import { createSkillsRouter } from "./routes/skills";
-import { createOverseerRouter } from "./routes/overseer";
+import {
+  createOverseerRouter,
+  notifyPendingOverseerItems,
+} from "./routes/overseer";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const STARTUP_TIMESTAMP = Date.now();
@@ -39,6 +42,7 @@ process.env.WORKSPACE_DAEMON_DB_PATH = DB_FILE;
 export function createServer(): {
   app: express.Express;
   tracker: Tracker;
+  openclawClient: OpenClawClient;
   orchestrator: Orchestrator;
   missionLoop: MissionLoop;
 } {
@@ -177,15 +181,35 @@ export function createServer(): {
   registerEventsRoutes(eventsRouter, tracker);
   app.use("/api/workspace/events", eventsRouter);
 
-  return { app, tracker, orchestrator, missionLoop };
+  return { app, tracker, openclawClient, orchestrator, missionLoop };
 }
 
-const { app, orchestrator } = createServer();
+const { app, tracker, openclawClient, orchestrator } = createServer();
 
 orchestrator.start();
 
+const overseerScheduler = setInterval(() => {
+  const hasConfiguredOverseers = tracker
+    .listProjects()
+    .some(
+      (project) =>
+        typeof project.overseer === "string" && project.overseer.trim().length > 0,
+    );
+
+  if (!hasConfiguredOverseers) {
+    return;
+  }
+
+  console.log("[overseer] Checking for stale checkpoints...");
+  void notifyPendingOverseerItems(tracker, openclawClient).catch(() => undefined);
+}, 15 * 60 * 1_000);
+
 const server = app.listen(PORT, () => {
   process.stdout.write(`Workspace daemon listening on http://localhost:${PORT}\n`);
+});
+
+server.on("close", () => {
+  clearInterval(overseerScheduler);
 });
 
 server.on("error", (error: NodeJS.ErrnoException) => {

@@ -1053,7 +1053,7 @@ export class Tracker extends EventEmitter {
          RETURNING *`,
       )
       .get(taskId, agentId, attempt, workspacePath) as TaskRun
-    this.emitSse('task_run.started', taskRun)
+    this.emitTaskRunEvent('task_run.started', taskRun)
     return taskRun
   }
 
@@ -1083,7 +1083,7 @@ export class Tracker extends EventEmitter {
          RETURNING *`,
       )
       .get(taskId, agentId, attempt, workspacePath) as TaskRun
-    this.emitSse('task_run.updated', taskRun)
+    this.emitTaskRunEvent('task_run.updated', taskRun)
     return taskRun
   }
 
@@ -1099,7 +1099,7 @@ export class Tracker extends EventEmitter {
 
     const run = this.getTaskRun(id)
     if (run) {
-      this.emitSse('task_run.updated', run)
+      this.emitTaskRunEvent('task_run.updated', run)
     }
     return run
   }
@@ -1137,7 +1137,7 @@ export class Tracker extends EventEmitter {
 
     const run = this.getTaskRun(id)
     if (run) {
-      this.emitSse('task_run.updated', run)
+      this.emitTaskRunEvent('task_run.updated', run)
       this.emitTaskRunCompleted(run)
     }
     return run
@@ -1174,7 +1174,7 @@ export class Tracker extends EventEmitter {
 
     const run = this.getTaskRun(id)
     if (run) {
-      this.emitSse('task_run.updated', run)
+      this.emitTaskRunEvent('task_run.updated', run)
       this.emitTaskRunCompleted(run)
     }
     return run
@@ -1217,7 +1217,7 @@ export class Tracker extends EventEmitter {
 
     const run = this.getTaskRun(id)
     if (run) {
-      this.emitSse('task_run.updated', run)
+      this.emitTaskRunEvent('task_run.updated', run)
     }
     return run
   }
@@ -1233,7 +1233,7 @@ export class Tracker extends EventEmitter {
 
     const run = this.getTaskRun(id)
     if (run) {
-      this.emitSse('task_run.updated', run)
+      this.emitTaskRunEvent('task_run.updated', run)
     }
     return run
   }
@@ -1251,7 +1251,7 @@ export class Tracker extends EventEmitter {
       .run(sessionId, taskRunId)
     const run = this.getTaskRun(taskRunId)
     if (run) {
-      this.emitSse('task_run.updated', run)
+      this.emitTaskRunEvent('task_run.updated', run)
     }
   }
 
@@ -1386,7 +1386,10 @@ export class Tracker extends EventEmitter {
       .get(taskRunId, type, data ? JSON.stringify(data) : null) as RunEvent
     this.emitSse('run_event', event)
     if (type === 'output') {
-      this.emitSse('task_run.output', event)
+      this.emitSse('task_run.output', {
+        ...event,
+        ...this.getTaskRunProjectContext(taskRunId),
+      })
     }
     return event
   }
@@ -2599,7 +2602,11 @@ export class Tracker extends EventEmitter {
       return
     }
 
-    this.emitSse('task_run.completed', {
+    this.emitTaskRunEvent('task_run.completed', run)
+  }
+
+  private emitTaskRunEvent(event: string, run: TaskRun): void {
+    this.emitSse(event, {
       ...run,
       ...this.getTaskRunProjectContext(run.id),
     })

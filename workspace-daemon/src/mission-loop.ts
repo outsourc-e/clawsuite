@@ -5,7 +5,16 @@ import { buildCheckpoint } from "./checkpoint-builder";
 import { OpenClawClient, type SessionStatus } from "./openclaw-client";
 import { QARunner } from "./qa-runner";
 import { Tracker } from "./tracker";
-import type { AgentRecord, AgentRoleConfig, Project, Task, TaskAgentRole, TaskRun, TaskWithRelations } from "./types";
+import type {
+  AgentRecord,
+  AgentRoleConfig,
+  Project,
+  QAResult,
+  Task,
+  TaskAgentRole,
+  TaskRun,
+  TaskWithRelations,
+} from "./types";
 import { resolveProjectPath, WorkspaceManager } from "./workspace";
 
 const execFileAsync = promisify(execFile);
@@ -33,6 +42,7 @@ type RetryState = {
 
 type SessionState = {
   lastMessage?: string;
+  pollCount: number;
 };
 
 type ResolvedTaskAgent = {
@@ -356,7 +366,20 @@ export class MissionLoop {
         }
 
         const status = await this.openclawClient.getSessionStatus(run.session_id);
+        const sessionState = this.sessions.get(run.id) ?? { pollCount: 0 };
+        sessionState.pollCount += 1;
+        this.sessions.set(run.id, sessionState);
         this.captureSessionOutput(run.id, status);
+        if (sessionState.pollCount % 3 === 0) {
+          const startedAt = parseSqliteDate(run.started_at);
+          this.tracker.appendRunEvent(run.id, "status", {
+            type: "progress",
+            elapsed_ms: startedAt ? Date.now() - startedAt : 0,
+            session_status: status.status,
+            last_message: status.lastMessage?.slice(0, 200),
+            tokens: status.totalTokens,
+          });
+        }
 
         if (status.status === "running" || status.status === "unknown") {
           continue;
@@ -520,12 +543,12 @@ export class MissionLoop {
         session_id: session.sessionKey,
       });
       this.tracker.appendRunEvent(taskRun.id, "started", {
-        session_id: session.sessionKey,
+        agent_id: resolvedAgent.record?.id ?? resolvedAgent.spawnAgentId,
+        agent_role: task.agent_type ?? task.suggested_agent_type ?? null,
         workspace_path: workspace.path,
-        agent_id: resolvedAgent.spawnAgentId,
-        model: resolvedAgent.spawnModel,
+        session_key: session.sessionKey,
       });
-      this.sessions.set(taskRun.id, {});
+      this.sessions.set(taskRun.id, { pollCount: 0 });
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to start task";
@@ -592,6 +615,14 @@ export class MissionLoop {
           critic_issues: criticReview.issues,
           critic_revision_requested: true,
         });
+        this.appendRunCompletionEvent(
+          run,
+          status,
+          "completed",
+          null,
+          null,
+          criticReview,
+        );
         await this.createRevisionOrEscalate(
           task,
           run.attempt,
@@ -678,6 +709,18 @@ export class MissionLoop {
         )}.`,
       );
     }
+
+    const finalStatus =
+      this.tracker.getTaskRun(run.id)?.status ??
+      (latestCheckpoint.status === "approved" ? "completed" : "awaiting_review");
+    this.appendRunCompletionEvent(
+      run,
+      status,
+      finalStatus,
+      latestCheckpoint.id,
+      qaResult,
+      criticReview,
+    );
 
     const taskRun = this.tracker.getTaskRun(run.id);
     if (taskRun?.status === "completed") {
@@ -893,7 +936,7 @@ export class MissionLoop {
       return;
     }
 
-    const sessionState = this.sessions.get(runId) ?? {};
+    const sessionState = this.sessions.get(runId) ?? { pollCount: 0 };
     if (sessionState.lastMessage === message) {
       return;
     }
@@ -1090,5 +1133,26 @@ export class MissionLoop {
 
   private async pageOverseer(text: string): Promise<void> {
     await this.openclawClient.systemEvent(text);
+  }
+
+  private appendRunCompletionEvent(
+    run: TaskRun,
+    status: SessionStatus,
+    finalStatus: TaskRun["status"],
+    checkpointId: string | null,
+    qaResult: QAResult | null,
+    criticReview: CriticReviewResult | null,
+  ): void {
+    const startedAt = parseSqliteDate(run.started_at);
+
+    this.tracker.appendRunEvent(run.id, "completed", {
+      status: finalStatus,
+      checkpoint_id: checkpointId,
+      qa_verdict: qaResult?.verdict,
+      qa_confidence: qaResult?.confidence,
+      critic_score: criticReview?.score,
+      total_tokens: status.totalTokens,
+      elapsed_ms: startedAt ? Date.now() - startedAt : 0,
+    });
   }
 }
