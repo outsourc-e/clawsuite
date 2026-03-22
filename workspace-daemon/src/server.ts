@@ -20,6 +20,7 @@ import { createDecomposeRouter } from "./routes/decompose";
 import { createAdhocTaskRunsRouter, createTaskRunsRouter } from "./routes/task-runs";
 import { createTeamsRouter } from "./routes/teams";
 import { createSkillsRouter } from "./routes/skills";
+import { createDispatchRouter } from "./routes/dispatch";
 import {
   createOverseerRouter,
   notifyPendingOverseerItems,
@@ -175,6 +176,7 @@ export function createServer(): {
   app.use("/api/workspace/decompose", createDecomposeRouter(tracker));
   app.use("/api/workspace/teams", createTeamsRouter(tracker));
   app.use("/api/workspace/skills", createSkillsRouter());
+  app.use("/api/workspace/dispatch", createDispatchRouter());
   app.use("/api/workspace/overseer", createOverseerRouter(tracker, openclawClient));
 
   const eventsRouter = Router();
