@@ -17,7 +17,11 @@ import { TerminalWorkspace } from '@/components/terminal/terminal-workspace'
 import { AgentOutputPanel } from './components/agent-output-panel'
 import { useWorkspaceSse } from '@/hooks/use-workspace-sse'
 import { getWorkspaceCheckpointDiff } from '@/lib/workspace-checkpoints'
-import { useConductorWorkspace, type WorkspaceMissionTask } from './hooks/use-conductor-workspace'
+import {
+  useConductorWorkspace,
+  type WorkspaceMissionTask,
+  type WorkspaceProjectFile,
+} from './hooks/use-conductor-workspace'
 import { formatRelativeTime } from '@/screens/projects/lib/workspace-utils'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -28,7 +32,9 @@ type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
 type DecomposedTask = {
   title: string
   description: string
-  agent?: string
+  agent?: string | null
+  depends_on: string[]
+  suggested_agent_type?: string | null
   enabled: boolean
 }
 
@@ -134,6 +140,30 @@ function formatFileSize(size: number): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function getFilePriority(relativePath: string): number {
+  const normalizedPath = relativePath.replace(/\\/g, '/')
+  const lowerPath = normalizedPath.toLowerCase()
+  const fileName = lowerPath.split('/').pop() ?? lowerPath
+
+  if (/^(pages|src\/pages)\/.+\.tsx$/.test(lowerPath)) return 0
+  if (/^(components|src\/components)\/.+\.tsx$/.test(lowerPath)) return 1
+  if (fileName === 'app.tsx') return 2
+  if (fileName === 'index.tsx' || fileName === 'index.jsx') return 3
+  if (fileName === 'main.tsx' || fileName === 'main.jsx') return 4
+  if (fileName.endsWith('.html')) return 5
+  if (fileName.endsWith('.css') || fileName.endsWith('.scss')) return 6
+  if (
+    fileName === 'package.json' ||
+    fileName === 'tsconfig.json' ||
+    /^vite\.config\./.test(fileName) ||
+    /^tailwind\.config\./.test(fileName) ||
+    /^postcss\./.test(fileName)
+  ) {
+    return 7
+  }
+  return 8
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function Conductor() {
@@ -224,10 +254,10 @@ export function Conductor() {
     setLaunchError(null)
     try {
       const result = await workspace.decompose.mutateAsync(trimmed)
-      setDecomposedTasks(result.tasks.map((t) => ({ ...t, enabled: true })))
+      setDecomposedTasks(result.tasks.map((t) => ({ ...t, depends_on: t.depends_on ?? [], enabled: true })))
     } catch {
       // Fallback: single task if decompose fails (daemon offline)
-      setDecomposedTasks([{ title: trimmed, description: '', enabled: true }])
+      setDecomposedTasks([{ title: trimmed, description: '', depends_on: [], enabled: true }])
     }
   }, [goalDraft, workspace.decompose])
 
@@ -258,30 +288,41 @@ export function Conductor() {
     if (activeMissionId) void workspace.resumeMission.mutateAsync(activeMissionId)
   }, [activeMissionId, workspace.resumeMission])
 
-  const handleStop = useCallback(async () => {
-    if (activeMissionId) {
-      await workspace.stopMission.mutateAsync(activeMissionId)
-    }
-  }, [activeMissionId, workspace.stopMission])
-
-  const handleNewMission = useCallback(() => {
+  const clearMissionView = useCallback(() => {
     localStorage.removeItem('conductor-active-mission')
     setActiveMissionId(null)
     setActiveProjectId(null)
-    setDecomposedTasks(null)
-    setGoalDraft('')
-    setSelectedAction('build')
     setSelectedTaskId(null)
     setFileViewMode({})
     setLaunchError(null)
   }, [])
 
-  const handleBackToHome = useCallback(async () => {
+  const handleLeaveMission = useCallback(() => {
+    clearMissionView()
+  }, [clearMissionView])
+
+  const handleNewMission = useCallback(() => {
+    const shouldConfirm =
+      Boolean(activeMissionId) &&
+      !['completed', 'done', 'failed', 'stopped'].includes(missionStatus?.mission.status ?? 'pending')
+    if (shouldConfirm && !window.confirm('This mission is still running. Leave it running and clear your current view?')) {
+      return
+    }
+    clearMissionView()
+    setDecomposedTasks(null)
+    setGoalDraft('')
+    setSelectedAction('build')
+  }, [activeMissionId, clearMissionView, missionStatus?.mission.status])
+
+  const handleStopMission = useCallback(async () => {
     if (activeMissionId) {
       try { await workspace.stopMission.mutateAsync(activeMissionId) } catch { /* ignore */ }
     }
-    handleNewMission()
-  }, [activeMissionId, handleNewMission, workspace.stopMission])
+    clearMissionView()
+    setDecomposedTasks(null)
+    setGoalDraft('')
+    setSelectedAction('build')
+  }, [activeMissionId, clearMissionView, workspace.stopMission])
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const tasks: WorkspaceMissionTask[] = missionStatus?.task_breakdown ?? []
@@ -311,26 +352,40 @@ export function Conductor() {
     [taskRuns],
   )
   const visibleProjectFiles = useMemo(
-    () => workspace.projectFiles.data?.files.filter((f) => !f.relativePath.startsWith('.workspace')) ?? [],
+    () =>
+      [...(workspace.projectFiles.data?.files ?? [])]
+        .filter((f) => !f.relativePath.startsWith('.workspace'))
+        .sort((left, right) => {
+          const priorityDiff = getFilePriority(left.relativePath) - getFilePriority(right.relativePath)
+          if (priorityDiff !== 0) return priorityDiff
+          return left.relativePath.localeCompare(right.relativePath)
+        }),
     [workspace.projectFiles.data],
   )
+  const primarySourcePath = useMemo(() => {
+    const primarySource = visibleProjectFiles
+      .filter((file) => /\.(tsx|jsx)$/i.test(file.relativePath))
+      .sort((left, right) => {
+        const priorityDiff = getFilePriority(left.relativePath) - getFilePriority(right.relativePath)
+        if (priorityDiff !== 0) return priorityDiff
+        return left.relativePath.localeCompare(right.relativePath)
+      })[0]
+    return primarySource?.relativePath ?? null
+  }, [visibleProjectFiles])
 
   // ── Live output from workspace SSE (task_run.output events) ───────────────
   const queryClient = useQueryClient()
-  const runningRuns = useMemo(
-    () => taskRuns.filter((r) => r.status === 'running' || r.status === 'active'),
-    [taskRuns],
-  )
+  const allRuns = useMemo(() => taskRuns, [taskRuns])
   const liveOutputByRunId = useMemo(() => {
     const map = new Map<string, string[]>()
-    for (const run of runningRuns) {
+    for (const run of allRuns) {
       const cached = queryClient.getQueryData<string[]>(['workspace', 'task-run-live-output', run.id])
       if (cached && cached.length > 0) {
         map.set(run.id, cached.slice(-8))
       }
     }
     return map
-  }, [liveOutputTick, runningRuns, queryClient])
+  }, [allRuns, liveOutputTick, queryClient])
 
   const recentMissions = useMemo(() => {
     return [...(workspace.recentMissions.data ?? [])]
@@ -372,6 +427,257 @@ export function Conductor() {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   })
+
+  const renderProjectFileCard = useCallback((file: WorkspaceProjectFile) => {
+    const isHtmlFile = file.relativePath.endsWith('.html') && Boolean(file.content)
+    const mode = fileViewMode[file.relativePath] ?? 'preview'
+    const isAppShell = isHtmlFile && file.content!.includes('type="module"')
+    const isStandaloneHtml = isHtmlFile && !isAppShell
+    const isPrimarySource = primarySourcePath === file.relativePath
+
+    if (isStandaloneHtml) {
+      return (
+        <div
+          key={file.relativePath}
+          className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)]"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--theme-border)] px-4 py-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
+                {isPrimarySource && (
+                  <span className="rounded-full bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-strong)]">
+                    Primary source
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[var(--theme-muted-2)]">
+                {formatFileSize(file.size)} · {file.isText ? 'Text' : 'Binary'}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => toggleFileView(file.relativePath, 'preview')}
+                className={cn(
+                  'rounded-md px-2 py-1 text-[10px] font-medium transition-colors',
+                  mode === 'preview'
+                    ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
+                    : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
+                )}
+              >
+                Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleFileView(file.relativePath, 'source')}
+                className={cn(
+                  'rounded-md px-2 py-1 text-[10px] font-medium transition-colors',
+                  mode === 'source'
+                    ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
+                    : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
+                )}
+              >
+                Source
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenHtmlPreview(file.content!)}
+                className="rounded-full border border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--theme-accent-strong)] transition-colors hover:bg-[var(--theme-accent-soft-strong)]"
+              >
+                Open Preview
+              </button>
+            </div>
+          </div>
+          {mode === 'preview' ? (
+            <iframe
+              srcDoc={file.content}
+              sandbox="allow-scripts"
+              className="h-[400px] w-full border-0 bg-white"
+              title={file.relativePath}
+            />
+          ) : (
+            <div className="bg-[var(--theme-bg)] p-3">
+              <CodeBlock
+                content={file.content!}
+                language="html"
+                className="border-[var(--theme-border)]"
+              />
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    if (isAppShell) {
+      return (
+        <div
+          key={file.relativePath}
+          className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 py-3"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
+                {isPrimarySource && (
+                  <span className="rounded-full bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-strong)]">
+                    Primary source
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[var(--theme-muted-2)]">App shell detected. Build output is required before iframe preview.</p>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (isPrimarySource && file.content) {
+      return (
+        <div
+          key={file.relativePath}
+          className="overflow-hidden rounded-2xl border border-[var(--theme-accent)]/30 bg-[var(--theme-card2)]"
+        >
+          <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
+              <p className="text-xs text-[var(--theme-accent)]">Primary source</p>
+            </div>
+            <span className="rounded-full bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-strong)]">
+              {formatFileSize(file.size)}
+            </span>
+          </div>
+          <div className="max-h-[400px] overflow-auto bg-[var(--theme-bg)] p-3">
+            <CodeBlock
+              content={file.content}
+              language={getCodeLanguage(file.relativePath)}
+              className="border-[var(--theme-border)]"
+            />
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <details
+        key={file.relativePath}
+        className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)]"
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
+              {isPrimarySource && (
+                <span className="rounded-full bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-strong)]">
+                  Primary source
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-[var(--theme-muted-2)]">
+              {formatFileSize(file.size)} · {file.isText ? 'Text' : 'Binary'}
+            </p>
+          </div>
+          <span className="text-xs text-[var(--theme-muted-2)]">Expand</span>
+        </summary>
+        {file.isText && file.content ? (
+          <div className="border-t border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
+            <CodeBlock
+              content={file.content}
+              language={getCodeLanguage(file.relativePath)}
+              className="border-[var(--theme-border)]"
+            />
+          </div>
+        ) : (
+          <div className="border-t border-[var(--theme-border)] px-4 py-3 text-sm text-[var(--theme-muted)]">
+            Preview unavailable for this file.
+          </div>
+        )}
+      </details>
+    )
+  }, [fileViewMode, handleOpenHtmlPreview, primarySourcePath, toggleFileView])
+
+  const renderCheckpointCard = useCallback((cp: typeof checkpoints[number]) => {
+    const isExpanded = expandedCheckpointId === cp.id
+    const diffText = isExpanded ? checkpointDiffQuery.data?.diff ?? '' : ''
+    const checkpointTaskName = taskRuns.find((r) => r.id === cp.task_run_id)?.task_name ?? 'Review changes'
+    const isPendingReview = cp.status === 'pending' || cp.status === 'awaiting_review'
+
+    return (
+      <div key={cp.id} className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => setExpandedCheckpointId(isExpanded ? null : cp.id)}
+            className="min-w-0 flex-1 text-left"
+          >
+            <p className="text-sm text-[var(--theme-text)]">
+              {cp.diff_summary ?? checkpointTaskName}
+            </p>
+            <p className="text-[10px] text-[var(--theme-muted-2)]">
+              {cp.files_changed != null && `${cp.files_changed} files`}
+              {cp.additions != null && ` +${cp.additions}`}
+              {cp.deletions != null && ` -${cp.deletions}`}
+              {' · Click to '}
+              {isExpanded ? 'collapse' : 'view diff'}
+            </p>
+          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {isPendingReview && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void workspace.approveCheckpoint.mutateAsync({ id: cp.id, action: 'merge' })}
+                  className="rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/25"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void workspace.rejectCheckpoint.mutateAsync(cp.id)}
+                  className="rounded-full bg-red-500/10 px-3 py-1 text-[11px] font-medium text-red-300 transition-colors hover:bg-red-500/20"
+                >
+                  Reject
+                </button>
+              </>
+            )}
+            <span className={cn(
+              'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+              cp.status === 'approved' ? 'bg-emerald-500/15 text-emerald-400' :
+              cp.status === 'rejected' ? 'bg-red-500/15 text-red-400' :
+              'bg-amber-500/15 text-amber-400',
+            )}>
+              {cp.status}
+            </span>
+          </div>
+        </div>
+        {isExpanded && (
+          <div className="border-t border-[var(--theme-border)] bg-[var(--theme-bg)]">
+            {checkpointDiffQuery.isPending ? (
+              <div className="px-4 py-6 text-center text-xs text-[var(--theme-muted)]">Loading diff…</div>
+            ) : diffText ? (
+              <pre className="max-h-80 overflow-auto px-4 py-3 font-mono text-[11px] leading-relaxed">
+                {diffText.split('\n').map((line, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      line.startsWith('+') && !line.startsWith('+++') ? 'text-emerald-400' :
+                      line.startsWith('-') && !line.startsWith('---') ? 'text-red-400' :
+                      line.startsWith('@@') ? 'text-sky-400' :
+                      'text-[var(--theme-muted-2)]',
+                    )}
+                  >
+                    {line}
+                  </div>
+                ))}
+              </pre>
+            ) : (
+              <div className="px-4 py-6 text-center text-xs text-[var(--theme-muted)]">No diff available</div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }, [checkpoints, checkpointDiffQuery.data?.diff, checkpointDiffQuery.isPending, expandedCheckpointId, taskRuns, workspace.approveCheckpoint, workspace.rejectCheckpoint])
 
   // ════════════════════════════════════════════════════════════════════════════
   // ── HOME PHASE ─────────────────────────────────────────────────────────────
@@ -550,7 +856,21 @@ export function Conductor() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-[var(--theme-text)]">{task.title}</p>
                     {task.description && <p className="mt-0.5 text-xs text-[var(--theme-muted)]">{task.description}</p>}
-                    {task.agent && <span className="mt-1 inline-block rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-[10px] text-[var(--theme-muted-2)]">{task.agent}</span>}
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {task.agent && (
+                        <span className="inline-block rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-[10px] text-[var(--theme-muted-2)]">
+                          {task.agent}
+                        </span>
+                      )}
+                      {task.depends_on.map((dependency) => (
+                        <span
+                          key={`${task.title}-${dependency}`}
+                          className="inline-block rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-[10px] text-[var(--theme-muted-2)]"
+                        >
+                          Depends on {dependency}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </button>
               ))}
@@ -597,14 +917,43 @@ export function Conductor() {
     return (
       <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
         <main className="grid h-full min-h-0 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <section className="flex min-h-0 flex-col overflow-y-auto px-6 py-8 lg:px-10">
-            <div className="mx-auto w-full max-w-3xl space-y-6">
-              <div className="space-y-2">
-                <p className={cn('text-xs font-semibold uppercase tracking-[0.24em]', failed ? 'text-red-400' : 'text-emerald-400')}>
-                  {failed ? 'Mission Failed' : 'Mission Complete'}
-                </p>
-                <h1 className="text-3xl font-semibold tracking-tight">{missionName}</h1>
+          <section className="flex min-h-0 flex-col overflow-y-auto">
+            <div className="sticky top-0 z-10 bg-[var(--theme-bg)] px-6 py-4 lg:px-10">
+              <div className="mx-auto w-full max-w-3xl rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">Conductor</p>
+                    <h1 className="truncate text-3xl font-semibold tracking-tight">{missionName}</h1>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn(
+                      'rounded-full border px-3 py-1 text-xs font-medium capitalize',
+                      failed
+                        ? 'border-red-400/35 bg-red-500/10 text-red-300'
+                        : 'border-emerald-400/35 bg-emerald-500/10 text-emerald-300',
+                    )}>
+                      {missionStatusLabel}
+                    </span>
+                    <Button
+                      type="button"
+                      onClick={handleLeaveMission}
+                      variant="outline"
+                      className="rounded-xl border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-card2)]"
+                    >
+                      ← Missions
+                    </Button>
+                    <Button
+                      onClick={handleNewMission}
+                      className="rounded-xl bg-[var(--theme-accent)] text-white hover:bg-[var(--theme-accent-strong)]"
+                    >
+                      + New Mission
+                    </Button>
+                  </div>
+                </div>
               </div>
+            </div>
+            <div className="px-6 pb-8 lg:px-10">
+            <div className="mx-auto w-full max-w-3xl space-y-6">
 
               {workspace.projectFiles.data && (
                 <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
@@ -623,165 +972,7 @@ export function Conductor() {
                   </div>
 
                   <div className="mt-4 space-y-3">
-                    {visibleProjectFiles.map((file) => {
-                      const isHtmlFile = file.relativePath.endsWith('.html') && Boolean(file.content)
-                      const mode = fileViewMode[file.relativePath] ?? 'preview'
-
-                      // Detect React/Vite shell HTML (has module script, not self-contained)
-                      const isAppShell = isHtmlFile && file.content!.includes('type="module"')
-                      const isStandaloneHtml = isHtmlFile && !isAppShell
-
-                      if (isStandaloneHtml) {
-                        return (
-                          <div
-                            key={file.relativePath}
-                            className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)]"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--theme-border)] px-4 py-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-[var(--theme-text)]">
-                                  {file.relativePath}
-                                </p>
-                                <p className="text-xs text-[var(--theme-muted-2)]">
-                                  {formatFileSize(file.size)} · {file.isText ? 'Text' : 'Binary'}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleFileView(file.relativePath, 'preview')}
-                                  className={cn(
-                                    'rounded-md px-2 py-1 text-[10px] font-medium transition-colors',
-                                    mode === 'preview'
-                                      ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
-                                      : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
-                                  )}
-                                >
-                                  Preview
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleFileView(file.relativePath, 'source')}
-                                  className={cn(
-                                    'rounded-md px-2 py-1 text-[10px] font-medium transition-colors',
-                                    mode === 'source'
-                                      ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
-                                      : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
-                                  )}
-                                >
-                                  Source
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenHtmlPreview(file.content!)}
-                                  className="rounded-full border border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--theme-accent-strong)] transition-colors hover:bg-[var(--theme-accent-soft-strong)]"
-                                >
-                                  Open Preview
-                                </button>
-                              </div>
-                            </div>
-                            {mode === 'preview' ? (
-                              <iframe
-                                srcDoc={file.content}
-                                sandbox="allow-scripts"
-                                className="h-[400px] w-full border-0 bg-white"
-                                title={file.relativePath}
-                              />
-                            ) : (
-                              <div className="bg-[var(--theme-bg)] p-3">
-                                <CodeBlock
-                                  content={file.content!}
-                                  language="html"
-                                  className="border-[var(--theme-border)]"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )
-                      }
-
-                      // Auto-expand main source files (tsx/jsx pages/components)
-                      const isMainSource = /\.(tsx|jsx)$/.test(file.relativePath) &&
-                        /(page|home|app|index|main)\.(tsx|jsx)$/i.test(file.relativePath)
-                      // isConfigFile can be used later for sorting/grouping
-                      const _isConfigFile = /^[^/]*\.(json|ts|js|css)$/.test(file.relativePath.split('/').pop() ?? '') &&
-                        !isMainSource
-                      void _isConfigFile
-
-                      // App shell HTML — show notice, not blank iframe
-                      if (isAppShell) {
-                        return (
-                          <div
-                            key={file.relativePath}
-                            className="flex items-center gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 py-3"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
-                              <p className="text-xs text-[var(--theme-muted-2)]">App shell — requires build to preview</p>
-                            </div>
-                          </div>
-                        )
-                      }
-
-                      // Main source files — show expanded by default
-                      if (isMainSource && file.content) {
-                        return (
-                          <div
-                            key={file.relativePath}
-                            className="overflow-hidden rounded-2xl border border-[var(--theme-accent)]/30 bg-[var(--theme-card2)]"
-                          >
-                            <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
-                                <p className="text-xs text-[var(--theme-accent)]">Main component</p>
-                              </div>
-                              <span className="rounded-full bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-strong)]">
-                                {formatFileSize(file.size)}
-                              </span>
-                            </div>
-                            <div className="max-h-[400px] overflow-auto bg-[var(--theme-bg)] p-3">
-                              <CodeBlock
-                                content={file.content}
-                                language={getCodeLanguage(file.relativePath)}
-                                className="border-[var(--theme-border)]"
-                              />
-                            </div>
-                          </div>
-                        )
-                      }
-
-                      return (
-                        <details
-                          key={file.relativePath}
-                          className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)]"
-                        >
-                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-[var(--theme-text)]">
-                                {file.relativePath}
-                              </p>
-                              <p className="text-xs text-[var(--theme-muted-2)]">
-                                {formatFileSize(file.size)} · {file.isText ? 'Text' : 'Binary'}
-                              </p>
-                            </div>
-                            <span className="text-xs text-[var(--theme-muted-2)]">Expand</span>
-                          </summary>
-                          {file.isText && file.content ? (
-                            <div className="border-t border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
-                              <CodeBlock
-                                content={file.content}
-                                language={getCodeLanguage(file.relativePath)}
-                                className="border-[var(--theme-border)]"
-                              />
-                            </div>
-                          ) : (
-                            <div className="border-t border-[var(--theme-border)] px-4 py-3 text-sm text-[var(--theme-muted)]">
-                              Preview unavailable for this file.
-                            </div>
-                          )}
-                        </details>
-                      )
-                    })}
+                    {visibleProjectFiles.map(renderProjectFileCard)}
                     {visibleProjectFiles.length === 0 && (
                       <p className="text-sm text-[var(--theme-muted)]">No output files found.</p>
                     )}
@@ -794,47 +985,7 @@ export function Conductor() {
                 <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
                   <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Checkpoints</h2>
                   <div className="mt-4 space-y-2">
-                    {checkpoints.map((cp) => (
-                      <div key={cp.id} className="flex items-center justify-between gap-3 rounded-xl bg-[var(--theme-card2)] px-3 py-2">
-                        <div className="min-w-0">
-                          <p className="text-sm text-[var(--theme-text)]">
-                            {cp.diff_summary ?? (taskRuns.find((r) => r.id === cp.task_run_id)?.task_name ?? 'Review changes')}
-                          </p>
-                          <p className="text-xs text-[var(--theme-muted-2)]">
-                            {cp.files_changed != null && `${cp.files_changed} files`}
-                            {cp.additions != null && ` +${cp.additions}`}
-                            {cp.deletions != null && ` -${cp.deletions}`}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {(cp.status === 'pending' || cp.status === 'awaiting_review') && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => void workspace.approveCheckpoint.mutateAsync({ id: cp.id, action: 'merge' })}
-                                className="rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/25"
-                              >
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void workspace.rejectCheckpoint.mutateAsync(cp.id)}
-                                className="rounded-full bg-red-500/10 px-3 py-1 text-[11px] font-medium text-red-300 transition-colors hover:bg-red-500/20"
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-                          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                            cp.status === 'approved' ? 'bg-emerald-500/15 text-emerald-400' :
-                            cp.status === 'rejected' ? 'bg-red-500/15 text-red-400' :
-                            'bg-amber-500/15 text-amber-400',
-                          )}>
-                            {cp.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                    {checkpoints.map(renderCheckpointCard)}
                   </div>
                 </div>
               )}
@@ -854,14 +1005,7 @@ export function Conductor() {
                   </div>
                 </div>
               )}
-
-              <Button
-                onClick={handleNewMission}
-                className="inline-flex w-fit rounded-xl bg-[var(--theme-accent)] text-white hover:bg-[var(--theme-accent-strong)]"
-              >
-                <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.7} />
-                New Mission
-              </Button>
+            </div>
             </div>
           </section>
 
@@ -976,10 +1120,10 @@ export function Conductor() {
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">
                 <button
                   type="button"
-                  onClick={() => void handleBackToHome()}
+                  onClick={handleLeaveMission}
                   className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
                 >
-                  Back to Home
+                  ← Missions
                 </button>
                 <span>Conductor</span>
                 <span className="text-[var(--theme-border2)]">&gt;</span>
@@ -1002,7 +1146,7 @@ export function Conductor() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleStop()}
+                  onClick={() => void handleStopMission()}
                   className="inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15"
                 >
                   <HugeiconsIcon icon={CancelCircleHalfDotIcon} size={14} strokeWidth={1.7} />

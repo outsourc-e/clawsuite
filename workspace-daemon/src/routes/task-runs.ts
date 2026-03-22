@@ -130,7 +130,13 @@ export function createTaskRunsRouter(tracker: Tracker, orchestrator: Orchestrato
 
   router.get("/", (req, res) => {
     const projectId = typeof req.query.project_id === "string" ? req.query.project_id : undefined;
-    res.json(tracker.listTaskRuns({ projectId }));
+    const missionId = typeof req.query.mission_id === "string" ? req.query.mission_id : undefined;
+    const taskRuns = tracker.listTaskRuns({ projectId });
+    res.json(
+      missionId
+        ? taskRuns.filter((taskRun) => taskRun.mission_id === missionId)
+        : taskRuns,
+    );
   });
 
   router.get("/:id/events", (req, res) => {

@@ -29,7 +29,9 @@ export type DecomposeResult = {
   tasks: Array<{
     title: string
     description: string
-    agent?: string
+    agent?: string | null
+    depends_on?: string[]
+    suggested_agent_type?: string | null
   }>
 }
 
@@ -187,7 +189,17 @@ function parseDecomposeResult(payload: unknown): DecomposeResult {
         return {
           title,
           description: asString(r.description) ?? '',
-          agent: asString(r.agent) ?? undefined,
+          agent:
+            asString(r.suggested_agent_type) ??
+            asString(r.agent) ??
+            null,
+          depends_on: Array.isArray(r.depends_on)
+            ? r.depends_on.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+            : [],
+          suggested_agent_type:
+            asString(r.suggested_agent_type) ??
+            asString(r.agent) ??
+            null,
         }
       })
       .filter((t): t is NonNullable<typeof t> => t !== null),
@@ -386,6 +398,31 @@ function extractEntityId(payload: unknown, entityKey: string): string | null {
   return asString(record.id) ?? asString(record[`${entityKey}_id`])
 }
 
+type WorkspaceAgentDirectoryEntry = {
+  id: string
+  name: string
+  adapter_type?: string | null
+}
+
+function parseAgentDirectory(payload: unknown): WorkspaceAgentDirectoryEntry[] {
+  const record = asRecord(payload)
+  const items = Array.isArray(record?.agents) ? record.agents : []
+
+  return items
+    .map((item) => {
+      const agent = asRecord(item)
+      if (!agent) return null
+      const id = asString(agent.id)
+      if (!id) return null
+      return {
+        id,
+        name: asString(agent.name) ?? 'Agent',
+        adapter_type: asString(agent.adapter_type),
+      }
+    })
+    .filter((agent): agent is NonNullable<typeof agent> => agent !== null)
+}
+
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useConductorWorkspace(options?: {
@@ -460,8 +497,9 @@ export function useConductorWorkspace(options?: {
       mission_id: string
       name: string
       description?: string
-      suggested_agent_type?: string
+      agent_id?: string | null
       sort_order: number
+      depends_on?: string[]
     }) => workspacePost('/api/workspace-tasks', params),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['workspace', 'missions'] })
@@ -626,7 +664,13 @@ export function useConductorWorkspace(options?: {
       goal: string
       projectName?: string
       projectPath?: string
-      tasks: Array<{ title: string; description?: string; agent?: string }>
+      tasks: Array<{
+        title: string
+        description?: string
+        agent?: string | null
+        depends_on?: string[]
+        suggested_agent_type?: string | null
+      }>
     }) => {
       // 1. Create or reuse project (default path to /tmp/conductor-workspace if none given)
       let resolvedProjectId = projectId
@@ -660,15 +704,36 @@ export function useConductorWorkspace(options?: {
       })
       if (!mission.id) throw new Error('Failed to create mission')
 
+      const agents = parseAgentDirectory(await workspaceJson('/api/workspace/agents'))
+      const agentIdBySuggestion = new Map<string, string>()
+      for (const agent of agents) {
+        const keys = [agent.id, agent.name, agent.adapter_type]
+        for (const key of keys) {
+          const normalizedKey = key?.trim().toLowerCase()
+          if (normalizedKey && !agentIdBySuggestion.has(normalizedKey)) {
+            agentIdBySuggestion.set(normalizedKey, agent.id)
+          }
+        }
+      }
+
       // 4. Create tasks for the mission
+      const createdTaskIdByTitle = new Map<string, string>()
       for (const [index, task] of params.tasks.entries()) {
-        await createTaskMutation.mutateAsync({
+        const suggestion = (task.suggested_agent_type ?? task.agent)?.trim().toLowerCase()
+        const createdTask = await createTaskMutation.mutateAsync({
           mission_id: mission.id,
           name: task.title,
           description: task.description,
-          suggested_agent_type: task.agent,
+          agent_id: suggestion ? agentIdBySuggestion.get(suggestion) ?? null : null,
           sort_order: index,
+          depends_on: (task.depends_on ?? [])
+            .map((dependencyTitle) => createdTaskIdByTitle.get(dependencyTitle))
+            .filter((dependencyId): dependencyId is string => typeof dependencyId === 'string'),
         })
+        const createdTaskId = extractEntityId(createdTask, 'task')
+        if (createdTaskId) {
+          createdTaskIdByTitle.set(task.title, createdTaskId)
+        }
       }
 
       // 5. Start mission

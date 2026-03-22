@@ -120,6 +120,7 @@ export function useWorkspaceSse(options?: { silent?: boolean }) {
           ['workspace', 'projects'],
           ['workspace', 'project-snapshots'],
           ['workspace', 'stats'],
+          ['workspace', 'conductor'],
         ])
       })
 
@@ -160,6 +161,7 @@ export function useWorkspaceSse(options?: { silent?: boolean }) {
           ['workspace', 'layout', 'project-detail'],
           ['workspace', 'stats'],
           ['workspace', 'events'],
+          ['workspace', 'conductor'],
         ])
 
         const payload = parseSseData(event)
@@ -195,6 +197,7 @@ export function useWorkspaceSse(options?: { silent?: boolean }) {
           ['workspace', 'projects'],
           ['workspace', 'project-detail'],
           ['workspace', 'layout', 'project-detail'],
+          ['workspace', 'conductor', 'checkpoints'],
         ])
       })
 
@@ -204,6 +207,7 @@ export function useWorkspaceSse(options?: { silent?: boolean }) {
           ['workspace', 'projects'],
           ['workspace', 'project-detail'],
           ['workspace', 'layout', 'project-detail'],
+          ['workspace', 'conductor', 'checkpoints'],
         ])
       })
 
@@ -215,6 +219,7 @@ export function useWorkspaceSse(options?: { silent?: boolean }) {
           ['workspace', 'project-snapshots'],
           ['workspace', 'layout', 'project-detail'],
           ['workspace', 'stats'],
+          ['workspace', 'conductor', 'recent-missions'],
         ])
       })
 
