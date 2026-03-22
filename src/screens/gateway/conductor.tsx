@@ -761,7 +761,7 @@ export function Conductor() {
           </div>
 
           {/* Recent missions — flows right below input card */}
-          {recentMissions.length > 0 && (
+          {(workspace.recentMissions.data?.length ?? 0) > 0 && (
             <div className="mt-6 w-full">
               <div className="space-y-2 pb-2">
                 <div className="flex items-center justify-between">
@@ -815,6 +815,11 @@ export function Conductor() {
                 </div>
               </div>
               <div className="w-full space-y-1.5">
+                {pageMissions.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-[var(--theme-border)] px-4 py-6 text-center text-sm text-[var(--theme-muted)]">
+                    No {missionFilter === 'all' ? '' : missionFilter} missions
+                  </div>
+                )}
                 {pageMissions.map((mission) => {
                   const statusDot = getTaskStatusDot(mission.status)
                   const isRunning = isRunningMissionStatus(mission.status)
