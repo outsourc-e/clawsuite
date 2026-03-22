@@ -20,6 +20,7 @@ import { createDecomposeRouter } from "./routes/decompose";
 import { createAdhocTaskRunsRouter, createTaskRunsRouter } from "./routes/task-runs";
 import { createTeamsRouter } from "./routes/teams";
 import { createSkillsRouter } from "./routes/skills";
+import { createOverseerRouter } from "./routes/overseer";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const STARTUP_TIMESTAMP = Date.now();
@@ -164,6 +165,7 @@ export function createServer(): {
   app.use("/api/workspace/decompose", createDecomposeRouter(tracker));
   app.use("/api/workspace/teams", createTeamsRouter(tracker));
   app.use("/api/workspace/skills", createSkillsRouter());
+  app.use("/api/workspace/overseer", createOverseerRouter(tracker, openclawClient));
 
   const eventsRouter = Router();
   registerEventsRoutes(eventsRouter, tracker);
