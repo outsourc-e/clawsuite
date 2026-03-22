@@ -85,8 +85,20 @@ export class WorkspaceManager {
   }
 
   async prepare(project: Project, task: Task, runId: string): Promise<WorkspaceInfo> {
+    const isEphemeralProject = project.path?.startsWith("/tmp/conductor") ?? false;
     const projectPath = resolveProjectPath(project.path);
     const workflowConfig = getWorkflowConfig(projectPath);
+    if (isEphemeralProject) {
+      const createdNow = !fs.existsSync(projectPath);
+      fs.mkdirSync(projectPath, { recursive: true });
+      return {
+        path: projectPath,
+        createdNow,
+        hooks: {},
+        git_worktree: false,
+      };
+    }
+
     const projectKey = sanitizeSegment(project.name || project.id);
     const taskKey = sanitizeSegment(task.name || task.id);
     const workspacePath = path.join(workflowConfig.workspaceRoot, projectKey, `${task.id}-${taskKey}`);
@@ -101,6 +113,7 @@ export class WorkspaceManager {
     if (createdNow) {
       const baseBranch = await getBaseBranch(projectPath);
       await this.createGitWorktree(projectPath, workspacePath, runId, baseBranch);
+      await execFileAsync("git", ["checkout", "HEAD", "--", "."], { cwd: workspacePath });
     } else if (!hasWorkspaceGitEntry(workspacePath)) {
       throw new Error(`Workspace path exists but is not a git worktree: ${workspacePath}`);
     }

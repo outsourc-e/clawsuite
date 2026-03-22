@@ -1755,6 +1755,48 @@ function saveStoredMissionReport(entry: StoredMissionReport): StoredMissionRepor
   return next
 }
 
+const MISSION_SUGGESTION_STOP_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'build',
+  'create',
+  'for',
+  'from',
+  'in',
+  'of',
+  'on',
+  'the',
+  'to',
+  'with',
+])
+
+function tokenizeMissionText(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !MISSION_SUGGESTION_STOP_WORDS.has(token))
+}
+
+function scoreMissionSimilarity(goal: string, candidate: string): number {
+  const goalTokens = tokenizeMissionText(goal)
+  const candidateTokens = tokenizeMissionText(candidate)
+  if (goalTokens.length === 0 || candidateTokens.length === 0) return 0
+
+  const goalSet = new Set(goalTokens)
+  const candidateSet = new Set(candidateTokens)
+  let overlap = 0
+
+  goalSet.forEach((token) => {
+    if (candidateSet.has(token)) overlap += 1
+  })
+
+  if (overlap === 0) return 0
+
+  return overlap / Math.sqrt(goalSet.size * candidateSet.size)
+}
+
 const TEMPLATE_DISPLAY_NAMES: Record<TeamTemplateId, string> = {
   research: 'Research Team',
   coding: 'Coding Sprint',
@@ -5750,6 +5792,67 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     return selected.length >= 3 ? selected : questionPool.slice(0, 5).map((question) => ({ key: question.key, text: question.text }))
   }, [newMissionGoal])
 
+  const similarMissionSuggestions = useMemo(() => {
+    const trimmedGoal = newMissionGoal.trim()
+    if (!trimmedGoal) return []
+
+    const checkpointEntries = missionHistory.map((checkpoint) => {
+      const completedTasks = checkpoint.tasks.filter((task) => task.status === 'done' || task.status === 'completed').length
+      const totalTasks = checkpoint.tasks.length
+      return {
+        id: checkpoint.id,
+        name: checkpoint.name || checkpoint.label,
+        goal: checkpoint.goal || checkpoint.label,
+        completedAt: checkpoint.completedAt ?? checkpoint.updatedAt,
+        successRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+        origin: 'history' as const,
+      }
+    })
+
+    const reportEntries = missionReports.map((report) => ({
+      id: getStoredMissionReportMissionId(report),
+      name: report.name || report.goal,
+      goal: report.goal,
+      completedAt: report.completedAt,
+      successRate: report.taskStats.total > 0
+        ? Math.round((report.taskStats.completed / report.taskStats.total) * 100)
+        : 0,
+      origin: 'report' as const,
+    }))
+
+    const deduped = [...reportEntries, ...checkpointEntries].reduce<Array<{
+      id: string
+      name: string
+      goal: string
+      completedAt: number
+      successRate: number
+      origin: 'history' | 'report'
+    }>>((acc, entry) => {
+      const normalizedGoal = entry.goal.trim().toLowerCase()
+      if (!normalizedGoal) return acc
+      if (acc.some((candidate) => candidate.id === entry.id || candidate.goal.trim().toLowerCase() === normalizedGoal)) {
+        return acc
+      }
+      acc.push(entry)
+      return acc
+    }, [])
+
+    return deduped
+      .map((entry) => ({
+        ...entry,
+        score: Math.max(
+          scoreMissionSimilarity(trimmedGoal, entry.goal),
+          scoreMissionSimilarity(trimmedGoal, entry.name),
+        ),
+      }))
+      .filter((entry) => entry.score >= 0.2)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score
+        return b.completedAt - a.completedAt
+      })
+      .slice(0, 3)
+  }, [missionHistory, missionReports, newMissionGoal])
+
   const buildMockMissionPlan = useCallback((): MissionPlanItem[] => {
     const trimmedGoal = newMissionGoal.trim()
     if (!trimmedGoal) {
@@ -8785,6 +8888,56 @@ Respond with ONLY a JSON array, no markdown:
                         className="mt-1.5 w-full resize-y rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-2 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
                       />
                     </label>
+                    {similarMissionSuggestions.length > 0 ? (
+                      <div className="rounded-xl border border-sky-200 bg-sky-50/80 p-3 dark:border-sky-900/60 dark:bg-sky-950/20">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold text-sky-900 dark:text-sky-100">Similar Missions Found</p>
+                            <p className="mt-1 text-[11px] text-sky-700 dark:text-sky-200/80">
+                              Reuse a prior mission goal to tighten scope before planning.
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-sky-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+                            Memory
+                          </span>
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {similarMissionSuggestions.map((mission) => (
+                            <button
+                              key={`${mission.origin}-${mission.id}`}
+                              type="button"
+                              onClick={() => {
+                                setNewMissionGoal(mission.goal)
+                                setMissionPlan([])
+                                if (!newMissionName.trim()) {
+                                  setNewMissionName(mission.name)
+                                }
+                              }}
+                              className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-left transition-colors hover:border-sky-300 hover:bg-sky-100/60 dark:border-sky-900/60 dark:bg-slate-900 dark:hover:border-sky-700 dark:hover:bg-sky-950/30"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="truncate text-xs font-semibold text-neutral-900 dark:text-white">
+                                  {mission.name}
+                                </p>
+                                <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/50 dark:text-sky-200">
+                                  {Math.round(mission.score * 100)}% match
+                                </span>
+                              </div>
+                              <p className="mt-1 line-clamp-2 text-[11px] text-neutral-600 dark:text-neutral-300">
+                                {mission.goal}
+                              </p>
+                              <div className="mt-2 flex items-center gap-2 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+                                <span>{mission.origin === 'report' ? 'Saved report' : 'Recent run'}</span>
+                                <span>•</span>
+                                <span>{mission.successRate}% success</span>
+                                <span>•</span>
+                                <span>{timeAgoFromMs(mission.completedAt)}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 

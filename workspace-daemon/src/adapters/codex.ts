@@ -99,6 +99,16 @@ interface AgentMessageDeltaNotification {
   delta: string;
 }
 
+interface ItemCompletedNotification {
+  threadId?: string;
+  turnId?: string;
+  item?: {
+    id?: string;
+    type?: string;
+    text?: string;
+  } | null;
+}
+
 interface LegacyTurnCompleteEvent {
   turn_id: string;
   last_agent_message?: string | null;
@@ -454,7 +464,16 @@ export class CodexAdapter implements AgentAdapter {
             if (notification.delta) {
               finalMessage += notification.delta;
               context.onEvent({ type: "agent_message", message: notification.delta });
-              context.onEvent({ type: "output", message: notification.delta });
+            }
+            break;
+          }
+
+          case "item/completed": {
+            const notification = rawParams as unknown as ItemCompletedNotification;
+            const item = notification.item;
+            if (item?.type === "agentMessage" && typeof item.text === "string" && item.text.trim().length > 0) {
+              completedTurnMessage = item.text;
+              context.onEvent({ type: "output", message: item.text });
             }
             break;
           }
@@ -538,7 +557,6 @@ export class CodexAdapter implements AgentAdapter {
             if (delta) {
               finalMessage += delta;
               context.onEvent({ type: "agent_message", message: delta });
-              context.onEvent({ type: "output", message: delta });
             }
             break;
           }
@@ -566,6 +584,7 @@ export class CodexAdapter implements AgentAdapter {
             if (typeof legacy.last_agent_message === "string" && legacy.last_agent_message.trim().length > 0) {
               completedTurnMessage = legacy.last_agent_message;
               finalMessage = legacy.last_agent_message;
+              context.onEvent({ type: "output", message: legacy.last_agent_message });
             }
             context.onEvent({
               type: "turn.completed",

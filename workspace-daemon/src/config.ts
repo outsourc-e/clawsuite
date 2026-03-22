@@ -7,7 +7,7 @@ const DEFAULT_WORKFLOW_CONFIG: WorkflowConfig = {
   pollIntervalMs: 5000,
   maxConcurrentAgents: 4,
   workspaceRoot: path.resolve(process.cwd(), ".workspaces"),
-  autoApprove: false,
+  autoApprove: true,
   defaultAdapter: "codex",
   hooks: {},
 };
