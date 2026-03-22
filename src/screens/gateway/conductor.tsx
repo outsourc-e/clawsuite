@@ -12,6 +12,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { CodeBlock } from '@/components/prompt-kit/code-block'
+import { Markdown } from '@/components/prompt-kit/markdown'
 import { cn } from '@/lib/utils'
 import { TerminalWorkspace } from '@/components/terminal/terminal-workspace'
 import { AgentOutputPanel } from './components/agent-output-panel'
@@ -20,7 +21,6 @@ import { getWorkspaceCheckpointDiff } from '@/lib/workspace-checkpoints'
 import {
   useConductorWorkspace,
   type WorkspaceMissionTask,
-  type WorkspaceProjectFile,
 } from './hooks/use-conductor-workspace'
 import { formatRelativeTime } from '@/screens/projects/lib/workspace-utils'
 
@@ -138,6 +138,44 @@ function getCodeLanguage(filePath: string): string {
   }
 }
 
+function isCodeFile(filePath: string): boolean {
+  return /\.(js|jsx|ts|tsx|py|css)$/i.test(filePath)
+}
+
+function isMarkdownFile(filePath: string): boolean {
+  return /\.md$/i.test(filePath)
+}
+
+function isHtmlFile(filePath: string): boolean {
+  return /\.html?$/i.test(filePath)
+}
+
+function normalizeSlashes(value: string): string {
+  return value.replace(/\\/g, '/')
+}
+
+function getRelativeOutputPath(outputFile: string, projectPath: string | null | undefined): string | null {
+  const normalizedOutput = normalizeSlashes(outputFile).replace(/^\/+/, '')
+  if (!projectPath) {
+    return normalizedOutput.includes('..') ? null : normalizedOutput
+  }
+
+  const normalizedProject = normalizeSlashes(projectPath).replace(/\/+$/, '')
+  if (normalizeSlashes(outputFile).startsWith(`${normalizedProject}/`)) {
+    return normalizeSlashes(outputFile).slice(normalizedProject.length + 1)
+  }
+
+  return normalizedOutput.includes('..') ? null : normalizedOutput
+}
+
+function getDispatchFileUrl(relativePath: string): string {
+  return `/api/workspace/dispatch/files/${relativePath
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')}`
+}
+
 function formatFileSize(size: number): string {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
@@ -205,8 +243,8 @@ export function Conductor() {
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [liveOutputTick, setLiveOutputTick] = useState(0)
-  const [fileViewMode, setFileViewMode] = useState<Record<string, 'preview' | 'source'>>({})
   const [taskReplyDraft, setTaskReplyDraft] = useState('')
+  const [showAllFiles, setShowAllFiles] = useState(false)
 
   // ── Workspace hook ────────────────────────────────────────────────────────
   const workspace = useConductorWorkspace({
@@ -216,6 +254,7 @@ export function Conductor() {
   })
 
   const missionStatus = workspace.missionStatus.data
+  const dispatchState = workspace.dispatchState.data
   const taskRuns = workspace.taskRuns.data ?? []
   const checkpoints = workspace.checkpoints.data ?? []
 
@@ -299,7 +338,6 @@ export function Conductor() {
     setActiveMissionId(null)
     setActiveProjectId(null)
     setSelectedTaskId(null)
-    setFileViewMode({})
     setLaunchError(null)
   }, [])
 
@@ -368,16 +406,49 @@ export function Conductor() {
         }),
     [workspace.projectFiles.data],
   )
-  const primarySourcePath = useMemo(() => {
-    const primarySource = visibleProjectFiles
-      .filter((file) => /\.(tsx|jsx)$/i.test(file.relativePath))
-      .sort((left, right) => {
-        const priorityDiff = getFilePriority(left.relativePath) - getFilePriority(right.relativePath)
-        if (priorityDiff !== 0) return priorityDiff
-        return left.relativePath.localeCompare(right.relativePath)
-      })[0]
-    return primarySource?.relativePath ?? null
-  }, [visibleProjectFiles])
+  const completedOutputFiles = useMemo(() => {
+    const projectPath = dispatchState?.options.project_path ?? workspace.projectFiles.data?.projectPath ?? null
+
+    return (dispatchState?.tasks ?? [])
+      .filter((task) => task.status === 'completed' && typeof task.output_file === 'string' && task.output_file.trim().length > 0)
+      .map((task) => {
+        const relativePath = getRelativeOutputPath(task.output_file!, projectPath)
+        if (!relativePath) return null
+        return {
+          taskId: task.id,
+          taskTitle: task.title,
+          relativePath,
+          fileUrl: getDispatchFileUrl(relativePath),
+        }
+      })
+      .filter((file, index, files): file is NonNullable<typeof file> => {
+        if (!file) return false
+        return files.findIndex((candidate) => candidate?.relativePath === file.relativePath) === index
+      })
+  }, [dispatchState, workspace.projectFiles.data?.projectPath])
+  const outputFileContentsQuery = useQuery({
+    queryKey: ['workspace', 'dispatch', 'output-files', completedOutputFiles.map((file) => file.relativePath)],
+    enabled: phase === 'complete' && completedOutputFiles.length > 0,
+    queryFn: async () => {
+      const entries = await Promise.all(
+        completedOutputFiles.map(async (file) => {
+          if (!isCodeFile(file.relativePath) && !isMarkdownFile(file.relativePath) && !isHtmlFile(file.relativePath)) {
+            return [file.relativePath, null] as const
+          }
+
+          const response = await fetch(file.fileUrl)
+          if (!response.ok) {
+            return [file.relativePath, null] as const
+          }
+
+          return [file.relativePath, await response.text()] as const
+        }),
+      )
+
+      return Object.fromEntries(entries) as Record<string, string | null>
+    },
+    staleTime: 30_000,
+  })
 
   // ── Live output from workspace SSE (task_run.output events) ───────────────
   const queryClient = useQueryClient()
@@ -411,15 +482,8 @@ export function Conductor() {
     return sorted
   }, [workspace.recentMissions.data, missionFilter])
 
-  const handleOpenHtmlPreview = useCallback((content: string) => {
-    const blob = new Blob([content], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank', 'noopener,noreferrer')
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  }, [])
-
-  const toggleFileView = useCallback((filePath: string, mode: 'preview' | 'source') => {
-    setFileViewMode((prev) => ({ ...prev, [filePath]: mode }))
+  const openDispatchFileInNewWindow = useCallback((relativePath: string) => {
+    window.open(getDispatchFileUrl(relativePath), '_blank', 'noopener,noreferrer')
   }, [])
 
   // Map task_id → run for quick lookup
@@ -459,174 +523,6 @@ export function Conductor() {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   })
-
-  const renderProjectFileCard = useCallback((file: WorkspaceProjectFile) => {
-    const isHtmlFile = file.relativePath.endsWith('.html') && Boolean(file.content)
-    const mode = fileViewMode[file.relativePath] ?? 'preview'
-    const isAppShell = isHtmlFile && file.content!.includes('type="module"')
-    const isStandaloneHtml = isHtmlFile && !isAppShell
-    const isPrimarySource = primarySourcePath === file.relativePath
-
-    if (isStandaloneHtml) {
-      return (
-        <div
-          key={file.relativePath}
-          className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)]"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--theme-border)] px-4 py-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
-                {isPrimarySource && (
-                  <span className="rounded-full bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-strong)]">
-                    Primary source
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-[var(--theme-muted-2)]">
-                {formatFileSize(file.size)} · {file.isText ? 'Text' : 'Binary'}
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => toggleFileView(file.relativePath, 'preview')}
-                className={cn(
-                  'rounded-md px-2 py-1 text-[10px] font-medium transition-colors',
-                  mode === 'preview'
-                    ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
-                    : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
-                )}
-              >
-                Preview
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleFileView(file.relativePath, 'source')}
-                className={cn(
-                  'rounded-md px-2 py-1 text-[10px] font-medium transition-colors',
-                  mode === 'source'
-                    ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
-                    : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
-                )}
-              >
-                Source
-              </button>
-              <button
-                type="button"
-                onClick={() => handleOpenHtmlPreview(file.content!)}
-                className="rounded-full border border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--theme-accent-strong)] transition-colors hover:bg-[var(--theme-accent-soft-strong)]"
-              >
-                Open Preview
-              </button>
-            </div>
-          </div>
-          {mode === 'preview' ? (
-            <iframe
-              srcDoc={file.content}
-              sandbox="allow-scripts"
-              className="h-[400px] w-full border-0 bg-white"
-              title={file.relativePath}
-            />
-          ) : (
-            <div className="bg-[var(--theme-bg)] p-3">
-              <CodeBlock
-                content={file.content!}
-                language="html"
-                className="border-[var(--theme-border)]"
-              />
-            </div>
-          )}
-        </div>
-      )
-    }
-
-    if (isAppShell) {
-      return (
-        <div
-          key={file.relativePath}
-          className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 py-3"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
-                {isPrimarySource && (
-                  <span className="rounded-full bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-strong)]">
-                    Primary source
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-[var(--theme-muted-2)]">App shell detected. Build output is required before iframe preview.</p>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    if (isPrimarySource && file.content) {
-      return (
-        <div
-          key={file.relativePath}
-          className="overflow-hidden rounded-2xl border border-[var(--theme-accent)]/30 bg-[var(--theme-card2)]"
-        >
-          <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
-              <p className="text-xs text-[var(--theme-accent)]">Primary source</p>
-            </div>
-            <span className="rounded-full bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-strong)]">
-              {formatFileSize(file.size)}
-            </span>
-          </div>
-          <div className="max-h-[400px] overflow-auto bg-[var(--theme-bg)] p-3">
-            <CodeBlock
-              content={file.content}
-              language={getCodeLanguage(file.relativePath)}
-              className="border-[var(--theme-border)]"
-            />
-          </div>
-        </div>
-      )
-    }
-
-    return (
-      <details
-        key={file.relativePath}
-        className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)]"
-      >
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
-              {isPrimarySource && (
-                <span className="rounded-full bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-strong)]">
-                  Primary source
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-[var(--theme-muted-2)]">
-              {formatFileSize(file.size)} · {file.isText ? 'Text' : 'Binary'}
-            </p>
-          </div>
-          <span className="text-xs text-[var(--theme-muted-2)]">Expand</span>
-        </summary>
-        {file.isText && file.content ? (
-          <div className="border-t border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
-            <CodeBlock
-              content={file.content}
-              language={getCodeLanguage(file.relativePath)}
-              className="border-[var(--theme-border)]"
-            />
-          </div>
-        ) : (
-          <div className="border-t border-[var(--theme-border)] px-4 py-3 text-sm text-[var(--theme-muted)]">
-            Preview unavailable for this file.
-          </div>
-        )}
-      </details>
-    )
-  }, [fileViewMode, handleOpenHtmlPreview, primarySourcePath, toggleFileView])
 
   const renderCheckpointCard = useCallback((cp: typeof checkpoints[number]) => {
     const isExpanded = expandedCheckpointId === cp.id
@@ -982,6 +878,7 @@ export function Conductor() {
 
   if (phase === 'complete') {
     const failed = missionStatusLabel === 'failed'
+    const outputFileContents = outputFileContentsQuery.data ?? {}
     return (
       <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
         <main className="grid h-full min-h-0 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -1023,30 +920,125 @@ export function Conductor() {
             <div className="px-6 pb-8 lg:px-10">
             <div className="mx-auto w-full max-w-3xl space-y-6">
 
-              {workspace.projectFiles.data && (
-                <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
-                        Output Files
-                      </h2>
-                      <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
-                        {workspace.projectFiles.data.projectPath}
-                      </p>
-                    </div>
+              <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+                      Output Preview
+                    </h2>
+                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
+                      {dispatchState?.options.project_path ?? workspace.projectFiles.data?.projectPath ?? 'No project path available'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowAllFiles((value) => !value)}
+                      className="rounded-xl border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-card2)]"
+                    >
+                      {showAllFiles ? 'Hide Files' : 'View Files'}
+                    </Button>
                     <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs text-[var(--theme-muted)]">
-                      {visibleProjectFiles.length} files
+                      {completedOutputFiles.length} outputs
                     </span>
                   </div>
-
-                  <div className="mt-4 space-y-3">
-                    {visibleProjectFiles.map(renderProjectFileCard)}
-                    {visibleProjectFiles.length === 0 && (
-                      <p className="text-sm text-[var(--theme-muted)]">No output files found.</p>
-                    )}
-                  </div>
                 </div>
-              )}
+
+                <div className="mt-4 space-y-4">
+                  {completedOutputFiles.map((file) => {
+                    const content = outputFileContents[file.relativePath] ?? null
+                    return (
+                      <div
+                        key={file.relativePath}
+                        className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)]"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary-200 px-4 py-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-[var(--theme-text)]">{file.relativePath}</p>
+                            <p className="text-xs text-[var(--theme-muted-2)]">{file.taskTitle}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => openDispatchFileInNewWindow(file.relativePath)}
+                            className="rounded-xl border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-bg)]"
+                          >
+                            Open in New Window
+                          </Button>
+                        </div>
+
+                        {isHtmlFile(file.relativePath) ? (
+                          <iframe
+                            src={file.fileUrl}
+                            className="min-h-[400px] w-full border-0 bg-white"
+                            title={file.relativePath}
+                          />
+                        ) : isCodeFile(file.relativePath) && content ? (
+                          <div className="bg-[var(--theme-bg)] p-3">
+                            <CodeBlock
+                              content={content}
+                              language={getCodeLanguage(file.relativePath)}
+                              className="border-[var(--theme-border)]"
+                            />
+                          </div>
+                        ) : isMarkdownFile(file.relativePath) && content ? (
+                          <div className="bg-[var(--theme-bg)] px-4 py-4">
+                            <Markdown className="max-w-none text-sm text-[var(--theme-text)]">
+                              {content}
+                            </Markdown>
+                          </div>
+                        ) : outputFileContentsQuery.isPending ? (
+                          <div className="px-4 py-6 text-sm text-[var(--theme-muted)]">Loading preview…</div>
+                        ) : (
+                          <div className="px-4 py-6 text-sm text-[var(--theme-muted)]">
+                            Preview unavailable for this file type.
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {completedOutputFiles.length === 0 && (
+                    <p className="text-sm text-[var(--theme-muted)]">No completed task outputs were reported in dispatch state.</p>
+                  )}
+                </div>
+
+                {showAllFiles && (
+                  <div className="mt-5 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Project Files</h3>
+                      <span className="text-xs text-[var(--theme-muted-2)]">{visibleProjectFiles.length} files</span>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {visibleProjectFiles.map((file) => (
+                        <div
+                          key={file.relativePath}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm text-[var(--theme-text)]">{file.relativePath}</p>
+                            <p className="text-xs text-[var(--theme-muted-2)]">{formatFileSize(file.size)}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => openDispatchFileInNewWindow(file.relativePath)}
+                            className="rounded-xl border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-card2)]"
+                          >
+                            Open
+                          </Button>
+                        </div>
+                      ))}
+                      {visibleProjectFiles.length === 0 && (
+                        <p className="text-sm text-[var(--theme-muted)]">
+                          File listing is unavailable until the mission has a tracked project path.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Checkpoints */}
               {checkpoints.length > 0 && (

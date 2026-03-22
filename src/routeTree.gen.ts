@@ -168,6 +168,7 @@ import { Route as ApiWorkspaceMissionsIdStartRouteImport } from './routes/api/wo
 import { Route as ApiWorkspaceMissionsIdResumeRouteImport } from './routes/api/workspace/missions.$id.resume'
 import { Route as ApiWorkspaceMissionsIdPauseRouteImport } from './routes/api/workspace/missions.$id.pause'
 import { Route as ApiWorkspaceMissionsIdLiveRouteImport } from './routes/api/workspace/missions.$id.live'
+import { Route as ApiWorkspaceDispatchFilesSplatRouteImport } from './routes/api/workspace/dispatch.files.$'
 import { Route as ApiWorkspaceCheckpointsIdVerifyTscRouteImport } from './routes/api/workspace/checkpoints.$id.verify-tsc'
 import { Route as ApiWorkspaceCheckpointsIdReviseRouteImport } from './routes/api/workspace/checkpoints.$id.revise'
 import { Route as ApiWorkspaceCheckpointsIdRejectRouteImport } from './routes/api/workspace/checkpoints.$id.reject'
@@ -992,6 +993,12 @@ const ApiWorkspaceMissionsIdLiveRoute =
     path: '/$id/live',
     getParentRoute: () => ApiWorkspaceMissionsRoute,
   } as any)
+const ApiWorkspaceDispatchFilesSplatRoute =
+  ApiWorkspaceDispatchFilesSplatRouteImport.update({
+    id: '/dispatch/files/$',
+    path: '/dispatch/files/$',
+    getParentRoute: () => ApiWorkspaceRoute,
+  } as any)
 const ApiWorkspaceCheckpointsIdVerifyTscRoute =
   ApiWorkspaceCheckpointsIdVerifyTscRouteImport.update({
     id: '/verify-tsc',
@@ -1203,6 +1210,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
+  '/api/workspace/dispatch/files/$': typeof ApiWorkspaceDispatchFilesSplatRoute
   '/api/workspace/missions/$id/live': typeof ApiWorkspaceMissionsIdLiveRoute
   '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
   '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
@@ -1372,6 +1380,7 @@ export interface FileRoutesByTo {
   '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
+  '/api/workspace/dispatch/files/$': typeof ApiWorkspaceDispatchFilesSplatRoute
   '/api/workspace/missions/$id/live': typeof ApiWorkspaceMissionsIdLiveRoute
   '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
   '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
@@ -1543,6 +1552,7 @@ export interface FileRoutesById {
   '/api/workspace/checkpoints/$id/reject': typeof ApiWorkspaceCheckpointsIdRejectRoute
   '/api/workspace/checkpoints/$id/revise': typeof ApiWorkspaceCheckpointsIdReviseRoute
   '/api/workspace/checkpoints/$id/verify-tsc': typeof ApiWorkspaceCheckpointsIdVerifyTscRoute
+  '/api/workspace/dispatch/files/$': typeof ApiWorkspaceDispatchFilesSplatRoute
   '/api/workspace/missions/$id/live': typeof ApiWorkspaceMissionsIdLiveRoute
   '/api/workspace/missions/$id/pause': typeof ApiWorkspaceMissionsIdPauseRoute
   '/api/workspace/missions/$id/resume': typeof ApiWorkspaceMissionsIdResumeRoute
@@ -1715,6 +1725,7 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/reject'
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/checkpoints/$id/verify-tsc'
+    | '/api/workspace/dispatch/files/$'
     | '/api/workspace/missions/$id/live'
     | '/api/workspace/missions/$id/pause'
     | '/api/workspace/missions/$id/resume'
@@ -1884,6 +1895,7 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/reject'
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/checkpoints/$id/verify-tsc'
+    | '/api/workspace/dispatch/files/$'
     | '/api/workspace/missions/$id/live'
     | '/api/workspace/missions/$id/pause'
     | '/api/workspace/missions/$id/resume'
@@ -2054,6 +2066,7 @@ export interface FileRouteTypes {
     | '/api/workspace/checkpoints/$id/reject'
     | '/api/workspace/checkpoints/$id/revise'
     | '/api/workspace/checkpoints/$id/verify-tsc'
+    | '/api/workspace/dispatch/files/$'
     | '/api/workspace/missions/$id/live'
     | '/api/workspace/missions/$id/pause'
     | '/api/workspace/missions/$id/resume'
@@ -3295,6 +3308,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceMissionsIdLiveRouteImport
       parentRoute: typeof ApiWorkspaceMissionsRoute
     }
+    '/api/workspace/dispatch/files/$': {
+      id: '/api/workspace/dispatch/files/$'
+      path: '/dispatch/files/$'
+      fullPath: '/api/workspace/dispatch/files/$'
+      preLoaderRoute: typeof ApiWorkspaceDispatchFilesSplatRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
     '/api/workspace/checkpoints/$id/verify-tsc': {
       id: '/api/workspace/checkpoints/$id/verify-tsc'
       path: '/verify-tsc'
@@ -3639,6 +3659,7 @@ interface ApiWorkspaceRouteChildren {
   ApiWorkspaceTeamsRoute: typeof ApiWorkspaceTeamsRouteWithChildren
   ApiWorkspaceDispatchStartRoute: typeof ApiWorkspaceDispatchStartRoute
   ApiWorkspaceDispatchStateRoute: typeof ApiWorkspaceDispatchStateRoute
+  ApiWorkspaceDispatchFilesSplatRoute: typeof ApiWorkspaceDispatchFilesSplatRoute
 }
 
 const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
@@ -3658,6 +3679,7 @@ const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
   ApiWorkspaceTeamsRoute: ApiWorkspaceTeamsRouteWithChildren,
   ApiWorkspaceDispatchStartRoute: ApiWorkspaceDispatchStartRoute,
   ApiWorkspaceDispatchStateRoute: ApiWorkspaceDispatchStateRoute,
+  ApiWorkspaceDispatchFilesSplatRoute: ApiWorkspaceDispatchFilesSplatRoute,
 }
 
 const ApiWorkspaceRouteWithChildren = ApiWorkspaceRoute._addFileChildren(
@@ -3778,12 +3800,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

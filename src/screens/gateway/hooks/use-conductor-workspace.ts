@@ -47,6 +47,23 @@ export type WorkspaceMissionStatus = {
   estimated_completion: string | null
 }
 
+export type WorkspaceDispatchTask = {
+  id: string
+  title: string
+  status: string
+  output_file?: string | null
+}
+
+export type WorkspaceDispatchState = {
+  mission_id: string
+  mission: string
+  status: string
+  tasks: WorkspaceDispatchTask[]
+  options: {
+    project_path?: string | null
+  }
+}
+
 export type WorkspaceTaskRun = {
   id: string
   task_id: string
@@ -165,6 +182,39 @@ function asNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+function parseDispatchStateRecord(payload: unknown): WorkspaceDispatchState | null {
+  const record = asRecord(payload)
+  if (!record) return null
+
+  const rawStatus = asString(record.status) ?? 'idle'
+  if (rawStatus === 'idle') return null
+
+  const options = asRecord(record.options)
+  const taskItems = Array.isArray(record.tasks) ? record.tasks : []
+  const tasks = taskItems
+    .map((item) => {
+      const task = asRecord(item)
+      if (!task) return null
+      return {
+        id: asString(task.id) ?? crypto.randomUUID(),
+        title: asString(task.title) ?? asString(task.name) ?? 'Untitled task',
+        status: asString(task.status) ?? 'pending',
+        output_file: asString(task.output_file),
+      }
+    })
+    .filter((task): task is NonNullable<typeof task> => task !== null)
+
+  return {
+    mission_id: asString(record.mission_id) ?? '',
+    mission: asString(record.mission) ?? 'Mission',
+    status: rawStatus,
+    tasks,
+    options: {
+      project_path: asString(options?.project_path),
+    },
+  }
+}
+
 /**
  * Parse dispatch-state.json into WorkspaceMissionStatus.
  * Dispatch statuses: idle, pending_dispatch → pending
@@ -172,37 +222,33 @@ function asNumber(value: unknown): number | null {
  *                    complete, complete_partial → completed
  */
 function parseDispatchState(payload: unknown): WorkspaceMissionStatus | null {
-  const record = asRecord(payload)
+  const record = parseDispatchStateRecord(payload)
   if (!record) return null
-
-  const rawStatus = asString(record.status) ?? 'idle'
-  if (rawStatus === 'idle') return null
 
   // Normalise status
   let missionStatus: string
-  if (rawStatus === 'complete' || rawStatus === 'complete_partial') {
-    missionStatus = rawStatus === 'complete' ? 'completed' : 'failed'
-  } else if (rawStatus === 'running') {
+  if (record.status === 'complete' || record.status === 'complete_partial') {
+    missionStatus = record.status === 'complete' ? 'completed' : 'failed'
+  } else if (record.status === 'running') {
     missionStatus = 'running'
   } else {
     missionStatus = 'pending'
   }
 
-  const taskItems = Array.isArray(record.tasks) ? record.tasks : []
-  const taskBreakdown: WorkspaceMissionTask[] = taskItems
-    .map((item) => {
-      const r = asRecord(item)
-      if (!r) return null
-      return {
-        id: asString(r.id) ?? crypto.randomUUID(),
-        name: asString(r.title) ?? asString(r.name) ?? 'Untitled task',
-        status: asString(r.status) ?? 'pending',
-        agent_id: asString(r.type) ?? asString(r.agent_id) ?? null,
-        started_at: asString(r.started_at),
-        completed_at: asString(r.completed_at),
-      }
-    })
-    .filter((t): t is NonNullable<typeof t> => t !== null)
+  const payloadRecord = asRecord(payload)
+  const taskItems = Array.isArray(payloadRecord?.tasks) ? payloadRecord.tasks : []
+  const taskBreakdown: WorkspaceMissionTask[] = taskItems.map((item, index) => {
+    const r = asRecord(item)
+    const fallback = record.tasks[index]
+    return {
+      id: asString(r?.id) ?? fallback?.id ?? crypto.randomUUID(),
+      name: asString(r?.title) ?? asString(r?.name) ?? fallback?.title ?? 'Untitled task',
+      status: asString(r?.status) ?? fallback?.status ?? 'pending',
+      agent_id: asString(r?.type) ?? asString(r?.agent_id) ?? null,
+      started_at: asString(r?.started_at),
+      completed_at: asString(r?.completed_at),
+    }
+  })
 
   const completedCount = taskBreakdown.filter(
     (t) => t.status === 'completed' || t.status === 'done',
@@ -217,8 +263,8 @@ function parseDispatchState(payload: unknown): WorkspaceMissionStatus | null {
 
   return {
     mission: {
-      id: asString(record.mission_id) ?? '',
-      name: asString(record.mission) ?? 'Mission',
+      id: record.mission_id,
+      name: record.mission,
       status: missionStatus,
       progress,
     },
@@ -396,8 +442,7 @@ export function useConductorWorkspace(options?: {
     enabled,
     queryFn: async () => {
       try {
-        const payload = await workspaceJson('/api/workspace/dispatch/state')
-        return parseDispatchState(payload)
+        return parseDispatchStateRecord(await workspaceJson('/api/workspace/dispatch/state'))
       } catch {
         return null
       }
@@ -411,7 +456,7 @@ export function useConductorWorkspace(options?: {
     enabled: enabled && Boolean(missionId),
     queryFn: async () => {
       // Try dispatch state first (already cached)
-      const dispatchStatus = dispatchStateQuery.data
+      const dispatchStatus = parseDispatchState(dispatchStateQuery.data)
       if (dispatchStatus && dispatchStatus.mission.id === missionId) {
         return dispatchStatus
       }
@@ -468,7 +513,7 @@ export function useConductorWorkspace(options?: {
     ? missionStatusQuery
     : {
         ...dispatchStateQuery,
-        data: dispatchStateQuery.data ?? null,
+        data: parseDispatchState(dispatchStateQuery.data) ?? null,
       }
 
   // ── Task runs ────────────────────────────────────────────────────────────
@@ -659,12 +704,13 @@ export function useConductorWorkspace(options?: {
         asString(record?.mission_id) ??
         asString(record?.id) ??
         `mission-${Date.now()}`
+      const projectIdResult = asString(record?.project_id)
 
       // Invalidate dispatch state so UI refreshes immediately
       void queryClient.invalidateQueries({ queryKey: ['workspace', 'dispatch', 'state'] })
       void queryClient.invalidateQueries({ queryKey: ['workspace', 'conductor', 'recent-missions'] })
 
-      return { missionId: missionIdResult, projectId: null as string | null }
+      return { missionId: missionIdResult, projectId: projectIdResult }
     },
     [queryClient],
   )
@@ -690,6 +736,7 @@ export function useConductorWorkspace(options?: {
     launchMission,
 
     // Queries
+    dispatchState: dispatchStateQuery,
     missionStatus: effectiveMissionStatus,
     taskRuns: taskRunsQuery,
     checkpoints: checkpointsQuery,

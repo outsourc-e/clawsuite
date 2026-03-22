@@ -21,6 +21,7 @@ import { createAdhocTaskRunsRouter, createTaskRunsRouter } from "./routes/task-r
 import { createTeamsRouter } from "./routes/teams";
 import { createSkillsRouter } from "./routes/skills";
 import { createDispatchRouter } from "./routes/dispatch";
+import { createDispatchFilesRouter } from "./routes/dispatch-files";
 import {
   createOverseerRouter,
   notifyPendingOverseerItems,
@@ -177,6 +178,7 @@ export function createServer(): {
   app.use("/api/workspace/teams", createTeamsRouter(tracker));
   app.use("/api/workspace/skills", createSkillsRouter());
   app.use("/api/workspace/dispatch", createDispatchRouter(tracker));
+  app.use("/api/workspace/dispatch/files", createDispatchFilesRouter());
   app.use("/api/workspace/overseer", createOverseerRouter(tracker, openclawClient));
 
   const eventsRouter = Router();

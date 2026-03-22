@@ -58,6 +58,7 @@ export function createDispatchRouter(tracker?: Tracker): Router {
     writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
 
     // Sync to daemon SQLite so Recent Missions shows it
+    let projectId: string | null = null;
     if (tracker) {
       try {
         const project = tracker.createProject({
@@ -65,6 +66,7 @@ export function createDispatchRouter(tracker?: Tracker): Router {
           path: projectPath || null,
           spec: mission,
         });
+        projectId = project.id;
         const phase = tracker.createPhase({ project_id: project.id, name: "Phase 1" });
         const dbMission = tracker.createMission({ phase_id: phase.id, name: mission.slice(0, 100) });
         if (dbMission) {
@@ -85,7 +87,7 @@ export function createDispatchRouter(tracker?: Tracker): Router {
     // Fire system event to trigger dispatch skill immediately
     fireDispatchTrigger(missionId, mission);
 
-    res.json({ ok: true, mission_id: missionId });
+    res.json({ ok: true, mission_id: missionId, project_id: projectId });
   });
 
   return router;
