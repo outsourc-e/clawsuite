@@ -5,6 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Router } from "express";
 import { Tracker } from "./tracker";
+import { MissionLoop } from "./mission-loop";
+import { OpenClawClient } from "./openclaw-client";
 import { Orchestrator } from "./orchestrator";
 import { createProjectsRouter } from "./routes/projects";
 import { createStatsRouter } from "./routes/stats";
@@ -33,10 +35,17 @@ mkdirSync(DB_DIR, { recursive: true });
 
 process.env.WORKSPACE_DAEMON_DB_PATH = DB_FILE;
 
-export function createServer(): { app: express.Express; tracker: Tracker; orchestrator: Orchestrator } {
+export function createServer(): {
+  app: express.Express;
+  tracker: Tracker;
+  orchestrator: Orchestrator;
+  missionLoop: MissionLoop;
+} {
   const app = express();
   const tracker = new Tracker();
-  const orchestrator = new Orchestrator(tracker);
+  const openclawClient = new OpenClawClient();
+  const missionLoop = new MissionLoop(tracker, openclawClient);
+  const orchestrator = new Orchestrator(tracker, missionLoop);
 
   app.use(cors());
   app.use(express.json({ limit: "2mb" }));
@@ -100,7 +109,7 @@ export function createServer(): { app: express.Express; tracker: Tracker; orches
   registerEventsRoutes(eventsRouter, tracker);
   app.use("/api/workspace/events", eventsRouter);
 
-  return { app, tracker, orchestrator };
+  return { app, tracker, orchestrator, missionLoop };
 }
 
 const { app, orchestrator } = createServer();
