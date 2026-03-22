@@ -363,7 +363,7 @@ export function Conductor() {
               </p>
             </div>
 
-            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]">
+            <section className="w-full overflow-hidden rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]">
               <textarea
                 value={goalDraft}
                 onChange={(e) => setGoalDraft(e.target.value)}
@@ -436,7 +436,7 @@ export function Conductor() {
                   </button>
                 </div>
               </div>
-              <div className="space-y-1.5">
+              <div className="w-full space-y-1.5">
                 {pageMissions.map((mission) => {
                   const statusDot = getTaskStatusDot(mission.status)
                   const timeValue = mission.updated_at ?? mission.created_at
@@ -448,7 +448,7 @@ export function Conductor() {
                         setActiveMissionId(mission.id)
                         setActiveProjectId(mission.project_id ?? null)
                       }}
-                      className="flex w-full items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
+                      className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
                     >
                       <span className={cn('size-2 shrink-0 rounded-full', statusDot.dotClass)} />
                       <p className="min-w-0 flex-1 truncate text-sm text-[var(--theme-text)]">
