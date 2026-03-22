@@ -320,6 +320,7 @@ export function Conductor() {
   )
 
   // ── Checkpoint diff expansion ─────────────────────────────────────────────
+  const [missionsExpanded, setMissionsExpanded] = useState(false)
   const [expandedCheckpointId, setExpandedCheckpointId] = useState<string | null>(null)
   const checkpointDiffQuery = useQuery({
     queryKey: ['workspace', 'checkpoint-diff', expandedCheckpointId],
@@ -337,9 +338,14 @@ export function Conductor() {
   // ════════════════════════════════════════════════════════════════════════════
 
   if (phase === 'home') {
+    const VISIBLE_MISSIONS = 3
+    const visibleMissions = missionsExpanded ? recentMissions : recentMissions.slice(0, VISIBLE_MISSIONS)
+    const hasMore = recentMissions.length > VISIBLE_MISSIONS
+
     return (
-      <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-full max-w-[720px] flex-col items-center justify-center px-6 py-12">
+      <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+        {/* Hero — always vertically centered in remaining space */}
+        <main className="mx-auto flex min-h-0 flex-1 max-w-[720px] flex-col items-center justify-center px-6">
           <div className="w-full space-y-8">
             {/* Title */}
             <div className="space-y-3 text-center">
@@ -392,51 +398,58 @@ export function Conductor() {
                 </Button>
               </div>
             </section>
-
-            {recentMissions.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                    Recent Missions
-                  </h2>
-                  <span className="text-xs text-[var(--theme-muted-2)]">
-                    Last {recentMissions.length}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {recentMissions.map((mission) => {
-                    const statusDot = getTaskStatusDot(mission.status)
-                    const timeValue = mission.updated_at ?? mission.created_at
-                    return (
-                      <button
-                        key={mission.id}
-                        type="button"
-                        onClick={() => {
-                          setActiveMissionId(mission.id)
-                          setActiveProjectId(mission.project_id ?? null)
-                        }}
-                        className="flex w-full items-center gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
-                      >
-                        <span className={cn('size-2.5 shrink-0 rounded-full', statusDot.dotClass)} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-[var(--theme-text)]">
-                            {mission.name}
-                          </p>
-                          <p className="text-xs text-[var(--theme-muted-2)]">
-                            {statusDot.label}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-xs text-[var(--theme-muted-2)]">
-                          {timeValue ? formatRelativeTime(timeValue) : 'just now'}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </section>
-            )}
           </div>
         </main>
+
+        {/* Recent missions — pinned to bottom, doesn't push hero */}
+        {recentMissions.length > 0 && (
+          <footer className="mx-auto w-full max-w-[720px] shrink-0 space-y-3 px-6 pb-6 pt-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                Recent Missions
+              </h2>
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={() => setMissionsExpanded((v) => !v)}
+                  className="text-xs font-medium text-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
+                >
+                  {missionsExpanded ? 'Show less' : `Show all ${recentMissions.length}`}
+                </button>
+              )}
+            </div>
+            <div className="space-y-2">
+              {visibleMissions.map((mission) => {
+                const statusDot = getTaskStatusDot(mission.status)
+                const timeValue = mission.updated_at ?? mission.created_at
+                return (
+                  <button
+                    key={mission.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveMissionId(mission.id)
+                      setActiveProjectId(mission.project_id ?? null)
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-left transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
+                  >
+                    <span className={cn('size-2.5 shrink-0 rounded-full', statusDot.dotClass)} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-[var(--theme-text)]">
+                        {mission.name}
+                      </p>
+                      <p className="text-xs text-[var(--theme-muted-2)]">
+                        {statusDot.label}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs text-[var(--theme-muted-2)]">
+                      {timeValue ? formatRelativeTime(timeValue) : 'just now'}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </footer>
+        )}
       </div>
     )
   }
