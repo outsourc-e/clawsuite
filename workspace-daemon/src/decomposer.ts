@@ -1,13 +1,13 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import type { AgentAdapterType, DecomposeResult, DecomposerContext, DecomposedTask } from "./types";
-
-const execFileAsync = promisify(execFile);
 
 const SYSTEM_PROMPT = [
   "You are a task decomposition engine for an engineering workspace daemon.",
   "Return only a valid JSON array with no markdown fences and no surrounding explanation.",
+  'Before decomposing, identify 2-3 clarifying questions the user should answer to scope the work properly. Include these as the FIRST task with suggested_agent_type: null and name starting with "Clarify:"',
   "Each array item must be an object with keys:",
   "name, description, estimated_minutes, depends_on, suggested_agent_type.",
   "Use concise but actionable task names and descriptions.",
@@ -17,6 +17,15 @@ const SYSTEM_PROMPT = [
 ].join(" ");
 
 const VALID_AGENT_TYPES = new Set<AgentAdapterType>(["codex", "claude", "openclaw", "ollama"]);
+
+type OpenClawConfig = {
+  auth?: {
+    profiles?: Record<string, { apiKey?: string; api?: string }>
+  };
+  models?: {
+    providers?: Record<string, { apiKey?: string; api?: string }>
+  };
+};
 
 function buildPrompt(goal: string, context?: DecomposerContext): string {
   const lines = [
@@ -110,30 +119,78 @@ function normalizeTask(value: unknown, index: number): DecomposedTask {
   };
 }
 
+function buildClarifyTask(goal: string): DecomposedTask {
+  const summary = goal.trim() || "the requested work";
+  return {
+    name: `Clarify: scope ${summary.slice(0, 48)}`,
+    description: `Ask 2-3 scoping questions about ${summary} before implementation begins.`,
+    estimated_minutes: 10,
+    depends_on: [],
+    suggested_agent_type: null,
+  };
+}
+
+function ensureClarifyTask(tasks: DecomposedTask[], goal: string): DecomposedTask[] {
+  if (tasks.length === 0) {
+    return [buildClarifyTask(goal)];
+  }
+
+  const firstTask = tasks[0];
+  if (firstTask.name.startsWith("Clarify:")) {
+    return tasks;
+  }
+
+  const clarifyTask = buildClarifyTask(goal);
+  return [
+    clarifyTask,
+    ...tasks.map((task, index) =>
+      index === 0 && task.depends_on.length === 0
+        ? { ...task, depends_on: [clarifyTask.name] }
+        : task,
+    ),
+  ];
+}
+
+function readApiKeyValue(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : "";
+}
+
+async function readAnthropicApiKeyFromConfig(): Promise<string> {
+  const configPath = process.env.OPENCLAW_CONFIG_PATH?.trim() || path.join(homedir(), ".openclaw", "openclaw.json");
+
+  try {
+    const raw = await readFile(configPath, "utf8");
+    const config = JSON.parse(raw) as OpenClawConfig;
+
+    const profileKey = readApiKeyValue(config.auth?.profiles?.["anthropic:default"]?.apiKey)
+      || readApiKeyValue(config.auth?.profiles?.["anthropic:default"]?.api);
+    if (profileKey) {
+      return profileKey;
+    }
+
+    return readApiKeyValue(config.models?.providers?.anthropic?.apiKey)
+      || readApiKeyValue(config.models?.providers?.anthropic?.api);
+  } catch {
+    return "";
+  }
+}
+
 export class Decomposer {
   async decompose(goal: string, context?: DecomposerContext): Promise<DecomposeResult> {
     const prompt = buildPrompt(goal, context);
 
     let rawResponse = "";
-    let cliError: unknown = null;
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || (await readAnthropicApiKeyFromConfig());
 
-    // Try Codex CLI first (free via OAuth), then Anthropic SDK as fallback
-    try {
-      console.log("[decomposer] Using Codex CLI");
-      const { stdout } = await execFileAsync("codex", ["exec", "--full-auto", "-q", prompt], {
-        maxBuffer: 1024 * 1024,
-        timeout: 60_000,
-      });
-      rawResponse = stdout.trim();
-    } catch (error) {
-      console.log("[decomposer] Codex CLI failed, trying Anthropic SDK");
-      cliError = error;
-    }
-
-    if (!rawResponse && process.env.ANTHROPIC_API_KEY) {
+    if (anthropicApiKey) {
       try {
         console.log("[decomposer] Using Anthropic SDK");
-        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const client = new Anthropic({ apiKey: anthropicApiKey });
         const response = await client.messages.create({
           model: "claude-3-5-haiku-20241022",
           max_tokens: 2048,
@@ -152,17 +209,19 @@ export class Decomposer {
 
     if (!rawResponse) {
       const name = goal.trim().slice(0, 80) || "Task decomposition";
+      const clarifyTask = buildClarifyTask(goal);
       return {
         tasks: [
+          clarifyTask,
           {
             name,
             description: goal.trim() || name,
             estimated_minutes: 30,
-            depends_on: [],
+            depends_on: [clarifyTask.name],
             suggested_agent_type: null,
           },
         ],
-        rawResponse: cliError instanceof Error ? cliError.message : "",
+        rawResponse: anthropicApiKey ? "" : "Missing Anthropic API key",
         parsed: false,
       };
     }
@@ -174,7 +233,7 @@ export class Decomposer {
         const parsed = JSON.parse(jsonPayload) as unknown;
         if (Array.isArray(parsed)) {
           return {
-            tasks: parsed.map((task, index) => normalizeTask(task, index)),
+            tasks: ensureClarifyTask(parsed.map((task, index) => normalizeTask(task, index)), goal),
             rawResponse,
             parsed: true,
           };
@@ -185,15 +244,18 @@ export class Decomposer {
     }
 
     return {
-      tasks: [
-        {
-          name: goal.trim().slice(0, 80) || "Task decomposition",
-          description: rawResponse || goal.trim(),
-          estimated_minutes: 30,
-          depends_on: [],
-          suggested_agent_type: "claude",
-        },
-      ],
+      tasks: ensureClarifyTask(
+        [
+          {
+            name: goal.trim().slice(0, 80) || "Task decomposition",
+            description: rawResponse || goal.trim(),
+            estimated_minutes: 30,
+            depends_on: [],
+            suggested_agent_type: "claude",
+          },
+        ],
+        goal,
+      ),
       rawResponse,
       parsed: false,
     };

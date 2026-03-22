@@ -15,6 +15,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
+const CLAWSUITE_REPO_PATH = '/Users/aurora/.openclaw/workspace/clawsuite'
+
+function isBlockedProjectPath(projectPath?: string | null): boolean {
+  if (typeof projectPath !== 'string' || projectPath.trim().length === 0) return false
+  const candidate = projectPath.trim()
+  return candidate === CLAWSUITE_REPO_PATH || candidate.startsWith(`${CLAWSUITE_REPO_PATH}/`)
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type DecomposeResult = {
@@ -623,7 +631,12 @@ export function useConductorWorkspace(options?: {
       // 1. Create or reuse project (default path to /tmp/conductor-workspace if none given)
       let resolvedProjectId = projectId
       if (!resolvedProjectId) {
-        const defaultPath = params.projectPath ?? `/tmp/conductor-${Date.now()}`
+        const timestamp = Date.now()
+        const safeDefaultPath = `/tmp/conductor-${timestamp}`
+        const defaultPath =
+          isBlockedProjectPath(params.projectPath) || !params.projectPath
+            ? safeDefaultPath
+            : params.projectPath
         const project = await createProjectMutation.mutateAsync({
           name: params.projectName ?? params.goal.slice(0, 64),
           path: defaultPath,

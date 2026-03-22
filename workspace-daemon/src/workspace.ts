@@ -7,9 +7,43 @@ import { cleanupWorktree, getBaseBranch, getWorktreeBranch } from "./git-ops";
 import type { Project, Task, WorkflowHooks, WorkspaceInfo } from "./types";
 
 const execFileAsync = promisify(execFile);
+export const BLOCKED_PATHS = ["/Users/aurora/.openclaw/workspace/clawsuite", process.cwd()];
 
 function sanitizeSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+}
+
+function normalizeAbsolutePath(value: string): string {
+  return path.resolve(value.trim());
+}
+
+export function isBlockedProjectPath(projectPath: string): boolean {
+  const candidate = normalizeAbsolutePath(projectPath);
+
+  return BLOCKED_PATHS.some((blockedPath) => {
+    const blocked = normalizeAbsolutePath(blockedPath);
+    const relative = path.relative(blocked, candidate);
+    return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  });
+}
+
+export function createSafeProjectPath(timestamp = Date.now()): string {
+  return path.join("/tmp", `conductor-${timestamp}`);
+}
+
+export function resolveProjectPath(projectPath?: string | null, timestamp = Date.now()): string {
+  const candidate = typeof projectPath === "string" && projectPath.trim().length > 0 ? normalizeAbsolutePath(projectPath) : null;
+  if (candidate && !isBlockedProjectPath(candidate)) {
+    return candidate;
+  }
+
+  const safePath = createSafeProjectPath(timestamp);
+  if (!candidate) {
+    console.warn(`[workspace] Missing project path, using safe fallback: ${safePath}`);
+  } else {
+    console.warn(`[workspace] Blocked project path "${candidate}" replaced with safe fallback: ${safePath}`);
+  }
+  return safePath;
 }
 
 async function runHooks(commands: string[] | undefined, cwd: string): Promise<void> {
@@ -51,7 +85,8 @@ export class WorkspaceManager {
   }
 
   async prepare(project: Project, task: Task, runId: string): Promise<WorkspaceInfo> {
-    const workflowConfig = getWorkflowConfig(project.path);
+    const projectPath = resolveProjectPath(project.path);
+    const workflowConfig = getWorkflowConfig(projectPath);
     const projectKey = sanitizeSegment(project.name || project.id);
     const taskKey = sanitizeSegment(task.name || task.id);
     const workspacePath = path.join(workflowConfig.workspaceRoot, projectKey, `${task.id}-${taskKey}`);
@@ -59,21 +94,21 @@ export class WorkspaceManager {
 
     fs.mkdirSync(path.dirname(workspacePath), { recursive: true });
 
-    if (!project.path || !hasGitDirectory(project.path)) {
+    if (!hasGitDirectory(projectPath)) {
       throw new Error(`Cannot create workspace for task ${task.id}: project path is not a git repository`);
     }
 
     if (createdNow) {
-      const baseBranch = await getBaseBranch(project.path);
-      await this.createGitWorktree(project.path, workspacePath, runId, baseBranch);
+      const baseBranch = await getBaseBranch(projectPath);
+      await this.createGitWorktree(projectPath, workspacePath, runId, baseBranch);
     } else if (!hasWorkspaceGitEntry(workspacePath)) {
       throw new Error(`Workspace path exists but is not a git worktree: ${workspacePath}`);
     }
 
-    if (project.path && fs.existsSync(project.path)) {
+    if (fs.existsSync(projectPath)) {
       const manifestPath = path.join(workspacePath, ".workspace-source");
       if (!fs.existsSync(manifestPath)) {
-        fs.writeFileSync(manifestPath, `${project.path}\n`, "utf8");
+        fs.writeFileSync(manifestPath, `${projectPath}\n`, "utf8");
       }
     }
 
@@ -94,16 +129,17 @@ export class WorkspaceManager {
   }
 
   async cleanup(project: Project, task: Task, runId: string): Promise<void> {
-    if (!project.path || !fs.existsSync(project.path)) {
+    const projectPath = typeof project.path === "string" && project.path.trim().length > 0 ? resolveProjectPath(project.path) : null;
+    if (!projectPath || !fs.existsSync(projectPath)) {
       return;
     }
 
-    const workflowConfig = getWorkflowConfig(project.path);
+    const workflowConfig = getWorkflowConfig(projectPath);
     const projectKey = sanitizeSegment(project.name || project.id);
     const taskKey = sanitizeSegment(task.name || task.id);
     const workspacePath = path.join(workflowConfig.workspaceRoot, projectKey, `${task.id}-${taskKey}`);
 
-    await cleanupWorktree(project.path, workspacePath, getWorktreeBranch(runId));
+    await cleanupWorktree(projectPath, workspacePath, getWorktreeBranch(runId));
   }
 
   async runBeforeRunHooks(workspacePath: string, hooks: WorkflowHooks): Promise<void> {

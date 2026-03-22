@@ -5,6 +5,7 @@ import { AgentRunner } from "./agent-runner";
 import { Scheduler } from "./scheduler";
 import { Tracker } from "./tracker";
 import { getWorkflowConfig } from "./config";
+import { resolveProjectPath } from "./workspace";
 import type {
   AgentAdapterType,
   AgentRecord,
@@ -328,18 +329,11 @@ export class Orchestrator extends EventEmitter {
 
     const retryEntry = this.state.retryAttempts.get(task.id);
     const attempt = options?.taskRun?.attempt ?? retryEntry?.attempt ?? 1;
-    const projectPath = project.path;
-    if (!projectPath) {
-      const taskRun =
-        options?.taskRun ??
-        this.tracker.createPendingTaskRun(task.id, agent.id, null, attempt);
-      const errorMessage = "Project path is not set";
-      this.tracker.failTaskRun(taskRun.id, errorMessage);
-      this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
-      this.tracker.setTaskStatus(task.id, "failed");
-      this.tracker.setAgentStatus(agent.id, "online");
-      return;
-    }
+    const projectPath = resolveProjectPath(project.path);
+    const resolvedProject = {
+      ...project,
+      path: projectPath,
+    };
     // Auto-create workspace directory if it doesn't exist
     if (!existsSync(projectPath)) {
       try {
@@ -404,7 +398,7 @@ export class Orchestrator extends EventEmitter {
     console.log(`[orchestrator] Dispatching task "${task.name}" to ${agent.id} (${agent.adapter_type}) at ${projectPath}`);
     try {
       const { result, workspacePath, checkpoint, autoApproved } = await this.agentRunner.runTask({
-        project,
+        project: resolvedProject,
         task,
         taskRun,
         agent,
@@ -442,7 +436,7 @@ export class Orchestrator extends EventEmitter {
           cost_cents: result.costCents,
         });
         this.tracker.logAuditEvent("task.completed", taskRun.id, "task_run");
-        notifyCompletion(task.name, project.name, "completed");
+        notifyCompletion(task.name, resolvedProject.name, "completed");
       } else {
         this.tracker.failTaskRun(taskRun.id, result.error ?? result.summary ?? null, {
           input_tokens: result.inputTokens,
@@ -450,7 +444,7 @@ export class Orchestrator extends EventEmitter {
           cost_cents: result.costCents,
         });
         this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
-        notifyCompletion(task.name, project.name, "failed");
+        notifyCompletion(task.name, resolvedProject.name, "failed");
       }
 
       if (result.status === "completed") {
@@ -480,7 +474,7 @@ export class Orchestrator extends EventEmitter {
       this.tracker.failTaskRun(taskRun.id, message);
       this.tracker.logAuditEvent("task.failed", taskRun.id, "task_run");
       this.tracker.setTaskStatus(task.id, "failed");
-      notifyCompletion(task.name, project.name, "failed");
+      notifyCompletion(task.name, resolvedProject.name, "failed");
       this.queueRetry(task.id, attempt, message);
     } finally {
       clearTimeout(watchdogHandle);
