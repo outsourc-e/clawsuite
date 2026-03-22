@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
+import { execFile } from "child_process";
 import { join, dirname } from "path";
 import { Tracker } from "../tracker";
 
@@ -7,6 +8,17 @@ const STATE_PATH = join(
   process.env.HOME || "/Users/aurora",
   ".openclaw/workspace/data/dispatch-state.json"
 );
+
+function fireDispatchTrigger(missionId: string, mission: string): void {
+  const text = `[dispatch] Mission started: ${missionId}. Goal: "${mission.slice(0, 100)}". Read data/dispatch-state.json and run the workspace-dispatch skill loop now.`;
+  execFile("openclaw", ["system", "event", "--text", text, "--mode", "now"], (err) => {
+    if (err) {
+      console.error("[dispatch] Failed to fire system event:", err.message);
+    } else {
+      console.log("[dispatch] System event fired for", missionId);
+    }
+  });
+}
 
 export function createDispatchRouter(tracker?: Tracker): Router {
   const router = Router();
@@ -45,7 +57,7 @@ export function createDispatchRouter(tracker?: Tracker): Router {
     mkdirSync(dirname(STATE_PATH), { recursive: true });
     writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
 
-    // Also sync to daemon SQLite so Recent Missions shows it
+    // Sync to daemon SQLite so Recent Missions shows it
     if (tracker) {
       try {
         const project = tracker.createProject({
@@ -66,9 +78,12 @@ export function createDispatchRouter(tracker?: Tracker): Router {
           }
         }
       } catch {
-        // SQLite sync is best-effort — don't fail the dispatch start
+        // SQLite sync is best-effort
       }
     }
+
+    // Fire system event to trigger dispatch skill immediately
+    fireDispatchTrigger(missionId, mission);
 
     res.json({ ok: true, mission_id: missionId });
   });
