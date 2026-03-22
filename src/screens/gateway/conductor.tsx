@@ -175,6 +175,7 @@ export function Conductor() {
   const { connected } = useWorkspaceSse({ silent: true })
 
   // ── Local state ───────────────────────────────────────────────────────────
+  const [missionFilter, setMissionFilter] = useState<'all' | 'running' | 'completed' | 'failed'>('all')
   const [goalDraft, setGoalDraft] = useState('')
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
   const [decomposedTasks, setDecomposedTasks] = useState<DecomposedTask[] | null>(null)
@@ -392,7 +393,7 @@ export function Conductor() {
   }, [allRuns, liveOutputTick, queryClient])
 
   const recentMissions = useMemo(() => {
-    return [...(workspace.recentMissions.data ?? [])]
+    const sorted = [...(workspace.recentMissions.data ?? [])]
       .sort((left, right) => {
         const leftRunning = isRunningMissionStatus(left.status)
         const rightRunning = isRunningMissionStatus(right.status)
@@ -402,8 +403,12 @@ export function Conductor() {
         const rightTime = new Date(right.updated_at ?? right.created_at ?? 0).getTime()
         return rightTime - leftTime
       })
-      .slice(0, 10)
-  }, [workspace.recentMissions.data])
+    if (missionFilter === 'all') return sorted
+    if (missionFilter === 'running') return sorted.filter((m) => isRunningMissionStatus(m.status))
+    if (missionFilter === 'completed') return sorted.filter((m) => m.status === 'completed')
+    if (missionFilter === 'failed') return sorted.filter((m) => m.status === 'failed' || m.status === 'stopped')
+    return sorted
+  }, [workspace.recentMissions.data, missionFilter])
 
   const handleOpenHtmlPreview = useCallback((content: string) => {
     const blob = new Blob([content], { type: 'text/html;charset=utf-8' })
@@ -758,36 +763,55 @@ export function Conductor() {
           {/* Recent missions — flows right below input card */}
           {recentMissions.length > 0 && (
             <div className="mt-6 w-full">
-              <div className="flex items-center justify-between pb-2">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                  Recent Missions
-                </h2>
+              <div className="space-y-2 pb-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                    Recent Missions
+                  </h2>
+                  <div className="flex items-center gap-1">
+                    <span className="mr-2 text-[10px] text-[var(--theme-muted-2)]">
+                      {missionsPage + 1}/{totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={!canPrev}
+                      onClick={() => setMissionsPage((p) => p - 1)}
+                      className={cn(
+                        'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
+                        canPrev ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
+                      )}
+                    >
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} className="rotate-180" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canNext}
+                      onClick={() => setMissionsPage((p) => p + 1)}
+                      className={cn(
+                        'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
+                        canNext ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
+                      )}
+                    >
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} />
+                    </button>
+                  </div>
+                </div>
                 <div className="flex items-center gap-1">
-                  <span className="mr-2 text-[10px] text-[var(--theme-muted-2)]">
-                    {missionsPage + 1}/{totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={!canPrev}
-                    onClick={() => setMissionsPage((p) => p - 1)}
-                    className={cn(
-                      'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
-                      canPrev ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
-                    )}
-                  >
-                    <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} className="rotate-180" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canNext}
-                    onClick={() => setMissionsPage((p) => p + 1)}
-                    className={cn(
-                      'flex size-7 items-center justify-center rounded-lg border border-[var(--theme-border)] text-[var(--theme-muted)] transition-colors',
-                      canNext ? 'hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]' : 'opacity-30',
-                    )}
-                  >
-                    <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.7} />
-                  </button>
+                  {(['all', 'running', 'completed', 'failed'] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => { setMissionFilter(filter); setMissionsPage(0) }}
+                      className={cn(
+                        'rounded-full border px-3 py-1 text-[11px] font-medium capitalize transition-colors',
+                        missionFilter === filter
+                          ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
+                          : 'border-[var(--theme-border)] text-[var(--theme-muted-2)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-text)]',
+                      )}
+                    >
+                      {filter}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="w-full space-y-1.5">

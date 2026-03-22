@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as XboxControllerRouteImport } from './routes/xbox-controller'
 import { Route as WorkspaceTeamsRouteImport } from './routes/workspace-teams'
 import { Route as WorkspaceSkillsRouteImport } from './routes/workspace-skills'
 import { Route as WorkspaceAgentsRouteImport } from './routes/workspace-agents'
@@ -176,11 +175,6 @@ import { Route as ApiWorkspaceCheckpointsIdApproveAndCommitRouteImport } from '.
 import { Route as ApiWorkspaceCheckpointsIdApproveRouteImport } from './routes/api/workspace/checkpoints.$id.approve'
 import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
-const XboxControllerRoute = XboxControllerRouteImport.update({
-  id: '/xbox-controller',
-  path: '/xbox-controller',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const WorkspaceTeamsRoute = WorkspaceTeamsRouteImport.update({
   id: '/workspace-teams',
   path: '/workspace-teams',
@@ -1070,7 +1064,6 @@ export interface FileRoutesByFullPath {
   '/workspace-agents': typeof WorkspaceAgentsRoute
   '/workspace-skills': typeof WorkspaceSkillsRoute
   '/workspace-teams': typeof WorkspaceTeamsRoute
-  '/xbox-controller': typeof XboxControllerRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1237,7 +1230,6 @@ export interface FileRoutesByTo {
   '/workspace-agents': typeof WorkspaceAgentsRoute
   '/workspace-skills': typeof WorkspaceSkillsRoute
   '/workspace-teams': typeof WorkspaceTeamsRoute
-  '/xbox-controller': typeof XboxControllerRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1406,7 +1398,6 @@ export interface FileRoutesById {
   '/workspace-agents': typeof WorkspaceAgentsRoute
   '/workspace-skills': typeof WorkspaceSkillsRoute
   '/workspace-teams': typeof WorkspaceTeamsRoute
-  '/xbox-controller': typeof XboxControllerRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
@@ -1576,7 +1567,6 @@ export interface FileRouteTypes {
     | '/workspace-agents'
     | '/workspace-skills'
     | '/workspace-teams'
-    | '/xbox-controller'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1743,7 +1733,6 @@ export interface FileRouteTypes {
     | '/workspace-agents'
     | '/workspace-skills'
     | '/workspace-teams'
-    | '/xbox-controller'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -1911,7 +1900,6 @@ export interface FileRouteTypes {
     | '/workspace-agents'
     | '/workspace-skills'
     | '/workspace-teams'
-    | '/xbox-controller'
     | '/api/agent-activity'
     | '/api/agent-dispatch'
     | '/api/agent-kill'
@@ -2080,7 +2068,6 @@ export interface RootRouteChildren {
   WorkspaceAgentsRoute: typeof WorkspaceAgentsRoute
   WorkspaceSkillsRoute: typeof WorkspaceSkillsRoute
   WorkspaceTeamsRoute: typeof WorkspaceTeamsRoute
-  XboxControllerRoute: typeof XboxControllerRoute
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentKillRoute: typeof ApiAgentKillRoute
@@ -2157,13 +2144,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/xbox-controller': {
-      id: '/xbox-controller'
-      path: '/xbox-controller'
-      fullPath: '/xbox-controller'
-      preLoaderRoute: typeof XboxControllerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/workspace-teams': {
       id: '/workspace-teams'
       path: '/workspace-teams'
@@ -3655,7 +3635,6 @@ const rootRouteChildren: RootRouteChildren = {
   WorkspaceAgentsRoute: WorkspaceAgentsRoute,
   WorkspaceSkillsRoute: WorkspaceSkillsRoute,
   WorkspaceTeamsRoute: WorkspaceTeamsRoute,
-  XboxControllerRoute: XboxControllerRoute,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentKillRoute: ApiAgentKillRoute,
