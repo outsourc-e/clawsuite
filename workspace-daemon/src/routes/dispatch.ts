@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
-import { execFile } from "child_process";
 import { join, dirname } from "path";
 import { Tracker } from "../tracker";
 
@@ -20,30 +19,46 @@ const STATE_PATH = join(
 );
 
 function fireDispatchTrigger(missionId: string, mission: string): void {
-  const text = `[dispatch] Mission started: ${missionId}. Goal: "${mission.slice(0, 100)}". Read data/dispatch-state.json and run the workspace-dispatch skill loop now.`;
+  const message = `[dispatch] Mission started: ${missionId}. Goal: "${mission.slice(0, 100)}". Read data/dispatch-state.json and run the workspace-dispatch skill loop now.`;
 
-  // Try wake first (reaches active session), fall back to system event
+  // Use gateway hooks/agent endpoint to spawn an isolated agent session.
+  // This creates an independent session that can use sessions_spawn — no chat session dependency.
   const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789";
-  fetch(`${gatewayUrl}/api/cron/wake`, {
+  const hooksToken = process.env.OPENCLAW_HOOKS_TOKEN ?? "";
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (hooksToken) {
+    headers["Authorization"] = `Bearer ${hooksToken}`;
+  }
+
+  fetch(`${gatewayUrl}/hooks/agent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, mode: "now" }),
+    headers,
+    body: JSON.stringify({
+      message,
+      name: `mission-${missionId}`,
+      deliver: false,
+      wakeMode: "now",
+    }),
   })
     .then((res) => {
       if (res.ok) {
-        console.log("[dispatch] Wake event sent for", missionId);
+        return res.json().then((data: any) => {
+          console.log("[dispatch] Agent hook triggered for", missionId, "runId:", data?.runId);
+        });
       } else {
-        throw new Error(`Wake returned ${res.status}`);
+        throw new Error(`Hooks returned ${res.status}`);
       }
     })
-    .catch(() => {
-      // Fallback to CLI system event
-      execFile("openclaw", ["system", "event", "--text", text, "--mode", "now"], (err) => {
-        if (err) {
-          console.error("[dispatch] Failed to fire system event:", err.message);
-        } else {
-          console.log("[dispatch] System event (CLI fallback) fired for", missionId);
-        }
+    .catch((err: Error) => {
+      console.error("[dispatch] Failed to trigger agent hook:", err.message);
+      // Fallback: wake event (goes to agent:main:main)
+      fetch(`${gatewayUrl}/api/cron/wake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: message, mode: "now" }),
+      }).catch(() => {
+        console.error("[dispatch] Wake fallback also failed for", missionId);
       });
     });
 }

@@ -784,19 +784,8 @@ export function useConductorWorkspace(options?: {
       void queryClient.invalidateQueries({ queryKey: ['workspace', 'dispatch', 'state'] })
       void queryClient.invalidateQueries({ queryKey: ['workspace', 'conductor', 'recent-missions'] })
 
-      // Trigger the agent by sending a chat message through the gateway
-      // This arrives in the active session so the agent can dispatch the orchestrator
-      const dispatchMessage = `[dispatch] Mission started: ${missionIdResult}. Goal: "${params.goal.slice(0, 120)}". Daemon mission ready — spawn orchestrator sub-agent now.`
-      try {
-        await fetch('/api/stream', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ message: dispatchMessage }),
-        })
-      } catch {
-        // Best-effort — if it fails, user can tell the agent manually
-        console.warn('[conductor] Failed to notify agent of mission start')
-      }
+      // Agent trigger is handled server-side by the daemon via gateway hooks/agent endpoint.
+      // No client-side dispatch needed — daemon spawns an isolated agent session directly.
 
       return { missionId: missionIdResult, projectId: projectIdResult }
     },
