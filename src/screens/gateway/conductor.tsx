@@ -787,71 +787,37 @@ export function Conductor() {
 
   if (phase === 'preview' && decomposedTasks) {
     const enabledCount = decomposedTasks.filter((t) => t.enabled).length
-    const agentDirectory = (workspace as unknown as { models: { data?: Array<{ id: string; name: string; provider: string | null; free: boolean; description: string | null }> } }).models.data ?? []
+    const agentModels = workspace.models.data ?? []
     return (
       <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-full max-w-[820px] flex-col px-6 py-12">
-          <div className="w-full space-y-8">
-            {/* Header with hands-free toggle */}
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 space-y-1">
+        <main className="mx-auto flex min-h-full max-w-[720px] flex-col items-center justify-center px-6 py-12">
+          <div className="w-full space-y-6">
+            {/* Header */}
+            <div className="space-y-2 text-center">
+              <div className="flex items-center justify-center gap-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Plan</p>
-                <h1 className="text-2xl font-semibold tracking-tight">{goalDraft.length > 80 ? `${goalDraft.slice(0, 77)}…` : goalDraft}</h1>
-                <p className="text-sm text-[var(--theme-muted-2)]">{decomposedTasks.length} tasks · {enabledCount} enabled</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !workspace.config.data?.autoApprove
+                    workspace.updateConfig.mutate({ auto_approve: next })
+                  }}
+                  className={cn(
+                    'rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors',
+                    workspace.config.data?.autoApprove
+                      ? 'border-sky-400/30 bg-sky-500/10 text-sky-300'
+                      : 'border-amber-400/30 bg-amber-500/10 text-amber-300',
+                  )}
+                >
+                  {workspace.config.data?.autoApprove ? '🤖 Hands-free' : '👀 Supervised'}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !workspace.config.data?.autoApprove
-                  workspace.updateConfig.mutate({ auto_approve: next })
-                }}
-                className={cn(
-                  'flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  workspace.config.data?.autoApprove
-                    ? 'border-sky-400/30 bg-sky-500/10 text-sky-300'
-                    : 'border-amber-400/30 bg-amber-500/10 text-amber-300',
-                )}
-              >
-                {workspace.config.data?.autoApprove ? '🤖 Hands-free' : '👀 Supervised'}
-              </button>
+              <h1 className="text-2xl font-semibold tracking-tight">{goalDraft.length > 80 ? `${goalDraft.slice(0, 77)}…` : goalDraft}</h1>
+              <p className="text-sm text-[var(--theme-muted-2)]">{decomposedTasks.length} tasks — choose agents and launch.</p>
             </div>
 
-            {/* Available agents */}
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Available Agents</p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {(agentDirectory.length > 0 ? agentDirectory : [
-                  { id: 'auto', name: 'Auto', provider: null, free: true, description: 'Picks the best agent for each task' },
-                  { id: 'codex', name: 'Codex (GPT-5.4)', provider: 'openai-codex', free: true, description: 'Multi-file coding, builds, refactors' },
-                  { id: 'sonnet46-coding', name: 'Claude Sonnet 4.6', provider: 'anthropic-oauth', free: true, description: 'Reasoning, reviews, planning' },
-                  { id: 'minimax-fast', name: 'MiniMax Lightning', provider: 'minimax', free: false, description: 'Fast research and synthesis' },
-                  { id: 'nemotron-super', name: 'Nemotron 120B', provider: 'openrouter', free: true, description: 'Free general purpose' },
-                ]).map((agent) => (
-                  <div
-                    key={agent.id}
-                    className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 transition-colors hover:border-[var(--theme-accent)]"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-[var(--theme-text)]">{agent.name}</p>
-                      {agent.free && (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">Free</span>
-                      )}
-                    </div>
-                    {agent.description && (
-                      <p className="mt-1 text-xs text-[var(--theme-muted)]">{agent.description}</p>
-                    )}
-                    {agent.provider && (
-                      <p className="mt-1 text-[10px] text-[var(--theme-muted-2)]">{agent.provider}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tasks with agent assignment */}
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Task Breakdown</p>
-              <div className="space-y-2">
+            {/* Task Breakdown with agent assignment */}
+            <div className="space-y-2">
                 {decomposedTasks.map((task, i) => (
                   <button
                     key={i}
@@ -886,7 +852,7 @@ export function Conductor() {
                           }}
                           className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1 text-xs text-[var(--theme-text)] outline-none"
                         >
-                          {(agentDirectory.length > 0 ? agentDirectory : [
+                          {(agentModels.length > 0 ? agentModels : [
                             { id: 'auto', name: 'Auto (best available)', free: true },
                             { id: 'codex', name: 'Codex (GPT-5.4)', free: true },
                             { id: 'sonnet46-coding', name: 'Claude Sonnet 4.6', free: true },
@@ -910,7 +876,6 @@ export function Conductor() {
                   </button>
                 ))}
               </div>
-            </div>
 
             <div className="flex items-center justify-between gap-3">
               <button
