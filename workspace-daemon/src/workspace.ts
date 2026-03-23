@@ -85,12 +85,17 @@ export class WorkspaceManager {
   }
 
   async prepare(project: Project, task: Task, runId: string): Promise<WorkspaceInfo> {
-    const isEphemeralProject = project.path?.startsWith("/tmp/workspace-mission") ?? false;
     const projectPath = resolveProjectPath(project.path);
+    const isEphemeralProject = !project.path || project.path.startsWith("/tmp/workspace-mission") || !hasGitDirectory(projectPath);
     const workflowConfig = getWorkflowConfig(projectPath);
     if (isEphemeralProject) {
       const createdNow = !fs.existsSync(projectPath);
       fs.mkdirSync(projectPath, { recursive: true });
+      // Ensure git repo exists so checkpoint builder can create diffs
+      if (!hasGitDirectory(projectPath)) {
+        await execFileAsync("git", ["init"], { cwd: projectPath });
+        await execFileAsync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: projectPath });
+      }
       return {
         path: projectPath,
         createdNow,

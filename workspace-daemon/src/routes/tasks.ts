@@ -70,6 +70,15 @@ export function createTasksRouter(tracker: Tracker, orchestrator: Orchestrator):
     res.json(task);
   });
 
+  router.patch("/:id", (req, res) => {
+    const task = tracker.updateTask(req.params.id, req.body);
+    if (!task) {
+      res.status(404).json({ error: "Task not found" });
+      return;
+    }
+    res.json(task);
+  });
+
   router.post("/:id/run", async (req, res) => {
     let triggered = false;
     try {

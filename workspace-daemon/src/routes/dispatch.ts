@@ -78,6 +78,8 @@ export function createDispatchRouter(tracker?: Tracker): Router {
               agent_type: task.type || null,
             });
           }
+          // Start the mission so the mission loop picks it up
+          tracker.startMission(dbMission.id);
         }
       } catch {
         // SQLite sync is best-effort

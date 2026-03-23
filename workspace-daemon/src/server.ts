@@ -190,7 +190,14 @@ export function createServer(): {
 
 const { app, tracker, openclawClient, orchestrator } = createServer();
 
-orchestrator.start();
+// Mission loop disabled — daemon cannot HTTP into OpenClaw sessions_spawn (404s).
+// Execution is handled by Aurora spawning dispatch orchestrator sub-agents.
+// Re-enable when/if OpenClaw gateway gets a REST API for session management.
+if (process.env.MISSION_LOOP_ENABLED === "true") {
+  orchestrator.start();
+} else {
+  console.log("[mission-loop] Disabled (MISSION_LOOP_ENABLED !== 'true'). Execution via Aurora sub-agents.");
+}
 
 const overseerScheduler = setInterval(() => {
   const hasConfiguredOverseers = tracker

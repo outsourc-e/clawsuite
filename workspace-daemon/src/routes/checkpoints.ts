@@ -380,6 +380,44 @@ export function createCheckpointsRouter(tracker: Tracker, orchestrator: Orchestr
     });
   }
 
+  // POST /api/workspace/checkpoints — create a checkpoint (used by dispatch orchestrator sub-agents)
+  router.post("/", (req, res) => {
+    const { task_run_id, summary, diff_stat, commit_hash, verification, raw_diff } = req.body as {
+      task_run_id?: string;
+      summary?: string | null;
+      diff_stat?: string | null;
+      commit_hash?: string | null;
+      verification?: string | null;
+      raw_diff?: string | null;
+    };
+
+    if (!task_run_id) {
+      res.status(400).json({ error: "task_run_id is required" });
+      return;
+    }
+
+    const taskRun = tracker.getTaskRun(task_run_id);
+    if (!taskRun) {
+      res.status(404).json({ error: "Task run not found" });
+      return;
+    }
+
+    try {
+      const checkpoint = tracker.createCheckpoint(
+        task_run_id,
+        summary ?? null,
+        diff_stat ?? null,
+        commit_hash,
+        verification,
+        raw_diff,
+      );
+      res.status(201).json(checkpoint);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create checkpoint";
+      res.status(500).json({ error: message });
+    }
+  });
+
   router.get("/", (req, res) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const projectId = typeof req.query.project_id === "string" ? req.query.project_id : undefined;
