@@ -821,26 +821,31 @@ export function Conductor() {
                     <p className="text-sm font-medium text-[var(--theme-text)]">{task.title}</p>
                     {task.description && <p className="mt-0.5 text-xs text-[var(--theme-muted)]">{task.description}</p>}
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {true && (
-                        <select
-                          value={task.suggested_agent_type || 'auto'}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            setDecomposedTasks((prev) =>
-                              prev ? prev.map((t, j) => j === i ? { ...t, agent: e.target.value, suggested_agent_type: e.target.value } : t) : prev
-                            )
-                          }}
-                          className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[10px] text-[var(--theme-muted-2)] outline-none"
-                        >
-                          <option value="auto">Auto-select</option>
-                          <option value="codex">Codex (Free)</option>
-                          <option value="sonnet">Claude Sonnet</option>
-                          <option value="minimax-fast">MiniMax Fast</option>
-                          <option value="researcher">Researcher</option>
-                          <option value="planner">Planner</option>
-                        </select>
-                      )}
+                      <select
+                        value={task.suggested_agent_type || 'auto'}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          setDecomposedTasks((prev) =>
+                            prev ? prev.map((t, j) => j === i ? { ...t, agent: e.target.value, suggested_agent_type: e.target.value } : t) : prev
+                          )
+                        }}
+                        className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[10px] text-[var(--theme-muted-2)] outline-none"
+                      >
+                        {(workspace.models.data && workspace.models.data.length > 0
+                          ? workspace.models.data
+                          : [
+                              { id: 'auto', name: 'Auto (best available)', free: true },
+                              { id: 'codex', name: 'Codex (GPT-5.4)', free: true },
+                              { id: 'sonnet46-coding', name: 'Claude Sonnet 4.6', free: true },
+                              { id: 'minimax-fast', name: 'MiniMax Lightning', free: false },
+                            ]
+                        ).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}{m.free ? ' ✦' : ''}
+                          </option>
+                        ))}
+                      </select>
                       {task.depends_on.map((dependency) => (
                         <span
                           key={`${task.title}-${dependency}`}
@@ -853,6 +858,38 @@ export function Conductor() {
                   </div>
                 </button>
               ))}
+            </div>
+
+            {/* Hands-free toggle */}
+            <div className="flex items-center justify-between rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--theme-text)]">
+                  {workspace.config.data?.autoApprove ? '🤖 Hands-free mode' : '👀 Supervised mode'}
+                </p>
+                <p className="text-xs text-[var(--theme-muted)]">
+                  {workspace.config.data?.autoApprove
+                    ? 'Auto-approve tasks when quality checks pass'
+                    : 'Review and approve each task before proceeding'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !workspace.config.data?.autoApprove
+                  workspace.updateConfig.mutate({ auto_approve: next })
+                }}
+                className={cn(
+                  'relative ml-3 inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors',
+                  workspace.config.data?.autoApprove ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]',
+                )}
+              >
+                <span
+                  className={cn(
+                    'pointer-events-none inline-block size-5 rounded-full bg-white shadow transition-transform',
+                    workspace.config.data?.autoApprove ? 'translate-x-5' : 'translate-x-0',
+                  )}
+                />
+              </button>
             </div>
 
             <div className="flex items-center justify-between gap-3">
@@ -1205,6 +1242,14 @@ export function Conductor() {
                 <span className="max-w-[420px] truncate text-[var(--theme-text)]">{missionName}</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <span className={cn(
+                  'rounded-full border px-3 py-1 text-xs font-medium',
+                  workspace.config.data?.autoApprove
+                    ? 'border-sky-400/30 bg-sky-500/10 text-sky-300'
+                    : 'border-amber-400/30 bg-amber-500/10 text-amber-300',
+                )}>
+                  {workspace.config.data?.autoApprove ? '🤖 Hands-free' : '👀 Supervised'}
+                </span>
                 <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs font-medium text-[var(--theme-muted)]">
                   Elapsed: {formatElapsedTime(earliestStart, now)}
                 </span>
@@ -1273,6 +1318,17 @@ export function Conductor() {
                       )}
                       {run && (
                         <span className="text-[10px] text-[var(--theme-muted-2)]">Run: {run.status}</span>
+                      )}
+                      {run?.session_id && (
+                        <a
+                          href={`/gateway/sessions/${encodeURIComponent(run.session_id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-[10px] text-[var(--theme-accent)] transition-colors hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft)]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          View session →
+                        </a>
                       )}
                     </div>
                   </div>
@@ -1375,7 +1431,6 @@ export function Conductor() {
                     const td = getTaskStatusDot(task.status)
                     const run = runByTaskId.get(task.id)
                     const liveLines = run ? liveOutputByRunId.get(run.id) ?? [] : []
-                    const lastLine = liveLines[liveLines.length - 1]
                     return (
                       <button
                         key={task.id}
@@ -1392,8 +1447,15 @@ export function Conductor() {
                           <span>·</span>
                           <span>{td.label}</span>
                         </div>
-                        {lastLine && (
-                          <p className="truncate font-mono text-[10px] text-[var(--theme-muted-2)] opacity-70">{lastLine}</p>
+                        {liveLines.length > 0 && (
+                          <div className="mt-1 w-full rounded-lg bg-[var(--theme-bg)] px-2 py-1.5 font-mono text-[10px] leading-relaxed text-emerald-400/80">
+                            {liveLines.slice(-3).map((line, li) => (
+                              <div key={li} className="truncate">{line}</div>
+                            ))}
+                          </div>
+                        )}
+                        {run?.session_id && (
+                          <span className="mt-0.5 text-[10px] text-[var(--theme-accent)] opacity-70">View session →</span>
                         )}
                       </button>
                     )

@@ -109,6 +109,19 @@ export type WorkspaceRecentMission = {
   updated_at?: string
 }
 
+export type WorkspaceConfig = {
+  autoApprove: boolean
+  overseer: string | null
+}
+
+export type WorkspaceAgentModel = {
+  id: string
+  name: string
+  provider: string | null
+  free: boolean
+  description: string | null
+}
+
 export type WorkspaceProjectFile = {
   relativePath: string
   size: number
@@ -586,6 +599,67 @@ export function useConductorWorkspace(options?: {
     ...RESILIENT_QUERY_OPTIONS,
   })
 
+  // ── Config (auto-approve / hands-free) ───────────────────────────────────
+  const configQuery = useQuery({
+    queryKey: ['workspace', 'config'],
+    enabled,
+    queryFn: async (): Promise<WorkspaceConfig> => {
+      try {
+        const raw = await workspaceJson<Record<string, unknown>>('/api/workspace/config')
+        return {
+          autoApprove: raw?.autoApprove === true,
+          overseer: typeof raw?.overseer === 'string' ? raw.overseer : null,
+        }
+      } catch {
+        return { autoApprove: true, overseer: null }
+      }
+    },
+    refetchInterval: 10_000,
+    ...RESILIENT_QUERY_OPTIONS,
+  })
+
+  const updateConfigMutation = useMutation({
+    mutationFn: async (params: { auto_approve?: boolean; overseer?: string | null }) => {
+      await workspaceJson('/api/workspace/config', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(params),
+      })
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace', 'config'] })
+    },
+  })
+
+  // ── Available models ────────────────────────────────────────────────────
+  const modelsQuery = useQuery({
+    queryKey: ['workspace', 'agents', 'models'],
+    enabled,
+    queryFn: async (): Promise<WorkspaceAgentModel[]> => {
+      try {
+        const raw = await workspaceJson<{ models?: unknown[] }>('/api/workspace/agents/models')
+        if (!Array.isArray(raw?.models)) return []
+        return raw.models
+          .map((item) => {
+            const r = asRecord(item)
+            if (!r) return null
+            return {
+              id: asString(r.id) ?? '',
+              name: asString(r.name) ?? asString(r.id) ?? '',
+              provider: asString(r.provider),
+              free: r.free === true,
+              description: asString(r.description),
+            }
+          })
+          .filter((m): m is NonNullable<typeof m> => m !== null && m.id.length > 0)
+      } catch {
+        return []
+      }
+    },
+    staleTime: 60_000,
+    ...RESILIENT_QUERY_OPTIONS,
+  })
+
   // ── Decompose mutation ───────────────────────────────────────────────────
   const decomposeMutation = useMutation({
     mutationFn: async (goal: string) => {
@@ -743,6 +817,11 @@ export function useConductorWorkspace(options?: {
     stats: statsQuery,
     recentMissions: recentMissionsQuery,
     projectFiles: projectFilesQuery,
+    config: configQuery,
+    models: modelsQuery,
+
+    // Config mutations
+    updateConfig: updateConfigMutation,
 
     // Helpers
     invalidateAll: useCallback(() => {

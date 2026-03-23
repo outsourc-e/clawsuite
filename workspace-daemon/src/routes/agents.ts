@@ -5,16 +5,59 @@ import type { UpdateAgentInput } from "../types";
 export function createAgentsRouter(tracker: Tracker): Router {
   const router = Router();
 
+  // Static fallback list — used when gateway is unreachable
+  const FALLBACK_MODELS = [
+    { id: 'auto', name: 'Auto (best available)', provider: null, free: true, description: 'Orchestrator picks the best model for the task type' },
+    { id: 'codex', name: 'Codex (GPT-5.4)', provider: 'openai-codex', free: true, description: 'Best for coding — multi-file edits, builds, refactors' },
+    { id: 'sonnet46-coding', name: 'Claude Sonnet 4.6', provider: 'anthropic-oauth', free: true, description: 'Strong reasoning — reviews, planning, complex analysis' },
+    { id: 'minimax-fast', name: 'MiniMax Lightning', provider: 'minimax', free: false, description: 'Fast and cheap — research, synthesis, drafts' },
+    { id: 'nemotron-super', name: 'Nemotron 120B', provider: 'openrouter', free: true, description: 'Free via OpenRouter — good general purpose' },
+  ];
+
+  // Dynamic model list — tries gateway first, falls back to static
+  router.get("/models", async (_req, res) => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789";
+      const response = await fetch(`${gatewayUrl}/api/models`, {
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
+      });
+      clearTimeout(timer);
+
+      if (response.ok) {
+        const data = (await response.json()) as { models?: Array<{ id: string; name?: string; provider?: string }> };
+        if (Array.isArray(data?.models) && data.models.length > 0) {
+          const gatewayModels = data.models.map((m) => ({
+            id: m.id,
+            name: m.name ?? m.id,
+            provider: m.provider ?? null,
+            free: false,
+            description: null,
+          }));
+          // Prepend "auto" + merge with known free flags
+          const freeIds = new Set(FALLBACK_MODELS.filter((m) => m.free).map((m) => m.id));
+          res.json({
+            source: "gateway",
+            models: [
+              FALLBACK_MODELS[0], // auto
+              ...gatewayModels.map((m) => ({ ...m, free: freeIds.has(m.id) || m.free })),
+            ],
+          });
+          return;
+        }
+      }
+    } catch {
+      // Gateway unreachable — fall through to static
+    }
+
+    res.json({ source: "static", models: FALLBACK_MODELS });
+  });
+
+  // Legacy endpoint — backward compat
   router.get("/available", (_req, res) => {
-    res.json([
-      { id: 'auto', name: 'Auto-select', description: 'Automatically picks the best agent for the task type' },
-      { id: 'codex', name: 'Codex (Free)', description: 'OpenAI Codex - best for coding tasks', model: 'openai-codex/gpt-5.4' },
-      { id: 'sonnet', name: 'Claude Sonnet', description: 'Claude Sonnet 4.6 - strong reasoning and review', model: 'anthropic-oauth/claude-sonnet-4-6' },
-      { id: 'minimax-fast', name: 'MiniMax Fast', description: 'MiniMax Lightning - fast and cheap for research', model: 'minimax/MiniMax-M2.5-Lightning' },
-      { id: 'researcher', name: 'Researcher', description: 'Optimized for web research and synthesis' },
-      { id: 'planner', name: 'Planner', description: 'Task decomposition and planning' },
-      { id: 'critic', name: 'Critic', description: 'Code review and quality assessment' },
-    ]);
+    res.json(FALLBACK_MODELS);
   });
 
   router.get("/", (_req, res) => {
