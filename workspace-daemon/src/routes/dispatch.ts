@@ -30,60 +30,65 @@ const STATE_PATH = join(
   ".openclaw/workspace/data/dispatch-state.json"
 );
 
-function buildOrchestratorPrompt(missionId: string, mission: string, tasks: any[], projectPath: string): string {
+function buildOrchestratorPrompt(missionId: string, mission: string, tasks: any[], projectPath: string, daemonMissionId: string | null): string {
   const taskList = tasks.map((t: any, i: number) => {
-    const id = t.id || `task-${String(i + 1).padStart(3, "0")}`;
+    // Use dbId (daemon SQLite ID) if available, otherwise dispatch ID
+    const id = t.dbId || t.id || `task-${String(i + 1).padStart(3, "0")}`;
     return `- [${id}] ${t.title || t.name || "Task"} (type: ${t.type || "coding"})${t.description ? `\n  ${t.description}` : ""}`;
   }).join("\n");
+
+  const missionPatchId = daemonMissionId || missionId;
 
   return `You are a mission orchestrator. Execute this mission end-to-end autonomously.
 
 ## Mission
-ID: ${missionId}
+ID: ${missionPatchId}
 Goal: ${mission}
 Project Path: ${projectPath}
 
-## Tasks
+## Tasks (IDs are daemon database IDs — use these exact IDs in PATCH calls)
 ${taskList}
 
 ## How to Execute
 
 For EACH task in order:
 
-1. **Update daemon**: Run \`exec\` to call:
-   curl -X PATCH http://localhost:3099/api/workspace/tasks/<TASK_ID> -H 'Content-Type: application/json' -d '{"status":"running"}'
+1. **Mark task running** — use exec to run:
+   curl -s -X PATCH http://localhost:3099/api/workspace/tasks/<TASK_DB_ID> -H 'Content-Type: application/json' -d '{"status":"running"}'
 
 2. **Spawn a worker agent** using sessions_spawn:
-   - task: detailed instructions for building/researching
-   - model: "openai-codex/gpt-5.4" for coding, or appropriate model
+   - task: clear instructions for what to build/research (include the project path and expected output)
+   - model: "openai-codex/gpt-5.4" for coding tasks
    - mode: "run"
-   - label: "worker-<task-id>"
+   - label: "worker-<short-name>"
    - cwd: "${projectPath}"
    - runTimeoutSeconds: 600
 
 3. **Call sessions_yield** and wait for the worker to complete.
 
-4. **Verify the output** — check files exist, run any validation.
+4. **Verify the output** — check files exist, content is correct.
 
-5. **Update daemon**: 
-   curl -X PATCH http://localhost:3099/api/workspace/tasks/<TASK_ID> -H 'Content-Type: application/json' -d '{"status":"completed"}'
+5. **Mark task completed**:
+   curl -s -X PATCH http://localhost:3099/api/workspace/tasks/<TASK_DB_ID> -H 'Content-Type: application/json' -d '{"status":"completed"}'
 
 6. **Move to next task**.
 
 After ALL tasks complete:
-- Summarize what was built
-- The Conductor UI updates automatically via daemon SSE
+- Mark mission completed:
+  curl -s -X PATCH http://localhost:3099/api/workspace/missions/${missionPatchId}/status -H 'Content-Type: application/json' -d '{"status":"completed"}'
+- Summarize what was built.
 
 ## Rules
 - Do NOT ask for user input. Execute everything autonomously.
-- Do NOT skip tasks. Execute each one.
-- If a worker fails, retry ONCE with error feedback, then mark failed.
-- Use exec + curl to update the daemon. The UI watches via SSE.
-- Work ONLY in the project path directory.`;
+- Do NOT skip tasks. Execute each one sequentially.
+- If a worker fails, retry ONCE with error feedback, then mark task failed.
+- Use the EXACT task IDs shown above in PATCH calls — they are daemon database IDs.
+- Work ONLY in the project path directory.
+- Do NOT start long-running processes (servers, watchers).`;
 }
 
-function fireDispatchTrigger(missionId: string, mission: string, tasks: any[] = [], projectPath: string = ""): void {
-  const orchestratorMessage = buildOrchestratorPrompt(missionId, mission, tasks, projectPath);
+function fireDispatchTrigger(missionId: string, mission: string, tasks: any[] = [], projectPath: string = "", daemonMissionId: string | null = null): void {
+  const orchestratorMessage = buildOrchestratorPrompt(missionId, mission, tasks, projectPath, daemonMissionId);
 
   // Use gateway hooks/agent endpoint to spawn an isolated agent session.
   // This creates an independent session that can use sessions_spawn — no chat session dependency.
@@ -171,7 +176,10 @@ export function createDispatchRouter(tracker?: Tracker): Router {
     writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
 
     // Sync to daemon SQLite so Recent Missions shows it
+    // Capture the real DB task IDs so the orchestrator can PATCH them
     let projectId: string | null = null;
+    let dbMissionId: string | null = null;
+    const dbTaskMap: Array<{ dispatchId: string; dbId: string; title: string; description: string; type: string }> = [];
     if (tracker) {
       try {
         const project = tracker.createProject({
@@ -183,15 +191,26 @@ export function createDispatchRouter(tracker?: Tracker): Router {
         const phase = tracker.createPhase({ project_id: project.id, name: "Phase 1" });
         const dbMission = tracker.createMission({ phase_id: phase.id, name: mission.slice(0, 100) });
         if (dbMission) {
-          for (const task of (tasks || [])) {
-            tracker.createTask({
+          dbMissionId = dbMission.id;
+          for (let i = 0; i < (tasks || []).length; i++) {
+            const task = tasks[i];
+            const dbTask = tracker.createTask({
               mission_id: dbMission.id,
               name: task.title || task.name || "Task",
               description: task.description || "",
               agent_type: task.type || null,
             });
+            if (dbTask) {
+              dbTaskMap.push({
+                dispatchId: task.id || `task-${String(i + 1).padStart(3, "0")}`,
+                dbId: dbTask.id,
+                title: task.title || task.name || "Task",
+                description: task.description || "",
+                type: task.type || "coding",
+              });
+            }
           }
-          // Start the mission so the mission loop picks it up
+          // Start the mission so status shows as running
           tracker.startMission(dbMission.id);
         }
       } catch {
@@ -199,8 +218,9 @@ export function createDispatchRouter(tracker?: Tracker): Router {
       }
     }
 
-    // Spawn orchestrator agent via gateway hooks
-    fireDispatchTrigger(missionId, mission, tasks || [], resolvedProjectPath);
+    // Spawn orchestrator agent — pass the DB task IDs so it can update the daemon
+    const tasksWithDbIds = dbTaskMap.length > 0 ? dbTaskMap : (tasks || []);
+    fireDispatchTrigger(missionId, mission, tasksWithDbIds, resolvedProjectPath, dbMissionId);
 
     res.json({ ok: true, mission_id: missionId, project_id: projectId });
   });
