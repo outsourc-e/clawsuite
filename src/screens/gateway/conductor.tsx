@@ -7,12 +7,12 @@ import {
   Search01Icon,
   TaskDone01Icon,
 } from '@hugeicons/core-free-icons'
-import { IsometricOffice } from '@/components/agent-swarm/isometric-office'
 import { Button } from '@/components/ui/button'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { type GatewaySession } from '@/lib/gateway-api'
-import { type SwarmSession } from '@/stores/agent-swarm-store'
 import { cn } from '@/lib/utils'
+import { OfficeView } from './components/office-view'
+import type { AgentWorkingRow, AgentWorkingStatus } from './components/agents-working-panel'
 import { type ConductorWorker, type MissionHistoryEntry, useConductorGateway } from './hooks/use-conductor-gateway'
 
 type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
@@ -251,15 +251,27 @@ function extractProjectPath(text: string): string | null {
   return null
 }
 
-function workersToSwarmSessions(workers: ConductorWorker[]): SwarmSession[] {
-  return workers.map((worker) => ({
-    ...worker.raw,
-    swarmStatus: worker.status === 'complete' ? 'complete' as const
-      : worker.status === 'running' ? 'running' as const
-      : worker.status === 'stale' ? 'failed' as const
-      : 'idle' as const,
-    staleness: worker.updatedAt ? Date.now() - new Date(worker.updatedAt).getTime() : 0,
-  }))
+function workersToAgentRows(workers: ConductorWorker[]): AgentWorkingRow[] {
+  return workers.map((worker, index) => {
+    const persona = getAgentPersona(index)
+    const statusMap: Record<ConductorWorker['status'], AgentWorkingStatus> = {
+      running: 'active',
+      complete: 'idle',
+      stale: 'error',
+      idle: 'ready',
+    }
+    return {
+      id: worker.key,
+      name: `${persona.emoji} ${persona.name}`,
+      modelId: worker.model ?? 'default',
+      status: statusMap[worker.status] ?? 'none',
+      lastLine: worker.displayName,
+      lastAt: worker.updatedAt ? new Date(worker.updatedAt).getTime() : undefined,
+      taskCount: 1,
+      currentTask: worker.label,
+      sessionKey: worker.key,
+    }
+  })
 }
 
 function deriveSessionStatus(session: GatewaySession): 'running' | 'completed' | 'failed' {
@@ -864,23 +876,42 @@ export function Conductor() {
                   <span>{activeWorkerCount} active</span>
                 </div>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={conductor.resetMission}
-                className="shrink-0 rounded-xl border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-card2)]"
-              >
-                Stop Mission
-              </Button>
             </div>
-            <div className="mt-3 h-0.5 w-full overflow-hidden rounded-full bg-[var(--theme-border)]">
-              <div className="h-full rounded-full bg-[var(--theme-accent)] transition-[width] duration-300" style={{ width: `${missionProgress}%` }} />
+            <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-[var(--theme-border)]">
+              <div className="h-full rounded-full bg-[var(--theme-accent)] transition-[width] duration-500 ease-out" style={{ width: `${missionProgress}%` }} />
+            </div>
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={conductor.resetMission}
+                className="inline-flex items-center gap-1.5 rounded-full border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
+              >
+                <span>■</span> Stop
+              </button>
+              <button
+                type="button"
+                disabled
+                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-muted)] opacity-50"
+              >
+                <span>⏸</span> Pause
+              </button>
+              <button
+                type="button"
+                disabled
+                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-muted)] opacity-50"
+              >
+                <span>💬</span> Steer
+              </button>
             </div>
           </section>
           <div className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
-            <IsometricOffice
-              sessions={workersToSwarmSessions(conductor.workers)}
-              className="h-[280px] w-full"
+            <OfficeView
+              agentRows={workersToAgentRows(conductor.workers)}
+              missionRunning={conductor.workers.some((w) => w.status === 'running')}
+              onViewOutput={() => {}}
+              processType="sequential"
+              companyName="Conductor"
+              containerHeight={280}
             />
           </div>
 
