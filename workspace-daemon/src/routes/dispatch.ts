@@ -18,17 +18,6 @@ const STATE_PATH = join(
   ".openclaw/workspace/data/dispatch-state.json"
 );
 
-function resolveHooksToken(): string {
-  try {
-    const configPath = join(process.env.HOME || "", ".openclaw/openclaw.json");
-    if (!existsSync(configPath)) return "";
-    const cfg = JSON.parse(readFileSync(configPath, "utf-8"));
-    return typeof cfg?.hooks?.token === "string" ? cfg.hooks.token : "";
-  } catch {
-    return "";
-  }
-}
-
 function buildOrchestratorMessage(missionId: string, mission: string, tasks: any[], projectPath: string, daemonMissionId: string | null): string {
   const taskLines = tasks.map((t: any, i: number) => {
     const dbId = t.dbId || t.id || `task-${String(i + 1).padStart(3, "0")}`;
@@ -86,50 +75,14 @@ curl -s -X PATCH http://localhost:3099/api/workspace/missions/${missionPatchId}/
 function fireDispatchTrigger(missionId: string, mission: string, tasks: any[] = [], projectPath: string = "", daemonMissionId: string | null = null): void {
   const message = buildOrchestratorMessage(missionId, mission, tasks, projectPath, daemonMissionId);
   const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789";
-  const hooksToken = process.env.OPENCLAW_HOOKS_TOKEN ?? resolveHooksToken();
-
-  // Primary: hooks/agent — spawns isolated orchestrator session (no chat dependency)
-  if (hooksToken) {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${hooksToken}`,
-    };
-
-    fetch(`${gatewayUrl}/hooks/agent`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        message,
-        name: `orchestrator-${missionId}`,
-        deliver: false,
-        wakeMode: "now",
-        timeoutSeconds: 600,
-      }),
-    })
-      .then((res) => {
-        if (res.ok) {
-          return res.json().then((data: any) => {
-            console.log("[dispatch] Orchestrator spawned for", missionId, "runId:", data?.runId);
-          });
-        }
-        throw new Error(`Hooks returned ${res.status}`);
-      })
-      .catch((err: Error) => {
-        console.error("[dispatch] Hooks failed, falling back to wake:", err.message);
-        fireWakeFallback(gatewayUrl, missionId, mission);
-      });
-  } else {
-    // No hooks token — fall back to wake
-    fireWakeFallback(gatewayUrl, missionId, mission);
-  }
+  fireWakeFallback(gatewayUrl, missionId, message);
 }
 
-function fireWakeFallback(gatewayUrl: string, missionId: string, mission: string): void {
-  const text = `[dispatch] Mission started: ${missionId}. Goal: "${mission.slice(0, 100)}". Read data/dispatch-state.json and run the workspace-dispatch skill loop.`;
+function fireWakeFallback(gatewayUrl: string, missionId: string, message: string): void {
   fetch(`${gatewayUrl}/api/cron/wake`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, mode: "now" }),
+    body: JSON.stringify({ text: message, mode: "now" }),
   })
     .then((res) => {
       if (res.ok) console.log("[dispatch] Wake sent for", missionId);

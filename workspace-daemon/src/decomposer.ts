@@ -7,7 +7,6 @@ import type { DecomposeResult, DecomposerContext, DecomposedTask, TaskAgentRole 
 const SYSTEM_PROMPT = [
   "You are a task decomposition engine for an engineering workspace daemon.",
   "Return only a valid JSON array with no markdown fences and no surrounding explanation.",
-  'Before decomposing, identify 2-3 clarifying questions the user should answer to scope the work properly. Include these as the FIRST task with suggested_agent_type: null and name starting with "Clarify:"',
   "Each array item must be an object with keys:",
   "name, description, estimated_minutes, depends_on, suggested_agent_type.",
   "Use concise but actionable task names and descriptions.",
@@ -144,36 +143,8 @@ function normalizeTask(value: unknown, index: number): DecomposedTask {
   };
 }
 
-function buildClarifyTask(goal: string): DecomposedTask {
-  const summary = goal.trim() || "the requested work";
-  return {
-    name: `Clarify: scope ${summary.slice(0, 48)}`,
-    description: `Ask 2-3 scoping questions about ${summary} before implementation begins.`,
-    estimated_minutes: 10,
-    depends_on: [],
-    suggested_agent_type: null,
-  };
-}
-
-function ensureClarifyTask(tasks: DecomposedTask[], goal: string): DecomposedTask[] {
-  if (tasks.length === 0) {
-    return [buildClarifyTask(goal)];
-  }
-
-  const firstTask = tasks[0];
-  if (firstTask.name.startsWith("Clarify:")) {
-    return tasks;
-  }
-
-  const clarifyTask = buildClarifyTask(goal);
-  return [
-    clarifyTask,
-    ...tasks.map((task, index) =>
-      index === 0 && task.depends_on.length === 0
-        ? { ...task, depends_on: [clarifyTask.name] }
-        : task,
-    ),
-  ];
+function ensureClarifyTask(tasks: DecomposedTask[]): DecomposedTask[] {
+  return tasks;
 }
 
 function readApiKeyValue(value: unknown): string {
@@ -217,7 +188,7 @@ export class Decomposer {
         console.log("[decomposer] Using Anthropic SDK");
         const client = new Anthropic({ apiKey: anthropicApiKey });
         const response = await client.messages.create({
-          model: "claude-3-5-haiku-20241022",
+          model: "claude-haiku-4-5-20250514",
           max_tokens: 2048,
           messages: [{ role: "user", content: prompt }],
         });
@@ -234,15 +205,13 @@ export class Decomposer {
 
     if (!rawResponse) {
       const name = goal.trim().slice(0, 80) || "Task decomposition";
-      const clarifyTask = buildClarifyTask(goal);
       return {
         tasks: [
-          clarifyTask,
           {
             name,
             description: goal.trim() || name,
             estimated_minutes: 30,
-            depends_on: [clarifyTask.name],
+            depends_on: [],
             suggested_agent_type: null,
           },
         ],
@@ -258,7 +227,7 @@ export class Decomposer {
         const parsed = JSON.parse(jsonPayload) as unknown;
         if (Array.isArray(parsed)) {
           return {
-            tasks: ensureClarifyTask(parsed.map((task, index) => normalizeTask(task, index)), goal),
+            tasks: ensureClarifyTask(parsed.map((task, index) => normalizeTask(task, index))),
             rawResponse,
             parsed: true,
           };
@@ -269,18 +238,15 @@ export class Decomposer {
     }
 
     return {
-      tasks: ensureClarifyTask(
-        [
-          {
-            name: goal.trim().slice(0, 80) || "Task decomposition",
-            description: rawResponse || goal.trim(),
-            estimated_minutes: 30,
-            depends_on: [],
-            suggested_agent_type: "researcher",
-          },
-        ],
-        goal,
-      ),
+      tasks: ensureClarifyTask([
+        {
+          name: goal.trim().slice(0, 80) || "Task decomposition",
+          description: rawResponse || goal.trim(),
+          estimated_minutes: 30,
+          depends_on: [],
+          suggested_agent_type: "researcher",
+        },
+      ]),
       rawResponse,
       parsed: false,
     };
