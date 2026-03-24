@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { type GatewaySession } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
-import { useConductorGateway } from './hooks/use-conductor-gateway'
+import { type MissionHistoryEntry, useConductorGateway } from './hooks/use-conductor-gateway'
 
 type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
 type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
@@ -273,7 +273,7 @@ export function Conductor() {
   const [goalDraft, setGoalDraft] = useState('')
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [activityFilter, setActivityFilter] = useState<'all' | 'conductor' | 'running' | 'completed' | 'failed'>('all')
+  const [activityFilter, setActivityFilter] = useState<'all' | 'completed' | 'failed'>('all')
   const [activityPage, setActivityPage] = useState(0)
   const [now, setNow] = useState(() => Date.now())
 
@@ -357,19 +357,23 @@ export function Conductor() {
     }
     return lines.join('\n')
   }, [phase, completePhaseProjectPath, totalWorkers, conductor.goal, totalTokens, conductor.missionStartedAt, now])
-
+  const hasMissionHistory = conductor.missionHistory.length > 0
+  const filteredHistory = (() => {
+    const history = conductor.missionHistory
+    if (activityFilter === 'all') return history
+    return history.filter((entry) => entry.status === activityFilter)
+  })()
   const filteredSessions = (() => {
     const sessions = conductor.recentSessions
     if (activityFilter === 'all') return sessions
-    const conductorOnly = sessions.filter((s) => (s.label as string)?.startsWith('worker-'))
-    if (activityFilter === 'conductor') return conductorOnly
-    if (activityFilter === 'running') return conductorOnly.filter((s) => deriveSessionStatus(s as GatewaySession) === 'running')
-    if (activityFilter === 'completed') return conductorOnly.filter((s) => deriveSessionStatus(s as GatewaySession) === 'completed')
-    return conductorOnly.filter((s) => deriveSessionStatus(s as GatewaySession) === 'failed')
+    return sessions
+      .filter((session) => ((session.label as string) ?? '').startsWith('worker-'))
+      .filter((session) => deriveSessionStatus(session as GatewaySession) === activityFilter)
   })()
-  const totalPages = Math.max(1, Math.ceil(filteredSessions.length / ACTIVITY_PAGE_SIZE))
+  const activityItems: Array<MissionHistoryEntry | GatewaySession> = hasMissionHistory ? filteredHistory : filteredSessions
+  const totalPages = Math.max(1, Math.ceil(activityItems.length / ACTIVITY_PAGE_SIZE))
   const safeActivityPage = Math.min(activityPage, totalPages - 1)
-  const pageSessions = filteredSessions.slice(
+  const pageItems = activityItems.slice(
     safeActivityPage * ACTIVITY_PAGE_SIZE,
     (safeActivityPage + 1) * ACTIVITY_PAGE_SIZE,
   )
@@ -450,7 +454,7 @@ export function Conductor() {
               </div>
             </section>
 
-            {conductor.recentSessions.length > 0 && (
+            {(hasMissionHistory || conductor.recentSessions.length > 0) && (
               <section className="w-full space-y-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Recent Activity</h2>
@@ -481,7 +485,7 @@ export function Conductor() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {(['all', 'conductor', 'running', 'completed', 'failed'] as const).map((filter) => (
+                  {(['all', 'completed', 'failed'] as const).map((filter) => (
                     <button
                       key={filter}
                       type="button"
@@ -500,48 +504,68 @@ export function Conductor() {
                     </button>
                   ))}
                 </div>
-                {pageSessions.length > 0 ? (
+                {pageItems.length > 0 ? (
                   <div className="space-y-1.5">
-                    {pageSessions.map((session) => {
-                      const recentSession = session as GatewaySession
-                      const label = recentSession.label ?? recentSession.key ?? ''
-                      const displayName = label.replace(/^worker-/, '').replace(/[-_]+/g, ' ')
-                      const tokens = typeof recentSession.totalTokens === 'number' ? recentSession.totalTokens : 0
-                      const model = getShortModelName(recentSession.model)
-                      const updatedAt =
-                        typeof recentSession.updatedAt === 'string'
-                          ? recentSession.updatedAt
-                          : typeof recentSession.startedAt === 'string'
-                            ? recentSession.startedAt
-                            : typeof recentSession.createdAt === 'string'
-                              ? recentSession.createdAt
-                              : null
-                      const sessionStatus = deriveSessionStatus(recentSession)
-                      const dotClass =
-                        sessionStatus === 'completed'
-                          ? 'bg-emerald-400'
-                          : sessionStatus === 'failed'
-                            ? 'bg-red-400'
-                            : 'bg-sky-400 animate-pulse'
+                    {hasMissionHistory
+                      ? pageItems.map((item) => {
+                          const entry = item as MissionHistoryEntry
+                          return (
+                            <div
+                              key={entry.id}
+                              className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2.5 text-sm"
+                            >
+                              <span
+                                className={cn('size-2 rounded-full', entry.status === 'completed' ? 'bg-emerald-400' : 'bg-red-400')}
+                              />
+                              <span className="min-w-0 flex-1 truncate font-medium text-[var(--theme-text)]">{entry.goal}</span>
+                              <span className="text-xs text-[var(--theme-muted)]">{entry.workerCount} workers</span>
+                              <span className="text-xs text-[var(--theme-muted)]">{entry.totalTokens.toLocaleString()} tok</span>
+                              <span className="text-xs text-[var(--theme-muted-2)]">
+                                {formatRelativeTime(entry.completedAt, now)}
+                              </span>
+                            </div>
+                          )
+                        })
+                      : pageItems.map((item) => {
+                          const recentSession = item as GatewaySession
+                          const label = recentSession.label ?? recentSession.key ?? ''
+                          const displayName = label.replace(/^worker-/, '').replace(/[-_]+/g, ' ')
+                          const tokens = typeof recentSession.totalTokens === 'number' ? recentSession.totalTokens : 0
+                          const model = getShortModelName(recentSession.model)
+                          const updatedAt =
+                            typeof recentSession.updatedAt === 'string'
+                              ? recentSession.updatedAt
+                              : typeof recentSession.startedAt === 'string'
+                                ? recentSession.startedAt
+                                : typeof recentSession.createdAt === 'string'
+                                  ? recentSession.createdAt
+                                  : null
+                          const sessionStatus = deriveSessionStatus(recentSession)
+                          const dotClass =
+                            sessionStatus === 'completed'
+                              ? 'bg-emerald-400'
+                              : sessionStatus === 'failed'
+                                ? 'bg-red-400'
+                                : 'bg-sky-400 animate-pulse'
 
-                      return (
-                        <div
-                          key={recentSession.key}
-                          className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2.5 text-sm"
-                        >
-                          <span className={cn('size-2 rounded-full', dotClass)} />
-                          <span className="min-w-0 flex-1 truncate font-medium text-[var(--theme-text)] capitalize">{displayName}</span>
-                          <span className="text-xs capitalize text-[var(--theme-muted)]">{sessionStatus}</span>
-                          <span className="text-xs text-[var(--theme-muted)]">{model}</span>
-                          <span className="text-xs text-[var(--theme-muted)]">{tokens.toLocaleString()} tok</span>
-                          <span className="text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(updatedAt, now)}</span>
-                        </div>
-                      )
-                    })}
+                          return (
+                            <div
+                              key={recentSession.key}
+                              className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2.5 text-sm"
+                            >
+                              <span className={cn('size-2 rounded-full', dotClass)} />
+                              <span className="min-w-0 flex-1 truncate font-medium text-[var(--theme-text)] capitalize">{displayName}</span>
+                              <span className="text-xs capitalize text-[var(--theme-muted)]">{sessionStatus}</span>
+                              <span className="text-xs text-[var(--theme-muted)]">{model}</span>
+                              <span className="text-xs text-[var(--theme-muted)]">{tokens.toLocaleString()} tok</span>
+                              <span className="text-xs text-[var(--theme-muted-2)]">{formatRelativeTime(updatedAt, now)}</span>
+                            </div>
+                          )
+                        })}
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-[var(--theme-border)] px-4 py-6 text-center text-sm text-[var(--theme-muted)]">
-                    No {activityFilter === 'all' ? '' : activityFilter} sessions found
+                    No {activityFilter === 'all' ? '' : `${activityFilter} `}{hasMissionHistory ? 'missions' : 'sessions'} found
                   </div>
                 )}
               </section>

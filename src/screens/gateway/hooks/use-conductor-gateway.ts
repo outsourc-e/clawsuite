@@ -62,6 +62,20 @@ export type ConductorTask = {
   output: string | null
 }
 
+export type MissionHistoryEntry = {
+  id: string
+  goal: string
+  startedAt: string
+  completedAt: string
+  workerCount: number
+  totalTokens: number
+  status: 'completed' | 'failed'
+  projectPath: string | null
+}
+
+const HISTORY_STORAGE_KEY = 'conductor:history'
+const MAX_HISTORY_ENTRIES = 50
+
 function extractTasksFromPlan(planText: string): ConductorTask[] {
   const tasks: ConductorTask[] = []
   const patterns = [
@@ -183,6 +197,34 @@ function loadPersistedMission(): PersistedMission | null {
     }
   } catch {
     return null
+  }
+}
+
+function loadMissionHistory(): MissionHistoryEntry[] {
+  try {
+    const raw = globalThis.localStorage?.getItem(HISTORY_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((entry: unknown): entry is MissionHistoryEntry => {
+        if (!entry || typeof entry !== 'object') return false
+        const e = entry as Record<string, unknown>
+        return typeof e.id === 'string' && typeof e.goal === 'string' && typeof e.startedAt === 'string'
+      })
+      .slice(0, MAX_HISTORY_ENTRIES)
+  } catch {
+    return []
+  }
+}
+
+function appendMissionHistory(entry: MissionHistoryEntry): void {
+  try {
+    const current = loadMissionHistory()
+    const updated = [entry, ...current].slice(0, MAX_HISTORY_ENTRIES)
+    globalThis.localStorage?.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated))
+  } catch {
+    // Ignore persistence failures.
   }
 }
 
@@ -399,6 +441,7 @@ export function useConductorGateway() {
   const [missionWorkerLabels, setMissionWorkerLabels] = useState<Set<string>>(() => new Set(initialMission?.workerLabels ?? []))
   const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>({})
   const [tasks, setTasks] = useState<ConductorTask[]>(() => initialMission?.tasks ?? [])
+  const [missionHistory, setMissionHistory] = useState<MissionHistoryEntry[]>(() => loadMissionHistory())
   const doneRef = useRef(initialMission?.phase === 'complete')
   const seenToolCallRef = useRef(false)
 
@@ -608,6 +651,26 @@ export function useConductorGateway() {
   }, [workers, workerOutputs, tasks.length])
 
   useEffect(() => {
+    if (phase !== 'complete' || !goal || !completedAt || !missionStartedAt) return
+    const missionId = `mission-${new Date(missionStartedAt).getTime()}`
+    setMissionHistory((current) => {
+      if (current.some((entry) => entry.id === missionId)) return current
+      const entry: MissionHistoryEntry = {
+        id: missionId,
+        goal,
+        startedAt: missionStartedAt,
+        completedAt,
+        workerCount: workers.length,
+        totalTokens: workers.reduce((sum, worker) => sum + worker.totalTokens, 0),
+        status: streamError ? 'failed' : 'completed',
+        projectPath: null,
+      }
+      appendMissionHistory(entry)
+      return [entry, ...current].slice(0, MAX_HISTORY_ENTRIES)
+    })
+  }, [phase, goal, completedAt, missionStartedAt, workers, streamError])
+
+  useEffect(() => {
     if (phase === 'idle') {
       try {
         localStorage.removeItem(ACTIVE_MISSION_STORAGE_KEY)
@@ -757,6 +820,7 @@ export function useConductorGateway() {
     tasks,
     workers,
     activeWorkers,
+    missionHistory,
     recentSessions: recentSessionsQuery.data ?? [],
     missionWorkerKeys,
     workerOutputs,
