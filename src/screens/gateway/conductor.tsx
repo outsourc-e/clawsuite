@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowRight01Icon,
@@ -19,11 +18,6 @@ type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
 type HistoryMessage = {
   role?: string
   content?: string | Array<{ type?: string; text?: string }>
-}
-
-type HistoryResponse = {
-  messages?: HistoryMessage[]
-  error?: string
 }
 
 const THEME_STYLE: CSSProperties = {
@@ -185,7 +179,6 @@ export function Conductor() {
   const conductor = useConductorGateway()
   const [goalDraft, setGoalDraft] = useState('')
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
-  const [selectedWorkerKey, setSelectedWorkerKey] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -194,17 +187,6 @@ export function Conductor() {
     return () => window.clearInterval(timer)
   }, [conductor.phase])
 
-  useEffect(() => {
-    if (!selectedWorkerKey) return
-    const workerStillVisible = conductor.workers.some((worker) => worker.key === selectedWorkerKey)
-    if (!workerStillVisible) setSelectedWorkerKey(null)
-  }, [conductor.workers, selectedWorkerKey])
-
-  useEffect(() => {
-    if (conductor.phase === 'idle') {
-      setSelectedWorkerKey(null)
-    }
-  }, [conductor.phase])
 
   const phase: ConductorPhase = useMemo(() => {
     if (conductor.phase === 'idle') return 'home'
@@ -216,7 +198,6 @@ export function Conductor() {
   const handleSubmit = async () => {
     const trimmed = goalDraft.trim()
     if (!trimmed) return
-    setSelectedWorkerKey(null)
     await conductor.sendMission(trimmed)
   }
 
@@ -228,32 +209,16 @@ export function Conductor() {
   const totalTokens = conductor.workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
   const livePlanText = useMemo(() => getFilteredPlanText(conductor.planText, totalWorkers), [conductor.planText, totalWorkers])
 
-  const workerHistoryQuery = useQuery({
-    queryKey: ['conductor', 'worker-history', selectedWorkerKey],
-    queryFn: async () => {
-      const response = await fetch(`/api/history?sessionKey=${encodeURIComponent(selectedWorkerKey ?? '')}&limit=20`)
-      const payload = (await response.json().catch(() => ({}))) as HistoryResponse
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load worker output')
-      }
-      return payload
-    },
-    enabled: !!selectedWorkerKey,
-    refetchInterval: phase === 'active' && selectedWorkerKey ? 5_000 : false,
-  })
-
-  const selectedWorkerOutput = getLastAssistantMessage(workerHistoryQuery.data?.messages) || (selectedWorkerKey ? conductor.workerOutputs[selectedWorkerKey] ?? '' : '')
   const completePhaseProjectPath = useMemo(() => {
     const workerOutput = [
       ...Object.values(conductor.workerOutputs),
       ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)),
-      selectedWorkerOutput,
     ]
       .filter(Boolean)
       .join('\n')
 
     return extractProjectPath(`${conductor.streamText}\n${workerOutput}`)
-  }, [conductor.streamText, conductor.workerOutputs, conductor.workers, selectedWorkerOutput])
+  }, [conductor.streamText, conductor.workerOutputs, conductor.workers])
 
   const completeSummary = useMemo(() => {
     if (phase !== 'complete') return null
@@ -362,9 +327,9 @@ export function Conductor() {
                   Decomposing
                 </span>
               </div>
-              <div className="mt-4 min-h-[320px] rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
+              <div className="mt-4 min-h-[320px] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
                 {conductor.streamText ? (
-                  <Markdown className="max-w-none text-sm text-[var(--theme-text)]">
+                  <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">
                     {conductor.streamText}
                   </Markdown>
                 ) : (
@@ -391,7 +356,7 @@ export function Conductor() {
       <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
         <main className="mx-auto flex min-h-full max-w-[960px] flex-col px-6 py-12">
           <div className="space-y-6">
-            <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+            <div className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Complete</p>
@@ -412,7 +377,7 @@ export function Conductor() {
               </div>
             </div>
 
-            <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
@@ -421,11 +386,11 @@ export function Conductor() {
                   Complete
                 </span>
               </div>
-              <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
+              <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
                 {completeSummary ? (
-                  <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{completeSummary}</Markdown>
+                  <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{completeSummary}</Markdown>
                 ) : conductor.streamText ? (
-                  <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{conductor.streamText}</Markdown>
+                  <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{conductor.streamText}</Markdown>
                 ) : (
                   <p className="text-sm text-[var(--theme-muted)]">No summary captured.</p>
                 )}
@@ -447,17 +412,17 @@ export function Conductor() {
                 </div>
               )}
               {conductor.streamText && completeSummary && (
-                <details className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
+                <details className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
                   <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">Raw Agent Output</summary>
                   <div className="mt-4 border-t border-[var(--theme-border)] pt-4">
-                    <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{conductor.streamText}</Markdown>
+                    <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{conductor.streamText}</Markdown>
                   </div>
                 </details>
               )}
             </section>
 
             {completePhaseProjectPath && (
-              <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+              <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output Preview</p>
@@ -490,42 +455,39 @@ export function Conductor() {
 
   return (
     <div className="flex h-full min-h-full flex-col overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-      <div className="border-b border-[var(--theme-border)] bg-[var(--theme-card)]/70">
-        <div className="mx-auto w-full max-w-[960px] px-5 py-4 sm:px-6">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
-            <div className="min-w-0 text-center">
-              <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">
-                <span>Conductor</span>
-                <span>•</span>
-                <span>Elapsed {formatElapsedTime(conductor.missionStartedAt, now)}</span>
-                <span>•</span>
-                <span>{completedWorkers}/{Math.max(totalWorkers, 1)} complete</span>
-                <span>•</span>
-                <span>{activeWorkerCount} active</span>
-              </div>
-              <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-3xl">{conductor.goal}</h1>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={conductor.resetMission}
-                className="rounded-xl border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-card2)]"
-              >
-                Leave Mission
-              </Button>
-            </div>
-          </div>
-          <div className="mt-4 h-0.5 w-full overflow-hidden rounded-full bg-[var(--theme-border)]">
-            <div className="h-full rounded-full bg-[var(--theme-accent)] transition-[width] duration-300" style={{ width: `${missionProgress}%` }} />
-          </div>
-        </div>
-      </div>
-
       <main className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-[960px] flex-col gap-6">
+          <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)]/70 px-5 py-4 sm:px-6">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+              <div className="min-w-0 text-center">
+                <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">
+                  <span>Conductor</span>
+                  <span>•</span>
+                  <span>Elapsed {formatElapsedTime(conductor.missionStartedAt, now)}</span>
+                  <span>•</span>
+                  <span>{completedWorkers}/{Math.max(totalWorkers, 1)} complete</span>
+                  <span>•</span>
+                  <span>{activeWorkerCount} active</span>
+                </div>
+                <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-3xl">{conductor.goal}</h1>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={conductor.resetMission}
+                  className="rounded-xl border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-card2)]"
+                >
+                  Leave Mission
+                </Button>
+              </div>
+            </div>
+            <div className="mt-4 h-0.5 w-full overflow-hidden rounded-full bg-[var(--theme-border)]">
+              <div className="h-full rounded-full bg-[var(--theme-accent)] transition-[width] duration-300" style={{ width: `${missionProgress}%` }} />
+            </div>
+          </section>
           <details
-            className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6"
+            className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6"
             open={!shouldCollapseLivePlanByDefault}
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:hidden">
@@ -537,9 +499,9 @@ export function Conductor() {
                 Running
               </span>
             </summary>
-            <div className="mt-4 min-h-[220px] rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
+            <div className="mt-4 min-h-[220px] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
               {livePlanText ? (
-                <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{livePlanText}</Markdown>
+                <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{livePlanText}</Markdown>
               ) : (
                 <div className="flex items-center gap-3 py-4">
                   <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-accent)] border-t-transparent" />
@@ -558,17 +520,13 @@ export function Conductor() {
               {conductor.workers.map((worker, index) => {
                 const dot = getWorkerDot(worker.status)
                 const persona = getAgentPersona(index)
-                const isSelected = selectedWorkerKey === worker.key
-                const workerOutput = isSelected ? selectedWorkerOutput : ''
+                const workerOutput = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
                 return (
-                  <button
+                  <div
                     key={worker.key}
-                    type="button"
-                    onClick={() => setSelectedWorkerKey((current) => (current === worker.key ? null : worker.key))}
                     className={cn(
-                      'rounded-2xl border border-[var(--theme-border)] border-l-4 bg-[var(--theme-card)] px-4 py-3 text-left transition-colors hover:border-[var(--theme-accent)]',
+                      'overflow-hidden rounded-2xl border border-[var(--theme-border)] border-l-4 bg-[var(--theme-card)] px-4 py-3',
                       getWorkerBorderClass(worker.status),
-                      isSelected && 'ring-1 ring-[var(--theme-accent)]/35',
                     )}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -605,22 +563,14 @@ export function Conductor() {
                       </div>
                     </div>
 
-                    {isSelected && (
-                      <div className="mt-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4">
-                        {workerHistoryQuery.isLoading ? (
-                          <p className="text-sm text-[var(--theme-muted)]">Loading worker output…</p>
-                        ) : workerHistoryQuery.error ? (
-                          <p className="text-sm text-red-300">
-                            {workerHistoryQuery.error instanceof Error ? workerHistoryQuery.error.message : 'Failed to load worker output.'}
-                          </p>
-                        ) : workerOutput ? (
-                          <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{workerOutput}</Markdown>
-                        ) : (
-                          <p className="text-sm text-[var(--theme-muted)]">No assistant output yet.</p>
-                        )}
-                      </div>
-                    )}
-                  </button>
+                    <div className="mt-3 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4">
+                      {workerOutput ? (
+                        <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{workerOutput}</Markdown>
+                      ) : (
+                        <p className="text-sm text-[var(--theme-muted)]">No assistant output yet.</p>
+                      )}
+                    </div>
+                  </div>
                 )
               })}
               {conductor.workers.length === 0 && (
