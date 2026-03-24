@@ -11,8 +11,6 @@ import { Button } from '@/components/ui/button'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { type GatewaySession } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
-import { type AgentWorkingRow } from './components/agents-working-panel'
-import { OfficeView, type RemoteSession } from './components/office-view'
 import { useConductorGateway } from './hooks/use-conductor-gateway'
 
 type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
@@ -190,13 +188,6 @@ function deriveSessionStatus(session: GatewaySession): 'running' | 'completed' |
   return 'running'
 }
 
-function mapSessionToOfficeStatus(session: GatewaySession): RemoteSession['status'] {
-  const status = deriveSessionStatus(session)
-  if (status === 'running') return 'active'
-  if (status === 'completed') return 'done'
-  return 'idle'
-}
-
 const ACTIVITY_PAGE_SIZE = 5
 
 export function Conductor() {
@@ -234,59 +225,6 @@ export function Conductor() {
   const shouldCollapseLivePlanByDefault = totalWorkers > 0
   const totalTokens = conductor.workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
   const livePlanText = useMemo(() => getFilteredPlanText(conductor.planText, totalWorkers), [conductor.planText, totalWorkers])
-  const remoteSessions = useMemo<RemoteSession[]>(() => {
-    return conductor.recentSessions.map((session, index) => {
-      const startedAtValue = session.startedAt ?? session.createdAt ?? session.updatedAt
-      const startedAtMs = typeof startedAtValue === 'string' || typeof startedAtValue === 'number'
-        ? new Date(startedAtValue).getTime()
-        : 0
-      const sessionKey = session.key ?? session.label ?? `session-${index}`
-      const label = session.label ?? session.title ?? session.derivedTitle ?? sessionKey
-      const lastMessage = getLastAssistantMessage(session.messages as HistoryMessage[] | undefined)
-      const kind = session.key?.includes(':subagent:') || (session.label ?? '').startsWith('worker-') ? 'subagent' : 'main'
-
-      return {
-        sessionKey,
-        label,
-        model: session.model ?? undefined,
-        status: mapSessionToOfficeStatus(session),
-        startedAt: Number.isFinite(startedAtMs) ? startedAtMs : Date.now(),
-        kind,
-        lastMessage: lastMessage || undefined,
-        tokenCount: typeof session.totalTokens === 'number' ? session.totalTokens : undefined,
-      }
-    })
-  }, [conductor.recentSessions])
-  const agentRows = useMemo<AgentWorkingRow[]>(() => {
-    return AGENT_NAMES.slice(0, 6).map((name, index) => {
-      const matchingSession = remoteSessions.find((session) => {
-        const normalizedLabel = session.label.toLowerCase()
-        return normalizedLabel.includes(name.toLowerCase()) || normalizedLabel.includes(`worker-${name.toLowerCase()}`)
-      })
-      const status: AgentWorkingRow['status'] = matchingSession
-        ? matchingSession.status === 'active'
-          ? 'active'
-          : matchingSession.status === 'done'
-            ? 'idle'
-            : 'ready'
-        : conductor.phase !== 'idle' && index < Math.max(activeWorkerCount, 1)
-          ? 'active'
-          : 'ready'
-
-      return {
-        id: `conductor-agent-${index}`,
-        name,
-        modelId: matchingSession?.model?.includes('codex') ? 'codex' : 'auto',
-        status,
-        lastLine: matchingSession?.lastMessage,
-        lastAt: matchingSession?.startedAt,
-        taskCount: matchingSession ? 1 : 0,
-        currentTask: matchingSession?.label ? `Tracking ${matchingSession.label}` : undefined,
-        sessionKey: matchingSession?.sessionKey,
-        roleDescription: `${AGENT_EMOJIS[index % AGENT_EMOJIS.length]} Conductor worker`,
-      }
-    })
-  }, [activeWorkerCount, conductor.phase, remoteSessions])
 
   const completePhaseProjectPath = useMemo(() => {
     const workerOutput = [
@@ -400,18 +338,6 @@ export function Conductor() {
                   <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
                 </Button>
               </div>
-            </section>
-
-            <section className="w-full overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
-              <OfficeView
-                agentRows={agentRows}
-                missionRunning={conductor.phase !== 'idle'}
-                remoteSessions={remoteSessions}
-                onViewOutput={() => {}}
-                processType="sequential"
-                companyName="Conductor"
-                containerHeight={300}
-              />
             </section>
 
             {conductor.recentSessions.length > 0 && (
