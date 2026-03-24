@@ -245,6 +245,9 @@ function extractProjectPath(text: string): string | null {
 }
 
 function getFilteredPlanText(planText: string, workerCount: number): string {
+  // Remove repeated fragments (SSE token concatenation artifacts)
+  planText = planText.replace(/(.{15,}?)\1+/g, '$1')
+
   const filtered = planText
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -586,8 +589,8 @@ export function Conductor() {
 
   if (phase === 'preview') {
     return (
-      <div className="h-full min-h-full bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-full max-w-[880px] flex-col px-6 py-12">
+      <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch justify-center px-6 py-8">
           <div className="space-y-6">
             <div className="space-y-2 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Decomposition</p>
@@ -611,7 +614,7 @@ export function Conductor() {
                 {conductor.planText ? (
                   <div className="space-y-4">
                     <Markdown className="max-h-[500px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">
-                      {conductor.planText}
+                      {conductor.planText.replace(/(.{20,}?)\1+/g, '$1')}
                     </Markdown>
                     <PlanningIndicator />
                   </div>

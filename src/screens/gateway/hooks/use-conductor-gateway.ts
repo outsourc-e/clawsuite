@@ -535,9 +535,20 @@ export function useConductorGateway() {
   }, [missionWorkerLabels, workers])
 
   useEffect(() => {
-    if (phase === 'decomposing' && workers.length > 0) {
+    if (phase !== 'decomposing') return
+
+    if (workers.length > 0) {
       setPhase('running')
+      return
     }
+
+    const timer = setTimeout(() => {
+      if (phase === 'decomposing') {
+        setPhase('running')
+      }
+    }, 15_000)
+
+    return () => clearTimeout(timer)
   }, [phase, workers.length])
 
   useEffect(() => {
@@ -746,6 +757,7 @@ export function useConductorGateway() {
         }
         if (event.type === 'tool') {
           seenToolCallRef.current = true
+          setPhase((current) => (current === 'decomposing' ? 'running' : current))
         }
         if (event.type === 'tool' && event.name === 'sessions_spawn' && event.phase === 'result') {
           const childSessionKey = readString(event.data?.childSessionKey)
