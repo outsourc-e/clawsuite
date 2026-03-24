@@ -256,6 +256,7 @@ export function Conductor() {
   const conductor = useConductorGateway()
   const [goalDraft, setGoalDraft] = useState('')
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activityFilter, setActivityFilter] = useState<'all' | 'conductor' | 'running' | 'completed' | 'failed'>('all')
   const [activityPage, setActivityPage] = useState(0)
   const [now, setNow] = useState(() => Date.now())
@@ -344,6 +345,12 @@ export function Conductor() {
       setActivityPage(safeActivityPage)
     }
   }, [activityPage, safeActivityPage])
+
+  useEffect(() => {
+    if (!selectedTaskId) return
+    if (conductor.tasks.some((task) => task.id === selectedTaskId)) return
+    setSelectedTaskId(null)
+  }, [conductor.tasks, selectedTaskId])
 
   if (phase === 'home') {
     return (
@@ -704,88 +711,221 @@ export function Conductor() {
             </div>
           </details>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Worker Sessions</h2>
-              <span className="text-xs text-[var(--theme-muted-2)]">Polling /api/sessions every 3s</span>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {conductor.workers.map((worker, index) => {
-                const dot = getWorkerDot(worker.status)
-                const persona = getAgentPersona(index)
-                const workerOutput = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
-                const workerStartedAt =
-                  typeof worker.raw.createdAt === 'string'
-                    ? worker.raw.createdAt
-                    : typeof worker.raw.startedAt === 'string'
-                      ? worker.raw.startedAt
-                      : conductor.missionStartedAt
-                const workerEndTime =
-                  worker.status === 'complete' || worker.status === 'stale'
-                    ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime()
-                    : now
-                return (
-                  <div
-                    key={worker.key}
-                    className={cn(
-                      'overflow-hidden rounded-2xl border border-[var(--theme-border)] border-l-4 bg-[var(--theme-card)] px-4 py-3',
-                      getWorkerBorderClass(worker.status),
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={cn('size-2.5 rounded-full', dot.dotClass)} />
-                          <p className="truncate text-sm font-medium text-[var(--theme-text)]">
-                            {persona.emoji} {persona.name} <span className="text-[var(--theme-muted)]">·</span> {worker.label}
-                          </p>
+          {conductor.tasks.length > 0 ? (
+            <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+              <div className="space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+                  Tasks ({conductor.tasks.filter((task) => task.status === 'complete').length}/{conductor.tasks.length})
+                </h2>
+                {conductor.tasks.map((task) => {
+                  const isSelected = selectedTaskId === task.id
+                  const statusDot =
+                    task.status === 'complete'
+                      ? 'bg-emerald-400'
+                      : task.status === 'running'
+                        ? 'bg-sky-400 animate-pulse'
+                        : task.status === 'failed'
+                          ? 'bg-red-400'
+                          : 'bg-zinc-500'
+                  return (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => setSelectedTaskId(isSelected ? null : task.id)}
+                      className={cn(
+                        'w-full rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
+                        isSelected
+                          ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)]'
+                          : 'border-[var(--theme-border)] bg-[var(--theme-card)] hover:border-[var(--theme-accent)]',
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={cn('size-2 shrink-0 rounded-full', statusDot)} />
+                        <span className="min-w-0 truncate font-medium text-[var(--theme-text)]">{task.title}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+                    {selectedTaskId ? 'Task Output' : 'Worker Sessions'}
+                  </h2>
+                  <span className="text-xs text-[var(--theme-muted-2)]">Polling /api/sessions every 3s</span>
+                </div>
+                {(() => {
+                  const selectedTask = selectedTaskId ? conductor.tasks.find((task) => task.id === selectedTaskId) : null
+                  const displayWorkers = selectedTask?.workerKey
+                    ? conductor.workers.filter((worker) => worker.key === selectedTask.workerKey)
+                    : conductor.workers
+                  return (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {displayWorkers.map((worker, index) => {
+                        const dot = getWorkerDot(worker.status)
+                        const persona = getAgentPersona(index)
+                        const workerOutput =
+                          conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+                        const workerStartedAt =
+                          typeof worker.raw.createdAt === 'string'
+                            ? worker.raw.createdAt
+                            : typeof worker.raw.startedAt === 'string'
+                              ? worker.raw.startedAt
+                              : conductor.missionStartedAt
+                        const workerEndTime =
+                          worker.status === 'complete' || worker.status === 'stale'
+                            ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime()
+                            : now
+                        return (
+                          <div
+                            key={worker.key}
+                            className={cn(
+                              'overflow-hidden rounded-2xl border border-[var(--theme-border)] border-l-4 bg-[var(--theme-card)] px-4 py-3',
+                              getWorkerBorderClass(worker.status),
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className={cn('size-2.5 rounded-full', dot.dotClass)} />
+                                  <p className="truncate text-sm font-medium text-[var(--theme-text)]">
+                                    {persona.emoji} {persona.name} <span className="text-[var(--theme-muted)]">·</span> {worker.label}
+                                  </p>
+                                </div>
+                                <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{worker.displayName}</p>
+                              </div>
+                              <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+                                {dot.label}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                                <p className="text-[var(--theme-muted)]">Model</p>
+                                <p className="mt-1 truncate text-[var(--theme-text)]">{getShortModelName(worker.model)}</p>
+                              </div>
+                              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                                <p className="text-[var(--theme-muted)]">Tokens</p>
+                                <p className="mt-1 text-[var(--theme-text)]">{worker.tokenUsageLabel}</p>
+                              </div>
+                              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                                <p className="text-[var(--theme-muted)]">Elapsed</p>
+                                <p className="mt-1 text-[var(--theme-text)]">{formatElapsedTime(workerStartedAt, workerEndTime)}</p>
+                              </div>
+                              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                                <p className="text-[var(--theme-muted)]">Last update</p>
+                                <p className="mt-1 text-[var(--theme-text)]">{formatRelativeTime(worker.updatedAt, now)}</p>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4">
+                              {workerOutput ? (
+                                <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{workerOutput}</Markdown>
+                              ) : (
+                                <CyclingStatus steps={WORKING_STEPS} intervalMs={3500} />
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {displayWorkers.length === 0 && (
+                        <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-8 text-center text-sm text-[var(--theme-muted)] md:col-span-2">
+                          <div className="flex items-center justify-center gap-3">
+                            <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+                            <span>Spawning workers…</span>
+                          </div>
                         </div>
-                        <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{worker.displayName}</p>
-                      </div>
-                      <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-                        {dot.label}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                        <p className="text-[var(--theme-muted)]">Model</p>
-                        <p className="mt-1 truncate text-[var(--theme-text)]">{getShortModelName(worker.model)}</p>
-                      </div>
-                      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                        <p className="text-[var(--theme-muted)]">Tokens</p>
-                        <p className="mt-1 text-[var(--theme-text)]">{worker.tokenUsageLabel}</p>
-                      </div>
-                      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                        <p className="text-[var(--theme-muted)]">Elapsed</p>
-                        <p className="mt-1 text-[var(--theme-text)]">{formatElapsedTime(workerStartedAt, workerEndTime)}</p>
-                      </div>
-                      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                        <p className="text-[var(--theme-muted)]">Last update</p>
-                        <p className="mt-1 text-[var(--theme-text)]">{formatRelativeTime(worker.updatedAt, now)}</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4">
-                      {workerOutput ? (
-                        <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{workerOutput}</Markdown>
-                      ) : (
-                        <CyclingStatus steps={WORKING_STEPS} intervalMs={3500} />
                       )}
                     </div>
-                  </div>
-                )
-              })}
-              {conductor.workers.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-8 text-center text-sm text-[var(--theme-muted)] md:col-span-2">
-                  <div className="flex items-center justify-center gap-3">
-                    <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
-                    <span>Spawning workers…</span>
-                  </div>
-                </div>
-              )}
+                  )
+                })()}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Worker Sessions</h2>
+                <span className="text-xs text-[var(--theme-muted-2)]">Polling /api/sessions every 3s</span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {conductor.workers.map((worker, index) => {
+                  const dot = getWorkerDot(worker.status)
+                  const persona = getAgentPersona(index)
+                  const workerOutput = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+                  const workerStartedAt =
+                    typeof worker.raw.createdAt === 'string'
+                      ? worker.raw.createdAt
+                      : typeof worker.raw.startedAt === 'string'
+                        ? worker.raw.startedAt
+                        : conductor.missionStartedAt
+                  const workerEndTime =
+                    worker.status === 'complete' || worker.status === 'stale'
+                      ? new Date(worker.updatedAt ?? new Date().toISOString()).getTime()
+                      : now
+                  return (
+                    <div
+                      key={worker.key}
+                      className={cn(
+                        'overflow-hidden rounded-2xl border border-[var(--theme-border)] border-l-4 bg-[var(--theme-card)] px-4 py-3',
+                        getWorkerBorderClass(worker.status),
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={cn('size-2.5 rounded-full', dot.dotClass)} />
+                            <p className="truncate text-sm font-medium text-[var(--theme-text)]">
+                              {persona.emoji} {persona.name} <span className="text-[var(--theme-muted)]">·</span> {worker.label}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{worker.displayName}</p>
+                        </div>
+                        <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+                          {dot.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                          <p className="text-[var(--theme-muted)]">Model</p>
+                          <p className="mt-1 truncate text-[var(--theme-text)]">{getShortModelName(worker.model)}</p>
+                        </div>
+                        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                          <p className="text-[var(--theme-muted)]">Tokens</p>
+                          <p className="mt-1 text-[var(--theme-text)]">{worker.tokenUsageLabel}</p>
+                        </div>
+                        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                          <p className="text-[var(--theme-muted)]">Elapsed</p>
+                          <p className="mt-1 text-[var(--theme-text)]">{formatElapsedTime(workerStartedAt, workerEndTime)}</p>
+                        </div>
+                        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                          <p className="text-[var(--theme-muted)]">Last update</p>
+                          <p className="mt-1 text-[var(--theme-text)]">{formatRelativeTime(worker.updatedAt, now)}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4">
+                        {workerOutput ? (
+                          <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{workerOutput}</Markdown>
+                        ) : (
+                          <CyclingStatus steps={WORKING_STEPS} intervalMs={3500} />
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                {conductor.workers.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-8 text-center text-sm text-[var(--theme-muted)] md:col-span-2">
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+                      <span>Spawning workers…</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

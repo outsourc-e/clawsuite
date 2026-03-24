@@ -30,6 +30,7 @@ type PersistedMission = {
   streamText: string
   planText: string
   completedAt: string | null
+  tasks: ConductorTask[]
 }
 
 type StreamEvent =
@@ -51,6 +52,45 @@ export type ConductorWorker = {
   contextTokens: number
   tokenUsageLabel: string
   raw: GatewaySession
+}
+
+export type ConductorTask = {
+  id: string
+  title: string
+  status: 'pending' | 'running' | 'complete' | 'failed'
+  workerKey: string | null
+  output: string | null
+}
+
+function extractTasksFromPlan(planText: string): ConductorTask[] {
+  const tasks: ConductorTask[] = []
+  const patterns = [
+    /^\s*(\d+)\.\s+(.+)$/gm,
+    /^\s*#{1,3}\s+(?:Step\s+)?(\d+)[.:]\s*(.+)$/gm,
+    /^\s*-\s+\*\*(?:Task\s+)?(\d+)[.:]\s*\*\*\s*(.+)$/gm,
+  ]
+
+  const seen = new Set<string>()
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null
+    while ((match = pattern.exec(planText)) !== null) {
+      const num = match[1]
+      const title = match[2].replace(/\*\*/g, '').trim()
+      const id = `task-${num}`
+      if (!seen.has(id) && title.length > 3 && title.length < 200) {
+        seen.add(id)
+        tasks.push({ id, title, status: 'pending', workerKey: null, output: null })
+      }
+    }
+  }
+
+  tasks.sort((a, b) => {
+    const numA = parseInt(a.id.replace('task-', ''), 10)
+    const numB = parseInt(b.id.replace('task-', ''), 10)
+    return numA - numB
+  })
+
+  return tasks
 }
 
 function readString(value: unknown): string | null {
@@ -92,6 +132,32 @@ function loadPersistedMission(): PersistedMission | null {
     const missionStartedAt =
       parsed.missionStartedAt === null || parsed.missionStartedAt === undefined ? null : toIso(parsed.missionStartedAt)
     const completedAt = parsed.completedAt === null || parsed.completedAt === undefined ? null : toIso(parsed.completedAt)
+    const tasks = Array.isArray(parsed.tasks)
+      ? parsed.tasks
+          .map((task): ConductorTask | null => {
+            const record = readRecord(task)
+            if (!record) return null
+            const id = readString(record.id)
+            const title = readString(record.title)
+            const status = record.status
+            if (
+              !id ||
+              !title ||
+              (status !== 'pending' && status !== 'running' && status !== 'complete' && status !== 'failed')
+            ) {
+              return null
+            }
+
+            return {
+              id,
+              title,
+              status,
+              workerKey: record.workerKey === null || record.workerKey === undefined ? null : readString(record.workerKey),
+              output: record.output === null || record.output === undefined ? null : readString(record.output),
+            }
+          })
+          .filter((task): task is ConductorTask => task !== null)
+      : []
 
     if (
       !goal ||
@@ -113,6 +179,7 @@ function loadPersistedMission(): PersistedMission | null {
       streamText,
       planText,
       completedAt,
+      tasks,
     }
   } catch {
     return null
@@ -330,6 +397,7 @@ export function useConductorGateway() {
   const [missionWorkerKeys, setMissionWorkerKeys] = useState<Set<string>>(() => new Set(initialMission?.workerKeys ?? []))
   const [missionWorkerLabels, setMissionWorkerLabels] = useState<Set<string>>(() => new Set(initialMission?.workerLabels ?? []))
   const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>({})
+  const [tasks, setTasks] = useState<ConductorTask[]>(() => initialMission?.tasks ?? [])
   const doneRef = useRef(initialMission?.phase === 'complete')
   const seenToolCallRef = useRef(false)
 
@@ -485,6 +553,42 @@ export function useConductorGateway() {
   }, [phase, workers])
 
   useEffect(() => {
+    if (!planText) return
+    const extracted = extractTasksFromPlan(planText)
+    if (extracted.length === 0) return
+    setTasks((current) => {
+      if (current.length >= extracted.length) return current
+      return extracted.map((task) => {
+        const existing = current.find((item) => item.id === task.id)
+        return existing ?? task
+      })
+    })
+  }, [planText])
+
+  useEffect(() => {
+    if (tasks.length === 0 || workers.length === 0) return
+    setTasks((current) => {
+      const updated = current.map((task, index) => {
+        const worker = workers[index]
+        if (!worker) return task
+        const workerOutput = workerOutputs[worker.key] ?? null
+        const newStatus: ConductorTask['status'] =
+          worker.status === 'complete'
+            ? 'complete'
+            : worker.status === 'stale'
+              ? 'failed'
+              : worker.status === 'running'
+                ? 'running'
+                : task.status
+        if (task.workerKey === worker.key && task.status === newStatus && task.output === workerOutput) return task
+        return { ...task, workerKey: worker.key, status: newStatus, output: workerOutput }
+      })
+      const changed = updated.some((task, index) => task !== current[index])
+      return changed ? updated : current
+    })
+  }, [workers, workerOutputs, tasks.length])
+
+  useEffect(() => {
     if (phase === 'idle') {
       try {
         localStorage.removeItem(ACTIVE_MISSION_STORAGE_KEY)
@@ -501,8 +605,9 @@ export function useConductorGateway() {
       streamText: streamText.slice(0, 10_000),
       planText: planText.slice(0, 10_000),
       completedAt,
+      tasks,
     })
-  }, [phase, goal, missionStartedAt, completedAt, missionWorkerKeys, missionWorkerLabels, streamText, planText])
+  }, [phase, goal, missionStartedAt, completedAt, missionWorkerKeys, missionWorkerLabels, streamText, planText, tasks])
 
   const sendMission = useMutation({
     mutationFn: async (nextGoal: string) => {
@@ -518,6 +623,7 @@ export function useConductorGateway() {
       setMissionWorkerKeys(new Set())
       setMissionWorkerLabels(new Set())
       setWorkerOutputs({})
+      setTasks([])
       seenToolCallRef.current = false
       setMissionStartedAt(new Date().toISOString())
       setPhase('decomposing')
@@ -605,6 +711,7 @@ export function useConductorGateway() {
     setMissionWorkerKeys(new Set())
     setMissionWorkerLabels(new Set())
     setWorkerOutputs({})
+    setTasks([])
     seenToolCallRef.current = false
   }
 
@@ -617,6 +724,7 @@ export function useConductorGateway() {
     streamError,
     missionStartedAt,
     completedAt,
+    tasks,
     workers,
     activeWorkers,
     recentSessions: recentSessionsQuery.data ?? [],
