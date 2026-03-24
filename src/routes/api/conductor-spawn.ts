@@ -2,30 +2,21 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
-
-type SpawnResponse = {
-  ok?: boolean
-  sessionKey?: string
-  childSessionKey?: string
-  error?: string
-}
 
 let cachedSkill: string | null = null
 
 function loadDispatchSkill(): string {
   if (cachedSkill) return cachedSkill
   try {
-    // Try ClawSuite repo first, then workspace
     const candidates = [
       resolve(process.cwd(), 'skills/workspace-dispatch/SKILL.md'),
       resolve(process.env.HOME ?? '~', '.openclaw/workspace/skills/workspace-dispatch/SKILL.md'),
     ]
-    for (const path of candidates) {
+    for (const p of candidates) {
       try {
-        cachedSkill = readFileSync(path, 'utf-8')
+        cachedSkill = readFileSync(p, 'utf-8')
         return cachedSkill
       } catch {
         continue
@@ -34,12 +25,11 @@ function loadDispatchSkill(): string {
   } catch {
     // ignore
   }
-  // Inline fallback if file not found
   return ''
 }
 
 function buildOrchestratorPrompt(goal: string, skill: string): string {
-  const lines = [
+  return [
     'You are a mission orchestrator. Execute this mission autonomously.',
     '',
     '## Dispatch Skill Instructions',
@@ -58,8 +48,28 @@ function buildOrchestratorPrompt(goal: string, skill: string): string {
     '- Each worker gets a self-contained prompt with the task + exit criteria',
     '- Verify exit criteria after each worker completes',
     '- Report a summary when all tasks are done',
+  ].join('\n')
+}
+
+function readGatewayConfig(): { url: string; token: string } {
+  // Read gateway URL and hooks token from openclaw.json
+  const configPaths = [
+    resolve(process.env.HOME ?? '~', '.openclaw/openclaw.json'),
   ]
-  return lines.join('\n')
+  for (const p of configPaths) {
+    try {
+      const raw = readFileSync(p, 'utf-8')
+      // openclaw.json uses relaxed JSON (JS object syntax) — extract what we need with regex
+      const portMatch = raw.match(/port:\s*(\d+)/)
+      const port = portMatch ? portMatch[1] : '18789'
+      const tokenMatch = raw.match(/hooks:\s*\{[^}]*token:\s*['"]([^'"]+)['"]/)
+      const token = tokenMatch ? tokenMatch[1] : ''
+      return { url: `http://127.0.0.1:${port}`, token }
+    } catch {
+      continue
+    }
+  }
+  return { url: 'http://127.0.0.1:18789', token: '' }
 }
 
 export const Route = createFileRoute('/api/conductor-spawn')({
@@ -82,20 +92,34 @@ export const Route = createFileRoute('/api/conductor-spawn')({
 
           const skill = loadDispatchSkill()
           const prompt = buildOrchestratorPrompt(goal, skill)
+          const { url: gatewayUrl, token: hooksToken } = readGatewayConfig()
 
-          // Spawn a dedicated orchestrator session via gateway
-          const result = await gatewayRpc<SpawnResponse>('sessions.spawn', {
-            task: prompt,
-            label: `conductor-${Date.now()}`,
-            mode: 'run',
-            runTimeoutSeconds: 900,
+          // Use the gateway hooks endpoint to spawn an isolated agent session
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+          if (hooksToken) {
+            headers['Authorization'] = `Bearer ${hooksToken}`
+          }
+
+          const hookResponse = await fetch(`${gatewayUrl}/hooks`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ text: prompt }),
           })
 
-          const sessionKey = result.childSessionKey ?? result.sessionKey ?? null
+          if (!hookResponse.ok) {
+            const errText = await hookResponse.text().catch(() => '')
+            return json(
+              { ok: false, error: `Gateway hooks returned ${hookResponse.status}: ${errText}` },
+              { status: 502 },
+            )
+          }
+
+          const hookResult = (await hookResponse.json().catch(() => ({}))) as Record<string, unknown>
 
           return json({
             ok: true,
-            sessionKey,
+            sessionKey: hookResult.sessionKey ?? hookResult.key ?? null,
+            runId: hookResult.runId ?? null,
           })
         } catch (error) {
           return json(
