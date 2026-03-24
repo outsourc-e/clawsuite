@@ -82,7 +82,6 @@ function getAgentPersona(index: number) {
 }
 
 const PLANNING_STEPS = ['Planning the mission…', 'Analyzing requirements…', 'Preparing agents…', 'Writing the spec…']
-const ORCHESTRATOR_STEPS = ['Orchestrator is planning...', 'Decomposing mission...', 'Preparing workers...']
 const WORKING_STEPS = [
   '📋 Reviewing the brief…',
   '🔍 Scanning existing patterns…',
@@ -252,27 +251,6 @@ function extractProjectPath(text: string): string | null {
   return null
 }
 
-function getFilteredPlanText(planText: string, workerCount: number): string {
-  // Remove repeated fragments (SSE token concatenation artifacts)
-  planText = planText.replace(/(.{15,}?)\1+/g, '$1')
-
-  const filtered = planText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .filter(
-      (line) =>
-        !line.includes('spawned') &&
-        !line.includes('Check the Conductor') &&
-        !line.includes('Waiting for it to finish'),
-    )
-    .join('\n')
-    .trim()
-
-  if (filtered) return filtered
-  return `Mission dispatched. ${workerCount} worker${workerCount === 1 ? '' : 's'} spawned.`
-}
-
 function workersToSwarmSessions(workers: ConductorWorker[]): SwarmSession[] {
   return workers.map((worker) => ({
     ...worker.raw,
@@ -332,7 +310,6 @@ export function Conductor() {
   const activeWorkerCount = conductor.activeWorkers.length
   const missionProgress = totalWorkers > 0 ? Math.round((completedWorkers / totalWorkers) * 100) : 0
   const totalTokens = conductor.workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
-  const livePlanText = useMemo(() => getFilteredPlanText(conductor.planText, totalWorkers), [conductor.planText, totalWorkers])
 
   const completePhaseProjectPath = useMemo(() => {
     const workerOutputTexts = [
@@ -763,11 +740,11 @@ export function Conductor() {
                     Open in new tab ↗
                   </a>
                 </div>
-                <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-white">
+                <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
                   <iframe
                     src={`/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`}
                     className="h-[500px] w-full"
-                    sandbox="allow-scripts"
+                    sandbox="allow-scripts allow-same-origin"
                     title="Mission output preview"
                   />
                 </div>
@@ -893,39 +870,19 @@ export function Conductor() {
                 onClick={conductor.resetMission}
                 className="shrink-0 rounded-xl border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-card2)]"
               >
-                Leave Mission
+                Stop Mission
               </Button>
             </div>
             <div className="mt-3 h-0.5 w-full overflow-hidden rounded-full bg-[var(--theme-border)]">
               <div className="h-full rounded-full bg-[var(--theme-accent)] transition-[width] duration-300" style={{ width: `${missionProgress}%` }} />
             </div>
           </section>
-          {conductor.workers.length > 0 && (
-            <div className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
-              <IsometricOffice
-                sessions={workersToSwarmSessions(conductor.workers)}
-                className="h-[200px] w-full"
-              />
-            </div>
-          )}
-          {livePlanText && (
-            <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-4 shadow-[0_24px_80px_var(--theme-shadow)]">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Mission Status</p>
-                <span className="rounded-full border border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--theme-accent-strong)]">
-                  Running
-                </span>
-              </div>
-              {conductor.workers.length === 0 ? (
-                <CyclingStatus steps={ORCHESTRATOR_STEPS} intervalMs={2600} />
-              ) : (
-                <p className="mt-2 text-sm text-[var(--theme-muted-2)]">
-                  {conductor.workers.length} worker{conductor.workers.length === 1 ? '' : 's'}{' '}
-                  {conductor.workers.every((worker) => worker.status === 'complete') ? 'complete' : 'running'}
-                </p>
-              )}
-            </div>
-          )}
+          <div className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
+            <IsometricOffice
+              sessions={workersToSwarmSessions(conductor.workers)}
+              className="h-[280px] w-full"
+            />
+          </div>
 
           {conductor.tasks.length > 0 ? (
             <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
