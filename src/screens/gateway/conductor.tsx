@@ -11,9 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { type GatewaySession } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
-import { OfficeView } from './components/office-view'
-import type { AgentWorkingRow, AgentWorkingStatus } from './components/agents-working-panel'
-import { type ConductorWorker, type MissionHistoryEntry, useConductorGateway } from './hooks/use-conductor-gateway'
+import { type MissionHistoryEntry, useConductorGateway } from './hooks/use-conductor-gateway'
 
 type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
 type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
@@ -249,29 +247,6 @@ function extractProjectPath(text: string): string | null {
   }
 
   return null
-}
-
-function workersToAgentRows(workers: ConductorWorker[]): AgentWorkingRow[] {
-  return workers.map((worker, index) => {
-    const persona = getAgentPersona(index)
-    const statusMap: Record<ConductorWorker['status'], AgentWorkingStatus> = {
-      running: 'active',
-      complete: 'idle',
-      stale: 'error',
-      idle: 'ready',
-    }
-    return {
-      id: worker.key,
-      name: `${persona.emoji} ${persona.name}`,
-      modelId: worker.model ?? 'default',
-      status: statusMap[worker.status] ?? 'none',
-      lastLine: worker.displayName,
-      lastAt: worker.updatedAt ? new Date(worker.updatedAt).getTime() : undefined,
-      taskCount: 1,
-      currentTask: worker.label,
-      sessionKey: worker.key,
-    }
-  })
 }
 
 function deriveSessionStatus(session: GatewaySession): 'running' | 'completed' | 'failed' {
@@ -865,16 +840,14 @@ export function Conductor() {
             </div>
           </div>
           <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-5 shadow-[0_24px_80px_var(--theme-shadow)]">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <h1 className="line-clamp-2 text-xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-2xl">{conductor.goal}</h1>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--theme-muted)]">
-                  <span>{formatElapsedTime(conductor.missionStartedAt, now)}</span>
-                  <span className="text-[var(--theme-border)]">•</span>
-                  <span>{completedWorkers}/{Math.max(totalWorkers, 1)} complete</span>
-                  <span className="text-[var(--theme-border)]">•</span>
-                  <span>{activeWorkerCount} active</span>
-                </div>
+            <div className="text-center">
+              <h1 className="line-clamp-2 text-xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-2xl">{conductor.goal}</h1>
+              <div className="mt-2 flex items-center justify-center gap-2 text-xs text-[var(--theme-muted)]">
+                <span>{formatElapsedTime(conductor.missionStartedAt, now)}</span>
+                <span className="text-[var(--theme-border)]">·</span>
+                <span>{completedWorkers}/{Math.max(totalWorkers, 1)} complete</span>
+                <span className="text-[var(--theme-border)]">·</span>
+                <span>{activeWorkerCount} active</span>
               </div>
             </div>
             <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-[var(--theme-border)]">
@@ -904,16 +877,39 @@ export function Conductor() {
               </button>
             </div>
           </section>
-          <div className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
-            <OfficeView
-              agentRows={workersToAgentRows(conductor.workers)}
-              missionRunning={conductor.workers.some((w) => w.status === 'running')}
-              onViewOutput={() => {}}
-              processType="sequential"
-              companyName="Conductor"
-              containerHeight={280}
-            />
-          </div>
+          {conductor.workers.length > 0 && (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {conductor.workers.map((worker, index) => {
+                const persona = getAgentPersona(index)
+                const dot = getWorkerDot(worker.status)
+                return (
+                  <div
+                    key={worker.key}
+                    className={cn(
+                      'flex items-center gap-3 rounded-2xl border border-l-4 bg-[var(--theme-card)] px-4 py-3',
+                      getWorkerBorderClass(worker.status),
+                    )}
+                  >
+                    <span className={cn('size-2.5 shrink-0 rounded-full', dot.dotClass)} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-[var(--theme-text)]">
+                        {persona.emoji} {persona.name}
+                      </p>
+                      <p className="truncate text-xs text-[var(--theme-muted)]">{worker.displayName}</p>
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                      {dot.label}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {conductor.workers.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-8 text-center text-sm text-[var(--theme-muted)]">
+              <CyclingStatus steps={PLANNING_STEPS} intervalMs={2500} />
+            </div>
+          )}
 
           {conductor.tasks.length > 0 ? (
             <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
