@@ -1,3 +1,5 @@
+> **⚠️ SUPERSEDED** — Dispatch now uses gateway-direct streaming via /api/send-stream, not the daemon trigger mechanism described here. See `CONDUCTOR-BUILD-PLAN.md`.
+
 # Dispatch Trigger Architecture Spec
 _2026-03-23 — Aurora_
 

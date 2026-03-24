@@ -1,3 +1,5 @@
+> **⚠️ SUPERSEDED** — The restore was completed using a gateway-direct architecture instead of the daemon-dispatch approach described here. See `CONDUCTOR-BUILD-PLAN.md`.
+
 # Conductor Restore — Wire to Dispatch Skill
 
 _Goal: Restore Conductor's UI, rip out old daemon execution hooks, wire to dispatch-state.json_

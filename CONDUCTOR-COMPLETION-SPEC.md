@@ -1,3 +1,5 @@
+> **⚠️ SUPERSEDED** — This spec describes the daemon-dispatch architecture which was replaced by the gateway-direct architecture in March 2026. See `CONDUCTOR-BUILD-PLAN.md` and `CONDUCTOR-AUDIT.md` for current state.
+
 # Conductor Completion Spec
 _2026-03-23 — Aurora_
 
