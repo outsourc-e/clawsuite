@@ -716,7 +716,7 @@ export function useConductorGateway() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           sessionKey: 'agent:main:main',
-          message: `[DISPATCH] ${trimmed}`,
+          message: `[DISPATCH] Read the workspace-dispatch skill at skills/workspace-dispatch/SKILL.md (relative to the ClawSuite project root) and execute this mission autonomously. Use sessions_spawn to create worker agents for each task. Do not ask for confirmation — start immediately.\n\nMission goal: ${trimmed}`,
         }),
       })
 

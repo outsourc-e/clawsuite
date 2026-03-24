@@ -149,8 +149,6 @@ import { Route as ApiGatewayApprovalsIndexRouteImport } from './routes/api/gatew
 import { Route as ApiWorkspaceTasksIdRouteImport } from './routes/api/workspace/tasks.$id'
 import { Route as ApiWorkspaceTaskRunsAdhocRouteImport } from './routes/api/workspace/task-runs.adhoc'
 import { Route as ApiWorkspaceProjectsIdRouteImport } from './routes/api/workspace/projects.$id'
-import { Route as ApiWorkspaceDispatchStateRouteImport } from './routes/api/workspace/dispatch.state'
-import { Route as ApiWorkspaceDispatchStartRouteImport } from './routes/api/workspace/dispatch.start'
 import { Route as ApiWorkspaceCheckpointsIdRouteImport } from './routes/api/workspace/checkpoints.$id'
 import { Route as ApiWorkspaceAgentsIdRouteImport } from './routes/api/workspace/agents.$id'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
@@ -882,18 +880,6 @@ const ApiWorkspaceProjectsIdRoute = ApiWorkspaceProjectsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ApiWorkspaceProjectsRoute,
 } as any)
-const ApiWorkspaceDispatchStateRoute =
-  ApiWorkspaceDispatchStateRouteImport.update({
-    id: '/dispatch/state',
-    path: '/dispatch/state',
-    getParentRoute: () => ApiWorkspaceRoute,
-  } as any)
-const ApiWorkspaceDispatchStartRoute =
-  ApiWorkspaceDispatchStartRouteImport.update({
-    id: '/dispatch/start',
-    path: '/dispatch/start',
-    getParentRoute: () => ApiWorkspaceRoute,
-  } as any)
 const ApiWorkspaceCheckpointsIdRoute =
   ApiWorkspaceCheckpointsIdRouteImport.update({
     id: '/$id',
@@ -1202,8 +1188,6 @@ export interface FileRoutesByFullPath {
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-  '/api/workspace/dispatch/start': typeof ApiWorkspaceDispatchStartRoute
-  '/api/workspace/dispatch/state': typeof ApiWorkspaceDispatchStateRoute
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRouteWithChildren
   '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
   '/api/workspace/tasks/$id': typeof ApiWorkspaceTasksIdRoute
@@ -1373,8 +1357,6 @@ export interface FileRoutesByTo {
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-  '/api/workspace/dispatch/start': typeof ApiWorkspaceDispatchStartRoute
-  '/api/workspace/dispatch/state': typeof ApiWorkspaceDispatchStateRoute
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRouteWithChildren
   '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
   '/api/workspace/tasks/$id': typeof ApiWorkspaceTasksIdRoute
@@ -1546,8 +1528,6 @@ export interface FileRoutesById {
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/workspace/agents/$id': typeof ApiWorkspaceAgentsIdRoute
   '/api/workspace/checkpoints/$id': typeof ApiWorkspaceCheckpointsIdRouteWithChildren
-  '/api/workspace/dispatch/start': typeof ApiWorkspaceDispatchStartRoute
-  '/api/workspace/dispatch/state': typeof ApiWorkspaceDispatchStateRoute
   '/api/workspace/projects/$id': typeof ApiWorkspaceProjectsIdRouteWithChildren
   '/api/workspace/task-runs/adhoc': typeof ApiWorkspaceTaskRunsAdhocRoute
   '/api/workspace/tasks/$id': typeof ApiWorkspaceTasksIdRoute
@@ -1720,8 +1700,6 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/status'
     | '/api/workspace/agents/$id'
     | '/api/workspace/checkpoints/$id'
-    | '/api/workspace/dispatch/start'
-    | '/api/workspace/dispatch/state'
     | '/api/workspace/projects/$id'
     | '/api/workspace/task-runs/adhoc'
     | '/api/workspace/tasks/$id'
@@ -1891,8 +1869,6 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/status'
     | '/api/workspace/agents/$id'
     | '/api/workspace/checkpoints/$id'
-    | '/api/workspace/dispatch/start'
-    | '/api/workspace/dispatch/state'
     | '/api/workspace/projects/$id'
     | '/api/workspace/task-runs/adhoc'
     | '/api/workspace/tasks/$id'
@@ -2063,8 +2039,6 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/status'
     | '/api/workspace/agents/$id'
     | '/api/workspace/checkpoints/$id'
-    | '/api/workspace/dispatch/start'
-    | '/api/workspace/dispatch/state'
     | '/api/workspace/projects/$id'
     | '/api/workspace/task-runs/adhoc'
     | '/api/workspace/tasks/$id'
@@ -3188,20 +3162,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceProjectsIdRouteImport
       parentRoute: typeof ApiWorkspaceProjectsRoute
     }
-    '/api/workspace/dispatch/state': {
-      id: '/api/workspace/dispatch/state'
-      path: '/dispatch/state'
-      fullPath: '/api/workspace/dispatch/state'
-      preLoaderRoute: typeof ApiWorkspaceDispatchStateRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/dispatch/start': {
-      id: '/api/workspace/dispatch/start'
-      path: '/dispatch/start'
-      fullPath: '/api/workspace/dispatch/start'
-      preLoaderRoute: typeof ApiWorkspaceDispatchStartRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
     '/api/workspace/checkpoints/$id': {
       id: '/api/workspace/checkpoints/$id'
       path: '/$id'
@@ -3677,8 +3637,6 @@ interface ApiWorkspaceRouteChildren {
   ApiWorkspaceTaskRunsRoute: typeof ApiWorkspaceTaskRunsRouteWithChildren
   ApiWorkspaceTasksRoute: typeof ApiWorkspaceTasksRouteWithChildren
   ApiWorkspaceTeamsRoute: typeof ApiWorkspaceTeamsRouteWithChildren
-  ApiWorkspaceDispatchStartRoute: typeof ApiWorkspaceDispatchStartRoute
-  ApiWorkspaceDispatchStateRoute: typeof ApiWorkspaceDispatchStateRoute
   ApiWorkspaceDispatchFilesSplatRoute: typeof ApiWorkspaceDispatchFilesSplatRoute
 }
 
@@ -3697,8 +3655,6 @@ const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
   ApiWorkspaceTaskRunsRoute: ApiWorkspaceTaskRunsRouteWithChildren,
   ApiWorkspaceTasksRoute: ApiWorkspaceTasksRouteWithChildren,
   ApiWorkspaceTeamsRoute: ApiWorkspaceTeamsRouteWithChildren,
-  ApiWorkspaceDispatchStartRoute: ApiWorkspaceDispatchStartRoute,
-  ApiWorkspaceDispatchStateRoute: ApiWorkspaceDispatchStateRoute,
   ApiWorkspaceDispatchFilesSplatRoute: ApiWorkspaceDispatchFilesSplatRoute,
 }
 
