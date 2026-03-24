@@ -80,6 +80,7 @@ function getAgentPersona(index: number) {
 }
 
 const PLANNING_STEPS = ['Planning the mission…', 'Analyzing requirements…', 'Preparing agents…', 'Writing the spec…']
+const ORCHESTRATOR_STEPS = ['Orchestrator is planning...', 'Decomposing mission...', 'Preparing workers...']
 const WORKING_STEPS = [
   '📋 Reviewing the brief…',
   '🔍 Scanning existing patterns…',
@@ -110,6 +111,11 @@ function CyclingStatus({ steps, intervalMs = 3000 }: { steps: string[]; interval
 
 function PlanningIndicator() {
   return <CyclingStatus steps={PLANNING_STEPS} intervalMs={2500} />
+}
+
+function getOutputDisplayName(projectPath: string | null | undefined): string {
+  if (!projectPath) return 'Output ready'
+  return projectPath.split('/').pop() || 'index.html'
 }
 
 function formatMissionTimestamp(value: string | null | undefined): string | null {
@@ -338,6 +344,10 @@ export function Conductor() {
     const candidates = buildProjectPathCandidates(conductor.workers, conductor.missionStartedAt)
     return candidates[0] ?? null
   }, [conductor.tasks, conductor.streamText, conductor.workerOutputs, conductor.workers, conductor.missionStartedAt])
+  const completePhaseOutputLabel = useMemo(
+    () => getOutputDisplayName(completePhaseProjectPath),
+    [completePhaseProjectPath],
+  )
 
   const completedTaskOutputs = useMemo(() => {
     return conductor.tasks
@@ -365,10 +375,10 @@ export function Conductor() {
       lines.push(`**Workers:** ${totalWorkers} ran · ${totalTokens.toLocaleString()} tokens`)
     }
     if (completePhaseProjectPath) {
-      lines.push(`**Output:** ${completePhaseProjectPath}/index.html`)
+      lines.push(`**Output:** ${completePhaseOutputLabel}`)
     }
     return lines.join('\n')
-  }, [phase, completePhaseProjectPath, totalWorkers, conductor.goal, totalTokens, conductor.missionStartedAt, now])
+  }, [phase, completePhaseProjectPath, completePhaseOutputLabel, totalWorkers, conductor.goal, totalTokens, conductor.missionStartedAt, now])
   const hasMissionHistory = conductor.missionHistory.length > 0
   const filteredHistory = (() => {
     const history = conductor.missionHistory
@@ -666,8 +676,14 @@ export function Conductor() {
   if (phase === 'complete') {
     return (
       <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto min-h-0 w-full max-w-[720px] flex-1 overflow-y-auto px-6 py-8">
+        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col justify-center px-6 py-8">
           <div className="space-y-6">
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
+                Conductor
+                <span className="size-2 rounded-full bg-emerald-400" />
+              </div>
+            </div>
             {conductor.streamError && (
               <div className="flex items-center justify-between gap-3 rounded-2xl border border-red-400/40 bg-red-500/10 px-5 py-3">
                 <div className="flex items-center gap-3">
@@ -717,11 +733,13 @@ export function Conductor() {
             </div>
 
             {completePhaseProjectPath && (
-              <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+              <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output Preview</p>
-                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{completePhaseProjectPath}/index.html</p>
+                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
+                      {completePhaseProjectPath ? completePhaseProjectPath.split('/').pop() || 'index.html' : 'index.html'}
+                    </p>
                   </div>
                   <a
                     href={`/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`}
@@ -735,7 +753,7 @@ export function Conductor() {
                 <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-white">
                   <iframe
                     src={`/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`}
-                    className="h-[400px] w-full"
+                    className="h-[500px] w-full"
                     sandbox="allow-scripts"
                     title="Mission output preview"
                   />
@@ -744,7 +762,7 @@ export function Conductor() {
             )}
 
             {conductor.tasks.length > 1 && completedTaskOutputs.length > 0 && (
-              <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+              <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Task Outputs</p>
@@ -785,7 +803,7 @@ export function Conductor() {
               </section>
             )}
 
-            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
@@ -836,9 +854,15 @@ export function Conductor() {
 
   return (
     <div className="flex h-full min-h-full flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-      <main className="mx-auto min-h-0 w-full max-w-[720px] flex-1 overflow-y-auto px-6 py-8">
+      <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col justify-center px-6 py-8">
         <div className="flex w-full flex-col gap-6">
-          <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)]/70 px-5 py-4 sm:px-6">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
+              Conductor
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            </div>
+          </div>
+          <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-4 shadow-[0_24px_80px_var(--theme-shadow)] sm:px-6">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
               <div className="min-w-0 text-center">
                 <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted-2)]">
@@ -850,7 +874,7 @@ export function Conductor() {
                   <span>•</span>
                   <span>{activeWorkerCount} active</span>
                 </div>
-                <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-3xl">{conductor.goal}</h1>
+                <h1 className="mt-2 line-clamp-2 text-2xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-3xl">{conductor.goal}</h1>
               </div>
               <div className="flex justify-end">
                 <Button
@@ -867,39 +891,22 @@ export function Conductor() {
               <div className="h-full rounded-full bg-[var(--theme-accent)] transition-[width] duration-300" style={{ width: `${missionProgress}%` }} />
             </div>
           </section>
-          {conductor.timeoutWarning && (
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-5 py-3">
-              <div className="flex items-center gap-3">
-                <span className="text-amber-500">⚠️</span>
-                <p className="text-sm text-amber-700 dark:text-amber-300">No worker activity detected for 60 seconds. The mission may be stalled.</p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  onClick={() => void conductor.retryMission()}
-                  className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
-                >
-                  Retry
-                </Button>
-                <Button
-                  type="button"
-                  onClick={conductor.resetMission}
-                  className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
           {livePlanText && (
-            <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-4">
+            <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-4 shadow-[0_24px_80px_var(--theme-shadow)]">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Status</p>
-                <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Mission Status</p>
+                <span className="rounded-full border border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--theme-accent-strong)]">
                   Running
                 </span>
               </div>
-              <p className="mt-2 text-sm text-[var(--theme-muted-2)] line-clamp-3">{livePlanText.slice(0, 300)}</p>
+              {conductor.workers.length === 0 ? (
+                <CyclingStatus steps={ORCHESTRATOR_STEPS} intervalMs={2600} />
+              ) : (
+                <p className="mt-2 text-sm text-[var(--theme-muted-2)]">
+                  {conductor.workers.length} worker{conductor.workers.length === 1 ? '' : 's'}{' '}
+                  {conductor.workers.every((worker) => worker.status === 'complete') ? 'complete' : 'running'}
+                </p>
+              )}
             </div>
           )}
 
@@ -941,12 +948,11 @@ export function Conductor() {
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
-                    {selectedTaskId ? 'Task Output' : 'Worker Sessions'}
-                  </h2>
-                  <span className="text-xs text-[var(--theme-muted-2)]">Polling /api/sessions every 3s</span>
-                </div>
+                {selectedTaskId ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Task Output</h2>
+                  </div>
+                ) : null}
                 {(() => {
                   const selectedTask = selectedTaskId ? conductor.tasks.find((task) => task.id === selectedTaskId) : null
                   const displayWorkers = selectedTask?.workerKey
@@ -1036,10 +1042,6 @@ export function Conductor() {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Worker Sessions</h2>
-                <span className="text-xs text-[var(--theme-muted-2)]">Polling /api/sessions every 3s</span>
-              </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {conductor.workers.map((worker, index) => {
                   const dot = getWorkerDot(worker.status)
