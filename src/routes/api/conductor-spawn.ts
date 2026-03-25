@@ -1,44 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { homedir } from 'node:os'
+import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 
-type HooksResponse = {
-  ok: boolean
+type SendResponse = {
   runId?: string
-  error?: string
-}
-
-function getGatewayUrl(): string {
-  return process.env.OPENCLAW_GATEWAY_URL ?? `http://127.0.0.1:${process.env.OPENCLAW_GATEWAY_PORT ?? '18789'}`
-}
-
-function getHooksToken(): string {
-  try {
-    const configPath = resolve(process.env.OPENCLAW_CONFIG_PATH ?? resolve(homedir(), '.openclaw/openclaw.json'))
-    const raw = readFileSync(configPath, 'utf-8')
-    const match = raw.match(/["']?token["']?\s*[:=]\s*["']([^"']+)["']/)
-    return match?.[1] ?? ''
-  } catch {
-    return process.env.OPENCLAW_HOOKS_TOKEN ?? ''
-  }
-}
-
-async function spawnViaHooks(sessionKey: string, message: string): Promise<HooksResponse> {
-  const url = `${getGatewayUrl()}/hooks/agent`
-  const token = getHooksToken()
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ sessionKey, message }),
-  })
-  return (await response.json()) as HooksResponse
 }
 
 let cachedSkill: string | null = null
@@ -88,6 +58,12 @@ function buildOrchestratorPrompt(goal: string, skill: string): string {
   ].join('\n')
 }
 
+function looksLikeMethodMissingError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const message = error.message.toLowerCase()
+  return message.includes('method') && (message.includes('not found') || message.includes('unknown'))
+}
+
 export const Route = createFileRoute('/api/conductor-spawn')({
   server: {
     handlers: {
@@ -109,11 +85,26 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           const skill = loadDispatchSkill()
           const prompt = buildOrchestratorPrompt(goal, skill)
 
-          const sessionKey = `agent:main:conductor-${Date.now()}`
-          const result = await spawnViaHooks(sessionKey, prompt)
+          // Send to agent:main:main — always exists, trusted internal RPC
+          const sessionKey = 'agent:main:main'
+          const idempotencyKey = randomUUID()
 
-          if (!result.ok) {
-            return json({ ok: false, error: result.error ?? 'Failed to spawn orchestrator' }, { status: 500 })
+          let result: SendResponse
+          try {
+            result = await gatewayRpc<SendResponse>('sessions.send', {
+              key: sessionKey,
+              message: prompt,
+              timeoutMs: 120_000,
+              idempotencyKey,
+            })
+          } catch (error) {
+            if (!looksLikeMethodMissingError(error)) throw error
+            result = await gatewayRpc<SendResponse>('chat.send', {
+              key: sessionKey,
+              message: prompt,
+              timeoutMs: 120_000,
+              idempotencyKey,
+            })
           }
 
           return json({
