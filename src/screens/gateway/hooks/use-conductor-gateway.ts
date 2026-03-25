@@ -79,6 +79,14 @@ export type ConductorTask = {
   output: string | null
 }
 
+export type MissionHistoryWorkerDetail = {
+  label: string
+  model: string
+  totalTokens: number
+  personaEmoji: string
+  personaName: string
+}
+
 export type MissionHistoryEntry = {
   id: string
   goal: string
@@ -92,11 +100,24 @@ export type MissionHistoryEntry = {
   workerSummary?: string[]
   outputText?: string
   streamText?: string
+  completeSummary?: string
+  workerDetails?: MissionHistoryWorkerDetail[]
   error?: string | null
 }
 
 const HISTORY_STORAGE_KEY = 'conductor:history'
 const MAX_HISTORY_ENTRIES = 50
+
+const AGENT_NAMES = ['Nova', 'Pixel', 'Blaze', 'Echo', 'Sage', 'Drift', 'Flux', 'Volt']
+const AGENT_EMOJIS = ['🤖', '⚡', '🔥', '🌊', '🌿', '💫', '🔮', '⭐']
+
+function getAgentPersona(index: number) {
+  return {
+    name: AGENT_NAMES[index % AGENT_NAMES.length],
+    emoji: AGENT_EMOJIS[index % AGENT_EMOJIS.length],
+  }
+}
+
 
 function extractTasksFromPlan(planText: string): ConductorTask[] {
   const tasks: ConductorTask[] = []
@@ -476,6 +497,41 @@ function summarizeWorkers(workers: ConductorWorker[]): string[] {
   })
 }
 
+function buildCompleteSummary(params: {
+  goal: string
+  streamError: string | null
+  missionStartedAt: string
+  completedAt: string
+  totalWorkers: number
+  totalTokens: number
+  outputPath: string | null
+}): string {
+  const { goal, streamError, missionStartedAt, completedAt, totalWorkers, totalTokens, outputPath } = params
+  const durationMs = Math.max(0, new Date(completedAt).getTime() - new Date(missionStartedAt).getTime())
+  const totalSeconds = Math.floor(durationMs / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const duration = hours > 0 ? `${hours}h ${minutes}m ${seconds}s` : minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`
+
+  const lines = [
+    streamError ? `❌ ${streamError}` : '✅ Mission completed successfully',
+    '',
+    `**Goal:** ${goal}`,
+    `**Duration:** ${duration}`,
+  ]
+
+  if (totalWorkers > 0) {
+    lines.push(`**Workers:** ${totalWorkers} ran · ${totalTokens.toLocaleString()} tokens`)
+  }
+
+  if (outputPath) {
+    lines.push(`**Output:** ${outputPath.split('/').pop() || 'Output ready'}`)
+  }
+
+  return lines.join('\n')
+}
+
 function buildMissionOutputText(workers: ConductorWorker[], workerOutputs: Record<string, string>, streamText: string): string {
   const combined = [
     ...Object.values(workerOutputs),
@@ -788,19 +844,41 @@ export function useConductorGateway() {
     const outputPath = buildMissionOutputPath(workers, workerOutputs, tasks, streamText)
     const workerSummary = summarizeWorkers(workers)
     const outputText = buildMissionOutputText(workers, workerOutputs, streamText)
+    const totalTokens = workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
+    const completeSummary = buildCompleteSummary({
+      goal,
+      streamError,
+      missionStartedAt,
+      completedAt,
+      totalWorkers: workers.length,
+      totalTokens,
+      outputPath,
+    })
+    const workerDetails = workers.map((worker, index) => {
+      const persona = getAgentPersona(index)
+      return {
+        label: worker.label,
+        model: worker.model ?? '',
+        totalTokens: worker.totalTokens,
+        personaEmoji: persona.emoji,
+        personaName: persona.name,
+      }
+    })
     const entry: MissionHistoryEntry = {
       id: missionId,
       goal,
       startedAt: missionStartedAt,
       completedAt,
       workerCount: workers.length,
-      totalTokens: workers.reduce((sum, worker) => sum + worker.totalTokens, 0),
+      totalTokens,
       status: streamError ? 'failed' : 'completed',
       projectPath: outputPath,
       outputPath,
       workerSummary: workerSummary.length > 0 ? workerSummary : undefined,
       outputText: outputText || undefined,
       streamText: streamText ? streamText.slice(0, 5000) : undefined,
+      completeSummary,
+      workerDetails: workerDetails.length > 0 ? workerDetails : undefined,
       error: streamError ?? undefined,
     }
     appendMissionHistory(entry)

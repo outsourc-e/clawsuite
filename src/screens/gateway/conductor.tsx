@@ -11,11 +11,11 @@ import {
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Markdown } from '@/components/prompt-kit/markdown'
-import { IsometricOffice } from '@/components/agent-swarm/isometric-office'
-import { type SwarmSession } from '@/stores/agent-swarm-store'
+import { OfficeView } from './components/office-view'
+import type { AgentWorkingRow } from './components/agents-working-panel'
 import { type GatewaySession } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
-import { type MissionHistoryEntry, useConductorGateway } from './hooks/use-conductor-gateway'
+import { type MissionHistoryEntry, type MissionHistoryWorkerDetail, useConductorGateway } from './hooks/use-conductor-gateway'
 
 type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
 type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
@@ -331,32 +331,43 @@ export function Conductor() {
   const activeWorkerCount = conductor.activeWorkers.length
   const missionProgress = totalWorkers > 0 ? Math.round((completedWorkers / totalWorkers) * 100) : 0
   const totalTokens = conductor.workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
-  const officeSessions = useMemo<SwarmSession[]>(() => {
+  const selectedHistoryEntry = conductor.selectedHistoryEntry
+  const officeAgentRows = useMemo<AgentWorkingRow[]>(() => {
     if (conductor.workers.length > 0) {
-      return conductor.workers.map((worker) => ({
-        ...worker.raw,
-        swarmStatus:
-          worker.status === 'complete'
-            ? 'complete'
-            : worker.status === 'stale'
-              ? 'failed'
-              : 'running',
-        staleness: 0,
-      }))
+      return conductor.workers.map((worker, index) => {
+        const persona = getAgentPersona(index)
+        const currentTask = conductor.tasks.find((task) => task.workerKey === worker.key && task.status === 'running')?.title
+        const lastLine = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+
+        return {
+          id: worker.key,
+          name: persona.name,
+          modelId: worker.model || 'auto',
+          roleDescription: worker.displayName,
+          status: worker.status === 'complete' ? 'idle' : worker.status === 'stale' ? 'error' : 'active',
+          lastLine,
+          lastAt: worker.updatedAt ? new Date(worker.updatedAt).getTime() : undefined,
+          taskCount: conductor.tasks.filter((task) => task.workerKey === worker.key).length,
+          currentTask,
+          sessionKey: worker.key,
+        }
+      })
     }
 
     return [
       {
-        key: 'conductor-orchestrator-placeholder',
-        label: 'Conductor',
-        title: conductor.goal || 'Planning mission',
-        initialMessage: conductor.goal || 'Planning mission',
-        status: 'thinking',
-        swarmStatus: 'thinking',
-        staleness: 0,
-      } as SwarmSession,
+        id: 'conductor-placeholder-agent',
+        name: 'Nova',
+        modelId: conductor.conductorSettings.workerModel || 'auto',
+        roleDescription: 'Waiting for workers',
+        status: 'spawning',
+        lastLine: conductor.goal || 'Preparing the office…',
+        taskCount: 0,
+        currentTask: conductor.goal || 'Preparing the office…',
+        sessionKey: 'conductor-placeholder-agent',
+      },
     ]
-  }, [conductor.goal, conductor.workers])
+  }, [conductor.conductorSettings.workerModel, conductor.goal, conductor.tasks, conductor.workerOutputs, conductor.workers])
 
   const completePhaseProjectPath = useMemo(() => {
     const workerOutputTexts = [
@@ -389,6 +400,33 @@ export function Conductor() {
   const previewUrl = completePhaseProjectPath
     ? `/api/preview-file?path=${encodeURIComponent(`${completePhaseProjectPath}/index.html`)}`
     : null
+
+  const selectedHistoryOutputPath = selectedHistoryEntry?.outputPath ?? null
+  const selectedHistoryOutputLabel = useMemo(
+    () => getOutputDisplayName(selectedHistoryOutputPath),
+    [selectedHistoryOutputPath],
+  )
+  const selectedHistoryPreviewUrl = selectedHistoryOutputPath
+    ? `/api/preview-file?path=${encodeURIComponent(`${selectedHistoryOutputPath}/index.html`)}`
+    : null
+
+  const selectedHistoryPreviewReady = useQuery({
+    queryKey: ['conductor', 'history-preview-probe', selectedHistoryPreviewUrl],
+    queryFn: async () => {
+      if (!selectedHistoryPreviewUrl) return false
+      try {
+        const res = await fetch(selectedHistoryPreviewUrl)
+        if (!res.ok) return false
+        const text = await res.text()
+        return text.length > 20 && (text.includes('<') || text.includes('html'))
+      } catch {
+        return false
+      }
+    },
+    enabled: !!selectedHistoryPreviewUrl && !!selectedHistoryEntry,
+    refetchInterval: (query) => (query.state.data === true ? false : 2_500),
+    staleTime: 5_000,
+  })
 
   const previewReady = useQuery({
     queryKey: ['conductor', 'preview-probe', previewUrl],
@@ -441,7 +479,6 @@ export function Conductor() {
     return lines.join('\n')
   }, [phase, completePhaseProjectPath, completePhaseOutputLabel, totalWorkers, conductor.goal, totalTokens, conductor.missionStartedAt, now])
   const hasMissionHistory = conductor.missionHistory.length > 0
-  const selectedHistoryEntry = conductor.selectedHistoryEntry
   const filteredHistory = (() => {
     const history = conductor.missionHistory
     if (activityFilter === 'all') return history
@@ -478,10 +515,18 @@ export function Conductor() {
 
   if (phase === 'home') {
     if (selectedHistoryEntry) {
+      const historyWorkerDetails = selectedHistoryEntry.workerDetails ?? []
+      const historySummary = selectedHistoryEntry.completeSummary ?? selectedHistoryEntry.streamText
+      const historyStatusLabel = selectedHistoryEntry.status === 'completed' ? 'Complete' : 'Stopped'
+      const historyStatusClasses =
+        selectedHistoryEntry.status === 'completed'
+          ? 'border border-emerald-400/35 bg-emerald-500/10 text-emerald-300'
+          : 'border border-red-400/35 bg-red-500/10 text-red-300'
+
       return (
         <div className="flex h-full min-h-full flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-          <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch px-6 py-8">
-            <div className="w-full space-y-6">
+          <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-6 py-8">
+            <div className="space-y-6">
               <button
                 type="button"
                 onClick={() => conductor.setSelectedHistoryEntry(null)}
@@ -490,90 +535,41 @@ export function Conductor() {
                 <span aria-hidden="true">←</span> Back
               </button>
 
-              <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={cn(
-                          'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium',
-                          selectedHistoryEntry.status === 'completed'
-                            ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-300'
-                            : 'border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] text-[var(--theme-danger)]',
-                        )}
-                      >
-                        {selectedHistoryEntry.status}
-                      </span>
-                    </div>
-                    <h1 className="text-2xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-3xl">{selectedHistoryEntry.goal}</h1>
-                    <div className="grid gap-2 text-sm text-[var(--theme-muted)] sm:grid-cols-3">
-                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                        <p className="text-xs uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">Duration</p>
-                        <p className="mt-1 text-[var(--theme-text)]">{formatDurationRange(selectedHistoryEntry.startedAt, selectedHistoryEntry.completedAt, now)}</p>
-                      </div>
-                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                        <p className="text-xs uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">Workers</p>
-                        <p className="mt-1 text-[var(--theme-text)]">{selectedHistoryEntry.workerCount}</p>
-                      </div>
-                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-                        <p className="text-xs uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">Tokens</p>
-                        <p className="mt-1 text-[var(--theme-text)]">{selectedHistoryEntry.totalTokens.toLocaleString()}</p>
-                      </div>
-                    </div>
+              <div className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className={cn('text-xs font-semibold uppercase tracking-[0.24em]', selectedHistoryEntry.status === 'completed' ? 'text-[var(--theme-accent)]' : 'text-red-400')}>
+                      {selectedHistoryEntry.status === 'completed' ? 'Mission Complete' : 'Mission Stopped'}
+                    </p>
+                    <h1 className="mt-2 text-xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-2xl">{selectedHistoryEntry.goal}</h1>
+                    <p className="mt-2 text-xs text-[var(--theme-muted-2)]">
+                      {selectedHistoryEntry.workerCount}/{Math.max(selectedHistoryEntry.workerCount, 1)} workers finished · {formatDurationRange(selectedHistoryEntry.startedAt, selectedHistoryEntry.completedAt, now)} total elapsed
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        conductor.setSelectedHistoryEntry(null)
+                        conductor.resetMission()
+                      }}
+                      className="rounded-xl bg-[var(--theme-accent)] px-5 text-white hover:bg-[var(--theme-accent-strong)]"
+                    >
+                      New Mission
+                    </Button>
                   </div>
                 </div>
-              </section>
+              </div>
 
-              {selectedHistoryEntry.workerSummary && selectedHistoryEntry.workerSummary.length > 0 && (
-                <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Worker Summary</p>
-                  <ul className="mt-4 space-y-2">
-                    {selectedHistoryEntry.workerSummary.map((summary, index) => (
-                      <li key={`${selectedHistoryEntry.id}-worker-${index}`} className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)]">
-                        {summary}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              {selectedHistoryEntry.outputText && (
-                <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output Preview</p>
-                  <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4 text-sm text-[var(--theme-text)]">
-                    <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{selectedHistoryEntry.outputText}</Markdown>
-                  </div>
-                </section>
-              )}
-
-              {selectedHistoryEntry.streamText && !selectedHistoryEntry.outputText && (
-                <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
-                  <div className="mt-4 max-h-[400px] overflow-auto rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4 text-sm text-[var(--theme-text)]">
-                    <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{selectedHistoryEntry.streamText}</Markdown>
-                  </div>
-                </section>
-              )}
-
-              {!selectedHistoryEntry.outputText && !selectedHistoryEntry.streamText && !selectedHistoryEntry.workerSummary?.length && !selectedHistoryEntry.outputPath && (
-                <section className="overflow-hidden rounded-3xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
-                  <p className="text-center text-sm text-[var(--theme-muted)]">
-                    No detailed output was captured for this mission.
-                    <br />
-                    <span className="text-xs text-[var(--theme-muted-2)]">Missions run after this update will save full agent summaries and output previews.</span>
-                  </p>
-                </section>
-              )}
-
-              {selectedHistoryEntry.outputPath && (
+              {selectedHistoryOutputPath && selectedHistoryPreviewReady.data === true ? (
                 <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Generated Output</p>
-                      <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{selectedHistoryEntry.outputPath.split('/').pop() || 'index.html'}</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output Preview</p>
+                      <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{selectedHistoryOutputLabel}</p>
                     </div>
                     <a
-                      href={`/api/preview-file?path=${encodeURIComponent(`${selectedHistoryEntry.outputPath}/index.html`)}`}
+                      href={selectedHistoryPreviewUrl!}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
@@ -583,27 +579,69 @@ export function Conductor() {
                   </div>
                   <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
                     <iframe
-                      src={`/api/preview-file?path=${encodeURIComponent(`${selectedHistoryEntry.outputPath}/index.html`)}`}
+                      src={selectedHistoryPreviewUrl!}
                       className="h-[500px] w-full"
                       sandbox="allow-scripts allow-same-origin"
                       title="Mission history output preview"
                     />
                   </div>
                 </section>
-              )}
+              ) : selectedHistoryOutputPath ? (
+                <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+                  <div className="flex items-center gap-3 text-sm text-[var(--theme-muted)]">
+                    <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-border)] border-t-[var(--theme-accent)]" />
+                    Loading output preview…
+                  </div>
+                </section>
+              ) : null}
 
-              <div className="flex justify-center pb-4">
-                <Button
-                  type="button"
-                  onClick={() => {
-                    conductor.setSelectedHistoryEntry(null)
-                    conductor.resetMission()
-                  }}
-                  className="rounded-xl bg-[var(--theme-accent)] px-5 text-white hover:bg-[var(--theme-accent-strong)]"
-                >
-                  New Mission
-                </Button>
-              </div>
+              <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
+                  </div>
+                  <span className={cn('rounded-full px-3 py-1 text-xs font-medium', historyStatusClasses)}>
+                    {historyStatusLabel}
+                  </span>
+                </div>
+                <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
+                  {historySummary ? (
+                    <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{historySummary}</Markdown>
+                  ) : (
+                    <p className="text-sm text-[var(--theme-muted)]">No summary captured.</p>
+                  )}
+                </div>
+                {historyWorkerDetails.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {historyWorkerDetails.map((worker: MissionHistoryWorkerDetail, index) => (
+                      <div key={`${selectedHistoryEntry.id}-worker-${index}`} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm">
+                        <span className={cn('size-2 rounded-full', selectedHistoryEntry.status === 'completed' ? 'bg-emerald-400' : 'bg-red-400')} />
+                        <span className="font-medium text-[var(--theme-text)]">{worker.personaEmoji} {worker.personaName}</span>
+                        <span className="text-[var(--theme-muted)]">{worker.label}</span>
+                        <span className="ml-auto text-xs text-[var(--theme-muted)]">{getShortModelName(worker.model)} · {worker.totalTokens.toLocaleString()} tok</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {selectedHistoryEntry.streamText && selectedHistoryEntry.completeSummary && (
+                  <details className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
+                    <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">Raw Agent Output</summary>
+                    <div className="mt-4 border-t border-[var(--theme-border)] pt-4">
+                      <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{selectedHistoryEntry.streamText}</Markdown>
+                    </div>
+                  </details>
+                )}
+              </section>
+
+              {!historySummary && historyWorkerDetails.length === 0 && !selectedHistoryOutputPath && !selectedHistoryEntry.workerSummary?.length && !selectedHistoryEntry.outputText && (
+                <section className="overflow-hidden rounded-3xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+                  <p className="text-center text-sm text-[var(--theme-muted)]">
+                    No detailed output was captured for this mission.
+                    <br />
+                    <span className="text-xs text-[var(--theme-muted-2)]">Missions run after this update will save full agent summaries and output previews.</span>
+                  </p>
+                </section>
+              )}
             </div>
           </main>
         </div>
@@ -1249,8 +1287,15 @@ export function Conductor() {
               </div>
             </section>
           )}
-          <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]">
-            <IsometricOffice sessions={officeSessions} className="h-[360px]" />
+          <section className="h-[360px] overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]">
+            <OfficeView
+              agentRows={officeAgentRows}
+              missionRunning
+              onViewOutput={() => {}}
+              processType="parallel"
+              companyName="Conductor Office"
+              containerHeight={360}
+            />
           </section>
 
           {conductor.tasks.length > 0 ? (
