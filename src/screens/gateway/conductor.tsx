@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -283,6 +283,13 @@ function formatRelativeTime(value: string | null | undefined, now: number): stri
   return `${diffHours}h ago`
 }
 
+function formatSteerTimestamp(value: number): string {
+  return new Date(value).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 function getWorkerDot(status: 'running' | 'complete' | 'stale' | 'idle') {
   if (status === 'complete') return { dotClass: 'bg-emerald-400', label: 'Complete' }
   if (status === 'running') return { dotClass: 'bg-sky-400 animate-pulse', label: 'Running' }
@@ -377,6 +384,10 @@ const ACTIVITY_PAGE_SIZE = 3
 export function Conductor() {
   const conductor = useConductorGateway()
   const [goalDraft, setGoalDraft] = useState('')
+  const [steerDraft, setSteerDraft] = useState('')
+  const [steerHistory, setSteerHistory] = useState<string[]>([])
+  const [steerHistoryTimestamps, setSteerHistoryTimestamps] = useState<number[]>([])
+  const [steerError, setSteerError] = useState<string | null>(null)
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activityFilter, setActivityFilter] = useState<'all' | 'completed' | 'failed'>('all')
@@ -385,6 +396,7 @@ export function Conductor() {
   const [historyCostExpanded, setHistoryCostExpanded] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const steerInputRef = useRef<HTMLInputElement | null>(null)
   const modelsQuery = useQuery({
     queryKey: ['conductor', 'models'],
     queryFn: async () => {
@@ -421,6 +433,10 @@ export function Conductor() {
   const handleNewMission = () => {
     conductor.resetMission()
     setGoalDraft('')
+    setSteerDraft('')
+    setSteerHistory([])
+    setSteerHistoryTimestamps([])
+    setSteerError(null)
     setSelectedTaskId(null)
     setActivityPage(0)
   }
@@ -428,7 +444,34 @@ export function Conductor() {
   const handleSubmit = async () => {
     const trimmed = goalDraft.trim()
     if (!trimmed) return
+    setSteerDraft('')
+    setSteerHistory([])
+    setSteerHistoryTimestamps([])
+    setSteerError(null)
     await conductor.sendMission(trimmed)
+  }
+
+  const focusSteerInput = () => {
+    if (!steerInputRef.current) return
+    steerInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    window.setTimeout(() => {
+      steerInputRef.current?.focus()
+    }, 150)
+  }
+
+  const handleSendSteer = async () => {
+    const trimmed = steerDraft.trim()
+    if (!trimmed || !conductor.orchestratorSessionKey) return
+
+    try {
+      await conductor.sendStream(conductor.orchestratorSessionKey, `[STEER] ${trimmed}`)
+      setSteerDraft('')
+      setSteerError(null)
+      setSteerHistory((current) => [...current, trimmed])
+      setSteerHistoryTimestamps((current) => [...current, Date.now()])
+    } catch (error) {
+      setSteerError(error instanceof Error ? error.message : 'Failed to send steer message')
+    }
   }
 
   const updateSettings = (patch: Partial<typeof conductor.conductorSettings>) => {
@@ -1436,8 +1479,14 @@ export function Conductor() {
               </button>
               <button
                 type="button"
-                disabled
-                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-muted)] opacity-50"
+                onClick={focusSteerInput}
+                disabled={!conductor.orchestratorSessionKey}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                  conductor.orchestratorSessionKey
+                    ? 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-text)]'
+                    : 'cursor-not-allowed border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] opacity-50',
+                )}
               >
                 <span>💬</span> Steer
               </button>
@@ -1691,6 +1740,73 @@ export function Conductor() {
               </div>
             </div>
           )}
+
+          <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-5 shadow-[0_24px_80px_var(--theme-shadow)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Steer</p>
+                <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Send live instructions to the orchestrator without restarting the mission.</p>
+              </div>
+              <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+                {conductor.orchestratorSessionKey ? 'Live' : 'Waiting'}
+              </span>
+            </div>
+
+            {steerHistory.length > 0 ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {steerHistory.map((message, index) => (
+                  <div
+                    key={`${steerHistoryTimestamps[index] ?? index}-${message}`}
+                    className="inline-flex max-w-full items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs text-[var(--theme-muted)]"
+                  >
+                    <span className="truncate text-[var(--theme-text)]">{message}</span>
+                    <span className="shrink-0 text-[var(--theme-muted-2)]">{formatSteerTimestamp(steerHistoryTimestamps[index] ?? Date.now())}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <form
+              className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void handleSendSteer()
+              }}
+            >
+              <input
+                ref={steerInputRef}
+                type="text"
+                value={steerDraft}
+                onChange={(event) => setSteerDraft(event.target.value)}
+                placeholder="Send instructions to the agent..."
+                disabled={!conductor.orchestratorSessionKey || conductor.isSendingStream}
+                className="min-w-0 flex-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted-2)] focus:border-[var(--theme-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <button
+                type="submit"
+                disabled={!steerDraft.trim() || !conductor.orchestratorSessionKey || conductor.isSendingStream}
+                className={cn(
+                  'inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-medium transition-colors sm:min-w-[96px]',
+                  !steerDraft.trim() || !conductor.orchestratorSessionKey || conductor.isSendingStream
+                    ? 'cursor-not-allowed border border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] opacity-60'
+                    : 'border border-[var(--theme-border)] bg-[var(--theme-accent-soft)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft-strong)]',
+                )}
+              >
+                <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
+                {conductor.isSendingStream ? 'Sending' : 'Send'}
+              </button>
+            </form>
+
+            {!conductor.orchestratorSessionKey ? (
+              <p className="mt-3 text-xs text-[var(--theme-muted)]">Waiting for the orchestrator session before steer messages can be sent.</p>
+            ) : null}
+
+            {steerError ? (
+              <div className="mt-3 rounded-2xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-4 py-3 text-xs text-[var(--theme-danger)]">
+                {steerError}
+              </div>
+            ) : null}
+          </section>
         </div>
       </main>
     </div>

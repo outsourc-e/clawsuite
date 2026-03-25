@@ -561,6 +561,7 @@ export function useConductorGateway() {
   const [initialMission] = useState<PersistedMission | null>(() => loadPersistedMission())
   const [phase, setPhase] = useState<MissionPhase>(() => initialMission?.phase ?? 'idle')
   const [goal, setGoal] = useState(() => initialMission?.goal ?? '')
+  const [orchestratorSessionKey, setOrchestratorSessionKey] = useState<string | null>(() => initialMission?.workerKeys[0] ?? null)
   const [streamText, setStreamText] = useState(() => initialMission?.streamText ?? '')
   const [planText, setPlanText] = useState(() => initialMission?.planText ?? '')
   const [streamEvents, setStreamEvents] = useState<StreamEvent[]>([])
@@ -927,6 +928,7 @@ export function useConductorGateway() {
     clearPersistedMission()
     setPhase('idle')
     setGoal('')
+    setOrchestratorSessionKey(null)
     setStreamText('')
     setPlanText('')
     setStreamEvents([])
@@ -954,6 +956,7 @@ export function useConductorGateway() {
       lastWorkerSnapshotRef.current = ''
       setTimeoutWarning(false)
       setGoal(trimmed)
+      setOrchestratorSessionKey(null)
       setStreamText('')
       setPlanText('')
       setStreamEvents([])
@@ -988,6 +991,7 @@ export function useConductorGateway() {
 
       // Track the orchestrator session key — it will spawn child workers
       const orchestratorKey = result.sessionKey
+      setOrchestratorSessionKey(orchestratorKey)
       setMissionWorkerKeys((current) => {
         if (current.has(orchestratorKey)) return current
         const next = new Set(current)
@@ -1010,6 +1014,31 @@ export function useConductorGateway() {
   const resetMission = () => {
     clearMissionState()
   }
+
+  const sendStream = useMutation({
+    mutationFn: async ({ sessionKey, message }: { sessionKey: string; message: string }) => {
+      const trimmedSessionKey = sessionKey.trim()
+      const trimmedMessage = message.trim()
+
+      if (!trimmedSessionKey) throw new Error('Session key required')
+      if (!trimmedMessage) throw new Error('Message required')
+
+      const response = await fetch('/api/send-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: trimmedSessionKey,
+          message: trimmedMessage,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      })
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        throw new Error(text || `Stream request failed (${response.status})`)
+      }
+    },
+  })
 
   const stopMission = async () => {
     const sessionKeys = [...new Set([...missionWorkerKeys, ...workers.map((worker) => worker.key)])]
@@ -1041,6 +1070,7 @@ export function useConductorGateway() {
   return {
     phase,
     goal,
+    orchestratorSessionKey,
     streamText,
     planText,
     streamEvents,
@@ -1061,7 +1091,9 @@ export function useConductorGateway() {
     conductorSettings,
     setConductorSettings,
     sendMission: (nextGoal: string) => sendMission.mutateAsync({ nextGoal, settings: conductorSettings }),
+    sendStream: (sessionKey: string, message: string) => sendStream.mutateAsync({ sessionKey, message }),
     isSending: sendMission.isPending,
+    isSendingStream: sendStream.isPending,
     resetMission,
     stopMission,
     retryMission,
