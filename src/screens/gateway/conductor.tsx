@@ -346,8 +346,9 @@ export function Conductor() {
 
   const completeSummary = useMemo(() => {
     if (phase !== 'complete') return null
+    const isFailed = !!conductor.streamError
     const lines = [
-      '✅ Mission completed successfully',
+      isFailed ? `❌ ${conductor.streamError}` : '✅ Mission completed successfully',
       '',
       `**Goal:** ${conductor.goal}`,
       `**Duration:** ${formatElapsedTime(conductor.missionStartedAt, conductor.completedAt ? new Date(conductor.completedAt).getTime() : now)}`,
@@ -702,20 +703,15 @@ export function Conductor() {
             <div className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Complete</p>
+                  <p className={cn('text-xs font-semibold uppercase tracking-[0.24em]', conductor.streamError ? 'text-red-400' : 'text-[var(--theme-accent)]')}>
+                    {conductor.streamError ? 'Mission Stopped' : 'Mission Complete'}
+                  </p>
                   <h1 className="mt-2 text-xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-2xl">{conductor.goal}</h1>
                   <p className="mt-2 text-xs text-[var(--theme-muted-2)]">
                     {completedWorkers}/{Math.max(totalWorkers, completedWorkers)} workers finished · {formatElapsedTime(conductor.missionStartedAt, conductor.completedAt ? new Date(conductor.completedAt).getTime() : now)} total elapsed
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => void conductor.stopMission()}
-                    className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
-                  >
-                    Stop Mission
-                  </Button>
                   <Button
                     type="button"
                     onClick={conductor.resetMission}
@@ -803,8 +799,13 @@ export function Conductor() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
                 </div>
-                <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
-                  Complete
+                <span className={cn(
+                  'rounded-full px-3 py-1 text-xs font-medium',
+                  conductor.streamError
+                    ? 'border border-red-400/35 bg-red-500/10 text-red-300'
+                    : 'border border-emerald-400/35 bg-emerald-500/10 text-emerald-300',
+                )}>
+                  {conductor.streamError ? 'Stopped' : 'Complete'}
                 </span>
               </div>
               <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
