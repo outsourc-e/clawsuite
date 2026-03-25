@@ -8,6 +8,15 @@ import { requireJsonContentType } from '../../server/rate-limit'
 
 let cachedSkill: string | null = null
 
+type ConductorSpawnBody = {
+  goal?: unknown
+  orchestratorModel?: unknown
+  workerModel?: unknown
+  projectsDir?: unknown
+  maxParallel?: unknown
+  supervised?: unknown
+}
+
 function loadDispatchSkill(): string {
   if (cachedSkill) return cachedSkill
   try {
@@ -29,7 +38,29 @@ function loadDispatchSkill(): string {
   return ''
 }
 
-function buildOrchestratorPrompt(goal: string, skill: string): string {
+function readOptionalString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function readMaxParallel(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 1
+  return Math.min(5, Math.max(1, Math.round(value)))
+}
+
+function buildOrchestratorPrompt(
+  goal: string,
+  skill: string,
+  options: {
+    orchestratorModel: string
+    workerModel: string
+    projectsDir: string
+    maxParallel: number
+    supervised: boolean
+  },
+): string {
+  const outputBase = options.projectsDir || '/tmp'
+  const outputPrefix = outputBase === '/tmp' ? '/tmp/dispatch-<slug>' : `${outputBase}/dispatch-<slug>`
+
   return [
     'You are a mission orchestrator. Execute this mission autonomously.',
     '',
@@ -40,6 +71,10 @@ function buildOrchestratorPrompt(goal: string, skill: string): string {
     '## Mission',
     '',
     `Goal: ${goal}`,
+    ...(options.orchestratorModel ? ['', `Use model: ${options.orchestratorModel} for the orchestrator`] : []),
+    ...(options.workerModel ? ['', `Use model: ${options.workerModel} for all workers`] : []),
+    ...(options.maxParallel > 1 ? ['', `Run up to ${options.maxParallel} workers in parallel when tasks are independent`] : []),
+    ...(options.supervised ? ['', 'Supervised mode is enabled. Require approval before each task.'] : []),
     '',
     '## Critical Rules',
     '- Use sessions_spawn to create worker agents for each task',
@@ -47,7 +82,7 @@ function buildOrchestratorPrompt(goal: string, skill: string): string {
     '- Do NOT ask for confirmation — start immediately',
     '- Label workers as "worker-<task-slug>" so the UI can track them',
     '- Each worker gets a self-contained prompt with the task + exit criteria',
-    '- Workers should write output to /tmp/dispatch-<slug>/ directories',
+    `- Workers should write output to ${outputPrefix} directories`,
     '- Verify exit criteria after each worker completes',
     '- Report a summary when all tasks are done',
   ].join('\n')
@@ -66,8 +101,6 @@ async function cronRpcWithFallback<T>(params: unknown): Promise<T> {
   throw lastError instanceof Error ? lastError : new Error('cron add failed')
 }
 
-
-
 export const Route = createFileRoute('/api/conductor-spawn')({
   server: {
     handlers: {
@@ -79,17 +112,27 @@ export const Route = createFileRoute('/api/conductor-spawn')({
         if (csrfCheck) return csrfCheck
 
         try {
-          const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
+          const body = (await request.json().catch(() => ({}))) as ConductorSpawnBody
           const goal = typeof body.goal === 'string' ? body.goal.trim() : ''
+          const orchestratorModel = readOptionalString(body.orchestratorModel)
+          const workerModel = readOptionalString(body.workerModel)
+          const projectsDir = readOptionalString(body.projectsDir)
+          const maxParallel = readMaxParallel(body.maxParallel)
+          const supervised = body.supervised === true
 
           if (!goal) {
             return json({ ok: false, error: 'goal required' }, { status: 400 })
           }
 
           const skill = loadDispatchSkill()
-          const prompt = buildOrchestratorPrompt(goal, skill)
+          const prompt = buildOrchestratorPrompt(goal, skill, {
+            orchestratorModel,
+            workerModel,
+            projectsDir,
+            maxParallel,
+            supervised,
+          })
 
-          // Use cron to spawn a trusted isolated agentTurn session
           const jobName = `conductor-${Date.now()}`
 
           const addResult = await cronRpcWithFallback<{ ok?: boolean; jobId?: string; id?: string; error?: string }>({
@@ -109,10 +152,6 @@ export const Route = createFileRoute('/api/conductor-spawn')({
 
           const jobId = addResult.jobId ?? addResult.id ?? jobName
 
-          // Don't force-run — the "at: now" schedule fires immediately on its own.
-          // Calling cron.run too would double-trigger the orchestrator.
-
-          // Schedule cleanup — delete the cron job after a delay so it doesn't linger
           setTimeout(() => {
             const removeMethods = ['cron.remove', 'cron.jobs.remove', 'scheduler.jobs.remove']
             for (const method of removeMethods) {
