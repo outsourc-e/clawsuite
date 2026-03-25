@@ -457,13 +457,16 @@ function extractHistoryMessageText(message: HistoryMessage | undefined): string 
 
 function getLastAssistantMessage(messages: HistoryMessage[] | undefined): string {
   if (!Array.isArray(messages)) return ''
+  // Return the LONGEST assistant message — steer responses are typically short,
+  // while the actual work output (HTML, code, analysis) is the longest one.
+  let best = ''
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
     if (message?.role !== 'assistant') continue
     const text = extractHistoryMessageText(message).trim()
-    if (text) return text
+    if (text.length > best.length) best = text
   }
-  return ''
+  return best
 }
 
 
