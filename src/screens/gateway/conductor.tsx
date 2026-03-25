@@ -314,6 +314,12 @@ function formatSteerTimestamp(value: number): string {
   })
 }
 
+function truncateContinuationText(text: string, limit = 500): string {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= limit) return normalized
+  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`
+}
+
 function getWorkerDot(status: 'running' | 'complete' | 'stale' | 'idle') {
   if (status === 'complete') return { dotClass: 'bg-emerald-400', label: 'Complete' }
   if (status === 'running') return { dotClass: 'bg-sky-400 animate-pulse', label: 'Running' }
@@ -461,6 +467,7 @@ export function Conductor() {
   const conductor = useConductorGateway()
   const [goalDraft, setGoalDraft] = useState('')
   const [steerDraft, setSteerDraft] = useState('')
+  const [continueDraft, setContinueDraft] = useState('')
   const [steerHistory, setSteerHistory] = useState<string[]>([])
   const [steerHistoryTimestamps, setSteerHistoryTimestamps] = useState<number[]>([])
   const [steerError, setSteerError] = useState<string | null>(null)
@@ -515,6 +522,7 @@ export function Conductor() {
     conductor.resetMission()
     setGoalDraft('')
     setSteerDraft('')
+    setContinueDraft('')
     setSteerHistory([])
     setSteerHistoryTimestamps([])
     setSteerError(null)
@@ -526,10 +534,40 @@ export function Conductor() {
     const trimmed = goalDraft.trim()
     if (!trimmed) return
     setSteerDraft('')
+    setContinueDraft('')
     setSteerHistory([])
     setSteerHistoryTimestamps([])
     setSteerError(null)
     await conductor.sendMission(trimmed)
+  }
+
+  const handleContinueMission = async () => {
+    const trimmedInstructions = continueDraft.trim()
+    if (!trimmedInstructions) return
+
+    const continuationSummarySource =
+      completeSummary ??
+      Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
+      conductor.workers
+        .map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined))
+        .find((output) => output.trim()) ??
+      conductor.streamText
+
+    const combinedPrompt = [
+      'CONTINUATION OF PREVIOUS MISSION',
+      `Original goal: ${conductor.goal}`,
+      `Previous output summary: ${truncateContinuationText(continuationSummarySource ?? '')}`,
+      `New instructions: ${trimmedInstructions}`,
+      '',
+      'Please continue building on the previous work.',
+    ].join('\n')
+
+    setContinueDraft('')
+    setSteerDraft('')
+    setSteerHistory([])
+    setSteerHistoryTimestamps([])
+    setSteerError(null)
+    await conductor.sendMission(combinedPrompt)
   }
 
   const focusSteerInput = () => {
@@ -748,6 +786,16 @@ export function Conductor() {
     }
     return lines.join('\n')
   }, [phase, completePhaseProjectPath, completePhaseOutputLabel, totalWorkers, conductor.goal, totalTokens, conductor.missionStartedAt, now])
+  const continuationPreview = useMemo(() => {
+    const summarySource =
+      completeSummary ??
+      Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
+      conductor.workers
+        .map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined))
+        .find((output) => output.trim()) ??
+      conductor.streamText
+    return truncateContinuationText(summarySource ?? '')
+  }, [completeSummary, conductor.streamText, conductor.workerOutputs, conductor.workers])
   const hasMissionHistory = conductor.missionHistory.length > 0
   const filteredHistory = (() => {
     const history = conductor.missionHistory
@@ -1543,6 +1591,55 @@ export function Conductor() {
                 </details>
               )}
             </section>
+
+            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-5 shadow-[0_24px_80px_var(--theme-shadow)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Continue Mission</p>
+                  <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Want to iterate? Continue the mission with new instructions.</p>
+                </div>
+                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+                  Context carried forward
+                </span>
+              </div>
+
+              {continuationPreview ? (
+                <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--theme-muted)]">Previous output summary</p>
+                  <p className="mt-2 text-sm text-[var(--theme-text)]">{continuationPreview}</p>
+                </div>
+              ) : null}
+
+              <form
+                className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void handleContinueMission()
+                }}
+              >
+                <input
+                  type="text"
+                  value={continueDraft}
+                  onChange={(event) => setContinueDraft(event.target.value)}
+                  placeholder="Continue with additional instructions..."
+                  disabled={conductor.isSending}
+                  className="min-w-0 flex-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted-2)] focus:border-[var(--theme-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                <button
+                  type="submit"
+                  disabled={!continueDraft.trim() || conductor.isSending}
+                  className={cn(
+                    'inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-medium transition-colors sm:min-w-[96px]',
+                    !continueDraft.trim() || conductor.isSending
+                      ? 'cursor-not-allowed border border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] opacity-60'
+                      : 'border border-[var(--theme-border)] bg-[var(--theme-accent-soft)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft-strong)]',
+                  )}
+                >
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
+                  {conductor.isSending ? 'Sending' : 'Send'}
+                </button>
+              </form>
+            </section>
           </div>
         </main>
       </div>
@@ -1883,6 +1980,7 @@ export function Conductor() {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Steer</p>
                 <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Send live instructions to the orchestrator without restarting the mission.</p>
+                <p className="mt-2 text-xs text-[var(--theme-muted-2)]">Note: Steer messages are delivered between worker turns and may not affect work already in progress.</p>
               </div>
               <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
                 {conductor.orchestratorSessionKey ? 'Live' : 'Waiting'}
