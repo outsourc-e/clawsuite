@@ -119,8 +119,8 @@ export const Route = createFileRoute('/api/conductor-spawn')({
 
           const jobId = addResult.jobId ?? addResult.id ?? jobName
 
-          // Force-run immediately in case the "at" schedule hasn't fired yet
-          await cronRunWithFallback(jobId).catch(() => {})
+          // Don't force-run — the "at: now" schedule fires immediately on its own.
+          // Calling cron.run too would double-trigger the orchestrator.
 
           return json({
             ok: true,
