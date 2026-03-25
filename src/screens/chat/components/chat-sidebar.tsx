@@ -626,7 +626,7 @@ function ChatSidebarComponent({
     false,
   )
   const [gatewayExpanded, toggleGateway] = usePersistedBool(
-    'openclaw-sidebar-gateway-expanded',
+    'openclaw-sidebar-gateway-collapsed-v2',
     false,
   )
 
