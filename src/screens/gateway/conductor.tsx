@@ -1441,8 +1441,6 @@ export function Conductor() {
                   Loading output preview…
                 </div>
               </section>
-            ) : completePhaseProjectPath && previewState.unavailable && !conductor.streamError ? (
-              <p className="px-1 text-sm text-[var(--theme-muted)]">No preview available.</p>
             ) : null}
 
             {conductor.tasks.length > 1 && completedTaskOutputs.length > 0 && (
