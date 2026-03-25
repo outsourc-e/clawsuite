@@ -41,11 +41,11 @@ const TABS: TabItem[] = [
     match: (p) => p.startsWith('/dashboard'),
   },
   {
-    id: 'agents',
-    label: 'Agent Hub',
+    id: 'conductor',
+    label: 'Conductor',
     icon: BotIcon,
-    to: '/agent-swarm',
-    match: (p) => p.startsWith('/agent-swarm') || p.startsWith('/agents'),
+    to: '/conductor',
+    match: (p) => p.startsWith('/conductor') || p.startsWith('/agent-swarm') || p.startsWith('/agents'),
   },
   {
     id: 'chat',

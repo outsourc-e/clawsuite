@@ -971,6 +971,41 @@ export function Conductor() {
       })),
     [selectedHistoryEntry],
   )
+  const OFFICE_NAMES = ['Nova', 'Pixel', 'Blaze', 'Echo', 'Sage', 'Drift']
+  const homeOfficeRows = useMemo<AgentWorkingRow[]>(() => {
+    const sessions = conductor.recentSessions
+    if (sessions.length === 0) {
+      return OFFICE_NAMES.slice(0, 3).map((name, i) => ({
+        id: `placeholder-${i}`,
+        name,
+        modelId: 'auto',
+        status: 'idle' as const,
+        lastLine: 'Waiting for work…',
+        taskCount: 0,
+        roleDescription: 'Worker',
+      }))
+    }
+    return sessions.slice(0, 6).map((session, i) => {
+      const s = session as GatewaySession
+      const updatedAt = typeof s.updatedAt === 'string' ? new Date(s.updatedAt).getTime() : typeof s.updatedAt === 'number' ? s.updatedAt : 0
+      const statusText = `${s.status ?? ''} ${s.kind ?? ''}`.toLowerCase()
+      const status = /error|failed/.test(statusText) ? 'error' as const
+        : /pause/.test(statusText) ? 'paused' as const
+        : Date.now() - updatedAt < 120_000 ? 'active' as const : 'idle' as const
+      return {
+        id: s.key ?? `session-${i}`,
+        name: OFFICE_NAMES[i % OFFICE_NAMES.length],
+        modelId: s.model ?? 'auto',
+        status,
+        lastLine: s.task ?? s.label ?? s.title ?? s.derivedTitle ?? 'Working…',
+        lastAt: updatedAt || undefined,
+        taskCount: 0,
+        roleDescription: s.label ?? 'Worker',
+        sessionKey: s.key ?? undefined,
+      }
+    })
+  }, [conductor.recentSessions])
+
   const officeAgentRows = useMemo<AgentWorkingRow[]>(() => {
     if (conductor.workers.length > 0) {
       return conductor.workers.map((worker, index) => {
@@ -1397,6 +1432,17 @@ export function Conductor() {
                   <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
                 </Button>
               </div>
+            </section>
+
+            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-sm" style={{ height: 420 }}>
+              <OfficeView
+                agentRows={homeOfficeRows}
+                missionRunning={homeOfficeRows.some((a) => a.status === 'active')}
+                onViewOutput={() => {}}
+                processType="parallel"
+                companyName="Agent Office"
+                containerHeight={420}
+              />
             </section>
 
             {(hasMissionHistory || conductor.recentSessions.length > 0) && (
