@@ -72,6 +72,9 @@ export type MissionHistoryEntry = {
   totalTokens: number
   status: 'completed' | 'failed'
   projectPath: string | null
+  outputPath?: string | null
+  workerSummary?: string[]
+  outputText?: string
 }
 
 const HISTORY_STORAGE_KEY = 'conductor:history'
@@ -358,6 +361,90 @@ function getLastAssistantMessage(messages: HistoryMessage[] | undefined): string
   return ''
 }
 
+
+function extractProjectPath(text: string): string | null {
+  const structuredPatterns = [
+    /\b(?:Created|Output|Wrote|Saved to|Built|Generated|Written to)\s+(\/tmp\/dispatch-[^\s"')`\]>]+)/gi,
+    /\b(?:Created|Output|Wrote|Saved to|Built|Generated|Written to)\s*:\s*(\/tmp\/dispatch-[^\s"')`\]>]+)/gi,
+  ]
+
+  for (const pattern of structuredPatterns) {
+    let match: RegExpExecArray | null
+    while ((match = pattern.exec(text)) !== null) {
+      const raw = match[1]
+      if (!raw) continue
+      const cleaned = raw.replace(/[.,;:!?`]+$/, '')
+      const normalized = cleaned.replace(/\/(index\.html|dist|build)\/?$/i, '')
+      if (normalized.startsWith('/tmp/dispatch-')) return normalized
+    }
+  }
+
+  const matches = text.match(/\/tmp\/dispatch-[^\s"')`\]>]+/g) ?? []
+  for (const raw of matches) {
+    const cleaned = raw.replace(/[.,;:!?\-`]+$/, '')
+    const normalized = cleaned.replace(/\/(index\.html|dist|build)\/?$/i, '')
+    if (normalized.startsWith('/tmp/dispatch-')) return normalized
+  }
+
+  const tmpMatches = text.match(/\/tmp\/[a-zA-Z0-9][^\s"')`\]>]+/g) ?? []
+  for (const raw of tmpMatches) {
+    const cleaned = raw.replace(/[.,;:!?\-`]+$/, '')
+    const normalized = cleaned.replace(/\/(index\.html|dist|build)\/?$/i, '')
+    if (normalized.length > 5) return normalized
+  }
+
+  return null
+}
+
+function buildMissionOutputPath(
+  workers: ConductorWorker[],
+  workerOutputs: Record<string, string>,
+  tasks: ConductorTask[],
+  streamText: string,
+): string | null {
+  const workerOutputTexts = [
+    ...Object.values(workerOutputs),
+    ...workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)),
+  ].filter(Boolean)
+
+  for (const text of workerOutputTexts) {
+    const extractedPath = extractProjectPath(text)
+    if (extractedPath) return extractedPath
+  }
+
+  for (const task of tasks) {
+    if (!task.output) continue
+    const extractedPath = extractProjectPath(task.output)
+    if (extractedPath) return extractedPath
+  }
+
+  const streamPath = extractProjectPath(streamText)
+  if (streamPath) return streamPath
+
+  return null
+}
+
+function summarizeWorkers(workers: ConductorWorker[]): string[] {
+  return workers.map((worker) => {
+    const output = getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+    const firstLine = output.split(/\n+/).map((line) => line.trim()).find(Boolean)
+    const statusLabel = worker.status === 'stale' ? 'failed' : worker.status
+    return `${worker.displayName}: ${firstLine ?? `${statusLabel} · ${worker.totalTokens.toLocaleString()} tok`}`
+  })
+}
+
+function buildMissionOutputText(workers: ConductorWorker[], workerOutputs: Record<string, string>, streamText: string): string {
+  const combined = [
+    ...Object.values(workerOutputs),
+    ...workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)),
+    streamText,
+  ]
+    .map((value) => value.trim())
+    .find(Boolean)
+
+  return combined ? combined.slice(0, 500) : ''
+}
+
 async function fetchWorkerOutput(sessionKey: string, limit = 5): Promise<string> {
   const response = await fetch(`/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=${limit}`)
   const payload = (await response.json().catch(() => ({}))) as HistoryResponse
@@ -384,6 +471,7 @@ export function useConductorGateway() {
   const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>(() => initialMission?.workerOutputs ?? {})
   const [tasks, setTasks] = useState<ConductorTask[]>(() => initialMission?.tasks ?? [])
   const [missionHistory, setMissionHistory] = useState<MissionHistoryEntry[]>(() => loadMissionHistory())
+  const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<MissionHistoryEntry | null>(null)
   const doneRef = useRef(initialMission?.phase === 'complete')
   const seenToolCallRef = useRef(false)
   const historySavedRef = useRef(false)
@@ -653,6 +741,9 @@ export function useConductorGateway() {
     historySavedRef.current = true
 
     const missionId = `mission-${new Date(missionStartedAt).getTime()}`
+    const outputPath = buildMissionOutputPath(workers, workerOutputs, tasks, streamText)
+    const workerSummary = summarizeWorkers(workers)
+    const outputText = buildMissionOutputText(workers, workerOutputs, streamText)
     const entry: MissionHistoryEntry = {
       id: missionId,
       goal,
@@ -661,14 +752,17 @@ export function useConductorGateway() {
       workerCount: workers.length,
       totalTokens: workers.reduce((sum, worker) => sum + worker.totalTokens, 0),
       status: streamError ? 'failed' : 'completed',
-      projectPath: null,
+      projectPath: outputPath,
+      outputPath,
+      workerSummary: workerSummary.length > 0 ? workerSummary : undefined,
+      outputText: outputText || undefined,
     }
     appendMissionHistory(entry)
     setMissionHistory((current) => {
       if (current.some((e) => e.id === missionId)) return current
       return [entry, ...current].slice(0, MAX_HISTORY_ENTRIES)
     })
-  }, [phase, goal, completedAt, missionStartedAt, workers, streamError])
+  }, [phase, goal, completedAt, missionStartedAt, workers, streamError, workerOutputs, tasks, streamText])
 
   useEffect(() => {
     if (phase === 'idle') {
@@ -715,6 +809,7 @@ export function useConductorGateway() {
     setMissionWorkerLabels(new Set())
     setWorkerOutputs({})
     setTasks([])
+    setSelectedHistoryEntry(null)
     seenToolCallRef.current = false
     historySavedRef.current = false
   }
@@ -737,6 +832,7 @@ export function useConductorGateway() {
       setMissionWorkerLabels(new Set())
       setWorkerOutputs({})
       setTasks([])
+      setSelectedHistoryEntry(null)
       seenToolCallRef.current = false
       historySavedRef.current = false
       setMissionStartedAt(new Date().toISOString())
@@ -826,6 +922,8 @@ export function useConductorGateway() {
     workers,
     activeWorkers,
     missionHistory,
+    selectedHistoryEntry,
+    setSelectedHistoryEntry,
     recentSessions: recentSessionsQuery.data ?? [],
     missionWorkerKeys,
     workerOutputs,

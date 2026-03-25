@@ -167,6 +167,12 @@ function formatElapsedTime(startIso: string | null | undefined, now: number): st
   return `${seconds}s`
 }
 
+function formatDurationRange(startIso: string | null | undefined, endIso: string | null | undefined, now: number): string {
+  const endMs = endIso ? new Date(endIso).getTime() : now
+  if (!Number.isFinite(endMs)) return formatElapsedTime(startIso, now)
+  return formatElapsedTime(startIso, endMs)
+}
+
 function formatRelativeTime(value: string | null | undefined, now: number): string {
   if (!value) return 'just now'
   const ms = new Date(value).getTime()
@@ -366,6 +372,7 @@ export function Conductor() {
     return lines.join('\n')
   }, [phase, completePhaseProjectPath, completePhaseOutputLabel, totalWorkers, conductor.goal, totalTokens, conductor.missionStartedAt, now])
   const hasMissionHistory = conductor.missionHistory.length > 0
+  const selectedHistoryEntry = conductor.selectedHistoryEntry
   const filteredHistory = (() => {
     const history = conductor.missionHistory
     if (activityFilter === 'all') return history
@@ -401,6 +408,120 @@ export function Conductor() {
   }, [conductor.tasks, selectedTaskId])
 
   if (phase === 'home') {
+    if (selectedHistoryEntry) {
+      return (
+        <div className="flex h-full min-h-full flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
+          <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch px-6 py-8">
+            <div className="w-full space-y-6">
+              <button
+                type="button"
+                onClick={() => conductor.setSelectedHistoryEntry(null)}
+                className="inline-flex items-center gap-2 self-start rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border2)] hover:text-[var(--theme-text)]"
+              >
+                <span aria-hidden="true">←</span> Back
+              </button>
+
+              <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={cn(
+                          'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium',
+                          selectedHistoryEntry.status === 'completed'
+                            ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-300'
+                            : 'border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] text-[var(--theme-danger)]',
+                        )}
+                      >
+                        {selectedHistoryEntry.status}
+                      </span>
+                    </div>
+                    <h1 className="text-2xl font-semibold tracking-tight text-[var(--theme-text)] sm:text-3xl">{selectedHistoryEntry.goal}</h1>
+                    <div className="grid gap-2 text-sm text-[var(--theme-muted)] sm:grid-cols-3">
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">Duration</p>
+                        <p className="mt-1 text-[var(--theme-text)]">{formatDurationRange(selectedHistoryEntry.startedAt, selectedHistoryEntry.completedAt, now)}</p>
+                      </div>
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">Workers</p>
+                        <p className="mt-1 text-[var(--theme-text)]">{selectedHistoryEntry.workerCount}</p>
+                      </div>
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.14em] text-[var(--theme-muted-2)]">Tokens</p>
+                        <p className="mt-1 text-[var(--theme-text)]">{selectedHistoryEntry.totalTokens.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {selectedHistoryEntry.workerSummary && selectedHistoryEntry.workerSummary.length > 0 && (
+                <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Worker Summary</p>
+                  <ul className="mt-4 space-y-2">
+                    {selectedHistoryEntry.workerSummary.map((summary, index) => (
+                      <li key={`${selectedHistoryEntry.id}-worker-${index}`} className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)]">
+                        {summary}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {selectedHistoryEntry.outputText && (
+                <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output Preview</p>
+                  <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-4 text-sm text-[var(--theme-text)]">
+                    <Markdown className="max-w-none text-sm text-[var(--theme-text)]">{selectedHistoryEntry.outputText}</Markdown>
+                  </div>
+                </section>
+              )}
+
+              {selectedHistoryEntry.outputPath && (
+                <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Generated Output</p>
+                      <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{selectedHistoryEntry.outputPath.split('/').pop() || 'index.html'}</p>
+                    </div>
+                    <a
+                      href={`/api/preview-file?path=${encodeURIComponent(`${selectedHistoryEntry.outputPath}/index.html`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
+                    >
+                      Open in new tab ↗
+                    </a>
+                  </div>
+                  <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
+                    <iframe
+                      src={`/api/preview-file?path=${encodeURIComponent(`${selectedHistoryEntry.outputPath}/index.html`)}`}
+                      className="h-[500px] w-full"
+                      sandbox="allow-scripts allow-same-origin"
+                      title="Mission history output preview"
+                    />
+                  </div>
+                </section>
+              )}
+
+              <div className="flex justify-center pb-4">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    conductor.setSelectedHistoryEntry(null)
+                    conductor.resetMission()
+                  }}
+                  className="rounded-xl bg-[var(--theme-accent)] px-5 text-white hover:bg-[var(--theme-accent-strong)]"
+                >
+                  New Mission
+                </Button>
+              </div>
+            </div>
+          </main>
+        </div>
+      )
+    }
+
     return (
       <div className="flex h-full min-h-full flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
         <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col items-stretch justify-center px-6 py-8">
@@ -518,20 +639,26 @@ export function Conductor() {
                       ? pageItems.map((item) => {
                           const entry = item as MissionHistoryEntry
                           return (
-                            <div
+                            <button
                               key={entry.id}
-                              className="flex items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2.5 text-sm"
+                              type="button"
+                              onClick={() => conductor.setSelectedHistoryEntry(entry)}
+                              className="flex w-full items-center gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-left text-sm transition-colors cursor-pointer hover:border-[var(--theme-border2)]"
                             >
                               <span
                                 className={cn('size-2 rounded-full', entry.status === 'completed' ? 'bg-emerald-400' : 'bg-red-400')}
                               />
-                              <span className="min-w-0 flex-1 truncate font-medium text-[var(--theme-text)]">{entry.goal}</span>
-                              <span className="text-xs text-[var(--theme-muted)]">{entry.workerCount} workers</span>
-                              <span className="text-xs text-[var(--theme-muted)]">{entry.totalTokens.toLocaleString()} tok</span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-medium text-[var(--theme-text)]">{entry.goal}</span>
+                                <span className="mt-0.5 block text-xs text-[var(--theme-muted-2)]">
+                                  {formatDurationRange(entry.startedAt, entry.completedAt, now)} · {entry.workerCount} workers
+                                </span>
+                              </span>
+                              <span className="hidden text-xs text-[var(--theme-muted)] sm:inline">{entry.totalTokens.toLocaleString()} tok</span>
                               <span className="text-xs text-[var(--theme-muted-2)]">
                                 {formatRelativeTime(entry.completedAt, now)}
                               </span>
-                            </div>
+                            </button>
                           )
                         })
                       : pageItems.map((item) => {
