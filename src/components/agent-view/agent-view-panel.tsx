@@ -7,7 +7,6 @@ import {
   BotIcon,
   Cancel01Icon,
 } from '@hugeicons/core-free-icons'
-import { useNavigate } from '@tanstack/react-router'
 import {
   AnimatePresence,
   LayoutGroup,
@@ -610,7 +609,6 @@ export function AgentViewPanel() {
     activeCount,
   } = useAgentView()
 
-  const navigate = useNavigate()
 
   // Transcript modal removed — View button now navigates to /agent-swarm
   const [selectedAgentChat, setSelectedAgentChat] = useState<{
@@ -897,13 +895,8 @@ export function AgentViewPanel() {
                   size="icon-sm"
                   variant="ghost"
                   onClick={function handleExpandHub() {
-                    navigate({ to: '/conductor' })
-                    setTimeout(() => {
-                      if (window.location.pathname !== '/conductor') {
-                        window.location.assign('/conductor')
-                      }
-                    }, 50)
                     setOpen(false)
+                    window.location.assign('/conductor')
                   }}
                   aria-label="Open Conductor"
                   title="Open Conductor"
