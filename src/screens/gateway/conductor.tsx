@@ -215,10 +215,14 @@ function getLastAssistantMessage(messages: HistoryMessage[] | undefined): string
   return ''
 }
 
+function isKnownOutputPath(p: string): boolean {
+  return p.startsWith('/tmp/dispatch-') || p.startsWith('/tmp/') || /\/conductor-projects\//.test(p) || /\/\.openclaw\/workspace\//.test(p)
+}
+
 function extractProjectPath(text: string): string | null {
   const structuredPatterns = [
-    /\b(?:Created|Output|Wrote|Saved to|Built|Generated|Written to)\s+(\/tmp\/dispatch-[^\s"')`\]>]+)/gi,
-    /\b(?:Created|Output|Wrote|Saved to|Built|Generated|Written to)\s*:\s*(\/tmp\/dispatch-[^\s"')`\]>]+)/gi,
+    /\b(?:Created|Output|Wrote|Saved to|Built|Generated|Written to|Project directory)\s+((?:\/tmp\/dispatch-|\/tmp\/|~\/conductor-projects\/|\/(?:Users|home)\/[^/]+\/conductor-projects\/)[^\s"')`\]>]+)/gi,
+    /\b(?:Created|Output|Wrote|Saved to|Built|Generated|Written to|Project directory)\s*:\s*((?:\/tmp\/dispatch-|\/tmp\/|~\/conductor-projects\/|\/(?:Users|home)\/[^/]+\/conductor-projects\/)[^\s"')`\]>]+)/gi,
   ]
 
   for (const pattern of structuredPatterns) {
@@ -228,15 +232,15 @@ function extractProjectPath(text: string): string | null {
       if (!raw) continue
       const cleaned = raw.replace(/[.,;:!?`]+$/, '')
       const normalized = cleaned.replace(/\/(index\.html|dist|build)\/?$/i, '')
-      if (normalized.startsWith('/tmp/dispatch-')) return normalized
+      if (isKnownOutputPath(normalized)) return normalized
     }
   }
 
-  const matches = text.match(/\/tmp\/dispatch-[^\s"')`\]>]+/g) ?? []
+  const matches = text.match(/(?:\/tmp\/dispatch-|~\/conductor-projects\/|\/(?:Users|home)\/[^/]+\/conductor-projects\/)[^\s"')`\]>]+/g) ?? []
   for (const raw of matches) {
     const cleaned = raw.replace(/[.,;:!?\-`]+$/, '')
     const normalized = cleaned.replace(/\/(index\.html|dist|build)\/?$/i, '')
-    if (normalized.startsWith('/tmp/dispatch-')) return normalized
+    if (isKnownOutputPath(normalized)) return normalized
   }
 
   const tmpMatches = text.match(/\/tmp\/[a-zA-Z0-9][^\s"')`\]>]+/g) ?? []

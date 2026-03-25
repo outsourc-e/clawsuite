@@ -13,7 +13,11 @@ const CONTENT_TYPES: Record<string, string> = {
 
 function isAllowedPreviewPath(filePath: string): boolean {
   const normalized = normalize(filePath)
-  return normalized.startsWith('/tmp/')
+  if (normalized.startsWith('/tmp/')) return true
+  // Allow conductor-projects and common home directory output paths
+  if (/^\/(?:Users|home)\/[^/]+\/conductor-projects\//.test(normalized)) return true
+  if (/^\/(?:Users|home)\/[^/]+\/\.openclaw\/workspace\//.test(normalized)) return true
+  return false
 }
 
 export const Route = createFileRoute('/api/preview-file')({
