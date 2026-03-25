@@ -372,28 +372,19 @@ function SectionLabel({
         transition={{ layout: transition }}
         className="flex items-center gap-1.5 px-3 pt-3 pb-1 w-full"
       >
-        {navigateTo ? (
-          <Link
-            to={navigateTo}
-            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
-          >
-            {label}
-          </Link>
-        ) : (
-          labelContent
-        )}
         <button
           type="button"
           onClick={onToggle}
-          className="ml-auto p-0.5 rounded hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors"
+          className="flex flex-1 items-center gap-1.5 rounded py-0.5 transition-colors hover:bg-primary-200 dark:hover:bg-primary-800"
           aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
         >
+          {labelContent}
           <HugeiconsIcon
             icon={ArrowDown01Icon}
             size={12}
             strokeWidth={2}
             className={cn(
-              'text-primary-500 transition-transform duration-150',
+              'ml-auto text-primary-500 transition-transform duration-150',
               expanded ? 'rotate-0' : '-rotate-90',
             )}
           />

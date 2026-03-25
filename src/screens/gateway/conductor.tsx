@@ -1369,9 +1369,9 @@ export function Conductor() {
           <div className="w-full space-y-6">
             <div className="space-y-2 text-center">
               <div className="relative flex items-center justify-center">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
+                <div className="inline-flex items-center gap-2.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
                   Conductor
-                  <span className="size-2 rounded-full bg-emerald-400" />
+                  <span className="size-2.5 rounded-full bg-emerald-400" />
                 </div>
                 <div className="absolute right-0 flex items-center gap-2">
                   <button
@@ -1395,20 +1395,20 @@ export function Conductor() {
               <p className="text-sm text-[var(--theme-muted-2)]">Launch a mission and watch your agent team build it live.</p>
             </div>
 
-            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]" style={{ height: 480 }}>
+            <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)]" style={{ height: 520 }}>
               <OfficeView
                 agentRows={homeOfficeRows}
                 missionRunning={homeOfficeRows.some((a) => a.status === 'active')}
                 onViewOutput={() => {}}
                 processType="parallel"
                 companyName=""
-                containerHeight={480}
+                containerHeight={520}
                 hideHeader
               />
             </section>
 
             {(hasMissionHistory || conductor.recentSessions.length > 0) && (
-              <section className="mt-4 w-full space-y-3">
+              <section className="mt-6 w-full space-y-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Recent Missions</h2>
                   {activityTotalPages > 1 && (
