@@ -1295,6 +1295,7 @@ export function Conductor() {
               processType="parallel"
               companyName="Conductor Office"
               containerHeight={360}
+              hideHeader
             />
           </section>
 

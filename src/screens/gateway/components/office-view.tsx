@@ -29,6 +29,8 @@ export type OfficeViewProps = {
   onViewRemoteOutput?: (sessionKey: string, label: string) => void
   /** Fixed pixel height for the office container (compact mode) */
   containerHeight?: number
+  /** Hide the header bar (title, badges, buttons) */
+  hideHeader?: boolean
 }
 
 export const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
@@ -427,6 +429,7 @@ export function OfficeView({
   remoteSessions = [],
   onViewRemoteOutput,
   containerHeight,
+  hideHeader = false,
 }: OfficeViewProps) {
   // When containerHeight is set, we use compact mode: header only (no footer), SVG fills remaining space
   const compact = Boolean(containerHeight)
@@ -542,7 +545,7 @@ export function OfficeView({
   return (
     <div className={cn('flex flex-col bg-gradient-to-b from-slate-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800', compact ? 'h-full' : 'min-h-[480px]')}>
       {/* Header bar */}
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-neutral-200 bg-white/80 px-5 py-3 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
+      {hideHeader ? null : <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-neutral-200 bg-white/80 px-5 py-3 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="text-base font-bold text-neutral-900 dark:text-white">ClawSuite Office</span>
           <div className="flex flex-wrap items-center gap-2">
@@ -569,7 +572,7 @@ export function OfficeView({
             + New Mission
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Mobile: compact list instead of desk grid */}
       <div className="flex-1 overflow-y-auto p-3 md:hidden">
