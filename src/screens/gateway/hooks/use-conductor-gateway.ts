@@ -1015,7 +1015,7 @@ export function useConductorGateway() {
     clearMissionState()
   }
 
-  const sendStream = useMutation({
+  const steerAgent = useMutation({
     mutationFn: async ({ sessionKey, message }: { sessionKey: string; message: string }) => {
       const trimmedSessionKey = sessionKey.trim()
       const trimmedMessage = message.trim()
@@ -1023,19 +1023,33 @@ export function useConductorGateway() {
       if (!trimmedSessionKey) throw new Error('Session key required')
       if (!trimmedMessage) throw new Error('Message required')
 
-      const response = await fetch('/api/send-stream', {
+      const response = await fetch('/api/agent-steer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionKey: trimmedSessionKey,
           message: trimmedMessage,
-          idempotencyKey: crypto.randomUUID(),
         }),
       })
 
       if (!response.ok) {
         const text = await response.text().catch(() => '')
-        throw new Error(text || `Stream request failed (${response.status})`)
+        throw new Error(text || `Steer request failed (${response.status})`)
+      }
+    },
+  })
+
+  const pauseAgent = useMutation({
+    mutationFn: async ({ sessionKey, pause }: { sessionKey: string; pause: boolean }) => {
+      const response = await fetch('/api/agent-pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionKey: sessionKey.trim(), pause }),
+      })
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        throw new Error(text || `Pause request failed (${response.status})`)
       }
     },
   })
@@ -1091,9 +1105,11 @@ export function useConductorGateway() {
     conductorSettings,
     setConductorSettings,
     sendMission: (nextGoal: string) => sendMission.mutateAsync({ nextGoal, settings: conductorSettings }),
-    sendStream: (sessionKey: string, message: string) => sendStream.mutateAsync({ sessionKey, message }),
+    steerAgent: (sessionKey: string, message: string) => steerAgent.mutateAsync({ sessionKey, message }),
+    pauseAgent: (sessionKey: string, pause: boolean) => pauseAgent.mutateAsync({ sessionKey, pause }),
     isSending: sendMission.isPending,
-    isSendingStream: sendStream.isPending,
+    isSteering: steerAgent.isPending,
+    isPausing: pauseAgent.isPending,
     resetMission,
     stopMission,
     retryMission,

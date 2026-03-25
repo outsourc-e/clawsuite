@@ -388,6 +388,7 @@ export function Conductor() {
   const [steerHistory, setSteerHistory] = useState<string[]>([])
   const [steerHistoryTimestamps, setSteerHistoryTimestamps] = useState<number[]>([])
   const [steerError, setSteerError] = useState<string | null>(null)
+  const [isPaused, setIsPaused] = useState(false)
   const [selectedAction, setSelectedAction] = useState<QuickActionId>('build')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activityFilter, setActivityFilter] = useState<'all' | 'completed' | 'failed'>('all')
@@ -464,7 +465,7 @@ export function Conductor() {
     if (!trimmed || !conductor.orchestratorSessionKey) return
 
     try {
-      await conductor.sendStream(conductor.orchestratorSessionKey, `[STEER] ${trimmed}`)
+      await conductor.steerAgent(conductor.orchestratorSessionKey, `[STEER] ${trimmed}`)
       setSteerDraft('')
       setSteerError(null)
       setSteerHistory((current) => [...current, trimmed])
@@ -1472,10 +1473,26 @@ export function Conductor() {
               </button>
               <button
                 type="button"
-                disabled
-                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-muted)] opacity-50"
+                disabled={!conductor.orchestratorSessionKey || conductor.isPausing}
+                onClick={async () => {
+                  if (!conductor.orchestratorSessionKey) return
+                  try {
+                    await conductor.pauseAgent(conductor.orchestratorSessionKey, !isPaused)
+                    setIsPaused(!isPaused)
+                  } catch {
+                    // best effort
+                  }
+                }}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                  !conductor.orchestratorSessionKey || conductor.isPausing
+                    ? 'cursor-not-allowed border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] opacity-50'
+                    : isPaused
+                      ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)] hover:bg-[var(--theme-accent-soft-strong)]'
+                      : 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-text)]',
+                )}
               >
-                <span>⏸</span> Pause
+                <span>{isPaused ? '▶' : '⏸'}</span> {conductor.isPausing ? '...' : isPaused ? 'Resume' : 'Pause'}
               </button>
               <button
                 type="button"
@@ -1779,21 +1796,21 @@ export function Conductor() {
                 value={steerDraft}
                 onChange={(event) => setSteerDraft(event.target.value)}
                 placeholder="Send instructions to the agent..."
-                disabled={!conductor.orchestratorSessionKey || conductor.isSendingStream}
+                disabled={!conductor.orchestratorSessionKey || conductor.isSteering}
                 className="min-w-0 flex-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted-2)] focus:border-[var(--theme-accent)] disabled:cursor-not-allowed disabled:opacity-60"
               />
               <button
                 type="submit"
-                disabled={!steerDraft.trim() || !conductor.orchestratorSessionKey || conductor.isSendingStream}
+                disabled={!steerDraft.trim() || !conductor.orchestratorSessionKey || conductor.isSteering}
                 className={cn(
                   'inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-medium transition-colors sm:min-w-[96px]',
-                  !steerDraft.trim() || !conductor.orchestratorSessionKey || conductor.isSendingStream
+                  !steerDraft.trim() || !conductor.orchestratorSessionKey || conductor.isSteering
                     ? 'cursor-not-allowed border border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] opacity-60'
                     : 'border border-[var(--theme-border)] bg-[var(--theme-accent-soft)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft-strong)]',
                 )}
               >
                 <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
-                {conductor.isSendingStream ? 'Sending' : 'Send'}
+                {conductor.isSteering ? 'Sending' : 'Send'}
               </button>
             </form>
 

@@ -270,6 +270,12 @@
         rgba(11, 20, 35, 0.9);
     }
 
+    .hero-copy {
+      display: grid;
+      align-content: start;
+      gap: 0;
+    }
+
     .eyebrow {
       display: inline-flex;
       align-items: center;
@@ -317,6 +323,38 @@
     .button.primary {
       border-color: rgba(118,168,255,0.35);
       background: linear-gradient(180deg, rgba(118,168,255,0.28), rgba(92,116,255,0.22));
+    }
+
+    .cat-companion {
+      margin-top: 18px;
+      width: fit-content;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 196, 122, 0.24);
+      background: linear-gradient(135deg, rgba(255, 193, 122, 0.14), rgba(140, 123, 255, 0.08));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 12px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    .cat-emoji {
+      font-size: 1.85rem;
+      line-height: 1;
+      filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.22));
+    }
+
+    .cat-companion strong {
+      display: block;
+      font-size: 0.92rem;
+      margin-bottom: 3px;
+    }
+
+    .cat-companion span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.4;
     }
 
     .mission-card {
@@ -788,7 +826,7 @@
 
       <main class="main">
         <section class="hero panel">
-          <div>
+          <div class="hero-copy">
             <div class="eyebrow">Operator cockpit · Mission-aware · Desktop-grade</div>
             <h2>One surface for thinking, running, and shipping.</h2>
             <p>
@@ -800,6 +838,13 @@
               <div class="button primary">Launch Mission Run</div>
               <div class="button">Open Artifact Review</div>
               <div class="button">Attach Node Workspace</div>
+            </div>
+            <div class="cat-companion">
+              <div class="cat-emoji">🐈‍⬛</div>
+              <div>
+                <strong>Operations cat online</strong>
+                <span>Quietly judging scope creep and protecting the mockup from boring decisions.</span>
+              </div>
             </div>
           </div>
           <div class="mission-card">
