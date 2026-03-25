@@ -34,15 +34,15 @@ export function AgentsScreen() {
           <h2 className="text-lg font-semibold text-primary-900">Screen simplified</h2>
           <p className="mt-2 max-w-2xl text-sm text-primary-600">
             The deleted workspace daemon and project stack backed the previous agent directory.
-            Use Conductor for mission launch and the Gateway Agent Hub for live session visibility.
+            Use Conductor for mission launch and the Gateway Conductor for live session visibility.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button
               variant="secondary"
               className="border border-primary-200 bg-white text-primary-700 hover:bg-primary-50"
-              onClick={() => void navigate({ to: '/agent-swarm' })}
+              onClick={() => void navigate({ to: '/conductor' })}
             >
-              Open Agent Hub
+              Open Conductor
             </Button>
             <Button
               className="bg-accent-500 text-primary-950 hover:bg-accent-400"

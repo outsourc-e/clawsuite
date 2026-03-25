@@ -544,7 +544,7 @@ function ChatSidebarComponent({
 
   // Route active states
   const isDashboardActive = pathname === '/dashboard'
-  const isAgentSwarmActive = pathname === '/agent-swarm'
+  const isAgentSwarmActive = pathname === '/conductor'
   const isNewSessionActive =
     pathname === '/new' || pathname.startsWith('/chat/new')
   const isTerminalActive = pathname === '/terminal'
@@ -568,7 +568,7 @@ function ChatSidebarComponent({
   // Track last-visited route per section
   const suiteRoutes = [
     '/dashboard',
-    '/agent-swarm',
+    '/conductor',
     '/new',
     '/terminal',
     '/tasks',
@@ -797,9 +797,9 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/agent-swarm',
+      to: '/conductor',
       icon: BotIcon,
-      label: 'Agent Hub',
+      label: 'Conductor',
       active: isAgentSwarmActive,
       dataTour: 'agent-hub',
     },
