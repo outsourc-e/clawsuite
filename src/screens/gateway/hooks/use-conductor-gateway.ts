@@ -895,10 +895,11 @@ export function useConductorGateway() {
     })
   }, [workers, workerOutputs, tasks.length])
 
-    useEffect(() => {
+    // Save/update history entry on complete — re-runs when workerOutputs arrive
+  // so the entry gets enriched with actual worker content instead of empty text.
+  const historySaveCountRef = useRef(0)
+  useEffect(() => {
     if (phase !== 'complete' || !goal || !completedAt || !missionStartedAt) return
-    if (historySavedRef.current) return
-    historySavedRef.current = true
 
     const missionId = `mission-${new Date(missionStartedAt).getTime()}`
     const outputPath = buildMissionOutputPath(workers, workerOutputs, tasks, streamText)
@@ -935,17 +936,29 @@ export function useConductorGateway() {
       projectPath: outputPath,
       outputPath,
       workerSummary: workerSummary.length > 0 ? workerSummary : undefined,
-      outputText,
+      outputText: outputText || undefined,
       streamText: streamText ? streamText.slice(0, 5000) : undefined,
       completeSummary,
       workerDetails: workerDetails.length > 0 ? workerDetails : undefined,
       error: streamError ?? undefined,
     }
+
+    // Always update localStorage (appendMissionHistory deduplicates by id)
     appendMissionHistory(entry)
-    setMissionHistory((current) => {
-      if (current.some((e) => e.id === missionId)) return current
-      return [entry, ...current].slice(0, MAX_HISTORY_ENTRIES)
-    })
+
+    // Update in-memory state: first save adds, subsequent saves update in-place
+    if (historySaveCountRef.current === 0) {
+      historySavedRef.current = true
+      setMissionHistory((current) => {
+        if (current.some((e) => e.id === missionId)) return current
+        return [entry, ...current].slice(0, MAX_HISTORY_ENTRIES)
+      })
+    } else {
+      setMissionHistory((current) =>
+        current.map((e) => (e.id === missionId ? entry : e)),
+      )
+    }
+    historySaveCountRef.current += 1
   }, [phase, goal, completedAt, missionStartedAt, workers, streamError, workerOutputs, tasks, streamText])
 
   useEffect(() => {
