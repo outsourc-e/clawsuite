@@ -18,8 +18,8 @@ import { getConnectionErrorInfo } from '@/lib/connection-errors'
 import { cn } from '@/lib/utils'
 
 const HEALTH_CHECK_INTERVAL_MS = 15_000
-const HEALTH_CHECK_DELAY_MS = 1_000
-const REQUIRED_FAILURES = 4
+const HEALTH_CHECK_DELAY_MS = 5_000
+const REQUIRED_FAILURES = 6
 const DISMISS_STORAGE_KEY = 'clawsuite-gateway-banner-dismissed-until'
 const DISMISS_TTL_MS = 60 * 60 * 1000
 

@@ -22,6 +22,7 @@ if (!gotTheLock) {
 
 let mainWindow = null;
 let tray = null;
+let quickChatWindow = null;
 let gatewayProcess = null;
 let localServer = null;
 let localServerPort = 0;
@@ -286,8 +287,100 @@ async function createWindow() {
     });
 }
 
+function createQuickChatWindow() {
+    if (quickChatWindow) return; // already created, just toggle
+
+    quickChatWindow = new electron_1.BrowserWindow({
+        width: 400,
+        height: 500,
+        show: false,
+        frame: false,
+        resizable: false,
+        skipTaskbar: true,
+        alwaysOnTop: true,
+        transparent: false,
+        vibrancy: 'under-window', // macOS frosted glass (subtle, no-op on other OS)
+        visualEffectState: 'active',
+        roundedCorners: true,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: (0, path_1.join)(__dirname, 'quick-chat-preload.cjs'),
+        },
+    });
+
+    quickChatWindow.loadFile((0, path_1.join)(__dirname, 'quick-chat.html'));
+
+    // Hide instead of close when user clicks the OS close button
+    quickChatWindow.on('close', (e) => {
+        e.preventDefault();
+        quickChatWindow?.hide();
+    });
+
+    quickChatWindow.on('blur', () => {
+        // Hide on blur (click outside), but only after a small delay
+        // so clicks on the tray icon don't double-fire
+        setTimeout(() => {
+            if (quickChatWindow && !quickChatWindow.isDestroyed() && quickChatWindow.isVisible()) {
+                quickChatWindow.hide();
+            }
+        }, 100);
+    });
+}
+
+function toggleQuickChat() {
+    if (!quickChatWindow || quickChatWindow.isDestroyed()) {
+        
+        // Wait for window to be created then show it
+        quickChatWindow?.once('ready-to-show', () => positionAndShowQuickChat());
+        return;
+    }
+
+    if (quickChatWindow.isVisible()) {
+        quickChatWindow.hide();
+    } else {
+        positionAndShowQuickChat();
+    }
+}
+
+function positionAndShowQuickChat() {
+    if (!quickChatWindow || quickChatWindow.isDestroyed()) return;
+
+    // Position near tray icon on macOS (top-right of screen)
+    const { screen } = electron_1;
+    const cursorPoint = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursorPoint);
+    const { bounds } = display;
+    const windowBounds = quickChatWindow.getBounds();
+
+    // Try to anchor near the tray area: top-right, with some margin
+    let x = bounds.x + bounds.width - windowBounds.width - 20;
+    let y = bounds.y + 30; // below macOS menu bar
+
+    // If tray is available, try to get its bounds for a more accurate position
+    if (tray) {
+        try {
+            const trayBounds = tray.getBounds();
+            if (trayBounds && trayBounds.x) {
+                x = Math.round(trayBounds.x + trayBounds.width / 2 - windowBounds.width / 2);
+                y = trayBounds.y + trayBounds.height + 4;
+                // Keep within screen bounds
+                x = Math.max(bounds.x + 10, Math.min(x, bounds.x + bounds.width - windowBounds.width - 10));
+            }
+        } catch { /* tray bounds not available on all platforms */ }
+    }
+
+    quickChatWindow.setPosition(x, y);
+    quickChatWindow.show();
+    quickChatWindow.focus();
+}
+
 function createTray() {
-    const iconPath = (0, path_1.join)(__dirname, '..', 'assets', 'tray-icon.png');
+    // Check app bundle Resources/assets first (production), then relative path (dev)
+    let iconPath = (0, path_1.join)(process.resourcesPath || '', 'assets', 'tray-icon.png');
+    if (!(0, fs_1.existsSync)(iconPath)) {
+        iconPath = (0, path_1.join)(__dirname, '..', 'assets', 'tray-icon.png');
+    }
     if (!(0, fs_1.existsSync)(iconPath)) return;
 
     const trayIcon = electron_1.nativeImage.createFromPath(iconPath);
@@ -304,21 +397,12 @@ function createTray() {
             {
                 label: 'Open ClawSuite',
                 click: () => { mainWindow?.show(); mainWindow?.focus(); },
-                accelerator: 'CommandOrControl+Shift+C',
             },
             { type: 'separator' },
             {
                 label: 'Quick Chat',
-                click: () => {
-                    if (mainWindow) {
-                        mainWindow.show();
-                        mainWindow.focus();
-                        // Navigate to chat
-                        mainWindow.webContents.executeJavaScript(
-                            `window.location.hash = ''; window.location.pathname = '/';`
-                        ).catch(() => {});
-                    }
-                },
+                accelerator: 'CommandOrControl+Shift+C',
+                click: () => { mainWindow?.show(); mainWindow?.focus(); },
             },
             { type: 'separator' },
             {
@@ -358,8 +442,13 @@ function createTray() {
     buildTrayMenu();
     // Refresh tray menu every 30s to update gateway status
     setInterval(buildTrayMenu, 30000);
-    tray.on('click', () => { mainWindow?.show(); mainWindow?.focus(); });
+    tray.on("click", () => { mainWindow?.show(); mainWindow?.focus(); });
 }
+
+// IPC: quick chat hide
+electron_1.ipcMain.on('quick-chat:hide', () => {
+    quickChatWindow?.hide();
+});
 
 // IPC handlers for onboarding wizard
 electron_1.ipcMain.handle('gateway:check', () => {
@@ -459,10 +548,68 @@ electron_1.ipcMain.handle('onboarding:complete', async (_event, config) => {
 });
 
 // App lifecycle
+// ── Update checker ────────────────────────────────────────────────────────
+async function checkForUpdates() {
+    try {
+        const pkg = require((0, path_1.join)(__dirname, '..', 'package.json'));
+        const currentVersion = pkg.version;
+        const res = await (await import('node:https')).default;
+        const data = await new Promise((resolve, reject) => {
+            const https = require('https');
+            https.get('https://api.github.com/repos/outsourc-e/clawsuite/releases/latest', {
+                headers: { 'User-Agent': 'ClawSuite/' + currentVersion },
+            }, (resp) => {
+                let body = '';
+                resp.on('data', (c) => body += c);
+                resp.on('end', () => {
+                    try { resolve(JSON.parse(body)); } catch { resolve(null); }
+                });
+            }).on('error', reject);
+        });
+        if (!data || !data.tag_name) return;
+        const latestVersion = data.tag_name.replace(/^v/, '');
+        if (latestVersion === currentVersion) return;
+        // Simple semver compare
+        const cur = currentVersion.split('.').map(Number);
+        const lat = latestVersion.split('.').map(Number);
+        const isNewer = lat[0] > cur[0] || (lat[0] === cur[0] && lat[1] > cur[1]) || (lat[0] === cur[0] && lat[1] === cur[1] && lat[2] > cur[2]);
+        if (!isNewer) return;
+        // Find DMG asset
+        const dmgAsset = (data.assets || []).find((a) => a.name.includes('arm64') && a.name.endsWith('.dmg'));
+        const downloadUrl = dmgAsset ? dmgAsset.browser_download_url : data.html_url;
+        const { dialog, shell } = require('electron');
+        const result = await dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: 'Update Available',
+            message: `ClawSuite v${latestVersion} is available`,
+            detail: `You're running v${currentVersion}. ${data.body ? data.body.slice(0, 200) : ''}`,
+            buttons: ['Download Update', 'Later'],
+            defaultId: 0,
+        });
+        if (result.response === 0) {
+            shell.openExternal(downloadUrl);
+        }
+    } catch (err) {
+        console.log('[ClawSuite] Update check failed:', err.message);
+    }
+}
+
 electron_1.app.whenReady().then(async () => {
     await startWorkspaceDaemonIfNeeded();
     createWindow();
     createTray();
+
+    // Pre-create the quick chat window so first open is instant
+    
+
+    // Check for updates after 10s (non-blocking)
+    setTimeout(checkForUpdates, 10000);
+
+    // Global shortcut: Cmd+Shift+C toggles quick chat popup
+    electron_1.globalShortcut.register('CommandOrControl+Shift+C', () => {
+        mainWindow?.show(); mainWindow?.focus();
+    });
+
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0) {
             createWindow();
@@ -477,6 +624,7 @@ electron_1.app.on('window-all-closed', () => {
 });
 
 electron_1.app.on('before-quit', () => {
+    electron_1.globalShortcut.unregisterAll();
     tray?.destroy();
     if (appProcess) {
         appProcess.kill();
