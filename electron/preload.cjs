@@ -25,3 +25,10 @@ electron_1.contextBridge.exposeInMainWorld('clawsuite', {
         isElectron: true,
     },
 });
+
+// Gateway lifecycle bridge — used by GatewayStatusToast
+electron_1.contextBridge.exposeInMainWorld('gatewayBridge', {
+    onStatusChange: (callback) => electron_1.ipcRenderer.on('gateway:status', (_event, data) => callback(data)),
+    requestRestart: () => electron_1.ipcRenderer.send('gateway:restart'),
+    removeStatusListener: (callback) => electron_1.ipcRenderer.removeListener('gateway:status', callback),
+});

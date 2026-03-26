@@ -30,13 +30,157 @@ let localServerPort = 0;
 // Gateway detection
 const DEFAULT_GATEWAY_PORT = 18789;
 const DEV_PORT = 3000;
+const GATEWAY_HEALTH_URL = `http://127.0.0.1:${DEFAULT_GATEWAY_PORT}/health`;
+
+// ── Gateway Monitor ───────────────────────────────────────────────────────
+/**
+ * GatewayMonitor: polls /health every 10s, auto-restarts on 3 consecutive
+ * failures, notifies renderer via 'gateway:status' IPC events.
+ */
+class GatewayMonitor {
+    constructor() {
+        this.state = 'starting';
+        this.consecutiveFailures = 0;
+        this.restartAttempts = 0;
+        this.maxRestartAttempts = 2;
+        this.pollIntervalMs = 10000;
+        this.failureThreshold = 3;
+        this.pollTimer = null;
+        this.manualStop = false; // set true when user deliberately stops gateway
+    }
+
+    start() {
+        if (this.pollTimer) return;
+        this.pollTimer = setInterval(() => this._tick(), this.pollIntervalMs);
+        console.log('[GatewayMonitor] Started');
+    }
+
+    stop() {
+        if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+        }
+        console.log('[GatewayMonitor] Stopped');
+    }
+
+    notifyManualStop() {
+        this.manualStop = true;
+    }
+
+    notifyManualStart() {
+        this.manualStop = false;
+        this.restartAttempts = 0;
+        this.consecutiveFailures = 0;
+    }
+
+    _sendStatus(state, message) {
+        if (this.state !== state || message) {
+            this.state = state;
+            console.log(`[GatewayMonitor] State: ${state} — ${message || ''}`);
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('gateway:status', { state, message: message || '' });
+        }
+    }
+
+    async _checkHealth() {
+        try {
+            const http = require('http');
+            return await new Promise((resolve) => {
+                const req = http.get(GATEWAY_HEALTH_URL, { timeout: 3000 }, (res) => {
+                    resolve(res.statusCode === 200);
+                });
+                req.on('error', () => resolve(false));
+                req.on('timeout', () => { req.destroy(); resolve(false); });
+            });
+        } catch {
+            return false;
+        }
+    }
+
+    async _attemptRestart() {
+        if (this.manualStop) {
+            console.log('[GatewayMonitor] Skipping restart — manual stop flag set');
+            return false;
+        }
+        if (!isOpenClawInstalled()) {
+            console.log('[GatewayMonitor] openclaw not found, cannot restart');
+            return false;
+        }
+        this.restartAttempts++;
+        console.log(`[GatewayMonitor] Restart attempt ${this.restartAttempts}/${this.maxRestartAttempts}`);
+        this._sendStatus('restarting', `Restarting gateway (attempt ${this.restartAttempts})...`);
+
+        try {
+            const child = (0, child_process_1.spawn)('openclaw', ['gateway', 'start'], {
+                detached: true,
+                stdio: 'ignore',
+                shell: true,
+            });
+            child.unref();
+        } catch (err) {
+            console.error('[GatewayMonitor] Failed to spawn restart:', err);
+            return false;
+        }
+
+        // Poll up to 30s for health to return
+        const deadline = Date.now() + 30000;
+        while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 2000));
+            if (await this._checkHealth()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    async _tick() {
+        const healthy = await this._checkHealth();
+        if (healthy) {
+            if (this.consecutiveFailures > 0 || this.state !== 'connected') {
+                this._sendStatus('connected', 'Gateway connected ✓');
+            }
+            this.consecutiveFailures = 0;
+            this.restartAttempts = 0;
+        } else {
+            this.consecutiveFailures++;
+            console.log(`[GatewayMonitor] Health check failed (${this.consecutiveFailures}/${this.failureThreshold})`);
+
+            if (this.consecutiveFailures < this.failureThreshold) {
+                this._sendStatus('disconnected', 'Gateway disconnected — reconnecting...');
+                return;
+            }
+
+            // 3 consecutive failures → attempt restart
+            if (this.manualStop) {
+                this._sendStatus('disconnected', 'Gateway offline (manually stopped)');
+                return;
+            }
+
+            if (this.restartAttempts >= this.maxRestartAttempts) {
+                this._sendStatus('failed', 'Gateway offline — click to retry');
+                return;
+            }
+
+            const recovered = await this._attemptRestart();
+            if (recovered) {
+                this.consecutiveFailures = 0;
+                this._sendStatus('connected', 'Gateway connected ✓');
+            } else if (this.restartAttempts >= this.maxRestartAttempts) {
+                this._sendStatus('failed', 'Gateway offline — click to retry');
+            }
+        }
+    }
+}
+
+const gatewayMonitor = new GatewayMonitor();
 
 // ── Production app server ─────────────────────────────────────────────────
 
 function getGatewayUrl() {
     try {
         const code = (0, child_process_1.execSync)(
-            `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${DEFAULT_GATEWAY_PORT}/health`,
+            `curl -s -o /dev/null -w "%{http_code}" ${GATEWAY_HEALTH_URL}`,
             { timeout: 3000 }
         ).toString().trim();
         if (code !== '200') throw new Error('not 200');
@@ -44,6 +188,69 @@ function getGatewayUrl() {
     } catch {
         return null;
     }
+}
+
+/**
+ * Async version of getGatewayUrl using http module (no execSync).
+ * Returns the gateway base URL or null.
+ */
+async function getGatewayUrlAsync() {
+    try {
+        const http = require('http');
+        const ok = await new Promise((resolve) => {
+            const req = http.get(GATEWAY_HEALTH_URL, { timeout: 3000 }, (res) => {
+                resolve(res.statusCode === 200);
+            });
+            req.on('error', () => resolve(false));
+            req.on('timeout', () => { req.destroy(); resolve(false); });
+        });
+        return ok ? `http://127.0.0.1:${DEFAULT_GATEWAY_PORT}` : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Auto-start the gateway on app launch. Waits up to 30s for it to come online.
+ * Returns true if gateway is healthy.
+ */
+async function ensureGatewayRunning() {
+    // Already up?
+    if (await getGatewayUrlAsync()) {
+        console.log('[ClawSuite] Gateway already running');
+        return true;
+    }
+
+    if (!isOpenClawInstalled()) {
+        console.log('[ClawSuite] openclaw not installed, skipping auto-start');
+        return false;
+    }
+
+    console.log('[ClawSuite] Gateway not running — auto-starting with --bind lan...');
+    try {
+        const child = (0, child_process_1.spawn)('openclaw', ['gateway', 'start', '--bind', 'lan'], {
+            detached: true,
+            stdio: 'ignore',
+            shell: true,
+        });
+        child.unref();
+    } catch (err) {
+        console.error('[ClawSuite] Failed to spawn gateway start:', err);
+        return false;
+    }
+
+    // Poll up to 30s
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if (await getGatewayUrlAsync()) {
+            console.log('[ClawSuite] Gateway came online');
+            return true;
+        }
+    }
+
+    console.warn('[ClawSuite] Gateway did not come online within 30s');
+    return false;
 }
 
 function isOpenClawInstalled() {
@@ -247,22 +454,6 @@ async function createWindow() {
         mainWindow?.focus();
     });
 
-    const gatewayUrl = getGatewayUrl();
-    if (!gatewayUrl && isOpenClawInstalled()) {
-        console.log('[ClawSuite] Gateway not running, auto-starting...');
-        try {
-            gatewayProcess = (0, child_process_1.spawn)('openclaw', ['gateway', 'start'], {
-                shell: true,
-                stdio: 'ignore',
-                detached: true,
-            });
-            gatewayProcess.unref();
-            await new Promise((resolve) => setTimeout(resolve, 3000));
-        } catch (err) {
-            console.error('[ClawSuite] Failed to auto-start gateway:', err);
-        }
-    }
-
     if (process.env.NODE_ENV !== 'development') {
         try {
             await startLocalServer(getGatewayUrl());
@@ -450,6 +641,25 @@ electron_1.ipcMain.on('quick-chat:hide', () => {
     quickChatWindow?.hide();
 });
 
+// IPC: renderer-triggered gateway restart (from GatewayStatusToast retry button)
+electron_1.ipcMain.on('gateway:restart', async () => {
+    console.log('[ClawSuite] Renderer requested gateway restart');
+    gatewayMonitor.notifyManualStart();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('gateway:status', { state: 'restarting', message: 'Restarting gateway...' });
+    }
+    try {
+        (0, child_process_1.execSync)('openclaw gateway stop', { timeout: 5000 });
+    } catch { /* may not be running */ }
+    const child = (0, child_process_1.spawn)('openclaw', ['gateway', 'start'], {
+        detached: true,
+        stdio: 'ignore',
+        shell: true,
+    });
+    child.unref();
+    // Let the monitor pick up the recovery on next tick
+});
+
 // IPC handlers for onboarding wizard
 electron_1.ipcMain.handle('gateway:check', () => {
     return { url: getGatewayUrl(), installed: isOpenClawInstalled() };
@@ -596,11 +806,28 @@ async function checkForUpdates() {
 
 electron_1.app.whenReady().then(async () => {
     await startWorkspaceDaemonIfNeeded();
+
+    // Auto-start gateway before creating the window so the app loads connected
+    await ensureGatewayRunning();
+
     createWindow();
     createTray();
 
-    // Pre-create the quick chat window so first open is instant
-    
+    // Start monitoring gateway health — auto-restarts on failure, notifies renderer
+    gatewayMonitor.start();
+
+    // Send initial connected status once window is ready
+    if (mainWindow) {
+        mainWindow.webContents.once('did-finish-load', async () => {
+            const isUp = await getGatewayUrlAsync();
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('gateway:status', {
+                    state: isUp ? 'connected' : 'disconnected',
+                    message: isUp ? 'Gateway connected ✓' : 'Gateway disconnected — reconnecting...',
+                });
+            }
+        });
+    }
 
     // Check for updates after 10s (non-blocking)
     setTimeout(checkForUpdates, 10000);
@@ -626,6 +853,7 @@ electron_1.app.on('window-all-closed', () => {
 electron_1.app.on('before-quit', () => {
     electron_1.globalShortcut.unregisterAll();
     tray?.destroy();
+    gatewayMonitor.stop();
     if (appProcess) {
         appProcess.kill();
         appProcess = null;

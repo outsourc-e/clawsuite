@@ -17,6 +17,7 @@ import { CompactionNotifier } from '@/components/compaction-notifier'
 import { FallbackBanner } from '@/components/fallback-banner'
 import { GatewayRestartProvider } from '@/components/gateway-restart-overlay'
 import { ExecApprovalToast } from '@/components/exec-approval-toast'
+import { GatewayStatusToast } from '@/components/gateway-status-toast'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
 
 const APP_CSP = [
@@ -295,6 +296,7 @@ function RootLayout() {
       <MobilePromptTrigger />
       <Toaster />
       <ExecApprovalToast />
+      <GatewayStatusToast />
       <WorkspaceShell />
       <SearchModal />
       <OnboardingTour />
