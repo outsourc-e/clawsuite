@@ -98,125 +98,66 @@ async function startWorkspaceDaemonIfNeeded() {
 }
 
 // ── Find or start ClawSuite server ────────────────────────────────────────
-// Checks common ports for a running ClawSuite dev/preview server.
-// If none found, starts `pnpm dev` from the repo directory.
 let appProcess = null;
-const CLAWSUITE_PORTS = [3000, 3003, 3001, 3002];
-
-function findRunningServer() {
-    for (const port of CLAWSUITE_PORTS) {
-        try {
-            const code = (0, child_process_1.execSync)(
-                `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/api/session-status`,
-                { timeout: 2000 }
-            ).toString().trim();
-            if (code === '200' || code === '401' || code === '503') {
-                return port;
-            }
-        } catch { /* not running on this port */ }
-    }
-    return null;
-}
-
-function findRepoDir() {
-    // Common locations for the ClawSuite repo
-    const candidates = [
-        (0, path_1.join)(process.env.HOME || '', '.openclaw', 'workspace', 'clawsuite'),
-        (0, path_1.join)(process.env.HOME || '', 'clawsuite'),
-        (0, path_1.join)(__dirname, '..'),
-    ];
-    for (const dir of candidates) {
-        if ((0, fs_1.existsSync)((0, path_1.join)(dir, 'package.json'))) {
-            try {
-                const pkg = JSON.parse((0, fs_1.readFileSync)((0, path_1.join)(dir, 'package.json'), 'utf-8'));
-                if (pkg.name === 'clawsuite' || pkg.name === '@clawsuite/app') return dir;
-            } catch { /* skip */ }
-        }
-    }
-    return null;
-}
+const PROD_SERVER_PORT = 3003;
 
 function startLocalServer(_gatewayUrl) {
     return new Promise((resolve, reject) => {
-        // First check if a server is already running
-        const existingPort = findRunningServer();
-        if (existingPort) {
-            localServerPort = existingPort;
-            console.log(`[ClawSuite] Found running server on port ${existingPort}`);
-            return resolve(existingPort);
+        // Check if something is already running on common ports
+        for (const port of [3000, 3003, 3001]) {
+            try {
+                const code = (0, child_process_1.execSync)(
+                    `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/`,
+                    { timeout: 2000 }
+                ).toString().trim();
+                if (['200', '301', '307', '401', '503'].includes(code)) {
+                    localServerPort = port;
+                    console.log(`[ClawSuite] Found running server on port ${port}`);
+                    return resolve(port);
+                }
+            } catch { /* not running */ }
         }
 
-        // Try to start one from the repo
-        const repoDir = findRepoDir();
-        if (!repoDir) {
-            console.error('[ClawSuite] Could not find ClawSuite repo directory');
-            return reject(new Error('ClawSuite repo not found'));
+        // Start the bundled production server (electron/prod-server.cjs)
+        const prodServerPath = (0, path_1.join)(__dirname, 'prod-server.cjs');
+        if (!(0, fs_1.existsSync)(prodServerPath)) {
+            console.error('[ClawSuite] prod-server.cjs not found');
+            return reject(new Error('Production server not found'));
         }
 
-        console.log(`[ClawSuite] Starting server from ${repoDir}...`);
-        const port = 3003;
-
-        appProcess = (0, child_process_1.spawn)('pnpm', ['dev', '--port', String(port)], {
-            cwd: repoDir,
-            shell: true,
+        console.log(`[ClawSuite] Starting production server on port ${PROD_SERVER_PORT}...`);
+        appProcess = (0, child_process_1.spawn)(process.execPath, [prodServerPath], {
+            env: { ...process.env, PORT: String(PROD_SERVER_PORT) },
             stdio: 'pipe',
-            env: { ...process.env, NODE_ENV: 'development', PORT: String(port) },
-            detached: true,
         });
 
         let started = false;
         const timeout = setTimeout(() => {
             if (!started) {
                 started = true;
-                // Try polling the port
-                const poll = setInterval(() => {
-                    const found = findRunningServer();
-                    if (found) {
-                        clearInterval(poll);
-                        localServerPort = found;
-                        resolve(found);
-                    }
-                }, 1000);
-                // Give up after 15s total
-                setTimeout(() => {
-                    clearInterval(poll);
-                    if (!localServerPort) {
-                        localServerPort = port;
-                        resolve(port);
-                    }
-                }, 10000);
+                localServerPort = PROD_SERVER_PORT;
+                resolve(PROD_SERVER_PORT);
             }
-        }, 5000);
+        }, 10000);
 
         appProcess.stdout?.on('data', (data) => {
             const output = data.toString();
-            console.log('[dev]', output.trim());
-            if (!started && output.includes('Local:')) {
+            console.log('[prod-server]', output.trim());
+            if (!started && output.includes('listening')) {
                 started = true;
                 clearTimeout(timeout);
-                // Extract actual port from output
-                const match = output.match(/:(\d{4})\//);
-                localServerPort = match ? parseInt(match[1], 10) : port;
-                console.log(`[ClawSuite] Dev server started on port ${localServerPort}`);
-                resolve(localServerPort);
+                localServerPort = PROD_SERVER_PORT;
+                console.log(`[ClawSuite] Production server ready on port ${PROD_SERVER_PORT}`);
+                resolve(PROD_SERVER_PORT);
             }
         });
 
         appProcess.stderr?.on('data', (data) => {
-            const output = data.toString();
-            console.error('[dev-err]', output.trim());
-            // pnpm outputs to stderr sometimes
-            if (!started && output.includes('Local:')) {
-                started = true;
-                clearTimeout(timeout);
-                const match = output.match(/:(\d{4})\//);
-                localServerPort = match ? parseInt(match[1], 10) : port;
-                resolve(localServerPort);
-            }
+            console.error('[prod-server-err]', data.toString().trim());
         });
 
         appProcess.on('error', (err) => {
-            console.error('[ClawSuite] Dev server failed:', err);
+            console.error('[ClawSuite] Production server failed:', err);
             if (!started) {
                 started = true;
                 clearTimeout(timeout);
