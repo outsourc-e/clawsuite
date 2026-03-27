@@ -155,6 +155,17 @@ function readString(value: unknown): string {
   return value.trim()
 }
 
+function dedupeById<T extends { id: string }>(items: Array<T>): Array<T> {
+  const unique = new Map<string, T>()
+  items.forEach((item) => {
+    if (!item.id) return
+    if (!unique.has(item.id)) {
+      unique.set(item.id, item)
+    }
+  })
+  return Array.from(unique.values())
+}
+
 function readNumber(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 0
   return value
@@ -591,9 +602,9 @@ export function useAgentView(): AgentViewResult {
 
         if (isDisposed) return
 
-        setActiveAgents(nextActiveAgents)
-        setQueuedAgents(nextQueuedAgents)
-        setHistoryAgents(nextHistoryAgents.slice(0, 10))
+        setActiveAgents(dedupeById(nextActiveAgents))
+        setQueuedAgents(dedupeById(nextQueuedAgents))
+        setHistoryAgents(dedupeById(nextHistoryAgents).slice(0, 10))
         setIsDemoMode(false)
         setIsLiveConnected(true)
         setErrorMessage(null)

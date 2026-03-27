@@ -45,7 +45,7 @@ export const tourSteps: Step[] = [
   {
     target: '[data-tour="agent-hub"]',
     placement: 'right',
-    title: 'Agent Hub',
+    title: 'Conductor',
     content:
       'Manage your AI agents and configurations. Create custom agents with specialized behaviors.',
   },

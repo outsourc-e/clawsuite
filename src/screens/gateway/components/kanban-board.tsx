@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { HubTask, TaskStatus, TaskPriority } from './task-board'
 import { useTaskStore, type Task as StoreTask, type TaskStatus as StoreTaskStatus } from '@/stores/task-store'
+import { addApproval } from '../lib/approvals-store'
 
 type AgentOption = { id: string; name: string }
 
@@ -12,9 +13,16 @@ type KanbanColumn = {
   label: string
 }
 
-const COLUMNS: KanbanColumn[] = [
+const DEFAULT_COLUMNS: KanbanColumn[] = [
   { key: 'backlog', label: 'Backlog' },
   { key: 'in_progress', label: 'In Progress' },
+  { key: 'review', label: 'Review' },
+  { key: 'done', label: 'Done' },
+]
+
+const COMPACT_COLUMNS: KanbanColumn[] = [
+  { key: 'backlog', label: 'Todo' },
+  { key: 'in_progress', label: 'WIP' },
   { key: 'review', label: 'Review' },
   { key: 'done', label: 'Done' },
 ]
@@ -34,7 +42,7 @@ const PRIORITY_BADGES: Record<TaskPriority, string> = {
 }
 
 function isKanbanColumnStatus(value: string): value is KanbanColumnStatus {
-  return COLUMNS.some((column) => column.key === value)
+  return DEFAULT_COLUMNS.some((column) => column.key === value)
 }
 
 function mapTaskStatusToColumn(status: TaskStatus): KanbanColumnStatus {
@@ -99,6 +107,11 @@ function appendNote(description: string, note: string): string {
   return description.trim() ? `${description.trim()}\n\n${entry}` : entry
 }
 
+function truncateCompactTitle(title: string): string {
+  if (title.length <= 40) return title
+  return `${title.slice(0, 37).trimEnd()}...`
+}
+
 export type KanbanBoardProps = {
   tasks: HubTask[]
   onUpdateTask: (task: HubTask) => void
@@ -106,14 +119,24 @@ export type KanbanBoardProps = {
   agents: AgentOption[]
   missionId?: string
   onAssignAgent?: (taskId: string, agentId: string) => void
+  compact?: boolean
 }
 
-export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, missionId, onAssignAgent }: KanbanBoardProps) {
+export function KanbanBoard({
+  tasks,
+  onUpdateTask,
+  onDeleteTask,
+  agents,
+  missionId,
+  onAssignAgent,
+  compact = false,
+}: KanbanBoardProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<KanbanColumnStatus | null>(null)
   const [menuTaskId, setMenuTaskId] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [noteDraft, setNoteDraft] = useState('')
+  const columns = compact ? COMPACT_COLUMNS : DEFAULT_COLUMNS
   const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus)
   const allStoreTasks = useTaskStore((state) => state.tasks)
   const missionTasks = useMemo(() => {
@@ -180,13 +203,28 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, mission
       updatedAt: Date.now(),
     }))
     updateTaskStatus(taskId, nextStoreStatus)
+
+    // Review gate: when a task is moved to Review, create a pending approval entry
+    if (nextColumn === 'review') {
+      const task = mergedTasks.find((t) => t.id === taskId)
+      if (task) {
+        const agentName = task.agentId ? (agentNameById.get(task.agentId) ?? task.agentId) : 'Unassigned'
+        addApproval({
+          agentId: task.agentId ?? 'unassigned',
+          agentName,
+          action: `Review task: ${task.title}`,
+          context: task.description || `Task "${task.title}" has been moved to Review and is awaiting approval.`,
+          source: 'agent',
+        })
+      }
+    }
   }
 
   return (
     <div className="h-full min-h-0 bg-[var(--theme-bg)]">
       <div className="h-full min-h-0 overflow-x-auto pb-2">
         <div className="grid min-h-full w-full min-w-[52rem] grid-cols-4 gap-3 px-3 py-3 lg:min-w-0">
-          {COLUMNS.map((column) => {
+          {columns.map((column) => {
             const columnTasks = tasksByColumn[column.key]
 
             return (
@@ -250,20 +288,39 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, mission
                           setMenuPosition({ x: event.clientX, y: event.clientY })
                           setNoteDraft('')
                         }}
-                        className="cursor-grab rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3 active:cursor-grabbing"
+                        className={cn(
+                          'cursor-grab rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] active:cursor-grabbing',
+                          compact ? 'p-2' : 'p-3',
+                        )}
                       >
-                        <h4 className="line-clamp-2 text-sm font-semibold text-[var(--theme-text)]">{task.title}</h4>
+                        <h4
+                          title={task.title}
+                          className={cn(
+                            'font-semibold text-[var(--theme-text)]',
+                            compact ? 'truncate text-[12px] leading-4' : 'line-clamp-2 text-sm',
+                          )}
+                        >
+                          {compact ? truncateCompactTitle(task.title) : task.title}
+                        </h4>
 
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                          <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide', PRIORITY_BADGES[task.priority])}>
+                        <div className={cn('flex items-center justify-between gap-2', compact ? 'mt-1.5' : 'mt-2')}>
+                          <span
+                            className={cn(
+                              'rounded-full border font-semibold uppercase tracking-wide',
+                              PRIORITY_BADGES[task.priority],
+                              compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]',
+                            )}
+                          >
                             {PRIORITY_LABELS[task.priority]}
                           </span>
-                          <span className="truncate text-[11px] text-[var(--theme-muted)]">{assignee}</span>
+                          <span className={cn('truncate text-[var(--theme-muted)]', compact ? 'max-w-[84px] text-[10px]' : 'text-[11px]')}>
+                            {assignee}
+                          </span>
                         </div>
 
                         {onAssignAgent ? (
-                          <div className="mt-2">
-                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)]">Assign</label>
+                          <div className={cn(compact ? 'mt-1.5' : 'mt-2')}>
+                            <label className={cn('mb-1 block font-medium uppercase tracking-wide text-[var(--theme-muted)]', compact ? 'text-[9px]' : 'text-[10px]')}>Assign</label>
                             <select
                               value={task.agentId ?? ''}
                               onChange={(event) => {
@@ -276,7 +333,10 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, mission
                                   updatedAt: Date.now(),
                                 }))
                               }}
-                              className="w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1 text-[11px] text-[var(--theme-text)] outline-none"
+                              className={cn(
+                                'w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 text-[var(--theme-text)] outline-none',
+                                compact ? 'py-1 text-[10px]' : 'py-1 text-[11px]',
+                              )}
                             >
                               <option value="">Unassigned</option>
                               {agents.map((agent) => (
@@ -286,7 +346,9 @@ export function KanbanBoard({ tasks, onUpdateTask, onDeleteTask, agents, mission
                           </div>
                         ) : null}
 
-                        <p className="mt-2 text-[11px] text-[var(--theme-muted)]">{formatTimeInColumn(task.updatedAt)}</p>
+                        <p className={cn('text-[var(--theme-muted)]', compact ? 'mt-1.5 text-[10px]' : 'mt-2 text-[11px]')}>
+                          {formatTimeInColumn(task.updatedAt)}
+                        </p>
                       </article>
                     )
                   })}

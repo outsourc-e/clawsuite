@@ -1,6 +1,35 @@
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:opsz,wght@8..120,400..800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 
+/* Hide scrollbars until scroll (cross-browser) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: rgba(0,0,0,0.2) transparent;
+}
+.dark *:hover {
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0.2);
+}
+.dark *:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255,255,255,0.2);
+}
+
 .root {
   isolation: isolate;
 }
@@ -1021,4 +1050,18 @@ code {
   :where(button, [data-slot='button'], a, [role='button']) {
     -webkit-tap-highlight-color: transparent;
   }
+}
+
+/* Orange glow pulse on composer when agent is actively working */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(249, 115, 22, 0.55);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }

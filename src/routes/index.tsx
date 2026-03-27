@@ -2,6 +2,13 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
   beforeLoad: function redirectToWorkspace() {
+    // First launch: redirect to setup wizard if gateway not configured
+    if (typeof window !== 'undefined') {
+      const configured = localStorage.getItem('clawsuite-gateway-configured') === 'true'
+      if (!configured) {
+        throw redirect({ to: '/wizard' as string, replace: true })
+      }
+    }
     const isMobile =
       typeof window !== 'undefined' && window.innerWidth < 768
     throw redirect({

@@ -86,7 +86,7 @@ export const Route = createFileRoute('/api/session-status')({
           if (mainUsage?.usage) {
             const u = mainUsage.usage
             const model = mainUsage.model ?? mainUsage.modelOverride ?? ''
-            const maxTokens = getContextWindow(model)
+            const maxTokens = mainUsage.contextTokens ?? mainUsage.contextWindow ?? getContextWindow(model)
 
             // Calculate context % from cache data
             const cacheRead = u.cacheRead ?? 0

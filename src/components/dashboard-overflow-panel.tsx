@@ -8,9 +8,10 @@ import {
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
-  GlobeIcon,
   ListViewIcon,
+  MessageMultiple01Icon,
   Moon02Icon,
+  Rocket01Icon,
   ServerStack01Icon,
   Sun02Icon,
   Task01Icon,
@@ -28,17 +29,18 @@ type OverflowItem = {
 }
 
 const SYSTEM_ITEMS: Array<OverflowItem> = [
-  { icon: File01Icon, label: 'Files', to: '/files' },
   { icon: BrainIcon, label: 'Memory', to: '/memory' },
   { icon: Task01Icon, label: 'Tasks', to: '/tasks' },
   { icon: ComputerTerminal01Icon, label: 'Terminal', to: '/terminal' },
-  { icon: GlobeIcon, label: 'Browser', to: '/browser' },
+
   { icon: Clock01Icon, label: 'Cron Jobs', to: '/cron' },
   { icon: ListViewIcon, label: 'Logs', to: '/logs' },
   { icon: ApiIcon, label: 'Debug', to: '/debug' },
 ]
 
 const GATEWAY_ITEMS: Array<OverflowItem> = [
+  { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
+  { icon: Rocket01Icon, label: 'Conductor', to: '/conductor' },
   { icon: ServerStack01Icon, label: 'Channels', to: '/channels' },
   { icon: ChartLineData02Icon, label: 'Costs', to: '/costs' },
 ]
@@ -131,7 +133,7 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
         onClick={onClose}
       />
 
-      <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-primary-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl animate-in slide-in-from-bottom-4 duration-200 dark:border-gray-700 dark:bg-gray-900">
+      <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-primary-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+5rem)] shadow-2xl animate-in slide-in-from-bottom-4 duration-200 dark:border-gray-700 dark:bg-gray-900">
         <div className="mb-3 h-1.5 w-10 rounded-full bg-primary-200 dark:bg-gray-700 mx-auto" />
         <div className="space-y-4">
           <section>

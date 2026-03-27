@@ -828,14 +828,14 @@ export function DashboardScreen() {
 
                 <button
                   type="button"
-                  onClick={() => void navigate({ to: '/agent-swarm' })}
+                  onClick={() => void navigate({ to: '/conductor' })}
                   className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 text-left shadow-sm active:scale-[0.98] hover:border-orange-300 transition-all dark:border-neutral-800 dark:bg-neutral-900/60"
                 >
                   <span className="flex size-8 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
                     <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="6" height="8" rx="1"/><rect x="12" y="6" width="6" height="8" rx="1"/><path d="M8 10h4M10 8v4"/></svg>
                   </span>
                   <div>
-                    <p className="text-xs font-semibold text-ink truncate">Agent Hub</p>
+                    <p className="text-xs font-semibold text-ink truncate">Conductor</p>
                     <p className="text-[10px] text-primary-500 dark:text-neutral-400">
                       {dashboardData.agents.active > 0
                         ? `${dashboardData.agents.active} active`

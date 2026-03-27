@@ -23,6 +23,8 @@ const WORKSPACE_ROOT = (
   process.env.OPENCLAW_WORKSPACE_DIR ||
   path.join(os.homedir(), '.openclaw', 'workspace')
 ).trim()
+const HOME_DIR = path.resolve(os.homedir())
+const TEMP_ROOT = path.resolve('/tmp')
 
 type FileEntry = {
   name: string
@@ -45,9 +47,47 @@ function ensureWorkspacePath(input: string) {
   return resolved
 }
 
+function isWithinRoot(resolvedPath: string, root: string) {
+  return resolvedPath === root || resolvedPath.startsWith(`${root}${path.sep}`)
+}
+
+function ensureReadablePath(input: string) {
+  const raw = input.trim()
+  if (!raw) return WORKSPACE_ROOT
+  const expanded =
+    raw === '~'
+      ? HOME_DIR
+      : raw.startsWith('~/')
+        ? path.join(HOME_DIR, raw.slice(2))
+        : raw
+  const resolved = path.isAbsolute(expanded)
+    ? path.resolve(expanded)
+    : path.resolve(WORKSPACE_ROOT, expanded)
+  if (
+    isWithinRoot(resolved, WORKSPACE_ROOT) ||
+    isWithinRoot(resolved, HOME_DIR) ||
+    isWithinRoot(resolved, TEMP_ROOT) ||
+    /^\/(?:Users|home)\/[^/]+\/conductor-projects\//.test(resolved)
+  ) {
+    return resolved
+  }
+  throw new Error('Path is outside allowed roots')
+}
+
 function toRelative(resolvedPath: string) {
   const relative = path.relative(WORKSPACE_ROOT, resolvedPath)
   return relative || ''
+}
+
+function toClientPath(resolvedPath: string) {
+  if (isWithinRoot(resolvedPath, WORKSPACE_ROOT)) {
+    return toRelative(resolvedPath)
+  }
+  if (isWithinRoot(resolvedPath, HOME_DIR)) {
+    const relative = path.relative(HOME_DIR, resolvedPath).split(path.sep).filter(Boolean).join('/')
+    return relative ? `~/${relative}` : '~'
+  }
+  return resolvedPath
 }
 
 function sortEntries(entries: Array<FileEntry>) {
@@ -146,7 +186,7 @@ async function readDirectory(
 
     if (IGNORED_DIRS.has(entry.name)) continue
     const fullPath = path.join(dirPath, entry.name)
-    const relativePath = toRelative(fullPath)
+    const relativePath = toClientPath(fullPath)
     try {
       const stats = await fs.stat(fullPath)
       if (entry.isDirectory()) {
@@ -252,7 +292,7 @@ export const Route = createFileRoute('/api/files')({
             })
           }
 
-          const resolvedPath = ensureWorkspacePath(inputPath)
+          const resolvedPath = ensureReadablePath(inputPath)
 
           if (action === 'read') {
             const buffer = await fs.readFile(resolvedPath)
@@ -260,13 +300,13 @@ export const Route = createFileRoute('/api/files')({
               const mime = getMimeType(resolvedPath)
               return json({
                 type: 'image',
-                path: toRelative(resolvedPath),
+                path: toClientPath(resolvedPath),
                 content: `data:${mime};base64,${buffer.toString('base64')}`,
               })
             }
             return json({
               type: 'text',
-              path: toRelative(resolvedPath),
+              path: toClientPath(resolvedPath),
               content: buffer.toString('utf8'),
             })
           }
@@ -289,8 +329,12 @@ export const Route = createFileRoute('/api/files')({
             countedEntries: { value: 0 },
           })
           return json({
-            root: toRelative(resolvedPath),
-            base: WORKSPACE_ROOT,
+            root: toClientPath(resolvedPath),
+            base: isWithinRoot(resolvedPath, WORKSPACE_ROOT)
+              ? WORKSPACE_ROOT
+              : isWithinRoot(resolvedPath, HOME_DIR)
+                ? HOME_DIR
+              : TEMP_ROOT,
             entries: tree,
           })
         } catch (err) {

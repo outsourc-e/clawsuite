@@ -22,10 +22,8 @@ async function dispatchViaGateway(payload: {
   model?: string
 }) {
   const params: Record<string, unknown> = {
-    sessionKey: payload.sessionKey,
+    key: payload.sessionKey,
     message: payload.message,
-    lane: 'subagent',
-    deliver: false,
     timeoutMs: 120_000,
     idempotencyKey: payload.idempotencyKey,
   }
@@ -35,11 +33,9 @@ async function dispatchViaGateway(payload: {
     return await gatewayRpc<DispatchGatewayResponse>('sessions.send', params)
   } catch (error) {
     if (!looksLikeMethodMissingError(error)) throw error
-    // Fallback for gateways that don't support sessions.send with lane param
     return gatewayRpc<DispatchGatewayResponse>('chat.send', {
-      sessionKey: payload.sessionKey,
+      key: payload.sessionKey,
       message: payload.message,
-      deliver: false,
       timeoutMs: 120_000,
       idempotencyKey: payload.idempotencyKey,
     })

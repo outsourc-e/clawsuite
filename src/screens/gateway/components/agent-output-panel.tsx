@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/prompt-kit/markdown'
+import { fetchSessionHistory, type SessionHistoryMessage } from '@/lib/gateway-api'
 import type { HubTask } from './task-board'
 import { InlineApprovalCard } from './inline-approval-card'
 import type { ApprovalRequest } from '../lib/approvals-store'
@@ -135,6 +136,15 @@ function extractTextFromMessage(message: unknown): string {
     .join('')
 }
 
+function extractTextFromHistoryMessage(message: SessionHistoryMessage): string {
+  if (typeof message.content === 'string') return message.content
+  if (!Array.isArray(message.content)) return ''
+  return message.content
+    .map((part) => (typeof part.text === 'string' ? part.text : ''))
+    .filter(Boolean)
+    .join('\n')
+}
+
 function readEventText(payload: Record<string, unknown>): string {
   return (
     readString(payload.text) ||
@@ -244,6 +254,44 @@ export function AgentOutputPanel({
     setSessionEnded(cached?.sessionEnded ?? false)
     setTokenCount(cached?.tokenCount ?? 0)
     setStreamDisconnected(false)
+  }, [sessionKey])
+
+  useEffect(() => {
+    if (!sessionKey) return
+    if (readCachedSessionState(sessionKey)?.messages.length) return
+
+    let cancelled = false
+
+    const loadHistory = async () => {
+      const response = await fetchSessionHistory(sessionKey, { limit: 100, includeTools: true })
+      if (cancelled || response.ok === false || !response.messages) return
+
+      const historyMessages = response.messages
+        .map((entry, index): OutputMessage | null => {
+          const content = extractTextFromHistoryMessage(entry).trim()
+          if (!content) return null
+          const role =
+            entry.role === 'assistant' || entry.role === 'user'
+              ? entry.role
+              : 'tool'
+          return {
+            role,
+            content,
+            timestamp: entry.timestamp ?? Date.now() + index,
+            done: role === 'assistant',
+          }
+        })
+        .filter((entry): entry is OutputMessage => Boolean(entry))
+
+      if (historyMessages.length === 0) return
+      setMessages((previous) => (previous.length > 0 ? previous : historyMessages))
+    }
+
+    void loadHistory()
+
+    return () => {
+      cancelled = true
+    }
   }, [sessionKey])
 
   // Persist state to in-memory cache, bounded by message count.

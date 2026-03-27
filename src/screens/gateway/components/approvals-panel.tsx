@@ -1,3 +1,7 @@
+// TODO(orphan): ApprovalsPanel is built but not imported or rendered anywhere.
+// The active approval surface is ApprovalsBell (header dropdown).
+// ApprovalsPanel is a sidebar-style panel variant — consider wiring it to replace
+// or complement ApprovalsBell for a richer approvals experience.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   fetchGatewayApprovals,

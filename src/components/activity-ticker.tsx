@@ -11,7 +11,7 @@ const TIPS = [
   { emoji: '💬', text: 'Use /model to switch models mid-conversation' },
   {
     emoji: '⚡',
-    text: 'Agents run in the background — check Agent Hub for status',
+    text: 'Agents run in the background — check Conductor for status',
   },
   { emoji: '🎨', text: 'Customize your theme and accent color in Settings' },
   { emoji: '📋', text: 'Cmd+F opens inline search across all messages' },

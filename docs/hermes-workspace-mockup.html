@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hermes Workspace Mockup</title>
+  <style>
+    :root {
+      --bg: #0a0f1a;
+      --panel: rgba(17, 24, 39, 0.78);
+      --panel-strong: rgba(11, 18, 32, 0.94);
+      --panel-soft: rgba(148, 163, 184, 0.08);
+      --line: rgba(148, 163, 184, 0.18);
+      --line-strong: rgba(99, 102, 241, 0.32);
+      --text: #e5eefc;
+      --muted: #9aa8c7;
+      --accent: #7c9cff;
+      --accent-2: #4de0d2;
+      --success: #6ee7b7;
+      --warning: #fbbf24;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.38);
+      --radius-xl: 28px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(77, 224, 210, 0.14), transparent 28%),
+        radial-gradient(circle at top right, rgba(124, 156, 255, 0.16), transparent 24%),
+        linear-gradient(180deg, #0b1020 0%, #070b14 100%);
+      color: var(--text);
+      padding: 32px;
+    }
+
+    .frame {
+      max-width: 1480px;
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      background: rgba(8, 12, 22, 0.78);
+      backdrop-filter: blur(22px);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #08101c;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+    }
+
+    .brand-copy h1 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .brand-copy p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .pill,
+    .button {
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+    }
+
+    .button.primary {
+      background: linear-gradient(135deg, rgba(124,156,255,0.28), rgba(77,224,210,0.18));
+      border-color: var(--line-strong);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr) 320px;
+      min-height: 860px;
+    }
+
+    .sidebar,
+    .rail,
+    .main {
+      min-width: 0;
+    }
+
+    .sidebar,
+    .rail {
+      background: rgba(255,255,255,0.02);
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--line);
+      padding: 22px;
+    }
+
+    .rail {
+      border-left: 1px solid var(--line);
+      padding: 22px;
+    }
+
+    .main {
+      padding: 24px;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 20px;
+    }
+
+    .section-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 12px;
+    }
+
+    .nav-group,
+    .card,
+    .hero,
+    .workspace-grid,
+    .metric,
+    .status-card,
+    .signal-list li,
+    .timeline li {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: var(--radius-lg);
+    }
+
+    .nav-group {
+      padding: 10px;
+      margin-bottom: 16px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 0.96rem;
+      margin-bottom: 4px;
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, rgba(124,156,255,0.18), rgba(77,224,210,0.12));
+      color: var(--text);
+      border: 1px solid rgba(124,156,255,0.2);
+    }
+
+    .badge {
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+    }
+
+    .hero {
+      padding: 28px;
+      background:
+        radial-gradient(circle at top right, rgba(124,156,255,0.22), transparent 32%),
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+    }
+
+    .hero-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+
+    .hero h2 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 0.98;
+      max-width: 10ch;
+    }
+
+    .hero p {
+      max-width: 58ch;
+      margin: 14px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 1rem;
+    }
+
+    .hero-note {
+      width: min(280px, 100%);
+      padding: 18px;
+      border-radius: 16px;
+      background: rgba(8, 12, 22, 0.72);
+      border: 1px solid var(--line);
+    }
+
+    .hero-note strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .metric {
+      padding: 18px;
+    }
+
+    .metric .kicker {
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 12px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 1.7rem;
+      margin-bottom: 6px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .workspace-grid {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr;
+      gap: 18px;
+    }
+
+    .card {
+      padding: 18px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .card h3,
+    .status-card h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .muted { color: var(--muted); }
+
+    .canvas {
+      min-height: 360px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(13,19,35,0.95), rgba(8,12,22,0.95));
+    }
+
+    .canvas-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .canvas-body {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .flow-box {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .flow-box strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+    }
+
+    .terminal {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(77,224,210,0.2);
+      background: linear-gradient(180deg, rgba(8,17,24,0.95), rgba(6,12,18,0.98));
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #c7fff7;
+      font-size: 0.9rem;
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+
+    .signal-list,
+    .timeline {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .signal-list li,
+    .timeline li {
+      padding: 14px;
+    }
+
+    .status-card {
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 12px 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .progress {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+
+    .progress > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    }
+
+    .tiny {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 1220px) {
+      .layout {
+        grid-template-columns: 240px minmax(0, 1fr);
+      }
+      .rail {
+        grid-column: 1 / -1;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+      .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 16px; }
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .hero-top,
+      .workspace-grid,
+      .flow-row,
+      .topbar {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">HW</div>
+        <div class="brand-copy">
+          <h1>Hermes Workspace</h1>
+          <p>Operational control surface for live projects, context, execution, and review.</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="pill">Workspace Mode: Executive</div>
+        <div class="pill">Sync: 14:41 EDT</div>
+        <div class="button primary">Launch Review Cycle</div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="section-label">Navigation</div>
+        <div class="nav-group">
+          <div class="nav-item active"><span>Workspace Overview</span><span class="badge">Live</span></div>
+          <div class="nav-item"><span>Research Cards</span><span class="badge">12</span></div>
+          <div class="nav-item"><span>Execution Streams</span><span class="badge">4</span></div>
+          <div class="nav-item"><span>Task Ledger</span><span class="badge">27</span></div>
+          <div class="nav-item"><span>Knowledge Vault</span><span class="badge">Ready</span></div>
+        </div>
+
+        <div class="section-label">Focus Lanes</div>
+        <div class="nav-group">
+          <div class="nav-item active"><span>Hermes Workspace Core</span><span class="badge">Primary</span></div>
+          <div class="nav-item"><span>Operator Signals</span><span class="badge">8</span></div>
+          <div class="nav-item"><span>QA Watchtower</span><span class="badge">3</span></div>
+          <div class="nav-item"><span>Agent Dispatch</span><span class="badge">Queued</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Design Intent</h3>
+          </div>
+          <div class="muted">Not a dashboard toy. This mockup frames Hermes Workspace as a serious operating layer where context, execution, and review sit in one coherent shell.</div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <section class="hero">
+          <div class="hero-top">
+            <div>
+              <div class="section-label">Product Mockup</div>
+              <h2>Hermes Workspace</h2>
+              <p>
+                A premium workspace surface for running active operations without losing context. The shell combines strategic overview, live execution state, and review-ready artifacts in one interface that feels built for real work.
+              </p>
+            </div>
+            <div class="hero-note">
+              <strong>Why it lands</strong>
+              <div class="tiny">The center stays focused on the actual work product, while side surfaces carry navigation, signal density, ownership, and status without suffocating the main canvas.</div>
+            </div>
+          </div>
+
+          <div class="metrics">
+            <div class="metric">
+              <div class="kicker">Active Streams</div>
+              <strong>04</strong>
+              <span>Parallel execution lanes with visible checkpoints.</span>
+            </div>
+            <div class="metric">
+              <div class="kicker">Context Depth</div>
+              <strong>92%</strong>
+              <span>Recovered memory and active state kept within reach.</span>
+            </div>
+            <div class="metric">
+              <div class="kicker">Review Latency</div>
+              <strong>6m</strong>
+              <span>Time from agent output to operator decision.</span>
+            </div>
+            <div class="metric">
+              <div class="kicker">Workspace Integrity</div>
+              <strong>Stable</strong>
+              <span>Structured shell, clear ownership, low noise.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="workspace-grid">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>Central Workspace Canvas</h3>
+                <div class="tiny">Primary content area for briefs, flows, system output, and decision artifacts.</div>
+              </div>
+              <span class="badge">Focused View</span>
+            </div>
+            <div class="canvas">
+              <div class="canvas-toolbar">
+                <span>Hermes Workspace / Mission Board / Active Composition</span>
+                <span class="tiny">Autosaved · Structured surface</span>
+              </div>
+              <div class="canvas-body">
+                <div class="flow-row">
+                  <div class="flow-box">
+                    <strong>Brief Intake</strong>
+                    Raw request translated into execution blocks with owner, criteria, and artifact target.
+                  </div>
+                  <div class="flow-box">
+                    <strong>Agent Coordination</strong>
+                    Subtasks split cleanly across implementation, review, and verification tracks.
+                  </div>
+                  <div class="flow-box">
+                    <strong>Operator Review</strong>
+                    Decisions happen against outputs, not vague status blurbs.
+                  </div>
+                </div>
+                <div class="terminal">$ workspace focus --surface hermes
+> mission: build a serious workspace concept artifact
+> shell: left navigation · center canvas · right status rail
+> standard: polished, responsive, product-grade
+> state: ready for review</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>Supporting Signals</h3>
+                <div class="tiny">Compact but credible. Enough signal to guide decisions without turning into a casino dashboard.</div>
+              </div>
+            </div>
+            <ul class="signal-list">
+              <li>
+                <strong>Mission posture</strong>
+                <div class="tiny">Execution healthy. No blocked dependencies. Review window opens in 18 minutes.</div>
+              </li>
+              <li>
+                <strong>Current owner</strong>
+                <div class="tiny">Aurora operating as coordinator with delegated build + verification tracks.</div>
+              </li>
+              <li>
+                <strong>Artifact standard</strong>
+                <div class="tiny">Premium shell, serious product language, responsive layout, embedded CSS only.</div>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </main>
+
+      <aside class="rail">
+        <div class="status-card">
+          <div class="card-header">
+            <h3>Workspace Health</h3>
+            <span class="badge">Nominal</span>
+          </div>
+          <div class="status-row"><span>Context continuity</span><strong>96%</strong></div>
+          <div class="progress"><span style="width: 96%"></span></div>
+          <div class="status-row"><span>Execution clarity</span><strong>88%</strong></div>
+          <div class="progress"><span style="width: 88%"></span></div>
+          <div class="status-row"><span>Review readiness</span><strong>91%</strong></div>
+          <div class="progress"><span style="width: 91%"></span></div>
+        </div>
+
+        <div class="status-card">
+          <div class="card-header">
+            <h3>Timeline</h3>
+          </div>
+          <ul class="timeline">
+            <li>
+              <strong>14:08</strong>
+              <div class="tiny">Mission defined with explicit artifact path and quality bar.</div>
+            </li>
+            <li>
+              <strong>14:19</strong>
+              <div class="tiny">Shell structure locked: navigation, canvas, and status rail.</div>
+            </li>
+            <li>
+              <strong>14:33</strong>
+              <div class="tiny">Responsive behavior tuned for narrow surfaces and laptop-width review.</div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="status-card">
+          <div class="card-header">
+            <h3>Operational Notes</h3>
+          </div>
+          <div class="tiny">This mockup deliberately avoids generic SaaS fluff. Hermes Workspace is framed as an operating environment: clear hierarchy, strong shell, dense but disciplined status surfaces, and a center that earns the screen real estate.</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

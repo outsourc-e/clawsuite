@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conductor Mockup</title>
+  <style>
+    :root {
+      --bg: #0a0f1c;
+      --panel: rgba(17, 24, 39, 0.76);
+      --panel-strong: rgba(15, 23, 42, 0.92);
+      --line: rgba(148, 163, 184, 0.18);
+      --text: #e5eefc;
+      --muted: #8ea4c7;
+      --accent: #7c9cff;
+      --accent-2: #5eead4;
+      --warning: #fbbf24;
+      --danger: #fb7185;
+      --shadow: 0 30px 80px rgba(2, 6, 23, 0.45);
+      --radius: 24px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:
+      radial-gradient(circle at top left, rgba(124, 156, 255, 0.22), transparent 28%),
+      radial-gradient(circle at top right, rgba(94, 234, 212, 0.12), transparent 22%),
+      linear-gradient(180deg, #0b1120 0%, #070b14 100%);
+      color: var(--text);
+    }
+
+    body {
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .frame {
+      width: min(1500px, 100%);
+      min-height: 92vh;
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr) 320px;
+      gap: 18px;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 32px;
+      background: rgba(8, 12, 24, 0.7);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      backdrop-filter: blur(18px);
+    }
+
+    .sidebar {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .brand {
+      padding: 18px;
+      background: linear-gradient(180deg, rgba(124,156,255,0.18), rgba(124,156,255,0.06));
+      border: 1px solid rgba(124,156,255,0.2);
+      border-radius: 20px;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 11px;
+      color: var(--accent-2);
+      margin-bottom: 10px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1;
+    }
+
+    .brand p, .muted { color: var(--muted); }
+    .brand p { margin: 12px 0 0; font-size: 14px; line-height: 1.5; }
+
+    .nav, .stack { display: grid; gap: 10px; }
+    .nav-item, .stack-card, .mini-card, .signal {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .nav-item {
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #dbe7ff;
+    }
+
+    .nav-item.active {
+      background: linear-gradient(90deg, rgba(124,156,255,0.18), rgba(124,156,255,0.05));
+      border-color: rgba(124,156,255,0.28);
+    }
+
+    .pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      color: #d6e3ff;
+      background: rgba(124,156,255,0.18);
+      border: 1px solid rgba(124,156,255,0.22);
+    }
+
+    .main {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .topbar {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .topbar strong { font-size: 15px; }
+    .status-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .hero {
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 80% 20%, rgba(94,234,212,0.15), transparent 18%),
+        linear-gradient(135deg, rgba(124,156,255,0.22), rgba(10,15,28,0.4));
+    }
+
+    .hero h2 {
+      margin: 8px 0 12px;
+      font-size: clamp(34px, 4vw, 56px);
+      line-height: 0.98;
+      max-width: 700px;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 760px;
+      color: #bfd0ee;
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    .hero-grid {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: 1.3fr .9fr;
+      gap: 14px;
+    }
+
+    .workspace, .insight {
+      padding: 20px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(4, 10, 22, 0.5);
+      min-height: 200px;
+    }
+
+    .workspace .lane {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .card {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      min-height: 110px;
+    }
+
+    .card strong, .mini-card strong, .stack-card strong { display: block; margin-bottom: 8px; }
+
+    .flow {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .flow span {
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(94,234,212,0.08);
+      border: 1px solid rgba(94,234,212,0.18);
+      color: #ccfff7;
+    }
+
+    .insight ul {
+      list-style: none;
+      padding: 0;
+      margin: 16px 0 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .insight li {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .content {
+      padding: 22px;
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 18px;
+    }
+
+    .timeline, .metrics {
+      padding: 20px;
+      border-radius: 20px;
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+    }
+
+    .event {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(148,163,184,0.12);
+    }
+
+    .event:last-child { border-bottom: 0; }
+    .time { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .rightbar {
+      padding: 20px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .stack-card, .mini-card, .signal { padding: 16px; }
+
+    .signal .row, .stack-card .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .bar {
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .bar > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    }
+
+    .tone-good { color: var(--accent-2); }
+    .tone-warn { color: var(--warning); }
+    .tone-risk { color: var(--danger); }
+
+    @media (max-width: 1180px) {
+      .frame {
+        grid-template-columns: 220px minmax(0, 1fr);
+      }
+      .rightbar { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .frame { grid-template-columns: 1fr; min-height: auto; }
+      .hero-grid, .content, .rightbar { grid-template-columns: 1fr; }
+      .workspace .lane { grid-template-columns: 1fr; }
+      .sidebar { order: 2; }
+      .main { order: 1; }
+      .rightbar { order: 3; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <aside class="panel sidebar">
+      <section class="brand">
+        <div class="eyebrow">Workspace system</div>
+        <h1>Conductor</h1>
+        <p>A command surface for orchestrating people, agents, queues, and live operational risk from one disciplined workspace.</p>
+      </section>
+
+      <nav class="nav">
+        <div class="nav-item active"><span>Mission board</span><span class="pill">Live</span></div>
+        <div class="nav-item"><span>Runs</span><span>12</span></div>
+        <div class="nav-item"><span>Research</span><span>5</span></div>
+        <div class="nav-item"><span>Automation</span><span>9</span></div>
+        <div class="nav-item"><span>Approvals</span><span class="tone-warn">3</span></div>
+      </nav>
+
+      <div class="stack">
+        <div class="mini-card">
+          <strong>Operator posture</strong>
+          <div class="muted">Focused execution window · 14:17 EDT</div>
+        </div>
+        <div class="mini-card">
+          <strong>Guiding principle</strong>
+          <div class="muted">See the entire system before touching any one thread.</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="panel topbar">
+        <div>
+          <div class="eyebrow">Control room</div>
+          <strong>Conductor / Active orchestration view</strong>
+        </div>
+        <div class="status-row">
+          <span class="pill">27 agents visible</span>
+          <span class="pill">4 approvals pending</span>
+          <span class="pill">92% system confidence</span>
+        </div>
+      </header>
+
+      <section class="panel hero">
+        <div class="eyebrow">Product concept</div>
+        <h2>Conductor turns a pile of parallel work into one readable operating picture.</h2>
+        <p>
+          The mockup centers on clarity: an app shell with stable navigation, a decisive central workspace,
+          and side surfaces that keep health, queue pressure, and human approvals visible without drowning the operator in noise.
+        </p>
+
+        <div class="hero-grid">
+          <div class="workspace">
+            <strong>Orchestration lanes</strong>
+            <div class="muted">Central board for current mission state, handoffs, and run sequencing.</div>
+            <div class="lane">
+              <div class="card">
+                <strong>Intake</strong>
+                New directives arrive with scope, urgency, and ownership pre-scored.
+              </div>
+              <div class="card">
+                <strong>Execution</strong>
+                Agents, jobs, and operator actions move through one timeline instead of ten tabs.
+              </div>
+              <div class="card">
+                <strong>Review</strong>
+                Risks, regressions, and approvals surface before anything ships.
+              </div>
+            </div>
+            <div class="flow">
+              <span>Mission routing</span>
+              <span>Live queue shaping</span>
+              <span>Checkpoint approvals</span>
+              <span>Exception handling</span>
+            </div>
+          </div>
+
+          <div class="insight">
+            <strong>Strategic readout</strong>
+            <ul>
+              <li><span class="tone-good">Healthy:</span> Three critical paths converging on time with spare capacity.</li>
+              <li><span class="tone-warn">Watch:</span> Review bottleneck forming around one shared file owner.</li>
+              <li><span class="tone-risk">Risk:</span> One external dependency threatens timeline integrity within 45 minutes.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel content">
+        <div class="timeline">
+          <div class="eyebrow">Live timeline</div>
+          <div class="event">
+            <div class="time">14:03</div>
+            <div><strong>Mission decomposed</strong><div class="muted">Planner generated execution tracks with clean ownership boundaries.</div></div>
+          </div>
+          <div class="event">
+            <div class="time">14:08</div>
+            <div><strong>Parallel work launched</strong><div class="muted">UI, daemon, and QA streams started with conflict-safe scopes.</div></div>
+          </div>
+          <div class="event">
+            <div class="time">14:12</div>
+            <div><strong>Approval surfaced</strong><div class="muted">A sensitive action was held in the queue until a human decision landed.</div></div>
+          </div>
+          <div class="event">
+            <div class="time">14:16</div>
+            <div><strong>Conductor recomputed plan</strong><div class="muted">Adjusted sequence after detecting a shared dependency collision.</div></div>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="eyebrow">System metrics</div>
+          <div class="stack-card">
+            <strong>Mission completion forecast</strong>
+            <div class="row"><span>ETA confidence</span><span class="tone-good">High</span></div>
+            <div class="bar"><span style="width: 86%"></span></div>
+          </div>
+          <div class="stack-card">
+            <strong>Context pressure</strong>
+            <div class="row"><span>Current load</span><span class="tone-warn">68%</span></div>
+            <div class="bar"><span style="width: 68%"></span></div>
+          </div>
+          <div class="stack-card">
+            <strong>Operational debt</strong>
+            <div class="row"><span>Deferred follow-ups</span><span>7 items</span></div>
+            <div class="bar"><span style="width: 41%"></span></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="panel rightbar">
+      <div class="signal">
+        <div class="eyebrow">Status surface</div>
+        <strong>Global health</strong>
+        <div class="row"><span>Signal quality</span><span class="tone-good">Stable</span></div>
+        <div class="row"><span>Human-in-loop</span><span>Connected</span></div>
+        <div class="row"><span>Escalations</span><span class="tone-warn">2 open</span></div>
+      </div>
+
+      <div class="signal">
+        <div class="eyebrow">Queue pressure</div>
+        <strong>Run backlog</strong>
+        <div class="row"><span>Ready now</span><span>18</span></div>
+        <div class="row"><span>Blocked</span><span class="tone-risk">4</span></div>
+        <div class="row"><span>Auto-routable</span><span>11</span></div>
+      </div>
+
+      <div class="signal">
+        <div class="eyebrow">Operator notes</div>
+        <strong>Why this layout works</strong>
+        <div class="muted">It looks like a serious product surface: fixed shell, decisive center, contextual right rail, and enough restraint to feel expensive instead of noisy.</div>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

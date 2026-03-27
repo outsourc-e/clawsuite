@@ -17,6 +17,7 @@ import { CompactionNotifier } from '@/components/compaction-notifier'
 import { FallbackBanner } from '@/components/fallback-banner'
 import { GatewayRestartProvider } from '@/components/gateway-restart-overlay'
 import { ExecApprovalToast } from '@/components/exec-approval-toast'
+import { GatewayStatusToast } from '@/components/gateway-status-toast'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
 
 const APP_CSP = [
@@ -94,8 +95,9 @@ const themeScript = `
     const isValidEnterpriseTheme =
       enterpriseTheme === 'ops-dark' ||
       enterpriseTheme === 'premium-dark' ||
-      enterpriseTheme === 'paper-light'
-    root.classList.remove('paper-light', 'ops-dark', 'premium-dark')
+      enterpriseTheme === 'paper-light' ||
+      enterpriseTheme === 'sunset-brand'
+    root.classList.remove('paper-light', 'ops-dark', 'premium-dark', 'sunset-brand')
     if (isValidEnterpriseTheme) {
       root.setAttribute('data-theme', enterpriseTheme)
       root.classList.add(enterpriseTheme)
@@ -294,6 +296,7 @@ function RootLayout() {
       <MobilePromptTrigger />
       <Toaster />
       <ExecApprovalToast />
+      <GatewayStatusToast />
       <WorkspaceShell />
       <SearchModal />
       <OnboardingTour />

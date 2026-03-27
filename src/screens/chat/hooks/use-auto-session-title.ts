@@ -128,8 +128,11 @@ export function useAutoSessionTitle({
   )
 
   const resolvedMessageCount = useMemo(() => {
-    if (typeof messageCount === 'number') return messageCount
-    return countRelevantMessages(messages)
+    const liveMessageCount = countRelevantMessages(messages)
+    if (typeof messageCount === 'number') {
+      return Math.max(messageCount, liveMessageCount)
+    }
+    return liveMessageCount
   }, [messageCount, messages])
 
   const minMessagesForThisSnippet = useMemo(

@@ -3,7 +3,6 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   ArrowDown01Icon,
-  BotIcon,
   BrainIcon,
   ChartLineData01Icon,
   ChartLineData02Icon,
@@ -11,16 +10,15 @@ import {
   Clock01Icon,
   ComputerTerminal01Icon,
   File01Icon,
-  GlobeIcon,
   Home01Icon,
   ListViewIcon,
   Notification03Icon,
   PencilEdit02Icon,
   PuzzleIcon,
+  Rocket01Icon,
   Search01Icon,
   ApiIcon,
   Settings01Icon,
-  ServerStack01Icon,
   SmartPhone01Icon,
   Task01Icon,
   UserGroupIcon,
@@ -153,12 +151,14 @@ async function fetchHasRecentIssues(): Promise<boolean> {
 type NavItemDef = {
   kind: 'link' | 'button'
   to?: string
+  search?: Record<string, unknown>
+  hash?: string
   icon: unknown
   label: string
   active: boolean
   onClick?: () => void
   disabled?: boolean
-  badge?: 'error-dot'
+  badge?: 'error-dot' | string | number
   dataTour?: string
 }
 
@@ -210,9 +210,14 @@ function NavItem({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={transition}
-          className="overflow-hidden whitespace-nowrap"
+          className="flex min-w-0 items-center gap-2"
         >
-          {item.label}
+          <span className="overflow-hidden whitespace-nowrap">{item.label}</span>
+          {item.badge && item.badge !== 'error-dot' ? (
+            <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full border border-primary-700 bg-primary-900 px-2 py-0.5 text-[10px] font-semibold leading-none text-primary-300">
+              {item.badge}
+            </span>
+          ) : null}
         </motion.span>
       ) : null}
     </AnimatePresence>
@@ -231,6 +236,8 @@ function NavItem({
               render={
                 <Link
                   to={item.to!}
+                  search={item.search}
+                  hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
                   data-tour={item.dataTour}
@@ -247,6 +254,8 @@ function NavItem({
     return (
       <Link
         to={item.to!}
+        search={item.search}
+        hash={item.hash}
         onClick={handleSelect}
         className={cls}
         data-tour={item.dataTour}
@@ -362,28 +371,19 @@ function SectionLabel({
         transition={{ layout: transition }}
         className="flex items-center gap-1.5 px-3 pt-3 pb-1 w-full"
       >
-        {navigateTo ? (
-          <Link
-            to={navigateTo}
-            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
-          >
-            {label}
-          </Link>
-        ) : (
-          labelContent
-        )}
         <button
           type="button"
           onClick={onToggle}
-          className="ml-auto p-0.5 rounded hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors"
+          className="flex flex-1 items-center gap-1.5 rounded py-0.5 transition-colors hover:bg-primary-200 dark:hover:bg-primary-800"
           aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
         >
+          {labelContent}
           <HugeiconsIcon
             icon={ArrowDown01Icon}
             size={12}
             strokeWidth={2}
             className={cn(
-              'text-primary-500 transition-transform duration-150',
+              'ml-auto text-primary-500 transition-transform duration-150',
               expanded ? 'rotate-0' : '-rotate-90',
             )}
           />
@@ -520,6 +520,7 @@ function ChatSidebarComponent({
     },
   })
 
+
   // Platform-aware modifier key
   const mod = useMemo(
     () =>
@@ -530,14 +531,11 @@ function ChatSidebarComponent({
     [],
   )
 
-
-
   // Route active states
   const isDashboardActive = pathname === '/dashboard'
-  const isAgentSwarmActive = pathname === '/agent-swarm'
+  const isAgentSwarmActive = pathname === '/conductor'
   const isNewSessionActive =
     pathname === '/new' || pathname.startsWith('/chat/new')
-  const isBrowserActive = pathname === '/browser'
   const isTerminalActive = pathname === '/terminal'
   const isTasksActive = pathname === '/tasks'
   // Gateway
@@ -546,8 +544,6 @@ function ChatSidebarComponent({
   const isSessionsActive = pathname === '/sessions'
   const isUsageActive = pathname === '/usage'
   const isCostsActive = pathname === '/costs'
-  const isInstancesActive = pathname === '/instances'
-  // Agent
   const isAgentsActive = pathname === '/agents'
   const isNodesActive = pathname === '/nodes'
   const isSkillsActive = pathname === '/skills'
@@ -555,13 +551,13 @@ function ChatSidebarComponent({
   const isMemoryActive = pathname === '/memory'
   const isDebugActive = pathname === '/debug'
   const isLogsActive = pathname === '/activity' || pathname === '/logs'
+  const isGatewayLogsActive = pathname === '/gateway/logs'
 
   // Track last-visited route per section
   const suiteRoutes = [
     '/dashboard',
-    '/agent-swarm',
+    '/conductor',
     '/new',
-    '/browser',
     '/terminal',
     '/tasks',
     '/skills',
@@ -575,11 +571,11 @@ function ChatSidebarComponent({
   ]
   const gatewayRoutes = [
     '/channels',
-    '/instances',
     '/sessions',
     '/usage',
     '/agents',
     '/nodes',
+    '/gateway/logs',
   ]
 
   useEffect(() => {
@@ -609,12 +605,16 @@ function ChatSidebarComponent({
     'openclaw-sidebar-suite-expanded',
     true,
   )
+  const [missionExpanded, toggleMission] = usePersistedBool(
+    'openclaw-sidebar-mission-expanded',
+    true,
+  )
   const [systemExpanded, toggleSystem] = usePersistedBool(
     'openclaw-sidebar-system-expanded',
     false,
   )
   const [gatewayExpanded, toggleGateway] = usePersistedBool(
-    'openclaw-sidebar-gateway-expanded',
+    'openclaw-sidebar-gw-v3',
     false,
   )
 
@@ -692,6 +692,7 @@ function ChatSidebarComponent({
 
   const isVisuallyCollapsed = isCollapsed && !isHoverExpanded
   const isHoverPreviewExpanded = !isMobile && isCollapsed && isHoverExpanded
+
 
   function handleSidebarToggle() {
     if (isHoverPreviewExpanded) {
@@ -783,18 +784,11 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/agent-swarm',
-      icon: BotIcon,
-      label: 'Agent Hub',
+      to: '/conductor',
+      icon: Rocket01Icon,
+      label: 'Conductor',
       active: isAgentSwarmActive,
       dataTour: 'agent-hub',
-    },
-    {
-      kind: 'link',
-      to: '/browser',
-      icon: GlobeIcon,
-      label: 'Browser',
-      active: isBrowserActive,
     },
     {
       kind: 'link',
@@ -864,6 +858,8 @@ function ChatSidebarComponent({
     },
   ]
 
+  const missionItems: NavItemDef[] = []
+
   const gatewayItems: NavItemDef[] = [
     {
       kind: 'link',
@@ -871,13 +867,6 @@ function ChatSidebarComponent({
       icon: Chat01Icon,
       label: 'Channels',
       active: isChannelsActive,
-    },
-    {
-      kind: 'link',
-      to: '/instances',
-      icon: ServerStack01Icon,
-      label: 'Instances',
-      active: isInstancesActive,
     },
     {
       kind: 'link',
@@ -906,6 +895,13 @@ function ChatSidebarComponent({
       icon: SmartPhone01Icon,
       label: 'Nodes',
       active: isNodesActive,
+    },
+    {
+      kind: 'link',
+      to: '/gateway/logs',
+      icon: Notification03Icon,
+      label: 'Logs',
+      active: isGatewayLogsActive,
     },
   ]
 
@@ -947,7 +943,6 @@ function ChatSidebarComponent({
       aria-hidden={isMobile && isCollapsed ? true : undefined}
       {...(isMobile && isCollapsed ? { inert: '' as unknown as boolean } : {})}
     >
-      {/* Electron title bar is rendered at shell level (workspace-shell.tsx) */}
       {/* ── Header ──────────────────────────────────────────────────── */}
       <motion.div
         layout
@@ -1071,7 +1066,7 @@ function ChatSidebarComponent({
                 navigateTo={suiteNav}
               />
               <CollapsibleSection
-                expanded={suiteExpanded || isCollapsed}
+                expanded={suiteExpanded}
                 items={suiteItems}
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
@@ -1091,7 +1086,7 @@ function ChatSidebarComponent({
                 onToggle={toggleSystem}
               />
               <CollapsibleSection
-                expanded={systemExpanded || isAnySystemActive || isCollapsed}
+                expanded={systemExpanded || isAnySystemActive}
                 items={mobileSecondarySuite}
                 isCollapsed={isVisuallyCollapsed}
                 transition={transition}
@@ -1100,6 +1095,26 @@ function ChatSidebarComponent({
             </>
           )}
 
+          {/* MISSION — hidden when empty (Conductor moved to Suite) */}
+          {missionItems.length > 0 && (
+            <>
+              <SectionLabel
+                label="Mission"
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                collapsible
+                expanded={missionExpanded}
+                onToggle={toggleMission}
+              />
+              <CollapsibleSection
+                expanded={missionExpanded}
+                items={missionItems}
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+            </>
+          )}
           {/* GATEWAY */}
           <SectionLabel
             label="Gateway"
@@ -1111,7 +1126,7 @@ function ChatSidebarComponent({
             navigateTo={gatewayNav}
           />
           <CollapsibleSection
-            expanded={gatewayExpanded || isCollapsed}
+            expanded={gatewayExpanded}
             items={gatewayItems}
             isCollapsed={isVisuallyCollapsed}
             transition={transition}

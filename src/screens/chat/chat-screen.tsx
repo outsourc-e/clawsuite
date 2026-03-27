@@ -22,6 +22,7 @@ import {
   clearHistoryMessages,
   fetchGatewayStatus,
   updateHistoryMessageByClientId,
+  updateHistoryMessageByClientIdEverywhere,
   updateSessionLastMessage,
 } from './chat-queries'
 import { ChatHeader } from './components/chat-header'
@@ -80,9 +81,13 @@ import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
+import {
+  CHAT_PENDING_COMMAND_STORAGE_KEY,
+  CHAT_RUN_COMMAND_EVENT,
+  type ChatRunCommandDetail,
+} from './chat-events'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
-import { BrailleSpinner } from '@/components/ui/braille-spinner'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -210,6 +215,12 @@ function isRetryableQueuedMessage(message: GatewayMessage): boolean {
   return status === 'error'
 }
 
+const commandHelpers: ChatComposerHelpers = {
+  reset() {},
+  setValue() {},
+  setAttachments() {},
+}
+
 function getMessageRetryAttachments(
   message: GatewayMessage,
 ): Array<GatewayAttachment> {
@@ -316,38 +327,6 @@ function stripQueuedWrapperFromUserMessage(message: GatewayMessage): GatewayMess
   }
 }
 
-function CompactingOverlay({ onDismiss }: { onDismiss: () => void }) {
-  // Auto-dismiss after 30s in case onCompactionEnd never fires
-  useEffect(() => {
-    const t = window.setTimeout(onDismiss, 30_000)
-    return () => window.clearTimeout(t)
-  }, [onDismiss])
-
-  return (
-    <div
-      className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={onDismiss}
-    >
-      <div
-        className="flex flex-col items-center gap-4 rounded-2xl border border-primary-200/60 bg-primary-50 px-10 py-8 shadow-2xl dark:border-primary-300/20 dark:bg-primary-100"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <BrailleSpinner preset="claw" size={36} className="text-primary-500 dark:text-primary-400" speed={90} />
-        <div className="text-center">
-          <p className="text-sm font-semibold text-ink">Compacting context</p>
-          <p className="mt-0.5 text-xs text-primary-500">Summarizing older messages to free up space…</p>
-        </div>
-        <button
-          onClick={onDismiss}
-          className="text-[10px] text-primary-400 hover:text-primary-600 transition-colors"
-        >
-          dismiss
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export function ChatScreen({
   activeFriendlyId,
   isNewChat = false,
@@ -356,6 +335,8 @@ export function ChatScreen({
   compact = false,
 }: ChatScreenProps) {
   const navigate = useNavigate()
+  const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
+  const setChatFocusMode = useWorkspaceStore((s) => s.setChatFocusMode)
   const queryClient = useQueryClient()
   const [sending, setSending] = useState(false)
   const [_creatingSession, setCreatingSession] = useState(false)
@@ -639,8 +620,15 @@ export function ChatScreen({
   // Use realtime-merged messages for display (SSE + history)
   // Re-apply display filter to realtime messages
   const finalDisplayMessages = useMemo(() => {
+    // Strip any stale streaming placeholder that survived in realtimeMessages.
+    // The live placeholder is injected separately below via isRealtimeStreaming —
+    // if a message with __streamingStatus === 'streaming' is also in the store
+    // it will render twice (once from store, once from the injected placeholder).
+    const withoutStalePlaceholders = realtimeMessages.filter(
+      (m) => (m as any).__streamingStatus !== 'streaming',
+    )
     // Rebuild display filter on merged messages
-    const filtered = realtimeMessages.filter((msg) => {
+    const filtered = withoutStalePlaceholders.filter((msg) => {
       if (msg.role === 'user') {
         const text = stripQueuedWrapper(textFromMessage(msg))
         if (text.startsWith('A subagent task')) return false
@@ -898,7 +886,34 @@ export function ChatScreen({
 
   refreshHistoryRef.current = function refreshHistory() {
     if (historyQuery.isFetching) return
-    void historyQuery.refetch()
+
+    // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
+    // The refetch replaces the query cache with server data — if the server
+    // hasn't processed the user's POST yet, the optimistic message vanishes.
+    const currentMessages = (historyQuery.data as any)?.messages as GatewayMessage[] | undefined
+    const pendingOptimistic = (currentMessages ?? []).filter((msg) => {
+      const raw = msg as Record<string, unknown>
+      return (
+        msg.role === 'user' &&
+        (normalizeMessageValue(raw.__optimisticId).startsWith('opt-') ||
+          normalizeMessageValue(raw.status) === 'sending')
+      )
+    })
+
+    void historyQuery.refetch().then(() => {
+      // Re-inject optimistic messages that weren't in the server response
+      if (pendingOptimistic.length === 0) return
+      if (!activeFriendlyId || !activeSessionKey) return
+
+      for (const optimistic of pendingOptimistic) {
+        appendHistoryMessage(
+          queryClient,
+          activeFriendlyId,
+          activeSessionKey,
+          optimistic,
+        )
+      }
+    })
   }
 
   // Track message count when waiting started — only clear when NEW assistant msg appears
@@ -955,7 +970,7 @@ export function ChatScreen({
     friendlyId: activeFriendlyId,
     sessionKey: resolvedSessionKey,
     activeSession,
-    messages: historyMessages,
+    messages: realtimeMessages,
     messageCount,
     enabled:
       !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
@@ -1050,17 +1065,11 @@ export function ChatScreen({
       ({ runId }: { runId: string | null }) => {
         const activeSend = activeSendRef.current
         if (!activeSend?.clientId) return
-        updateHistoryMessageByClientId(
-          queryClient,
-          activeSend.friendlyId,
-          activeSend.sessionKey,
-          activeSend.clientId,
-          (message) => ({
-            ...message,
-            status: 'sent',
-            runId: runId ?? message.runId,
-          }),
-        )
+        updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
+          ...message,
+          status: 'sent',
+          runId: runId ?? message.runId,
+        }))
         setSending(false)
       },
       [queryClient],
@@ -1068,13 +1077,11 @@ export function ChatScreen({
     onComplete: useCallback(() => {
       const activeSend = activeSendRef.current
       if (activeSend?.clientId) {
-        updateHistoryMessageByClientId(
-          queryClient,
-          activeSend.friendlyId,
-          activeSend.sessionKey,
-          activeSend.clientId,
-          (message) => ({ ...message, status: 'done' }),
-        )
+        updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
+          ...message,
+          status: 'done',
+          __optimisticId: undefined,
+        }))
       }
       activeSendRef.current = null
       refreshHistoryRef.current()
@@ -1087,13 +1094,10 @@ export function ChatScreen({
           activeSend?.clientId &&
           !isMissingGatewayAuth(messageText)
         ) {
-          updateHistoryMessageByClientId(
-            queryClient,
-            activeSend.friendlyId,
-            activeSend.sessionKey,
-            activeSend.clientId,
-            (message) => ({ ...message, status: 'error' }),
-          )
+          updateHistoryMessageByClientIdEverywhere(queryClient, activeSend.clientId, (message) => ({
+            ...message,
+            status: 'error',
+          }))
         }
         activeSendRef.current = null
         setSending(false)
@@ -1119,13 +1123,14 @@ export function ChatScreen({
         // status immediately so the Retry timer never fires. This is the
         // primary confirmation path since the gateway does NOT echo user
         // messages back via SSE.
-        updateHistoryMessageByClientId(
-          queryClient,
-          friendlyId,
-          _sessionKey,
-          clientId,
-          (message) => ({ ...message, status: 'queued' }),
-        )
+        updateHistoryMessageByClientId(queryClient, friendlyId, _sessionKey, clientId, (message) => ({
+          ...message,
+          status: 'queued',
+        }))
+        updateHistoryMessageByClientIdEverywhere(queryClient, clientId, (message) => ({
+          ...message,
+          status: 'queued',
+        }))
       },
       [queryClient],
     ),
@@ -1240,7 +1245,7 @@ export function ChatScreen({
   }, [historyQuery])
 
   const terminalPanelInset =
-    !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
+    !isMobile && isTerminalPanelOpen && !chatFocusMode ? terminalPanelHeight : 0
   // --chat-composer-height is the measured offsetHeight of the composer wrapper,
   // which already includes its own paddingBottom (tab bar + safe area).
   // So content just needs composer-height + a small breathing gap.
@@ -1356,7 +1361,49 @@ export function ChatScreen({
   ])
 
   const hideUi = shouldRedirectToNew || isRedirecting
+  const isFocusMode = !compact && chatFocusMode
   const showComposer = !isRedirecting
+
+  const handleToggleFocusMode = useCallback(() => {
+    if (compact) return
+    setChatFocusMode(!chatFocusMode)
+  }, [chatFocusMode, compact, setChatFocusMode])
+
+  useEffect(() => {
+    if (compact && chatFocusMode) {
+      setChatFocusMode(false)
+    }
+  }, [chatFocusMode, compact, setChatFocusMode])
+
+  useEffect(() => {
+    if (!chatFocusMode) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      setChatFocusMode(false)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [chatFocusMode, setChatFocusMode])
+
+  // ⌘. (Mac) / Ctrl+. (Win) to toggle focus mode
+  useEffect(() => {
+    if (compact) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '.' || !(event.metaKey || event.ctrlKey)) return
+      event.preventDefault()
+      setChatFocusMode(!chatFocusMode)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [compact, chatFocusMode, setChatFocusMode])
+
+  useEffect(() => {
+    return () => {
+      useWorkspaceStore.getState().setChatFocusMode(false)
+    }
+  }, [])
 
   // Reset state when session changes
   useEffect(() => {
@@ -1386,6 +1433,7 @@ export function ChatScreen({
       friendlyId: string,
       body: string,
       attachments: Array<GatewayAttachment> = [],
+      fastMode = false,
       skipOptimistic = false,
       existingClientId = '',
     ) {
@@ -1509,6 +1557,7 @@ export function ChatScreen({
         attachments:
           payloadAttachments.length > 0 ? payloadAttachments : undefined,
         thinking: currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
+        fastMode,
         idempotencyKey: optimisticClientId || crypto.randomUUID(),
       }).catch((err: unknown) => {
         const messageText = err instanceof Error ? err.message : String(err)
@@ -1562,6 +1611,7 @@ export function ChatScreen({
       pending.friendlyId,
       pending.message,
       pending.attachments,
+      false,
       true,
       typeof pending.optimisticMessage.clientId === 'string'
         ? pending.optimisticMessage.clientId
@@ -1596,15 +1646,12 @@ export function ChatScreen({
       const existingClientId = getMessageClientId(message)
 
       if (existingClientId) {
-        updateHistoryMessageByClientId(
-          queryClient,
-          activeFriendlyId,
-          sessionKeyForMessage,
-          existingClientId,
-          function markSending(currentMessage) {
-            return { ...currentMessage, status: 'sending' }
-          },
-        )
+        updateHistoryMessageByClientId(queryClient, activeFriendlyId, sessionKeyForMessage, existingClientId, function markSending(currentMessage) {
+          return { ...currentMessage, status: 'sending' }
+        })
+        updateHistoryMessageByClientIdEverywhere(queryClient, existingClientId, function markSendingEverywhere(currentMessage) {
+          return { ...currentMessage, status: 'sending' }
+        })
       }
 
       if (mode === 'auto') {
@@ -1616,6 +1663,7 @@ export function ChatScreen({
         activeFriendlyId,
         body,
         attachments,
+        false,
         true,
         existingClientId,
       )
@@ -1790,6 +1838,7 @@ export function ChatScreen({
     (
       body: string,
       attachments: Array<ChatComposerAttachment>,
+      fastMode: boolean,
       helpers: ChatComposerHelpers,
     ) => {
       const trimmedBody = body.trim()
@@ -1845,6 +1894,7 @@ export function ChatScreen({
           threadId,
           trimmedBody,
           attachmentPayload,
+          fastMode,
           true,
           typeof optimisticMessage.clientId === 'string'
             ? optimisticMessage.clientId
@@ -1866,6 +1916,7 @@ export function ChatScreen({
         activeFriendlyId,
         trimmedBody,
         attachmentPayload,
+        fastMode,
       )
     },
     [
@@ -1883,6 +1934,38 @@ export function ChatScreen({
       resolvedSessionKey,
     ],
   )
+
+  const runPaletteSlashCommand = useCallback(
+    (command: string) => {
+      const trimmedCommand = command.trim()
+      if (!trimmedCommand.startsWith('/')) return
+      send(trimmedCommand, [], false, commandHelpers)
+    },
+    [send],
+  )
+
+  useEffect(() => {
+    function handleRunCommand(event: Event) {
+      const detail = (event as CustomEvent<ChatRunCommandDetail>).detail
+      if (!detail?.command) return
+      runPaletteSlashCommand(detail.command)
+    }
+
+    window.addEventListener(CHAT_RUN_COMMAND_EVENT, handleRunCommand)
+    return () => {
+      window.removeEventListener(CHAT_RUN_COMMAND_EVENT, handleRunCommand)
+    }
+  }, [runPaletteSlashCommand])
+
+  useEffect(() => {
+    const pendingCommand = window.sessionStorage.getItem(
+      CHAT_PENDING_COMMAND_STORAGE_KEY,
+    )
+    if (!pendingCommand) return
+
+    window.sessionStorage.removeItem(CHAT_PENDING_COMMAND_STORAGE_KEY)
+    runPaletteSlashCommand(pendingCommand)
+  }, [runPaletteSlashCommand])
 
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
 
@@ -2006,7 +2089,7 @@ export function ChatScreen({
               : 'grid grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)]',
         )}
       >
-        {hideUi || compact ? null : isMobile ? null : (
+        {hideUi || compact || isFocusMode ? null : isMobile ? null : (
           <FileExplorerSidebar
             collapsed={fileExplorerCollapsed}
             onToggle={handleToggleFileExplorer}
@@ -2017,7 +2100,7 @@ export function ChatScreen({
         <main
           className={cn(
             'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-right,margin-bottom] duration-200',
-            !compact && isAgentViewOpen ? 'min-[1024px]:mr-72' : 'mr-0',
+            !compact && isAgentViewOpen && !isFocusMode ? 'min-[1024px]:mr-72' : 'mr-0',
             (isRealtimeStreaming || hasPendingGeneration()) && 'chat-streaming-glow',
           )}
           style={{
@@ -2033,7 +2116,10 @@ export function ChatScreen({
               renamingTitle={renamingSessionTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
-              showFileExplorerButton={!isMobile}
+              sessions={sessions ?? []}
+              activeFriendlyId={activeFriendlyId}
+              onSelectSession={(key) => void navigate({ to: '/chat/$sessionKey', params: { sessionKey: key } })}
+              showFileExplorerButton={!isMobile && !isFocusMode}
               fileExplorerCollapsed={fileExplorerCollapsed}
               onToggleFileExplorer={handleToggleFileExplorer}
               dataUpdatedAt={historyQuery.dataUpdatedAt}
@@ -2045,12 +2131,12 @@ export function ChatScreen({
               statusMode={headerStatusMode}
               activeToolName={activeHeaderToolName}
               thinkingLevel={thinkingLevel}
+              isFocusMode={isFocusMode}
+              onToggleFocusMode={handleToggleFocusMode}
             />
           )}
 
-          <ContextBar compact={compact} />
-
-          {isCompacting && <CompactingOverlay onDismiss={() => setIsCompacting(false)} />}
+          {!isFocusMode && <ContextBar compact={compact} />}
 
           {gatewayNotice && <div className="sticky top-0 z-20 px-4 py-2">{gatewayNotice}</div>}
           {pendingApprovals.length > 0 && (
@@ -2140,6 +2226,7 @@ export function ChatScreen({
               activeToolCalls={activeToolCalls}
               liveToolActivity={liveToolActivity}
               researchCard={researchCard}
+              isCompacting={isCompacting}
               sending={sending}
             />
           )}
@@ -2162,9 +2249,9 @@ export function ChatScreen({
             />
           ) : null}
         </main>
-        {!compact && <AgentViewPanel />}
+        {!compact && !isFocusMode && <AgentViewPanel />}
       </div>
-      {!compact && !hideUi && !isMobile && <TerminalPanel />}
+      {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
 
       {suggestion && (
         <ModelSuggestionToast

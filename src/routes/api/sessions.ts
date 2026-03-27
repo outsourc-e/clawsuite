@@ -25,6 +25,16 @@ type SessionsResolveResponse = {
   key?: string
 }
 
+const THINKING_VALUES = new Set([
+  'off',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'adaptive',
+])
+
 function deriveFriendlyIdFromKey(key: unknown): string {
   if (typeof key !== 'string' || key.trim().length === 0) return 'main'
   const parts = key.split(':')
@@ -40,9 +50,20 @@ function normalizeSessions(
   )
     ? payload.sessions
     : []
-  const normalized = sessions.map((session) => {
+  const deduped = new Map<string, Record<string, unknown>>()
+
+  function readUpdatedAt(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value)
+      if (!Number.isNaN(parsed)) return parsed
+    }
+    return 0
+  }
+
+  sessions.forEach((session) => {
     const rawKey = session.key
-    const key = typeof rawKey === 'string' ? rawKey : ''
+    const key = typeof rawKey === 'string' ? rawKey.trim() : ''
     const rawFriendly = session.friendlyId
     const friendlyIdFromPayload =
       typeof rawFriendly === 'string' ? rawFriendly.trim() : ''
@@ -50,14 +71,34 @@ function normalizeSessions(
       friendlyIdFromPayload.length > 0
         ? friendlyIdFromPayload
         : deriveFriendlyIdFromKey(key)
-    return {
+    const normalizedSession: Record<string, unknown> = {
       ...session,
       key,
       friendlyId,
     }
+
+    const identity = key || friendlyId
+    if (!identity) {
+      deduped.set(randomUUID(), normalizedSession)
+      return
+    }
+
+    const existing = deduped.get(identity)
+    if (!existing) {
+      deduped.set(identity, normalizedSession)
+      return
+    }
+
+    const existingUpdatedAt = readUpdatedAt(existing.updatedAt)
+    const nextUpdatedAt = readUpdatedAt(normalizedSession.updatedAt)
+
+    deduped.set(
+      identity,
+      nextUpdatedAt >= existingUpdatedAt ? normalizedSession : existing,
+    )
   })
 
-  return { sessions: normalized }
+  return { sessions: Array.from(deduped.values()) }
 }
 
 export const Route = createFileRoute('/api/sessions')({
@@ -184,6 +225,20 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
           const label =
             typeof body.label === 'string' ? body.label.trim() : undefined
+          const thinkingRaw =
+            typeof body.thinking === 'string' ? body.thinking.trim() : ''
+          const thinking = THINKING_VALUES.has(thinkingRaw)
+            ? thinkingRaw
+            : undefined
+          const hasFast = Object.prototype.hasOwnProperty.call(body, 'fast')
+          const hasVerbose = Object.prototype.hasOwnProperty.call(body, 'verbose')
+          const hasReasoning = Object.prototype.hasOwnProperty.call(
+            body,
+            'reasoning',
+          )
+          const fast = body.fast === true
+          const verbose = body.verbose === true
+          const reasoning = body.reasoning === true
 
           let sessionKey = rawSessionKey
           const friendlyId = rawFriendlyId
@@ -211,6 +266,10 @@ export const Route = createFileRoute('/api/sessions')({
 
           const params: Record<string, unknown> = { key: sessionKey }
           if (label) params.label = label
+          if (thinking) params.thinking = thinking
+          if (hasFast) params.fast = fast
+          if (hasVerbose) params.verbose = verbose
+          if (hasReasoning) params.reasoning = reasoning
 
           const payload = await gatewayRpc<SessionsPatchResponse>(
             'sessions.patch',

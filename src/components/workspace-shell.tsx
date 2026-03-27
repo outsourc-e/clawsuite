@@ -30,6 +30,7 @@ import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
+import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
 import { Button } from '@/components/ui/button'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
@@ -63,6 +64,7 @@ export function WorkspaceShell() {
 
   const { settings } = useSettings()
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
+  const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
@@ -83,7 +85,7 @@ export function WorkspaceShell() {
   // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
   const getTabIndex = useCallback((path: string): number => {
     if (path.startsWith('/dashboard')) return 0
-    if (path.startsWith('/agent-swarm') || path.startsWith('/agents')) return 1
+    if (path.startsWith('/conductor') || path.startsWith('/agents')) return 1
     if (path.startsWith('/chat') || path === '/new' || path === '/') return 2
     if (path.startsWith('/skills')) return 3
     if (path.startsWith('/settings')) return 4
@@ -137,6 +139,7 @@ export function WorkspaceShell() {
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
     !isMobile && !isOnChatRoute && !sidebarCollapsed
 
@@ -339,12 +342,15 @@ export function WorkspaceShell() {
           </div>
         )}
         <GatewayConnectionBanner />
-        <div className={cn(
-          "grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]"
-        )}>
+        <div
+          className={cn(
+            'grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden',
+            hideChatSidebar ? 'md:grid-cols-1' : 'md:grid-cols-[auto_1fr]',
+          )}
+        >
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
-          {!isMobile && (
+          {!isMobile && !hideChatSidebar && (
             <div className="relative z-30">
               <ChatSidebar
                 sessions={sessions}
@@ -411,6 +417,7 @@ export function WorkspaceShell() {
 
       {isMobile ? <MobileTabBar /> : null}
       {settings.showSystemMetricsFooter ? <SystemMetricsFooter /> : null}
+      <CommandPalette pathname={pathname} sessions={sessions} />
     </>
   )
 }

@@ -79,6 +79,7 @@ type MissionStore = {
   startMission: (mission: StartMissionInput) => void
   completeMission: () => void
   abortMission: () => void
+  resetMission: () => void
   updateTaskStatus: (taskId: string, status: TaskStatus) => void
   updateAgentStatus: (
     agentId: string,
@@ -310,6 +311,25 @@ export const useMissionStore = create<MissionStore>()(
           dispatchedTaskIdsByAgent: {},
           restoreCheckpoint: null,
           missionHistory: { reports },
+        })
+      },
+
+      resetMission: () => {
+        set({
+          activeMission: null,
+          missionActive: false,
+          missionGoal: '',
+          activeMissionName: '',
+          activeMissionGoal: '',
+          missionState: 'stopped',
+          missionTasks: [],
+          boardTasks: [],
+          dispatchedTaskIdsByAgent: {},
+          agentSessionMap: {},
+          agentSessionModelMap: {},
+          agentSessionStatus: {},
+          artifacts: [],
+          restoreCheckpoint: null,
         })
       },
 

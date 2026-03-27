@@ -7,19 +7,26 @@ module.exports = {
   productName: 'ClawSuite',
   copyright: 'Copyright © 2026 ClawSuite',
 
+  icon: 'assets/icon',
+
   directories: {
     output: 'release',
     buildResources: 'assets',
   },
 
   files: [
-    'dist/**/*',
-    'electron/**/*',
+    'dist/client/**/*',
+    'electron/main.cjs',
+    'electron/preload.cjs',
+    'electron/prod-server.cjs',
+    'electron/server-bundle.mjs',
     'assets/**/*',
-    '!node_modules',
-    '!src',
-    '!.git',
+    'package.json',
   ],
+
+  // Prevent pnpm node_modules from being bundled
+  npmArgs: ['--ignore-scripts'],
+  nodeGypRebuild: false,
 
   mac: {
     category: 'public.app-category.developer-tools',

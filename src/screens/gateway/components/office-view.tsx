@@ -29,6 +29,8 @@ export type OfficeViewProps = {
   onViewRemoteOutput?: (sessionKey: string, label: string) => void
   /** Fixed pixel height for the office container (compact mode) */
   containerHeight?: number
+  /** Hide the header bar (title, badges, buttons) */
+  hideHeader?: boolean
 }
 
 export const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
@@ -112,10 +114,10 @@ const WARROOM_DESK_POSITIONS = [
 ]
 
 const GRID_SOCIAL_SPOTS: SocialSpot[] = [
-  { x: 880, y: 140, type: 'coffee' as const },
-  { x: 880, y: 300, type: 'water' as const },
+  { x: 840, y: 140, type: 'coffee' as const },
+  { x: 840, y: 300, type: 'water' as const },
   { x: 60, y: 440, type: 'plant' as const },
-  { x: 880, y: 460, type: 'snack' as const },
+  { x: 840, y: 460, type: 'snack' as const },
 ]
 
 const ROUNDTABLE_SOCIAL_SPOTS: SocialSpot[] = [
@@ -427,6 +429,7 @@ export function OfficeView({
   remoteSessions = [],
   onViewRemoteOutput,
   containerHeight,
+  hideHeader = false,
 }: OfficeViewProps) {
   // When containerHeight is set, we use compact mode: header only (no footer), SVG fills remaining space
   const compact = Boolean(containerHeight)
@@ -445,7 +448,7 @@ export function OfficeView({
     ? { x: 450, y: 108, text: 'Collaboration Ring' }
     : layoutTemplate === 'warroom'
       ? { x: 480, y: 112, text: 'Briefing Lounge' }
-      : { x: 880, y: 110, text: 'Break Area' }
+      : { x: 840, y: 110, text: 'Break Area' }
 
   const changeLayout = (nextTemplate: OfficeLayoutTemplate) => {
     setLayoutTemplate(nextTemplate)
@@ -490,8 +493,8 @@ export function OfficeView({
     )
   }
 
-  const sceneW = 960
-  const sceneH = 560
+  const sceneW = 1040
+  const sceneH = 600
   const activeCount = agentRows.filter((r) => r.status === 'active').length
   const sessionCount = agentRows.filter((r) => Boolean(r.sessionKey)).length
   const phase = tick * 0.2
@@ -542,7 +545,7 @@ export function OfficeView({
   return (
     <div className={cn('flex flex-col bg-gradient-to-b from-slate-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800', compact ? 'h-full' : 'min-h-[480px]')}>
       {/* Header bar */}
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-neutral-200 bg-white/80 px-5 py-3 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
+      {hideHeader ? null : <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-neutral-200 bg-white/80 px-5 py-3 backdrop-blur dark:border-slate-700 dark:bg-slate-800/80">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="text-base font-bold text-neutral-900 dark:text-white">ClawSuite Office</span>
           <div className="flex flex-wrap items-center gap-2">
@@ -569,7 +572,7 @@ export function OfficeView({
             + New Mission
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Mobile: compact list instead of desk grid */}
       <div className="flex-1 overflow-y-auto p-3 md:hidden">
@@ -693,7 +696,7 @@ export function OfficeView({
         <svg
           viewBox={`0 0 ${sceneW} ${sceneH}`}
           className="absolute inset-0 h-full w-full"
-          preserveAspectRatio="xMidYMid slice"
+          preserveAspectRatio="xMidYMid meet"
           aria-hidden
         >
           {/* Floor zones */}

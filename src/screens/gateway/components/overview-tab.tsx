@@ -1,3 +1,7 @@
+// TODO(orphan): OverviewTab component exists but is not used in agent-hub-layout.tsx.
+// The Overview content is instead rendered inline via renderOverviewContent().
+// To reduce agent-hub-layout.tsx size, the inline overview rendering could be
+// migrated to use this component instead.
 import { cn } from '@/lib/utils'
 import type { AgentWorkingRow } from './agents-working-panel'
 import type { TeamMember } from './team-panel'

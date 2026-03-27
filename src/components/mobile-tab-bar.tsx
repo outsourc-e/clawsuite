@@ -1,7 +1,7 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  BotIcon,
+  Rocket01Icon,
   Chat01Icon,
   Home01Icon,
   PuzzleIcon,
@@ -41,11 +41,11 @@ const TABS: TabItem[] = [
     match: (p) => p.startsWith('/dashboard'),
   },
   {
-    id: 'agents',
-    label: 'Agent Hub',
-    icon: BotIcon,
-    to: '/agent-swarm',
-    match: (p) => p.startsWith('/agent-swarm') || p.startsWith('/agents'),
+    id: 'conductor',
+    label: 'Conductor',
+    icon: Rocket01Icon,
+    to: '/conductor',
+    match: (p) => p.startsWith('/conductor') || p.startsWith('/agent-swarm') || p.startsWith('/agents'),
   },
   {
     id: 'chat',
@@ -190,11 +190,10 @@ export function MobileTabBar() {
         'fixed bottom-0 left-0 right-0 mx-auto w-fit z-[80] md:hidden',
         // Vertical position: above home indicator
         'mb-[max(env(safe-area-inset-bottom,8px),16px)]',
-        // Frosted glass pill
-        'bg-white/75 dark:bg-neutral-900/75 backdrop-blur-2xl',
+        // Keep the pill visually isolated from page and error-state backgrounds
+        'bg-white/95 dark:bg-neutral-900/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/88 dark:supports-[backdrop-filter]:bg-neutral-900/88',
         'rounded-full',
-        'border border-white/40 dark:border-white/10',
-        'shadow-[0_8px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
+        'border border-primary-200/40',
         // Inner padding
         'px-3 py-2',
         // Hide/show animation
@@ -244,7 +243,7 @@ export function MobileTabBar() {
                   circleSize,
                   isActive
                     ? 'bg-accent-500 text-white shadow-sm'
-                    : 'text-neutral-400 dark:text-neutral-500',
+                    : 'text-primary-500',
                 )}
               >
                 <HugeiconsIcon

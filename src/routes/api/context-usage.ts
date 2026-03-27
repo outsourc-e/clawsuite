@@ -97,7 +97,7 @@ export const Route = createFileRoute('/api/context-usage')({
           }
 
           const model = mainSession.model ?? ''
-          const maxTokens = getContextWindow(model)
+          const maxTokens = mainSession.contextTokens ?? mainSession.contextWindow ?? getContextWindow(model)
           const mainUsage = usageSessions.find(
             (s: any) => s.key === mainSession.key,
           )

@@ -31,7 +31,7 @@ const MOCK_SESSIONS = ['main', 'devops', 'perf', 'agent-lab', 'ui']
 const MOCK_SOURCES = [
   'orchestrator',
   'gateway',
-  'agent-runner',
+  'mission-loop',
   'api',
   'heartbeat',
 ]
@@ -46,11 +46,11 @@ function buildMockMessage(
   if (source === 'heartbeat') {
     return `Heartbeat acknowledged for session "${session}".`
   }
-  if (source === 'agent-runner') {
+  if (source === 'mission-loop') {
     if (level === 'ERROR') {
-      return `Agent spawn failed for "${session}" due to missing tool permission.`
+      return `Mission loop failed to start "${session}" after a runner handoff error.`
     }
-    return `Spawned agent worker for "${session}" with retry-safe handoff.`
+    return `Mission loop dispatched "${session}" with retry-safe handoff.`
   }
   if (source === 'gateway') {
     if (level === 'WARN') {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useNavigate } from '@tanstack/react-router'
 import {
   ArrowDown01Icon,
   ArrowExpand01Icon,
@@ -7,7 +8,6 @@ import {
   BotIcon,
   Cancel01Icon,
 } from '@hugeicons/core-free-icons'
-import { useNavigate } from '@tanstack/react-router'
 import {
   AnimatePresence,
   LayoutGroup,
@@ -43,7 +43,6 @@ import { useSounds } from '@/hooks/use-sounds'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
-import { BrowserSidebarSection } from '@/components/browser-view/browser-sidebar-preview'
 import { cn } from '@/lib/utils'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
@@ -51,13 +50,6 @@ function getLastUserMessageBubbleElement(): HTMLElement | null {
     '[data-chat-message-role="user"] [data-chat-message-bubble="true"]',
   )
   return nodes.item(nodes.length - 1)
-}
-
-function formatRelativeMs(msAgo: number): string {
-  const seconds = Math.max(0, Math.floor(msAgo / 1000))
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}m ago`
 }
 
 function summarizeTask(raw: string): string {
@@ -71,6 +63,12 @@ function summarizeTask(raw: string): string {
   // Take first sentence or first 60 chars
   const firstLine = t.split(/[.\n]/)[0] || t
   return firstLine.slice(0, 60).trim() + (firstLine.length > 60 ? '…' : '')
+}
+
+function normalizeAgentTask(value: string): string {
+  const normalized = value.trim().replace(/\s+/g, ' ').toLowerCase()
+  if (!normalized || normalized === 'no task description') return ''
+  return normalized
 }
 
 function formatRuntimeLabel(runtimeSeconds: number): string {
@@ -586,7 +584,7 @@ export function AgentViewPanel() {
     showFloatingToggle,
     panelWidth,
     nowMs,
-    lastRefreshedMs,
+    lastRefreshedMs: _lastRefreshedMs,
     activeAgents,
     missionActiveAgents,
     nonMissionActiveAgents,
@@ -604,7 +602,6 @@ export function AgentViewPanel() {
     cancelQueueTask,
     activeCount,
   } = useAgentView()
-
   const navigate = useNavigate()
 
   // Transcript modal removed — View button now navigates to /agent-swarm
@@ -614,7 +611,6 @@ export function AgentViewPanel() {
     statusLabel: string
   } | null>(null)
   const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
-  const [browserPreviewExpanded, setBrowserPreviewExpanded] = useState(false)
   const cliAgentsQuery = useCliAgents()
   const cliAgents = cliAgentsQuery.data ?? []
   // Auto: expanded avatar when idle, compact when agents are working
@@ -636,6 +632,30 @@ export function AgentViewPanel() {
       }, 0)
     },
     [activeAgents],
+  )
+  const representedTaskFingerprints = useMemo(() => {
+    const fingerprints = new Set<string>()
+    activeAgents.forEach((agent) => {
+      const task = normalizeAgentTask(agent.task)
+      if (task) fingerprints.add(task)
+    })
+    queuedAgents.forEach((agent) => {
+      const task = normalizeAgentTask(agent.description)
+      if (task) fingerprints.add(task)
+    })
+    historyAgents.forEach((agent) => {
+      const task = normalizeAgentTask(agent.description)
+      if (task) fingerprints.add(task)
+    })
+    return fingerprints
+  }, [activeAgents, historyAgents, queuedAgents])
+  const visibleCliAgents = useMemo(
+    () =>
+      cliAgents.filter((agent) => {
+        const task = normalizeAgentTask(agent.task)
+        return !task || !representedTaskFingerprints.has(task)
+      }),
+    [cliAgents, representedTaskFingerprints],
   )
   const missionSessionIds = useMemo(
     () => new Set(missionActiveAgents.map((agent) => agent.id)),
@@ -860,7 +880,7 @@ export function AgentViewPanel() {
 
               {/* Center — title */}
               <h2 className="text-sm font-semibold text-primary-900">
-                Agent Hub
+                Agent View
               </h2>
 
               {/* Right — expand + close */}
@@ -869,11 +889,13 @@ export function AgentViewPanel() {
                   size="icon-sm"
                   variant="ghost"
                   onClick={function handleExpandHub() {
-                    setOpen(false)
-                    navigate({ to: '/agent-swarm' })
+                    navigate({ to: '/conductor' })
+                    setTimeout(() => {
+                      setOpen(false)
+                    }, 0)
                   }}
-                  aria-label="Open Agent Hub"
-                  title="Open Agent Hub"
+                  aria-label="Open Conductor"
+                  title="Open Conductor"
                 >
                   <HugeiconsIcon
                     icon={ArrowExpand01Icon}
@@ -912,12 +934,12 @@ export function AgentViewPanel() {
                 {/* Main Agent Card (includes usage section) */}
                 <OrchestratorCard compact={false} />
 
-                {/* Swarm — agent cards — only show when there's something */}
+                {/* Agents — agent cards — only show when there's something */}
                 {(activeCount > 0 || queuedAgents.length > 0 || historyAgents.length > 0) && <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
-                  {/* Centered Swarm pill */}
+                  {/* Centered Agents pill */}
                   <div className="mb-1 flex justify-center">
                     <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
-                      Swarm
+                      Agents
                     </span>
                   </div>
 
@@ -935,7 +957,7 @@ export function AgentViewPanel() {
                               statusCounts.thinking === 0 &&
                               statusCounts.failed === 0 &&
                               statusCounts.complete === 0
-                            ? 'No subagents'
+                            ? ''
                             : [
                                 statusCounts.running > 0 &&
                                   `${statusCounts.running} running`,
@@ -959,7 +981,7 @@ export function AgentViewPanel() {
                       <p>
                         {isLoading
                           ? ''
-                          : `synced ${formatRelativeMs(nowMs - lastRefreshedMs)}`}
+                          : ''}
                       </p>
                     </div>
                   </div>
@@ -1131,14 +1153,14 @@ export function AgentViewPanel() {
                         }
                         className="text-[11px] text-pretty text-primary-600 py-1"
                       >
-                        No active agents. Spawn agents from chat or CLI to see
-                        them here.
+
+
                       </p>
                     )}
                   </LayoutGroup>
                 </section>}
 
-                {(cliAgentsQuery.isLoading || cliAgents.length > 0) ? (
+                {(cliAgentsQuery.isLoading || visibleCliAgents.length > 0) ? (
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
                     <Collapsible
                       open={cliAgentsExpanded}
@@ -1158,7 +1180,7 @@ export function AgentViewPanel() {
                           ⚡ Active Agents
                         </CollapsibleTrigger>
                         <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
-                          {cliAgents.length}
+                          {visibleCliAgents.length}
                         </span>
                       </div>
                       <CollapsiblePanel contentClassName="pt-1">
@@ -1168,7 +1190,7 @@ export function AgentViewPanel() {
                               Scanning...
                             </p>
                           ) : null}
-                          {cliAgents.map(function renderCliAgent(agent) {
+                          {visibleCliAgents.map(function renderCliAgent(agent) {
                             const progressPct =
                               agent.status === 'finished'
                                 ? 100
@@ -1241,10 +1263,6 @@ export function AgentViewPanel() {
                   </section>
                 ) : null}
 
-                <BrowserSidebarSection
-                  expanded={browserPreviewExpanded}
-                  onExpandChange={setBrowserPreviewExpanded}
-                />
               </div>
             </ScrollAreaViewport>
             <ScrollAreaScrollbar>
@@ -1299,7 +1317,7 @@ export function AgentViewPanel() {
                       {activeCount}
                     </span>
                   </div>
-                  <h2 className="text-sm font-semibold text-primary-900">Agent Hub</h2>
+                  <h2 className="text-sm font-semibold text-primary-900">Agent View</h2>
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
@@ -1318,7 +1336,7 @@ export function AgentViewPanel() {
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
                     <div className="mb-1 flex justify-center">
                       <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">
-                        Swarm
+                        Agents
                       </span>
                     </div>
                     <div className="mb-1 flex items-center justify-between px-1">
@@ -1326,7 +1344,7 @@ export function AgentViewPanel() {
                         {isLoading
                           ? 'syncing...'
                           : activeNodes.length === 0 && queuedNodes.length === 0
-                            ? 'No subagents'
+                            ? ''
                             : `${activeNodes.length} active · ${queuedNodes.length} queued`}
                       </p>
                     </div>

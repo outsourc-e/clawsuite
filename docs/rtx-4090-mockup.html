@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RTX 4090 Control Mockup</title>
+    <style>
+      :root {
+        --bg: #071019;
+        --bg2: #0d1724;
+        --panel: rgba(12, 20, 32, 0.78);
+        --panel-soft: rgba(255, 255, 255, 0.04);
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #eef5ff;
+        --muted: #95a6bf;
+        --green: #77f2b3;
+        --cyan: #5bc8ff;
+        --violet: #9380ff;
+        --amber: #ffcf6a;
+        --danger: #ff7272;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(91, 200, 255, 0.18), transparent 28%),
+          radial-gradient(circle at top right, rgba(147, 128, 255, 0.15), transparent 30%),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+      }
+      .shell {
+        width: min(1520px, calc(100vw - 32px));
+        margin: 16px auto;
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+        backdrop-filter: blur(18px);
+      }
+      .topbar {
+        display: grid;
+        grid-template-columns: 280px 1fr auto;
+        gap: 16px;
+        align-items: center;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(4, 8, 14, 0.45);
+      }
+      .brand { display: flex; align-items: center; gap: 14px; }
+      .logo {
+        width: 46px; height: 46px; border-radius: 16px;
+        display: grid; place-items: center;
+        font-weight: 900; color: #041019;
+        background: linear-gradient(135deg, var(--green), var(--cyan));
+      }
+      .brand h1 { margin: 0; font-size: 15px; }
+      .brand p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+      .statusbar, .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .pill {
+        padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line);
+        background: rgba(255,255,255,0.04); color: var(--muted); font-size: 12px;
+      }
+      .pill strong { color: var(--text); }
+      .dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; margin-right: 8px; background: var(--green); box-shadow: 0 0 12px rgba(119,242,179,0.7); }
+      .button {
+        padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line);
+        background: rgba(255,255,255,0.04); color: var(--text); font-weight: 700; font-size: 13px;
+      }
+      .button.primary { color: #051019; background: linear-gradient(135deg, var(--green), var(--cyan)); border: 0; }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr) 360px;
+        min-height: 920px;
+      }
+      .sidebar, .inspector { background: rgba(7, 12, 20, 0.48); }
+      .sidebar { border-right: 1px solid var(--line); padding: 18px; }
+      .inspector { border-left: 1px solid var(--line); padding: 18px; display: grid; gap: 14px; align-content: start; }
+      .section-label {
+        margin: 16px 0 10px; color: var(--muted); font-size: 11px; font-weight: 800;
+        letter-spacing: 0.16em; text-transform: uppercase;
+      }
+      .card {
+        border: 1px solid var(--line); background: var(--panel); border-radius: 24px;
+      }
+      .nav-card { padding: 10px; }
+      .nav-item {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 14px; border-radius: 16px; color: var(--muted); font-size: 14px;
+      }
+      .nav-item.active {
+        color: var(--text);
+        background: linear-gradient(135deg, rgba(119,242,179,0.14), rgba(91,200,255,0.14));
+      }
+      .tiny-pill {
+        padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); font-size: 11px;
+      }
+      .mini-list { display: grid; gap: 10px; }
+      .mini-card { padding: 14px; }
+      .mini-card h4, .panel h3, .inspector h3 { margin: 0 0 6px; }
+      .mini-card p, .muted { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+      .main {
+        padding: 20px;
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 16px;
+      }
+      .hero {
+        display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px;
+      }
+      .panel { padding: 22px; }
+      .hero h2 { margin: 0; font-size: 31px; line-height: 1.08; }
+      .hero p { color: var(--muted); line-height: 1.7; font-size: 14px; }
+      .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+      .stat {
+        padding: 14px; border-radius: 18px; background: var(--panel-soft); border: 1px solid var(--line);
+      }
+      .stat .k { color: var(--muted); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+      .stat .v { margin-top: 8px; font-size: 25px; font-weight: 800; }
+
+      .gpu-preview {
+        min-height: 100%;
+        background:
+          radial-gradient(circle at 30% 20%, rgba(119,242,179,0.20), transparent 28%),
+          linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      }
+      .gpu-figure {
+        margin-top: 18px; padding: 20px; border-radius: 24px; border: 1px solid var(--line);
+        background: rgba(2, 7, 12, 0.4);
+      }
+      .gpu-card {
+        height: 180px; border-radius: 22px; position: relative; overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: linear-gradient(135deg, #111b26, #1a2b39 55%, #12202c);
+      }
+      .gpu-card:before, .gpu-card:after {
+        content: ""; position: absolute; top: 50%; width: 92px; height: 92px; border-radius: 999px;
+        transform: translateY(-50%); border: 10px solid rgba(255,255,255,0.08);
+        box-shadow: inset 0 0 0 12px rgba(255,255,255,0.04);
+      }
+      .gpu-card:before { left: 26px; }
+      .gpu-card:after { left: 146px; }
+      .gpu-badge {
+        position: absolute; right: 18px; top: 18px; padding: 8px 10px; border-radius: 12px;
+        background: linear-gradient(135deg, var(--green), var(--cyan)); color: #041019; font-weight: 900; font-size: 12px;
+      }
+      .gpu-edge {
+        position: absolute; inset: auto 14px 18px 14px; height: 16px; border-radius: 999px;
+        background: linear-gradient(90deg, rgba(119,242,179,0.15), rgba(91,200,255,0.45), rgba(147,128,255,0.15));
+      }
+
+      .stream-grid {
+        display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px;
+      }
+      .messages { display: grid; gap: 12px; }
+      .message {
+        max-width: 88%; padding: 16px 18px; border-radius: 22px; border: 1px solid var(--line);
+        font-size: 14px; line-height: 1.65;
+      }
+      .message.user { margin-left: auto; background: rgba(255,255,255,0.05); }
+      .message.agent { background: linear-gradient(180deg, rgba(119,242,179,0.09), rgba(91,200,255,0.08)); }
+      .meta { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+      .side-stack { display: grid; gap: 12px; }
+      .side-card { padding: 14px; }
+      .bar { margin-top: 12px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+      .bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--green), var(--cyan)); }
+
+      .rack {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      }
+      .rack-card { padding: 16px; }
+      .rack-card strong { display: block; margin-bottom: 8px; font-size: 14px; }
+      .rack-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+      .composer { padding: 16px; }
+      .prompt {
+        margin-top: 10px; padding: 14px 16px; border-radius: 18px; border: 1px solid var(--line);
+        background: rgba(255,255,255,0.03); color: var(--muted); font-size: 14px;
+      }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .timeline { display: grid; gap: 12px; margin-top: 12px; }
+      .timeline-item { display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
+      .icon {
+        width: 34px; height: 34px; border-radius: 12px; display: grid; place-items: center;
+        background: rgba(255,255,255,0.06); color: var(--green); font-weight: 900;
+      }
+      .timeline-item strong { display: block; margin-bottom: 4px; font-size: 13px; }
+      .timeline-item span { color: var(--muted); font-size: 12px; line-height: 1.55; }
+      .temp {
+        display: grid; gap: 10px; margin-top: 12px;
+      }
+      .temp-row {
+        display: grid; grid-template-columns: 90px 1fr auto; gap: 12px; align-items: center;
+        font-size: 12px; color: var(--muted);
+      }
+      .temp-line { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+      .temp-line span { display: block; height: 100%; border-radius: inherit; }
+
+      @media (max-width: 1220px) {
+        .layout { grid-template-columns: 230px minmax(0, 1fr); }
+        .inspector { display: none; }
+      }
+      @media (max-width: 940px) {
+        .topbar, .hero, .stream-grid, .rack { grid-template-columns: 1fr; }
+        .layout { grid-template-columns: 1fr; }
+        .sidebar { display: none; }
+        .stats { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 640px) {
+        .shell { width: calc(100vw - 16px); margin: 8px auto; border-radius: 22px; }
+        .stats { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="logo">4090</div>
+          <div>
+            <h1>RTX 4090 Control Center</h1>
+            <p>Mockup for monitoring inference, thermals, jobs, and throughput</p>
+          </div>
+        </div>
+        <div class="statusbar">
+          <div class="pill"><span class="dot"></span><strong>GPU online</strong></div>
+          <div class="pill"><strong>VRAM:</strong> 19.4 / 24 GB</div>
+          <div class="pill"><strong>Power:</strong> 392 W</div>
+          <div class="pill"><strong>Clock:</strong> 2745 MHz</div>
+          <div class="pill"><strong>CUDA jobs:</strong> 3 active</div>
+        </div>
+        <div class="top-actions">
+          <button class="button">Export report</button>
+          <button class="button">Tune profile</button>
+          <button class="button primary">Launch workload</button>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="section-label">Navigation</div>
+          <div class="card nav-card">
+            <div class="nav-item active"><span>Overview</span><span class="tiny-pill">Live</span></div>
+            <div class="nav-item"><span>Inference</span><span class="tiny-pill">3</span></div>
+            <div class="nav-item"><span>Thermals</span><span class="tiny-pill">71°C</span></div>
+            <div class="nav-item"><span>Power</span><span class="tiny-pill">392W</span></div>
+            <div class="nav-item"><span>Models</span><span class="tiny-pill">12</span></div>
+            <div class="nav-item"><span>Benchmarks</span><span class="tiny-pill">New</span></div>
+          </div>
+
+          <div class="section-label">Recent workloads</div>
+          <div class="mini-list">
+            <div class="card mini-card">
+              <h4>Llama 70B Q4</h4>
+              <p>Serving with 3 concurrent chats · 46 tok/s avg</p>
+            </div>
+            <div class="card mini-card">
+              <h4>Flux image batch</h4>
+              <p>128 images rendered · 11m 24s total</p>
+            </div>
+            <div class="card mini-card">
+              <h4>Whisper transcribe</h4>
+              <p>Queue cleared · GPU duty cycle peaked at 97%</p>
+            </div>
+          </div>
+        </aside>
+
+        <main class="main">
+          <section class="hero">
+            <div class="card panel">
+              <div class="section-label">Overview</div>
+              <h2>The RTX 4090 as a serious local AI workstation, not just a spec flex.</h2>
+              <p>
+                This mockup frames the 4090 like a premium control surface: live throughput, thermal headroom, active workloads, and operator actions in one place. Less gamer dashboard, more mission-critical workstation.
+              </p>
+              <div class="stats">
+                <div class="stat"><div class="k">Utilization</div><div class="v">94%</div></div>
+                <div class="stat"><div class="k">Temp</div><div class="v">71°C</div></div>
+                <div class="stat"><div class="k">Tokens/s</div><div class="v">46</div></div>
+                <div class="stat"><div class="k">Fan</div><div class="v">68%</div></div>
+              </div>
+            </div>
+
+            <div class="card panel gpu-preview">
+              <div class="section-label">Hardware</div>
+              <h3>Founders-grade visual treatment</h3>
+              <p class="muted">A clean concept block for the GPU itself, with enough presence to sell the machine without turning into RGB clownery.</p>
+              <div class="gpu-figure">
+                <div class="gpu-card">
+                  <div class="gpu-badge">RTX 4090</div>
+                  <div class="gpu-edge"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="stream-grid">
+            <div class="messages">
+              <div class="message user">
+                <span class="meta">Operator</span>
+                Prioritize Llama inference, keep thermals under 74°C, and queue Flux after the current run finishes.
+              </div>
+              <div class="message agent">
+                <span class="meta">Control agent</span>
+                Rebalanced the workload. Llama gets first priority, image generation is queued behind it, and the fan curve was bumped slightly to preserve headroom.
+              </div>
+              <div class="message agent">
+                <span class="meta">System note</span>
+                Tensor cores are saturated but stable. No throttling detected. Estimated queue completion in 14 minutes.
+              </div>
+            </div>
+
+            <div class="side-stack">
+              <div class="card side-card">
+                <h3>Current job</h3>
+                <p class="muted">Llama 70B Q4 · 32k context · streamed locally</p>
+                <div class="bar"><span style="width: 78%"></span></div>
+              </div>
+              <div class="card side-card">
+                <h3>Thermal headroom</h3>
+                <p class="muted">Target stays below 74°C to avoid noisy spikes and preserve sustained clocks.</p>
+              </div>
+              <div class="card side-card">
+                <h3>VRAM planner</h3>
+                <p class="muted">Model swap window available in 14m. One large model or two medium pipelines fit cleanly.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="rack">
+            <div class="card rack-card">
+              <strong>Inference lane</strong>
+              <p>Track model, tokens/sec, context size, batch size, and latency without digging through terminal noise.</p>
+            </div>
+            <div class="card rack-card">
+              <strong>Render lane</strong>
+              <p>Queue image/video jobs after language workloads, with clear visibility into VRAM reclaim timing.</p>
+            </div>
+            <div class="card rack-card">
+              <strong>Reliability lane</strong>
+              <p>Spot throttling, unstable clocks, or thermal drift before the machine starts lying to you.</p>
+            </div>
+          </section>
+
+          <section class="card composer">
+            <div class="row">
+              <strong>Operator console</strong>
+              <span class="muted">profiles · queue rules · model swaps · benchmark presets</span>
+            </div>
+            <div class="prompt">Tell the 4090 what to optimize: max throughput, silence, low heat, fastest image batch, or best mixed-workload balance…</div>
+          </section>
+        </main>
+
+        <aside class="inspector">
+          <div class="card panel">
+            <h3>Job timeline</h3>
+            <p class="muted">A right rail for what the machine is doing now, what it did, and what’s next.</p>
+            <div class="timeline">
+              <div class="timeline-item">
+                <div class="icon">1</div>
+                <div><strong>Warm cache</strong><span>Weights pinned, KV cache restored, first token latency stabilized.</span></div>
+              </div>
+              <div class="timeline-item">
+                <div class="icon">2</div>
+                <div><strong>Serve inference</strong><span>Main language workload running at 46 tok/s with high sustained utilization.</span></div>
+              </div>
+              <div class="timeline-item">
+                <div class="icon">3</div>
+                <div><strong>Queue render</strong><span>Flux batch waiting for VRAM release window after inference completes.</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card panel">
+            <h3>Thermal zones</h3>
+            <div class="temp">
+              <div class="temp-row"><span>GPU core</span><div class="temp-line"><span style="width:71%; background:linear-gradient(90deg,var(--green),var(--amber));"></span></div><strong>71°C</strong></div>
+              <div class="temp-row"><span>Hotspot</span><div class="temp-line"><span style="width:79%; background:linear-gradient(90deg,var(--amber),var(--danger));"></span></div><strong>79°C</strong></div>
+              <div class="temp-row"><span>VRAM</span><div class="temp-line"><span style="width:68%; background:linear-gradient(90deg,var(--green),var(--cyan));"></span></div><strong>68°C</strong></div>
+            </div>
+          </div>
+
+          <div class="card panel">
+            <h3>Why this mockup works</h3>
+            <p class="muted">
+              It sells the 4090 as infrastructure: throughput, queueing, thermal control, and operator trust. That’s way more interesting than a generic GPU stats panel.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </body>
+</html>

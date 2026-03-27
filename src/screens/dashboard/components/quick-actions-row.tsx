@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 
 const ACTIONS = [
   { label: 'Chat', to: '/chat/new', icon: Chat01Icon },
-  { label: 'Agent', to: '/agent-swarm', icon: BotIcon },
+  { label: 'Agent', to: '/conductor', icon: BotIcon },
   { label: 'Skills', to: '/skills', icon: PuzzleIcon },
   { label: 'Costs', to: '/costs', icon: ChartLineData02Icon },
   { label: 'Cron', to: '/cron', icon: Clock01Icon },

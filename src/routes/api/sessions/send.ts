@@ -30,7 +30,7 @@ async function sendMessageViaGateway(payload: {
 }) {
   try {
     return await gatewayRpc<SendGatewayResponse>('sessions.send', {
-      sessionKey: payload.sessionKey,
+      key: payload.sessionKey,
       message: payload.message,
       timeoutMs: 120_000,
       idempotencyKey: payload.idempotencyKey,
@@ -41,9 +41,8 @@ async function sendMessageViaGateway(payload: {
     }
 
     return gatewayRpc<SendGatewayResponse>('chat.send', {
-      sessionKey: payload.sessionKey,
+      key: payload.sessionKey,
       message: payload.message,
-      deliver: false,
       timeoutMs: 120_000,
       idempotencyKey: payload.idempotencyKey,
     })

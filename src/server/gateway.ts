@@ -53,14 +53,6 @@ type InflightRequest = {
   reject: (reason?: unknown) => void
 }
 
-type SocketHandlers = {
-  ws: WebSocket
-  onMessage: (data: RawData) => void
-  onPong: () => void
-  onClose: (code: number, reason: Buffer) => void
-  onError: (error: unknown) => void
-}
-
 // ── Device Identity (Ed25519) ─────────────────────────────────────
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex')
 
@@ -108,11 +100,16 @@ function signPayload(privPem: string, payload: string): string {
 }
 
 // ── Constants ─────────────────────────────────────────────────────
-const INITIAL_RECONNECT_DELAY_MS = 1000
+const RECONNECT_DELAYS_MS = [1000, 2000, 4000]
 const MAX_RECONNECT_DELAY_MS = 30000
 const HEARTBEAT_INTERVAL_MS = 30000
 const HEARTBEAT_TIMEOUT_MS = 20000
 const HANDSHAKE_TIMEOUT_MS = 15000
+const RPC_TIMEOUT_MS = 30000
+
+// ── Circuit breaker ───────────────────────────────────────────────
+const CIRCUIT_BREAKER_THRESHOLD = 15   // consecutive failures to trip (raised: one slow RPC shouldn't kill all)
+const CIRCUIT_BREAKER_COOLDOWN_MS = 10000 // how long to stay open
 
 export function getGatewayConfig() {
   // Check if browser set a custom gateway URL (for network/mobile access)
@@ -202,7 +199,11 @@ class GatewayClient {
   private authenticated = false
   private destroyed = false
   private _lastErrorKind: import('../lib/connection-errors').ConnectionErrorKind | null = null
-  private socketHandlers: SocketHandlers | null = null
+
+  // Circuit breaker: prevent request floods when gateway is unreachable
+  private circuitFailures = 0
+  private circuitOpen = false
+  private circuitOpenedAt = 0
 
   get lastErrorKind() { return this._lastErrorKind }
 
@@ -233,13 +234,35 @@ class GatewayClient {
       throw new Error('Gateway client is shut down')
     }
 
-    return new Promise<TPayload>((resolve, reject) => {
+    // Circuit breaker: fast-fail when gateway is known-unreachable
+    if (this.circuitOpen) {
+      if (Date.now() - this.circuitOpenedAt < CIRCUIT_BREAKER_COOLDOWN_MS) {
+        throw new Error(`Gateway circuit breaker open (${this.circuitFailures} consecutive failures, cooling down)`)
+      }
+      // Cooldown elapsed — allow one probe request through (half-open)
+      this.circuitOpen = false
+    }
+
+    const requestId = randomUUID()
+    let settled = false
+
+    const rpcCall = new Promise<TPayload>((resolve, reject) => {
       const request: PendingRequest = {
-        id: randomUUID(),
+        id: requestId,
         method,
         params,
-        resolve: resolve as (value: unknown) => void,
-        reject,
+        resolve: (value: unknown) => {
+          if (settled) return
+          settled = true
+          this.circuitFailures = 0
+          this.circuitOpen = false
+          resolve(value as TPayload)
+        },
+        reject: (reason?: unknown) => {
+          if (settled) return
+          settled = true
+          reject(reason)
+        },
       }
 
       this.requestQueue.push(request)
@@ -248,6 +271,29 @@ class GatewayClient {
       })
       this.flushQueue()
     })
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        if (settled) return // RPC already resolved/rejected — skip
+        settled = true
+        this.cleanupPendingRequest(requestId)
+        // Don't count known-slow RPCs toward circuit breaker
+        const slowRpcs = ['sessions.usage', 'sessions.costs', 'usage.analytics', 'usage.summary']
+        if (!slowRpcs.includes(method)) {
+          this.circuitFailures += 1
+        }
+        if (this.circuitFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+          this.circuitOpen = true
+          this.circuitOpenedAt = Date.now()
+          console.warn(`[gateway] Circuit breaker OPEN after ${this.circuitFailures} consecutive timeouts (last: ${method})`)
+        } else {
+          console.warn(`[gateway] RPC timeout after ${RPC_TIMEOUT_MS}ms for ${method} (${this.circuitFailures}/${CIRCUIT_BREAKER_THRESHOLD})`)
+        }
+        reject(new Error('Gateway RPC timeout'))
+      }, RPC_TIMEOUT_MS)
+    })
+
+    return Promise.race([rpcCall, timeoutPromise])
   }
 
   async ensureConnected(): Promise<void> {
@@ -286,10 +332,6 @@ class GatewayClient {
     this.ws = null
     this.authenticated = false
 
-    if (ws) {
-      this.detachSocket(ws)
-    }
-
     const closePromise = ws ? this.closeSocket(ws) : Promise.resolve()
 
     this.rejectQueuedRequests(new Error('Gateway client is shut down'))
@@ -319,11 +361,6 @@ class GatewayClient {
             return `${parsed.protocol}//${parsed.host}`
           } catch { return 'http://127.0.0.1:18789' }
         })()
-        if (this.ws) {
-          this.detachSocket(this.ws)
-          this.ws.terminate()
-          this.ws = null
-        }
         const ws = new WebSocket(url, { origin: gatewayOrigin, headers: { Origin: gatewayOrigin } })
 
         this.clearReconnectTimer()
@@ -345,9 +382,8 @@ class GatewayClient {
         // transition and is lost (causes "missing nonce" rejection).
         let challengeNonce: string | undefined
         let challengeResolved = false
-        let challengeHandler: ((data: RawData) => void) | null = null
         const nonce = await new Promise<string | undefined>((resolve) => {
-          challengeHandler = (data: RawData) => {
+          const originalHandler = (data: RawData) => {
             try {
               const f = JSON.parse(rawDataToString(data))
               if ((f.type === 'event' || f.type === 'evt') && f.event === 'connect.challenge') {
@@ -359,20 +395,23 @@ class GatewayClient {
                 return
               }
             } catch { /* ignore */ }
+            // Forward non-challenge messages to normal handler
+            this.handleMessage(data)
           }
-          ws.on('message', challengeHandler)
+          // Replace with a handler that captures challenge AND forwards others
+          ws.removeAllListeners('message')
+          ws.on('message', originalHandler)
           // Fallback if no challenge (older gateway without protocol 3)
           setTimeout(() => {
-            if (!challengeResolved && challengeHandler) {
+            if (!challengeResolved) {
               challengeResolved = true
-              ws.off('message', challengeHandler)
               resolve(undefined)
             }
           }, 3000)
         })
-        if (challengeHandler) {
-          ws.off('message', challengeHandler)
-        }
+        // Re-attach the normal message handler (challenge phase done)
+        ws.removeAllListeners('message')
+        ws.on('message', (data: RawData) => { this.handleMessage(data) })
 
         const connectId = randomUUID()
         const connectReq: GatewayFrame = {
@@ -407,10 +446,12 @@ class GatewayClient {
         })
 
         this.authenticated = true
-        this.reconnectAttempts = 0
         this.startHeartbeat()
         this.flushQueue()
         this._lastErrorKind = null
+        // Reset circuit breaker on successful connection
+        this.circuitFailures = 0
+        this.circuitOpen = false
         return // Success
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
@@ -420,7 +461,6 @@ class GatewayClient {
           this._lastErrorKind = classifyConnectionError(lastError)
         } catch { /* module may not be available in all contexts */ }
         if (this.ws) {
-          this.detachSocket(this.ws)
           this.ws.terminate()
           this.ws = null
         }
@@ -432,53 +472,28 @@ class GatewayClient {
   }
 
   private attachSocket(ws: WebSocket) {
-    if (this.socketHandlers && this.socketHandlers.ws !== ws) {
-      this.detachSocket(this.socketHandlers.ws)
-    }
-    this.detachSocket(ws)
-
-    const onMessage = (data: RawData) => {
+    ws.on('message', (data: RawData) => {
       this.handleMessage(data)
-    }
+    })
 
-    const onPong = () => {
+    ws.on('pong', () => {
       if (this.heartbeatTimeout) {
         clearTimeout(this.heartbeatTimeout)
         this.heartbeatTimeout = null
       }
-    }
+    })
 
-    const onClose = (code: number, reason: Buffer) => {
+    ws.on('close', (code: number, reason: Buffer) => {
       const reasonText = reason?.toString() || 'n/a'
       this.handleDisconnect(
-        ws,
         new Error(`Gateway connection closed (code=${code}, reason=${reasonText})`),
       )
-    }
+    })
 
-    const onError = (error: unknown) => {
+    ws.on('error', (error: unknown) => {
       const err = error instanceof Error ? error : new Error(String(error))
-      this.handleDisconnect(ws, err)
-    }
-
-    ws.on('message', onMessage)
-    ws.on('pong', onPong)
-    ws.on('close', onClose)
-    ws.on('error', onError)
-
-    this.socketHandlers = { ws, onMessage, onPong, onClose, onError }
-  }
-
-  private detachSocket(ws: WebSocket) {
-    if (!this.socketHandlers || this.socketHandlers.ws !== ws) {
-      return
-    }
-
-    ws.off('message', this.socketHandlers.onMessage)
-    ws.off('pong', this.socketHandlers.onPong)
-    ws.off('close', this.socketHandlers.onClose)
-    ws.off('error', this.socketHandlers.onError)
-    this.socketHandlers = null
+      this.handleDisconnect(err)
+    })
   }
 
   private handleMessage(data: RawData) {
@@ -516,13 +531,8 @@ class GatewayClient {
     pending.reject(new Error(frame.error?.message ?? 'gateway error'))
   }
 
-  private handleDisconnect(ws: WebSocket, error: Error) {
-    if (ws !== this.ws) {
-      this.detachSocket(ws)
-      return
-    }
-
-    this.detachSocket(ws)
+  private handleDisconnect(error: Error) {
+    const ws = this.ws
     this.ws = null
     this.authenticated = false
     this.stopHeartbeat()
@@ -586,10 +596,8 @@ class GatewayClient {
       return
     }
 
-    const attempt = this.reconnectAttempts + 1
     const delay = nextReconnectDelayMs(this.reconnectAttempts)
-    this.reconnectAttempts = attempt
-    console.warn(`[gateway] Reconnect attempt ${attempt} scheduled in ${delay}ms`)
+    this.reconnectAttempts += 1
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
@@ -614,7 +622,7 @@ class GatewayClient {
       try {
         this.ws.ping()
       } catch {
-        this.handleDisconnect(this.ws, new Error('Gateway ping failed'))
+        this.handleDisconnect(new Error('Gateway ping failed'))
         return
       }
 
@@ -624,9 +632,7 @@ class GatewayClient {
 
       this.heartbeatTimeout = setTimeout(() => {
         this.heartbeatTimeout = null
-        if (this.ws) {
-          this.handleDisconnect(this.ws, new Error('Gateway ping timeout'))
-        }
+        this.handleDisconnect(new Error('Gateway ping timeout'))
       }, HEARTBEAT_TIMEOUT_MS)
     }, HEARTBEAT_INTERVAL_MS)
   }
@@ -722,18 +728,31 @@ class GatewayClient {
     }
     this.inflight.clear()
   }
+
+  private cleanupPendingRequest(requestId: string): boolean {
+    const queueIndex = this.requestQueue.findIndex((pending) => pending.id === requestId)
+    if (queueIndex >= 0) {
+      this.requestQueue.splice(queueIndex, 1)
+      return true
+    }
+
+    if (this.inflight.has(requestId)) {
+      this.inflight.delete(requestId)
+      return true
+    }
+
+    return false
+  }
 }
 
 function nextReconnectDelayMs(attempt: number) {
-  const exponentialDelay = Math.min(
-    INITIAL_RECONNECT_DELAY_MS * 2 ** attempt,
-    MAX_RECONNECT_DELAY_MS,
-  )
-  const jitterFloor = Math.max(
-    INITIAL_RECONNECT_DELAY_MS,
-    Math.floor(exponentialDelay * 0.5),
-  )
-  return jitterFloor + Math.floor(Math.random() * (exponentialDelay - jitterFloor + 1))
+  if (attempt < RECONNECT_DELAYS_MS.length) {
+    return RECONNECT_DELAYS_MS[attempt]
+  }
+
+  const doubled =
+    RECONNECT_DELAYS_MS[RECONNECT_DELAYS_MS.length - 1] * 2 ** (attempt - 2)
+  return Math.min(doubled, MAX_RECONNECT_DELAY_MS)
 }
 
 function rawDataToString(data: RawData): string {
@@ -790,9 +809,15 @@ if (!(globalThis as any)[GW_UHR_KEY]) {
       msg.includes('WebSocket') ||
       msg.includes('ECONNREFUSED') ||
       msg.includes('ECONNRESET') ||
-      msg.includes('unknown method')
+      msg.includes('unknown method') ||
+      msg.includes('RPC timeout') ||
+      msg.includes('circuit breaker') ||
+      msg.includes('shut down')
     ) {
-      console.warn(`[gateway] Swallowed unhandled rejection: ${msg}`)
+      // Avoid log spam — only log non-timeout rejections
+      if (!msg.includes('RPC timeout') && !msg.includes('circuit breaker')) {
+        console.warn(`[gateway] Swallowed unhandled rejection: ${msg}`)
+      }
       return
     }
     // Re-throw non-gateway rejections so they're visible

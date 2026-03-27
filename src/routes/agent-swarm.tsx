@@ -4,14 +4,14 @@ import { AgentsScreen } from '@/screens/gateway/agents-screen'
 
 export const Route = createFileRoute('/agent-swarm')({
   component: function AgentSwarmRoute() {
-    usePageTitle('Agent Hub')
+    usePageTitle('Conductor')
     return <AgentsScreen />
   },
   errorComponent: function AgentSwarmError({ error }) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
         <h2 className="text-xl font-semibold text-primary-900 mb-3">
-          Failed to Load Agent Hub
+          Failed to Load Conductor
         </h2>
         <p className="text-sm text-primary-600 mb-4 max-w-md">
           {error instanceof Error
@@ -32,7 +32,7 @@ export const Route = createFileRoute('/agent-swarm')({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-accent-500 border-r-transparent mb-3" />
-          <p className="text-sm text-primary-500">Loading Agent Hub...</p>
+          <p className="text-sm text-primary-500">Loading Conductor...</p>
         </div>
       </div>
     )

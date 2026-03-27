@@ -121,6 +121,13 @@ const createEmptyStreamingState = (): StreamingState => ({
   toolCalls: [],
 })
 
+function finalizeAbortedText(text: string): string {
+  const trimmed = stripFinalTags(text).trim()
+  if (!trimmed) return '[aborted]'
+  if (/\[aborted\]\s*$/i.test(trimmed)) return trimmed
+  return `${trimmed} [aborted]`
+}
+
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -227,6 +234,60 @@ function getClientNonce(msg: GatewayMessage | null | undefined): string {
   )
 }
 
+function getMessageRunId(msg: GatewayMessage | null | undefined): string {
+  if (!msg) return ''
+  const raw = msg as Record<string, unknown>
+  return normalizeString(raw.__runId) || normalizeString(raw.runId)
+}
+
+function getMessageEventTime(msg: GatewayMessage | null | undefined): number | undefined {
+  if (!msg) return undefined
+  const raw = msg as Record<string, unknown>
+  for (const key of ['createdAt', 'created_at', 'timestamp', 'ts', 'date'] as const) {
+    const value = raw[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Date.parse(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return undefined
+}
+
+function getMessageReceiveTime(msg: GatewayMessage | null | undefined): number | undefined {
+  if (!msg) return undefined
+  const value = (msg as Record<string, unknown>).__receiveTime
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function isExternalInboundUserSource(source: unknown): boolean {
+  const normalized = normalizeString(source).toLowerCase()
+  return normalized === 'webchat' || normalized === 'signal' || normalized === 'telegram'
+}
+
+function getAttachmentSignature(msg: GatewayMessage | null | undefined): string {
+  if (!msg) return ''
+  const attachments = Array.isArray((msg as any).attachments)
+    ? ((msg as any).attachments as Array<Record<string, unknown>>)
+    : []
+  if (attachments.length === 0) return ''
+  return attachments
+    .map((attachment) => {
+      return `${normalizeString(attachment.name)}:${String(attachment.size ?? '')}`
+    })
+    .sort()
+    .join('|')
+}
+
+function isOptimisticUserCandidate(msg: GatewayMessage | null | undefined): boolean {
+  if (!msg || msg.role !== 'user') return false
+  const raw = msg as Record<string, unknown>
+  return (
+    normalizeString(raw.__optimisticId).length > 0 ||
+    ['sending', 'queued', 'sent', 'done'].includes(normalizeString(raw.status))
+  )
+}
+
 function messageMultipartSignature(msg: GatewayMessage | null | undefined): string {
   if (!msg) return ''
   let content = Array.isArray(msg.content)
@@ -257,6 +318,71 @@ function messageMultipartSignature(msg: GatewayMessage | null | undefined): stri
         .join('|')
     : ''
   return `${msg.role ?? 'unknown'}:${content}:${attachments}`
+}
+
+function sortMessagesChronologically(
+  messages: Array<GatewayMessage>,
+): Array<GatewayMessage> {
+  return [...messages]
+    .map((message, index) => ({ message, index }))
+    .sort((a, b) => {
+      const aTime = getMessageEventTime(a.message) ?? getMessageReceiveTime(a.message)
+      const bTime = getMessageEventTime(b.message) ?? getMessageReceiveTime(b.message)
+
+      if (aTime !== undefined && bTime !== undefined && aTime !== bTime) {
+        return aTime - bTime
+      }
+      if (aTime !== undefined && bTime === undefined) return -1
+      if (aTime === undefined && bTime !== undefined) return 1
+      return a.index - b.index
+    })
+    .map(({ message }) => message)
+}
+
+function findCompleteMessageIndex(
+  sessionMessages: Array<GatewayMessage>,
+  completeMessage: GatewayMessage,
+  runId?: string,
+): number {
+  const completeId = getMessageId(completeMessage)
+  const completeNonce = getClientNonce(completeMessage)
+  const completeText = extractMessageText(completeMessage)
+  const completeRunId = normalizeString(runId) || getMessageRunId(completeMessage)
+
+  for (let index = sessionMessages.length - 1; index >= 0; index -= 1) {
+    const existing = sessionMessages[index]
+    if (existing.role !== 'assistant') continue
+
+    const existingRunId = getMessageRunId(existing)
+    if (completeRunId && existingRunId && completeRunId === existingRunId) {
+      return index
+    }
+
+    const existingId = getMessageId(existing)
+    if (completeId && existingId && completeId === existingId) {
+      return index
+    }
+
+    const existingNonce = getClientNonce(existing)
+    if (completeNonce && existingNonce && completeNonce === existingNonce) {
+      return index
+    }
+
+    const existingText = extractMessageText(existing)
+    if (completeText && existingText && completeText === existingText) {
+      return index
+    }
+
+    if (
+      completeText &&
+      existingText &&
+      (completeText.startsWith(existingText) || existingText.startsWith(completeText))
+    ) {
+      return index
+    }
+  }
+
+  return -1
 }
 
 export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
@@ -329,6 +455,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
         const messages = new Map(state.realtimeMessages)
         const sessionMessages = [...(messages.get(sessionKey) ?? [])]
+        const incomingReceiveTime = now
 
         // Strip <final>…</final> sentinel tags from assistant messages before
         // storing or comparing.  The gateway can emit a bare assistant-message
@@ -365,14 +492,30 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             : normalizedMessage.role === 'user'
               ? sessionMessages.findIndex((existing) => {
                   if (existing.role !== 'user') return false
-                  if (normalizeString((existing as any).status) !== 'sending') return false
-                  return extractMessageText(existing) === extractMessageText(normalizedMessage)
+                  if (!isOptimisticUserCandidate(existing)) return false
+                  const existingText = extractMessageText(existing)
+                  const incomingText = extractMessageText(normalizedMessage)
+                  if (existingText && incomingText && existingText === incomingText) {
+                    return true
+                  }
+                  const existingAttachments = getAttachmentSignature(existing)
+                  const incomingAttachments = getAttachmentSignature(normalizedMessage)
+                  return (
+                    existingText.length === 0 &&
+                    incomingText.length === 0 &&
+                    existingAttachments.length > 0 &&
+                    existingAttachments === incomingAttachments
+                  )
                 })
               : -1
 
         // Plain-text extraction for content-based dedup (catches identical
         // replies that arrive with different IDs from different channels).
         const newPlainText = extractMessageText(normalizedMessage)
+        const isExternalInboundUser =
+          normalizedMessage.role === 'user' && isExternalInboundUserSource((event as any).source)
+        const incomingEventTime =
+          getMessageEventTime(normalizedMessage) ?? incomingReceiveTime
 
         const duplicateIndex = sessionMessages.findIndex((existing) => {
           if (existing.role !== normalizedMessage.role) return false
@@ -408,8 +551,10 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         // Mark user messages from external sources
         const incomingMessage: GatewayMessage = {
           ...normalizedMessage,
+          __runId: event.runId,
           __realtimeSource:
             event.type === 'user_message' ? (event as any).source : undefined,
+          __receiveTime: incomingReceiveTime,
           status: undefined,
         }
 
@@ -422,6 +567,22 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           }
           messages.set(sessionKey, sessionMessages)
           set({ realtimeMessages: messages, lastEventAt: now })
+          break
+        }
+
+        const hasRecentExternalDuplicate =
+          isExternalInboundUser &&
+          newPlainText.length > 0 &&
+          sessionMessages.some((existing) => {
+            if (existing.role !== 'user') return false
+            if (extractMessageText(existing) !== newPlainText) return false
+            const existingEventTime =
+              getMessageEventTime(existing) ?? getMessageReceiveTime(existing)
+            if (existingEventTime === undefined) return false
+            return Math.abs(incomingEventTime - existingEventTime) <= 10_000
+          })
+
+        if (hasRecentExternalDuplicate) {
           break
         }
 
@@ -513,6 +674,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
       case 'done': {
         const streamingMap = new Map(state.streamingState)
         const streaming = streamingMap.get(sessionKey)
+        const isAborted = event.state === 'aborted'
 
         // Build the complete message — prefer authoritative final payload (bug #8 fix)
         let completeMessage: GatewayMessage | null = null
@@ -529,9 +691,30 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           const streamToolCallsToEmbed = streaming?.toolCalls?.length
             ? streaming.toolCalls
             : undefined
+          const abortedText = isAborted
+            ? finalizeAbortedText(extractMessageText(cleanedMessage))
+            : ''
+          const content = Array.isArray(cleanedMessage.content)
+            ? cleanedMessage.content.map((part) => {
+                if (part.type !== 'text' || !isAborted) return part
+                return {
+                  ...part,
+                  text: finalizeAbortedText(String((part as TextContent).text ?? '')),
+                }
+              })
+            : cleanedMessage.content
           completeMessage = {
             ...cleanedMessage,
-            timestamp: now,
+            ...(isAborted && abortedText
+              ? {
+                  content:
+                    content && content.some((part) => part.type === 'text')
+                      ? content
+                      : [{ type: 'text', text: abortedText } as TextContent],
+                }
+              : {}),
+            __runId: event.runId ?? streaming?.runId,
+            timestamp: (cleanedMessage as any).timestamp ?? now,
             __streamingStatus: 'complete' as any,
             ...(streamToolCallsToEmbed ? { __streamToolCalls: streamToolCallsToEmbed } : {}),
           }
@@ -551,7 +734,9 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           if (cleanStreamText) {
             content.push({
               type: 'text',
-              text: cleanStreamText,
+              text: isAborted
+                ? finalizeAbortedText(cleanStreamText)
+                : cleanStreamText,
             } as TextContent)
           }
 
@@ -567,6 +752,7 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           completeMessage = {
             role: 'assistant',
             content,
+            __runId: event.runId ?? streaming.runId,
             timestamp: now,
             __streamingStatus: 'complete',
           }
@@ -576,42 +762,38 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           const messages = new Map(state.realtimeMessages)
           const sessionMessages = [...(messages.get(sessionKey) ?? [])]
 
-          // Deduplicate: by ID or exact content (bug #7 fix).
-          // extractMessageText handles both content-array and legacy top-level
-          // text/body/message payloads, and strips <final> tags for both.
-          const completeText = extractMessageText(completeMessage)
-          const completeId = getMessageId(completeMessage)
-          const isDuplicate = sessionMessages.some((existing) => {
-            if (existing.role !== 'assistant') return false
-            const existingId = getMessageId(existing)
-            if (completeId && existingId && completeId === existingId) return true
-            if (completeText && completeText === extractMessageText(existing)) return true
-            return false
-          })
-
-          if (!isDuplicate) {
-            sessionMessages.push(completeMessage)
-            messages.set(sessionKey, sessionMessages)
-            set({ realtimeMessages: messages })
-          } else {
-            // If there IS a duplicate (e.g. a tagged pre-final message was stored),
-            // replace it with the clean final version so the UI shows clean text.
-            const existingIdx = sessionMessages.findIndex((existing) => {
-              if (existing.role !== 'assistant') return false
-              const existingId = getMessageId(existing)
-              if (completeId && existingId && completeId === existingId) return true
-              if (completeText && completeText === extractMessageText(existing)) return true
-              return false
-            })
-            if (existingIdx >= 0) {
-              sessionMessages[existingIdx] = {
-                ...sessionMessages[existingIdx],
-                ...completeMessage,
-              }
-              messages.set(sessionKey, sessionMessages)
-              set({ realtimeMessages: messages })
+          // First priority: find the streaming partial message (marked with
+          // __streamingStatus === 'streaming'). This always wins over text/id
+          // matching because it's unambiguously the in-progress message for
+          // this session. Prevents duplicate messages when thinking text in
+          // the partial doesn't match the final response text.
+          let streamingPartialIdx = -1
+          for (let i = sessionMessages.length - 1; i >= 0; i--) {
+            const m = sessionMessages[i] as Record<string, unknown>
+            if (m.role === 'assistant' && m.__streamingStatus === 'streaming') {
+              streamingPartialIdx = i
+              break
             }
           }
+
+          const existingIdx = streamingPartialIdx >= 0
+            ? streamingPartialIdx
+            : findCompleteMessageIndex(
+                sessionMessages,
+                completeMessage,
+                event.runId ?? streaming?.runId ?? undefined,
+              )
+
+          if (existingIdx >= 0) {
+            sessionMessages[existingIdx] = {
+              ...sessionMessages[existingIdx],
+              ...completeMessage,
+            }
+          } else {
+            sessionMessages.push(completeMessage)
+          }
+          messages.set(sessionKey, sessionMessages)
+          set({ realtimeMessages: messages })
         }
 
         // Clear streaming state immediately — tool calls are preserved via
@@ -752,11 +934,11 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     })
 
     if (newRealtimeMessages.length === 0) {
-      return historyMessages
+      return sortMessagesChronologically(historyMessages)
     }
 
     // Append new realtime messages to history
-    return [...historyMessages, ...newRealtimeMessages]
+    return sortMessagesChronologically([...historyMessages, ...newRealtimeMessages])
   },
 }))
 

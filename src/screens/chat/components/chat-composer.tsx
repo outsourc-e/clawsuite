@@ -50,6 +50,7 @@ import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
 import { toast } from '@/components/ui/toast'
 import { getConnectionErrorInfo } from '@/lib/connection-errors'
+import { useGatewayChatStore } from '@/stores/gateway-chat-store'
 
 type ChatComposerAttachment = {
   id: string
@@ -67,6 +68,7 @@ type ChatComposerProps = {
   onSubmit: (
     value: string,
     attachments: Array<ChatComposerAttachment>,
+    fastMode: boolean,
     helpers: ChatComposerHelpers,
   ) => void
   isLoading: boolean
@@ -95,17 +97,8 @@ type ChatComposerHandle = {
   insertText: (value: string) => void
 }
 
-function thinkingLevelLabel(level: ThinkingLevel): string {
-  if (level === 'adaptive') return '⚡ Adaptive'
-  if (level === 'low') return '💡 Low'
-  return '○ Off'
-}
 
-function thinkingLevelTooltip(level: ThinkingLevel): string {
-  if (level === 'adaptive') return 'Thinking: Adaptive — Claude reasons before responding'
-  if (level === 'low') return 'Thinking: Low — minimal reasoning'
-  return 'Thinking: Off — no extended reasoning'
-}
+
 
 function nextThinkingLevel(level: ThinkingLevel): ThinkingLevel {
   if (level === 'off') return 'low'
@@ -594,6 +587,7 @@ function ChatComposerComponent({
   const [isWebSearchMode, _setIsWebSearchMode] = useState(false)
   const [isSlashMenuDismissed, setIsSlashMenuDismissed] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
+  const [fastMode, setFastMode] = useState(false)
   // Per-session thinking level — controlled externally (chat-screen owns the state)
   // Falls back to internal state if no external controller provided
   const [internalThinkingLevel, setInternalThinkingLevel] = useState<ThinkingLevel>('low')
@@ -781,9 +775,14 @@ function ChatComposerComponent({
     () => toDraftStorageKey(sessionKey),
     [sessionKey],
   )
-  const modelButtonLabel =
-    shortenModelName(currentModel) ||
-    (currentModelQuery.isLoading ? '…' : 'Model')
+  const modelButtonLabel = (() => {
+    const base = shortenModelName(currentModel) || (currentModelQuery.isLoading ? '…' : 'Model')
+    const suffix = [
+      thinkingLevel === 'low' ? '🧠 Low' : thinkingLevel === 'off' ? '🧠 Off' : null,
+      fastMode ? '⚡' : null,
+    ].filter(Boolean).join(' ')
+    return suffix ? `${base} · ${suffix}` : base
+  })()
   // Don't show "Gateway disconnected" for models query failures - it's confusing
   // since the main gateway connection might be fine. Show a subtler message instead.
   const modelAvailabilityLabel = modelsUnavailable ? 'Click to configure' : null
@@ -1176,7 +1175,9 @@ function ChatComposerComponent({
       ...attachment,
     }))
     try {
-      onSubmit(body, attachmentPayload, {
+      // Fast mode is incompatible with extended thinking — disable if thinking is on
+      const effectiveFastMode = fastMode && thinkingLevel === 'off' ? true : false
+      onSubmit(body, attachmentPayload, effectiveFastMode, {
         reset,
         setValue: setComposerValue,
         setAttachments: setComposerAttachments,
@@ -1202,6 +1203,7 @@ function ChatComposerComponent({
     setComposerAttachments,
     setComposerValue,
     value,
+    fastMode,
   ])
 
   // Fire queued submit once all in-flight attachment processing finishes
@@ -1331,10 +1333,16 @@ function ChatComposerComponent({
   const handleAbort = useCallback(
     async function handleAbort() {
       try {
-        await fetch('/api/chat-abort', {
+        const response = await fetch('/api/chat-abort', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ sessionKey }),
+        })
+        if (!response.ok || !sessionKey) return
+        useGatewayChatStore.getState().processEvent({
+          type: 'done',
+          state: 'aborted',
+          sessionKey,
         })
       } catch {
         // Ignore abort errors
@@ -1369,6 +1377,15 @@ function ChatComposerComponent({
 
   const handleSelectSlashCommand = useCallback(
     function handleSelectSlashCommand(command: SlashCommandDefinition) {
+      if (command.command === '/fast') {
+        setIsSlashMenuDismissed(false)
+        setFastMode((previous) => !previous)
+        setValue('')
+        persistDraft('')
+        focusPrompt()
+        return
+      }
+
       const nextValue = `${command.command} `
       setIsSlashMenuDismissed(false)
       setValue(nextValue)
@@ -1605,7 +1622,7 @@ function ChatComposerComponent({
           isDraggingOver &&
             'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
           isLoading &&
-            'ring-2 ring-accent-400/50 shadow-[0_0_15px_rgba(249,115,22,0.15)]',
+            'ring-2 ring-accent-400/70 shadow-[0_0_20px_rgba(249,115,22,0.35)] animate-pulse-glow',
         )}
         onPaste={handlePaste}
         onDragEnter={handleDragEnter}
@@ -1736,6 +1753,8 @@ function ChatComposerComponent({
                 }}
                 className="min-h-[36px] max-h-[120px] flex-1 text-base leading-snug"
               />
+
+
 
               {/* Right side: stop / send / mic */}
               <div className="shrink-0">
@@ -1955,7 +1974,7 @@ function ChatComposerComponent({
                           <a href="https://docs.openclaw.ai/configuration" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600">Setup Guide →</a>
                         </div>
                       ) : (
-                        <div className="max-h-[60dvh] overflow-y-auto pb-4">
+                        <div className="max-h-[60dvh] overflow-y-auto overflow-x-hidden pb-4">
                           {(pinnedModels.length > 0 || unavailablePinnedModels.length > 0) && (
                             <div className="mb-2 border-b border-neutral-100 dark:border-neutral-800 pb-2">
                               <div className="flex items-center gap-1.5 px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-neutral-400">
@@ -2069,6 +2088,13 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 )}
+                {/* Token counter — bottom bar, mirrors OpenClaw style, triggers at ~25 tokens */}
+                {value.length >= 100 && (
+                  <span className="ml-1 text-[10px] text-primary-400 tabular-nums select-none">
+                    ~{Math.ceil(value.length / 4)} tokens
+                  </span>
+                )}
+
                 <div
                   className="relative ml-0.5 md:ml-1 flex min-w-0 items-center gap-1 md:gap-2"
                   ref={modelSelectorRef}
@@ -2138,29 +2164,9 @@ function ChatComposerComponent({
                       ) : null}
                     </span>
                   ) : null}
-                  {/* Thinking level toggle — desktop only */}
-                  <button
-                    type="button"
-                    title={thinkingLevelTooltip(thinkingLevel)}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      handleThinkingToggle()
-                    }}
-                    className={cn(
-                      'hidden md:inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition-colors',
-                      thinkingLevel === 'adaptive'
-                        ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'
-                        : thinkingLevel === 'low'
-                          ? 'bg-primary-100/70 text-primary-600 hover:bg-primary-200 dark:hover:bg-primary-800'
-                          : 'bg-primary-100/40 text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900',
-                    )}
-                    aria-label={thinkingLevelTooltip(thinkingLevel)}
-                    disabled={disabled}
-                  >
-                    {thinkingLevelLabel(thinkingLevel)}
-                  </button>
+
                   {!isModelSwitcherDisabled && isModelMenuOpen ? (
-                    <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 sm:right-auto z-40 min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[24rem] rounded-xl border border-primary-200 bg-surface shadow-lg">
+                    <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 sm:right-auto z-40 min-w-[16rem] max-w-[calc(100vw-2rem)] sm:max-w-[28rem] overflow-hidden rounded-xl border border-primary-200 bg-surface shadow-lg">
                       {groupedModels.length === 0 && modelsUnavailable ? (
                         <div className="p-4 text-center text-sm text-primary-500">
                           <p className="font-medium text-primary-700 mb-1">
@@ -2192,7 +2198,7 @@ function ChatComposerComponent({
                           </a>
                         </div>
                       ) : (
-                        <div className="max-h-[20rem] overflow-y-auto p-1">
+                        <div className="max-h-[20rem] overflow-y-auto overflow-x-hidden p-1">
                           {/* Phase 4.2: Pinned models section */}
                           {(pinnedModels.length > 0 ||
                             unavailablePinnedModels.length > 0) && (
@@ -2357,6 +2363,38 @@ function ChatComposerComponent({
                           ))}
                         </div>
                       )}
+                      {/* Settings footer — thinking + fast mode */}
+                      <div className="border-t border-neutral-100 dark:border-neutral-800 px-3 py-2 flex items-center gap-2">
+                        {fastMode && thinkingLevel !== 'off' && (
+                          <span className="text-[10px] text-amber-500 mr-1">⚠ Fast disabled while thinking is on</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleThinkingToggle}
+                          className={cn(
+                            'inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition-colors',
+                            thinkingLevel === 'adaptive'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                              : thinkingLevel === 'low'
+                                ? 'bg-primary-100 text-primary-600'
+                                : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
+                          )}
+                        >
+                          🧠 {thinkingLevel === 'adaptive' ? 'Auto' : thinkingLevel === 'low' ? 'Low' : 'Off'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFastMode((p) => !p)}
+                          className={cn(
+                            'inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition-colors',
+                            fastMode
+                              ? 'bg-accent-500/15 text-accent-600'
+                              : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
+                          )}
+                        >
+                          ⚡ Fast
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -2437,6 +2475,7 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 ) : (
+                  <>
                   <PromptInputAction tooltip="Send message">
                     <Button
                       type="button"
@@ -2453,6 +2492,7 @@ function ChatComposerComponent({
                       />
                     </Button>
                   </PromptInputAction>
+                  </>
                 )}
               </div>
             </PromptInputActions>
