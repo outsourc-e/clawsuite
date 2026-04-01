@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import { WidgetShell } from './widget-shell'
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 import type { CronJob } from '@/components/cron-manager/cron-types'
 import type { TaskPriority, TaskStatus } from '@/stores/task-store'
 import { fetchCronJobs } from '@/lib/cron-api'
@@ -83,12 +84,13 @@ function mobileStatusRank(status: TaskStatus): number {
 
 export function TasksWidget({ draggable = false, onRemove }: TasksWidgetProps) {
   const navigate = useNavigate()
+  const { connected } = useGatewayConnected()
 
   const cronJobsQuery = useQuery({
     queryKey: ['cron', 'jobs'],
     queryFn: fetchCronJobs,
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: connected ? 30_000 : false,
   })
 
   const tasks = useMemo(

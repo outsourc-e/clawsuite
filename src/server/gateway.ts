@@ -784,11 +784,15 @@ if (existingClient) {
   const cooledDown = !lastReconnect || now - lastReconnect > cooldownMs
   if ((!snapshot.authenticated || snapshot.readyState !== WebSocket.OPEN) && cooledDown) {
     ;(globalThis as any)[GW_LAST_RECONNECT_KEY] = now
-    console.warn('[gateway] WARNING: Reused singleton is disconnected — triggering reconnect')
-    existingClient.ensureConnected().catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error)
-      console.warn(`[gateway] Reconnect attempt after singleton reuse failed: ${message}`)
-    })
+    // Defer reconnect to avoid crashing SSR hydration — the router's __store
+    // may not be initialized yet when this module is first imported.
+    setTimeout(() => {
+      console.warn('[gateway] WARNING: Reused singleton is disconnected — triggering reconnect')
+      existingClient.ensureConnected().catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        console.warn(`[gateway] Reconnect attempt after singleton reuse failed: ${message}`)
+      })
+    }, 100)
   }
 }
 let gatewayClient: GatewayClient = existingClient ?? new GatewayClient()

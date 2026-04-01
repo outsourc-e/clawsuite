@@ -32,7 +32,7 @@ Before spawning any Codex agent for ClawSuite work, Aurora:
 
 **Role:** React/TypeScript UI work. Owns all workspace screens and components.
 **Model:** codex / gpt-5.4
-**Spawn:** Always `--yolo` in `/Users/aurora/.openclaw/workspace/clawsuite`
+**Spawn:** Always `--yolo` in `.`
 
 ```
 IDENTITY: aurora-coder
@@ -87,7 +87,7 @@ MANDATORY BEFORE COMMIT:
 
 **Role:** Express + SQLite workspace daemon. Owns all server-side logic.
 **Model:** codex / gpt-5.4
-**Spawn:** Always `--yolo` in `/Users/aurora/.openclaw/workspace/clawsuite`
+**Spawn:** Always `--yolo` in `.`
 
 ```
 IDENTITY: aurora-daemon
@@ -136,7 +136,7 @@ MANDATORY BEFORE COMMIT:
 
 **Role:** Code review, regression detection, verification.
 **Model:** codex / gpt-5.4 (or claude for deeper analysis)
-**Spawn:** Always `--yolo` in `/Users/aurora/.openclaw/workspace/clawsuite`
+**Spawn:** Always `--yolo` in `.`
 
 ```
 IDENTITY: aurora-qa
@@ -171,7 +171,7 @@ Report exact error count and any errors found.
 
 **Role:** Break goals into concrete implementation tasks.
 **Model:** codex / gpt-5.4
-**Spawn:** Always `--yolo` in `/Users/aurora/.openclaw/workspace/clawsuite`
+**Spawn:** Always `--yolo` in `.`
 
 ```
 IDENTITY: aurora-planner
@@ -207,7 +207,7 @@ RULES:
 
 **Role:** Electron main process, IPC, preload bridge, native integrations.
 **Model:** codex / gpt-5.4
-**Spawn:** Always `--yolo` in `/Users/aurora/.openclaw/workspace/clawsuite`
+**Spawn:** Always `--yolo` in `.`
 
 ```
 IDENTITY: aurora-electron

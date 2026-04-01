@@ -1185,9 +1185,15 @@ export function ChatScreen({
     staleTime: 30_000,
     refetchInterval: 60_000, // Re-check every 60s to clear stale errors
   })
-  // Don't show gateway errors for new chats or when SSE is connected (proves gateway works)
+  // Don't show gateway errors for new chats, when SSE is connected (proves gateway works),
+  // or during initial load grace period (SSE may still be connecting)
+  const [pastGracePeriod, setPastGracePeriod] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setPastGracePeriod(true), 8_000)
+    return () => clearTimeout(timer)
+  }, [])
   const gatewayStatusError =
-    !isNewChat && connectionState !== 'connected'
+    !isNewChat && connectionState !== 'connected' && pastGracePeriod
       ? gatewayStatusQuery.error instanceof Error
         ? {
             message: gatewayStatusQuery.error.message,

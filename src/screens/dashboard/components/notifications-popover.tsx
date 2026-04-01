@@ -6,6 +6,7 @@ import { Notification03Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 import { cn } from '@/lib/utils'
 
 type SessionsApiResponse = {
@@ -91,11 +92,12 @@ function toNotifications(
 export function NotificationsPopover() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const { connected } = useGatewayConnected()
 
   const query = useQuery({
     queryKey: ['dashboard', 'notifications-popover'],
     queryFn: fetchSessions,
-    refetchInterval: 20_000,
+    refetchInterval: connected ? 20_000 : false,
   })
 
   const notifications = useMemo(() => {

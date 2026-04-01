@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 
 type CronApiJob = Record<string, unknown>
 
@@ -134,9 +135,11 @@ async function fetchScheduledJobs(): Promise<Array<ScheduledJobItem>> {
 }
 
 export function useScheduledJobs() {
+  const { connected } = useGatewayConnected()
+
   return useQuery({
     queryKey: ['dashboard', 'scheduled-jobs'],
     queryFn: fetchScheduledJobs,
-    refetchInterval: 60_000,
+    refetchInterval: connected ? 60_000 : false,
   })
 }

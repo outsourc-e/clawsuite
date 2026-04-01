@@ -8,6 +8,7 @@ import { UserGroupIcon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 import type { SessionMeta } from '@/screens/chat/types'
 import { cn } from '@/lib/utils'
 
@@ -206,10 +207,11 @@ export function AgentStatusWidget({
   draggable = false,
   onRemove,
 }: AgentStatusWidgetProps) {
+  const { connected } = useGatewayConnected()
   const sessionsQuery = useQuery({
     queryKey: ['dashboard', 'active-agent-sessions'],
     queryFn: fetchSessions,
-    refetchInterval: 15_000,
+    refetchInterval: connected ? 15_000 : false,
   })
 
   const agents = useMemo(

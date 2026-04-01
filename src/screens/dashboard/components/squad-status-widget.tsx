@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { formatModelName } from '../lib/formatters'
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 import { cn } from '@/lib/utils'
 
 type SquadStatusWidgetProps = { editMode?: boolean }
@@ -81,6 +82,7 @@ function formatTokenCompact(n: number): string {
 
 export function SquadStatusWidget({ editMode }: SquadStatusWidgetProps) {
   const navigate = useNavigate()
+  const { connected } = useGatewayConnected()
   const sessionsQuery = useQuery({
     queryKey: ['dashboard', 'squad-status'],
     queryFn: async () => {
@@ -89,7 +91,7 @@ export function SquadStatusWidget({ editMode }: SquadStatusWidgetProps) {
       const data = (await res.json()) as SessionsApiResponse
       return Array.isArray(data.sessions) ? data.sessions : []
     },
-    refetchInterval: 15_000,
+    refetchInterval: connected ? 15_000 : false,
   })
   const agents = useMemo(() => {
     const allSessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []

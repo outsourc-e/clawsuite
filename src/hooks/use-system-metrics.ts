@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useGatewayConnected } from './use-gateway-connected'
 
 export type SystemMetricsResponse = {
   cpu: number
@@ -45,10 +46,11 @@ async function fetchSystemMetrics(): Promise<SystemMetricsResponse> {
 }
 
 export function useSystemMetrics() {
+  const { connected } = useGatewayConnected()
   const query = useQuery({
     queryKey: ['system-metrics'],
     queryFn: fetchSystemMetrics,
-    refetchInterval: 10_000,
+    refetchInterval: connected ? 10_000 : false,
     retry: false,
   })
 
@@ -75,4 +77,3 @@ export function useSystemMetrics() {
     metrics,
   }
 }
-

@@ -282,25 +282,25 @@ export type UseDashboardDataResult = {
 
 export function useDashboardData(): UseDashboardDataResult {
   // ── Queries ──────────────────────────────────────────────────────────────
-
-  const sessionsQuery = useQuery({
-    queryKey: chatQueryKeys.sessions,
-    queryFn: fetchSessions,
-    refetchInterval: 30_000,
-  })
-
   const gatewayStatusQuery = useQuery({
     queryKey: ['gateway', 'dashboard-status'],
     queryFn: fetchGatewayStatus,
     retry: false,
     refetchInterval: 15_000,
   })
+  const connected = gatewayStatusQuery.data?.ok === true
+
+  const sessionsQuery = useQuery({
+    queryKey: chatQueryKeys.sessions,
+    queryFn: fetchSessions,
+    refetchInterval: connected ? 30_000 : false,
+  })
 
   const sessionStatusQuery = useQuery({
     queryKey: ['gateway', 'session-status'],
     queryFn: fetchSessionStatus,
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: connected ? 30_000 : false,
     refetchOnWindowFocus: true,
   })
 
@@ -309,28 +309,28 @@ export function useDashboardData(): UseDashboardDataResult {
     queryFn: fetchCostTimeseries,
     retry: false,
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    refetchInterval: connected ? 60_000 : false,
   })
 
   const cronJobsQuery = useQuery({
     queryKey: ['cron', 'jobs'],
     queryFn: fetchCronJobs,
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: connected ? 30_000 : false,
   })
 
   const skillsSummaryQuery = useQuery({
     queryKey: ['dashboard', 'skills'],
     queryFn: fetchInstalledSkills,
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    refetchInterval: connected ? 60_000 : false,
   })
 
   const usageSummaryQuery = useQuery({
     queryKey: ['dashboard', 'usage'],
     queryFn: fetchUsage,
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: connected ? 30_000 : false,
   })
 
   // ── Usage timeout (15s) — stops infinite skeleton ────────────────────────
@@ -353,7 +353,6 @@ export function useDashboardData(): UseDashboardDataResult {
     const todayKey = toLocalDateKey(new Date(now))
 
     // ── Connection ──────────────────────────────────────────────────────────
-    const connected = gatewayStatusQuery.data?.ok === true
     const syncing = !gatewayStatusQuery.isLoading && connected
 
     // ── Session-status payload ──────────────────────────────────────────────

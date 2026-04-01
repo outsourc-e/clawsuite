@@ -116,7 +116,7 @@ export function useServicesHealth(gatewayConnected: boolean) {
     queryKey: ['dashboard', 'services-health'],
     queryFn: fetchServicesHealthProbe,
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: gatewayConnected ? 30_000 : false,
   })
 
   const services = useMemo<Array<ServiceHealthItem>>(() => {

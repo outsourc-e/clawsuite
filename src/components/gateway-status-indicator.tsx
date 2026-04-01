@@ -1,31 +1,13 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
-
-async function pingGateway(): Promise<boolean> {
-  try {
-    const response = await fetch('/api/ping', {
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!response.ok) return false
-    const data = (await response.json()) as { ok?: boolean }
-    return Boolean(data.ok)
-  } catch {
-    return false
-  }
-}
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 
 /**
  * Minimal dot-only status indicator (no text).
  * Shows green (connected), yellow (connecting), or red (offline).
  */
 export function GatewayStatusDot() {
-  const { data: isConnected, isLoading } = useQuery({
-    queryKey: ['gateway', 'ping'],
-    queryFn: pingGateway,
-    refetchInterval: 15_000,
-    retry: false,
-  })
+  const { connected: isConnected, isLoading } = useGatewayConnected()
 
   const dotColor = isLoading
     ? 'bg-yellow-400'
@@ -56,12 +38,7 @@ export function GatewayStatusIndicator({
   collapsed?: boolean
   inline?: boolean
 }) {
-  const { data: isConnected, isLoading } = useQuery({
-    queryKey: ['gateway', 'ping'],
-    queryFn: pingGateway,
-    refetchInterval: 15_000,
-    retry: false,
-  })
+  const { connected: isConnected, isLoading } = useGatewayConnected()
 
   const dotColor = isLoading
     ? 'bg-yellow-400'

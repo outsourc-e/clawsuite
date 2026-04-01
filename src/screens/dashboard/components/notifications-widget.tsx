@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { DashboardNotification } from './dashboard-types'
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 import { cn } from '@/lib/utils'
 
 type SessionsApiResponse = {
@@ -111,10 +112,11 @@ export function NotificationsWidget({
   onRemove,
   editMode,
 }: NotificationsWidgetProps) {
+  const { connected } = useGatewayConnected()
   const notificationsQuery = useQuery({
     queryKey: ['dashboard', 'notifications'],
     queryFn: fetchSessionsForNotifications,
-    refetchInterval: 20_000,
+    refetchInterval: connected ? 20_000 : false,
   })
 
   const notifications = useMemo(

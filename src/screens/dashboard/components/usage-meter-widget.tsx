@@ -2,6 +2,7 @@ import { ChartLineData02Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { WidgetShell } from './widget-shell'
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 import { cn } from '@/lib/utils'
 
 type ProviderUsage = {
@@ -331,11 +332,12 @@ export function UsageMeterWidget({
 }: UsageMeterWidgetProps) {
   const [view, setView] = useState<'tokens' | 'cost'>('tokens')
   const [timedOut, setTimedOut] = useState(false)
+  const { connected } = useGatewayConnected()
   const usageQuery = useQuery({
     queryKey: ['dashboard', 'usage'],
     queryFn: fetchUsage,
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: connected ? 30_000 : false,
   })
 
   // Use isLoading only for the very first fetch (no cached data yet).

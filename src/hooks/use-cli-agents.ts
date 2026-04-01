@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useGatewayConnected } from './use-gateway-connected'
 
 export type CliAgentStatus = 'running' | 'finished'
 
@@ -76,10 +77,12 @@ export async function fetchCliAgents(): Promise<Array<CliAgent>> {
 }
 
 export function useCliAgents() {
+  const { connected } = useGatewayConnected()
+
   return useQuery({
     queryKey: ['sidebar', 'cli-agents'],
     queryFn: fetchCliAgents,
-    refetchInterval: 5_000,
+    refetchInterval: connected ? 5_000 : false,
     retry: false,
   })
 }

@@ -3,27 +3,6 @@ import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '@/server/auth-middleware'
 
-const SESSION_STATUS_METHODS = [
-  'sessions.usage',
-  'session.status',
-  'sessions.status',
-]
-
-async function trySessionStatus(sessionKey?: string): Promise<unknown> {
-  let lastError: unknown = null
-  const params: Record<string, unknown> = {}
-  if (sessionKey) params.sessionKey = sessionKey
-  for (const method of SESSION_STATUS_METHODS) {
-    try {
-      return await gatewayRpc(method, params)
-    } catch (error) {
-      lastError = error
-    }
-  }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('Session status unavailable')
-}
 
 // Known model context windows
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -59,29 +38,22 @@ export const Route = createFileRoute('/api/session-status')({
           // Default to main session so agent hub model changes don't bleed into main chat
           const sessionKey = requestedKey || 'main'
 
-          // Fetch both status and usage data in parallel
-          const [statusResult, usageResult] = await Promise.allSettled([
-            trySessionStatus(sessionKey),
-            gatewayRpc<any>('sessions.usage', {
-              limit: 200,
-              includeContextWeight: true,
-            }),
-          ])
+          // Single RPC — OC 3.28 only supports sessions.usage (no sessionKey param)
+          // Keep limit low to avoid 30s+ timeouts on large session sets
+          const usageData = await gatewayRpc<any>('sessions.usage', {
+            limit: 20,
+            includeContextWeight: true,
+          }).catch(() => null)
 
-          const payload =
-            statusResult.status === 'fulfilled' ? statusResult.value : {}
-          const usageData =
-            usageResult.status === 'fulfilled' ? usageResult.value : null
+          const allSessions: any[] = Array.isArray(usageData?.sessions) ? usageData.sessions : []
 
-          // Find main session usage
-          const mainUsage = usageData?.sessions?.find((s: any) =>
-            s.key?.includes(':main'),
-          )
+          // Find the requested session (default: main)
+          const mainUsage = allSessions.find((s: any) =>
+            s.key?.includes(`:${sessionKey}`) || s.key === sessionKey,
+          ) ?? allSessions.find((s: any) => s.key?.includes(':main'))
 
           // Enrich payload with session usage data
-          const enriched: Record<string, unknown> = {
-            ...(payload && typeof payload === 'object' ? payload : {}),
-          }
+          const enriched: Record<string, unknown> = {}
 
           if (mainUsage?.usage) {
             const u = mainUsage.usage
@@ -129,8 +101,7 @@ export const Route = createFileRoute('/api/session-status')({
             }
           }
 
-          // Include all sessions for dashboard aggregation (dailyModelUsage, dailyBreakdown, etc.)
-          const allSessions = Array.isArray(usageData?.sessions) ? usageData.sessions : []
+          // Include all sessions for dashboard aggregation
           enriched.sessions = allSessions.map((s: any) => ({
             key: s.key,
             agentId: s.agentId ?? s.key,

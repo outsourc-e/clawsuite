@@ -5,6 +5,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import { Button } from '@/components/ui/button'
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 import { cn } from '@/lib/utils'
 
 export type InstalledSkill = {
@@ -76,11 +77,12 @@ export function SkillsWidget({
   onRemove,
 }: SkillsWidgetProps) {
   const navigate = useNavigate()
+  const { connected } = useGatewayConnected()
   const skillsQuery = useQuery({
     queryKey: ['dashboard', 'skills'],
     queryFn: fetchInstalledSkills,
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    refetchInterval: connected ? 60_000 : false,
   })
 
   const skills = useMemo(

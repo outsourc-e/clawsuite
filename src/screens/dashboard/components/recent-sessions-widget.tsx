@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import type { RecentSession } from './dashboard-types'
+import { useGatewayConnected } from '@/hooks/use-gateway-connected'
 import type { SessionMeta } from '@/screens/chat/types'
 import { Button } from '@/components/ui/button'
 import { chatQueryKeys, fetchSessions } from '@/screens/chat/chat-queries'
@@ -82,10 +83,11 @@ export function RecentSessionsWidget({
   draggable = false,
   onRemove,
 }: RecentSessionsWidgetProps) {
+  const { connected } = useGatewayConnected()
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
     queryFn: fetchSessions,
-    refetchInterval: 30_000,
+    refetchInterval: connected ? 30_000 : false,
   })
 
   const sessions = useMemo(
