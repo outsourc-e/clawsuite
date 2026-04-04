@@ -19,7 +19,7 @@
 
 ---
 
-## ✨ What's New in v3.0
+## ✨ What's New in v4.0
 
 - 🤖 **Mission Control** — Full multi-agent orchestration with an isometric office view, live agent status, and mission lifecycle management (spawn → pause → resume → abort)
 - 📊 **Cost Analytics** — Per-agent spend, daily trends, MTD totals, and projected EOM cost backed by real gateway data
