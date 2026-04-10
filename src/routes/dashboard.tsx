@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { DashboardScreen } from '@/screens/dashboard/dashboard-screen'
+import { GatewayConnectionSetupForm } from '@/components/gateway-connection-banner'
 import { usePageTitle } from '@/hooks/use-page-title'
 
 export const Route = createFileRoute('/dashboard')({
@@ -8,22 +9,51 @@ export const Route = createFileRoute('/dashboard')({
     return <DashboardScreen />
   },
   errorComponent: function DashboardError({ error }) {
+    const message =
+      error instanceof Error ? error.message : 'An unexpected error occurred'
+    const isConnectionError =
+      message.includes('fetch') ||
+      message.includes('network') ||
+      message.includes('connect') ||
+      message.includes('503') ||
+      message.includes('ECONNREFUSED') ||
+      message.includes('Failed to Load')
+
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
-        <h2 className="text-xl font-semibold text-primary-900 mb-3">
-          Failed to Load Dashboard
-        </h2>
-        <p className="text-sm text-primary-600 mb-4 max-w-md">
-          {error instanceof Error
-            ? error.message
-            : 'An unexpected error occurred'}
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
-        >
-          Reload Page
-        </button>
+        {isConnectionError ? (
+          <div className="w-full max-w-xl">
+            <h2 className="text-xl font-semibold text-primary-900 mb-2">
+              Can&apos;t reach OCPlatform Gateway
+            </h2>
+            <p className="text-sm text-primary-600 mb-6 max-w-md mx-auto">
+              ControlSuite needs a running OCPlatform gateway to connect to.
+              Make sure it&apos;s running and enter your connection details
+              below.
+            </p>
+            <GatewayConnectionSetupForm
+              title="Connect to Gateway"
+              description="Enter your gateway WebSocket URL and token."
+              onSuccess={() => window.location.reload()}
+            />
+            <p className="mt-4 text-xs text-primary-400">
+              Default gateway URL: ws://127.0.0.1:18789
+            </p>
+          </div>
+        ) : (
+          <>
+            <h2 className="text-xl font-semibold text-primary-900 mb-3">
+              Failed to Load Dashboard
+            </h2>
+            <p className="text-sm text-primary-600 mb-4 max-w-md">{message}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
+            >
+              Reload Page
+            </button>
+          </>
+        )}
       </div>
     )
   },

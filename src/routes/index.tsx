@@ -8,13 +8,14 @@ export const Route = createFileRoute('/')({
       if (!configured) {
         throw redirect({ to: '/wizard' as string, replace: true })
       }
+      const isMobile = window.innerWidth < 768
+      throw redirect({
+        to: (isMobile ? '/chat/main' : '/dashboard') as string,
+        replace: true,
+      })
     }
-    const isMobile =
-      typeof window !== 'undefined' && window.innerWidth < 768
-    throw redirect({
-      to: (isMobile ? '/chat/main' : '/dashboard') as string,
-      replace: true,
-    })
+    // SSR: always redirect to wizard (safe default — client will re-check)
+    throw redirect({ to: '/wizard' as string, replace: true })
   },
   component: function IndexRoute() {
     return null

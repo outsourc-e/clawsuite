@@ -65,7 +65,7 @@
 ### Prerequisites
 
 - **Node.js 22+** — [nodejs.org](https://nodejs.org/)
-- **OpenClaw Gateway** running locally — [Setup Guide](https://openclaw.ai/docs/installation)
+- **OCPlatform Gateway** running locally on port `18789` — [Setup Guide](https://github.com/outsourc-e/clawsuite#prerequisites)
 
 ### Install & Run
 
@@ -73,18 +73,36 @@
 git clone https://github.com/outsourc-e/clawsuite.git
 cd clawsuite
 npm install
-cp .env.example .env       # Add your gateway URL + password
+cp .env.example .env
+```
+
+Edit `.env` with your gateway connection details:
+
+```env
+# Required — your OCPlatform gateway WebSocket URL
+CLAWDBOT_GATEWAY_URL=ws://127.0.0.1:18789
+
+# Required — your gateway auth token
+# Find it in ~/.ocplatform/ocplatform.json under gateway.auth.token
+# Or run: ocplatform config get gateway.auth.token
+CLAWDBOT_GATEWAY_TOKEN=your_token_here
+```
+
+Then start:
+
+```bash
 npm run dev                # Starts on http://localhost:3000
 ```
 
-### Environment Variables
+> **First launch:** If the gateway isn't configured yet, ControlSuite will show a setup wizard to help you connect.
 
-```env
-GATEWAY_URL=http://localhost:18789
-GATEWAY_TOKEN=your_gateway_token
-STUDIO_PASSWORD=your_dashboard_password
-```
+### Verify It Works
 
+1. Open `http://localhost:3000` in your browser
+2. You should see the dashboard (or setup wizard on first run)
+3. If you see a white screen, check that your gateway is running and `.env` is correct
+
+See [SETUP.md](SETUP.md) for detailed setup instructions, troubleshooting, and agent-friendly setup steps.
 ---
 
 ## 📱 Install as App (Recommended)

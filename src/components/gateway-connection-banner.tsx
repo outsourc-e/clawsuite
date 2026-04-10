@@ -17,9 +17,9 @@ import {
 import { getConnectionErrorInfo } from '@/lib/connection-errors'
 import { cn } from '@/lib/utils'
 
-const HEALTH_CHECK_INTERVAL_MS = 15_000
-const HEALTH_CHECK_DELAY_MS = 5_000
-const REQUIRED_FAILURES = 6
+const HEALTH_CHECK_INTERVAL_MS = 10_000
+const HEALTH_CHECK_DELAY_MS = 2_000
+const REQUIRED_FAILURES = 2
 const DISMISS_STORAGE_KEY = 'clawsuite-gateway-banner-dismissed-until'
 const DISMISS_TTL_MS = 60 * 60 * 1000
 
@@ -245,7 +245,7 @@ export function GatewayConnectionBanner() {
     setDismissed(true)
   }
 
-  const showBanner = setupConfigured && healthState === 'unhealthy' && !dismissed
+  const showBanner = healthState === 'unhealthy' && !dismissed
 
   return (
     <AnimatePresence initial={false}>
