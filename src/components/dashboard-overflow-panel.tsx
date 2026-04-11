@@ -6,6 +6,7 @@ import {
   BrainIcon,
   ChartLineData02Icon,
   Clock01Icon,
+  ClipboardIcon,
   ComputerTerminal01Icon,
   File01Icon,
   ListViewIcon,
@@ -41,6 +42,7 @@ const SYSTEM_ITEMS: Array<OverflowItem> = [
 const GATEWAY_ITEMS: Array<OverflowItem> = [
   { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
   { icon: Rocket01Icon, label: 'Conductor', to: '/conductor' },
+  { icon: ClipboardIcon, label: 'Operations', to: '/tasks' },
   { icon: ServerStack01Icon, label: 'Channels', to: '/channels' },
   { icon: ChartLineData02Icon, label: 'Costs', to: '/costs' },
 ]
