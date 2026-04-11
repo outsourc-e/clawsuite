@@ -3,6 +3,7 @@ import {
   ChartLineData02Icon,
   Chat01Icon,
   Clock01Icon,
+  ClipboardIcon,
   PuzzleIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -15,6 +16,7 @@ const ACTIONS = [
   { label: 'Skills', to: '/skills', icon: PuzzleIcon },
   { label: 'Costs', to: '/costs', icon: ChartLineData02Icon },
   { label: 'Cron', to: '/cron', icon: Clock01Icon },
+  { label: 'Tasks', to: '/tasks', icon: ClipboardIcon },
 ] as const
 
 type QuickActionsRowProps = {
@@ -26,7 +28,7 @@ export function QuickActionsRow({ className }: QuickActionsRowProps) {
 
   return (
     <div className={cn('', className)}>
-      <div className="flex items-center justify-between gap-1 px-1">
+      <div className="flex items-center justify-between gap-1 px-1 overflow-x-auto scrollbar-none">
         {ACTIONS.map((action) => (
           <button
             key={action.label}

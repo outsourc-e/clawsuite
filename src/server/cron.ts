@@ -92,12 +92,14 @@ function normalizeRun(run: unknown, index: number): Record<string, unknown> {
   const startedAt = normalizeTimestamp(
     row.startedAt ??
       row.started_at ??
+      row.runAtMs ??
+      row.runAt ??
       row.createdAt ??
       row.timestamp ??
       row.time,
   )
   const finishedAt = normalizeTimestamp(
-    row.finishedAt ?? row.finished_at ?? row.completedAt ?? row.endedAt,
+    row.finishedAt ?? row.finished_at ?? row.completedAt ?? row.endedAt ?? row.ts,
   )
 
   return {
@@ -162,7 +164,9 @@ export function normalizeCronRuns(
         ? root.items
         : Array.isArray(root.history)
           ? root.history
-          : []
+          : Array.isArray(root.entries)
+            ? root.entries
+            : []
 
   return rows.map(function mapRun(run, index) {
     return normalizeRun(run, index)
