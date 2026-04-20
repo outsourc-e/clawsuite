@@ -16,7 +16,6 @@ import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionsRouteImport } from './routes/sessions'
-import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as MemoryRouteImport } from './routes/memory'
@@ -50,6 +49,7 @@ import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-res
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
 import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
+import { Route as ApiStreamRouteImport } from './routes/api/stream'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 import { Route as ApiSessionTitleRouteImport } from './routes/api/session-title'
@@ -160,11 +160,6 @@ const SettingsRoute = SettingsRouteImport.update({
 const SessionsRoute = SessionsRouteImport.update({
   id: '/sessions',
   path: '/sessions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OperationsRoute = OperationsRouteImport.update({
-  id: '/operations',
-  path: '/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NodesRoute = NodesRouteImport.update({
@@ -330,6 +325,11 @@ const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
 const ApiSystemMetricsRoute = ApiSystemMetricsRouteImport.update({
   id: '/api/system-metrics',
   path: '/api/system-metrics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStreamRoute = ApiStreamRouteImport.update({
+  id: '/api/stream',
+  path: '/api/stream',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSkillsRoute = ApiSkillsRouteImport.update({
@@ -735,7 +735,6 @@ export interface FileRoutesByFullPath {
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/nodes': typeof NodesRoute
-  '/operations': typeof OperationsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -784,6 +783,7 @@ export interface FileRoutesByFullPath {
   '/api/session-title': typeof ApiSessionTitleRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
+  '/api/stream': typeof ApiStreamRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -854,7 +854,6 @@ export interface FileRoutesByTo {
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/nodes': typeof NodesRoute
-  '/operations': typeof OperationsRoute
   '/sessions': typeof SessionsRoute
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
@@ -902,6 +901,7 @@ export interface FileRoutesByTo {
   '/api/session-title': typeof ApiSessionTitleRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
+  '/api/stream': typeof ApiStreamRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -973,7 +973,6 @@ export interface FileRoutesById {
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
   '/nodes': typeof NodesRoute
-  '/operations': typeof OperationsRoute
   '/sessions': typeof SessionsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1022,6 +1021,7 @@ export interface FileRoutesById {
   '/api/session-title': typeof ApiSessionTitleRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
+  '/api/stream': typeof ApiStreamRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -1094,7 +1094,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/new'
     | '/nodes'
-    | '/operations'
     | '/sessions'
     | '/settings'
     | '/skills'
@@ -1143,6 +1142,7 @@ export interface FileRouteTypes {
     | '/api/session-title'
     | '/api/sessions'
     | '/api/skills'
+    | '/api/stream'
     | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -1213,7 +1213,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/new'
     | '/nodes'
-    | '/operations'
     | '/sessions'
     | '/skills'
     | '/tasks'
@@ -1261,6 +1260,7 @@ export interface FileRouteTypes {
     | '/api/session-title'
     | '/api/sessions'
     | '/api/skills'
+    | '/api/stream'
     | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -1331,7 +1331,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/new'
     | '/nodes'
-    | '/operations'
     | '/sessions'
     | '/settings'
     | '/skills'
@@ -1380,6 +1379,7 @@ export interface FileRouteTypes {
     | '/api/session-title'
     | '/api/sessions'
     | '/api/skills'
+    | '/api/stream'
     | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -1451,7 +1451,6 @@ export interface RootRouteChildren {
   MemoryRoute: typeof MemoryRoute
   NewRoute: typeof NewRoute
   NodesRoute: typeof NodesRoute
-  OperationsRoute: typeof OperationsRoute
   SessionsRoute: typeof SessionsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -1500,6 +1499,7 @@ export interface RootRouteChildren {
   ApiSessionTitleRoute: typeof ApiSessionTitleRoute
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRoute
+  ApiStreamRoute: typeof ApiStreamRoute
   ApiSystemMetricsRoute: typeof ApiSystemMetricsRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
@@ -1583,13 +1583,6 @@ declare module '@tanstack/react-router' {
       path: '/sessions'
       fullPath: '/sessions'
       preLoaderRoute: typeof SessionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/operations': {
-      id: '/operations'
-      path: '/operations'
-      fullPath: '/operations'
-      preLoaderRoute: typeof OperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nodes': {
@@ -1821,6 +1814,13 @@ declare module '@tanstack/react-router' {
       path: '/api/system-metrics'
       fullPath: '/api/system-metrics'
       preLoaderRoute: typeof ApiSystemMetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stream': {
+      id: '/api/stream'
+      path: '/api/stream'
+      fullPath: '/api/stream'
+      preLoaderRoute: typeof ApiStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/skills': {
@@ -2481,7 +2481,6 @@ const rootRouteChildren: RootRouteChildren = {
   MemoryRoute: MemoryRoute,
   NewRoute: NewRoute,
   NodesRoute: NodesRoute,
-  OperationsRoute: OperationsRoute,
   SessionsRoute: SessionsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
@@ -2530,6 +2529,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionTitleRoute: ApiSessionTitleRoute,
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRoute,
+  ApiStreamRoute: ApiStreamRoute,
   ApiSystemMetricsRoute: ApiSystemMetricsRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,
