@@ -544,6 +544,14 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         markAccepted()
         schedulePostAcceptanceTimeout('accepted')
 
+        // Signal the banner: chat is healthy even if WS polls are flapping.
+        // The banner uses this to suppress false-positive "disconnected" noise.
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('gateway:chat-ok', { detail: { at: Date.now() } }),
+          )
+        }
+
         // HTTP 200 — message accepted by gateway. Clear optimistic "sending"
         // status so the Retry timer never fires. The gateway does NOT echo
         // user messages via SSE, so this is the only confirmation we get.

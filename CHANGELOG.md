@@ -4,6 +4,23 @@ All notable changes to ClawSuite are documented here.
 
 ---
 
+## [4.1.0] — 2026-04-21 (feat/v4.1.0-instant-chat)
+
+### ⚡ Performance
+
+- **Hot-lane RPC priority (`server/gateway.ts`)**: `chat.send` / `chat.abort` / `session.create` now bypass the shared request queue and are sent to the gateway ahead of any background polls (`sessions.usage`, `usage.analytics`, `sessions.costs`, `runs.list`). Eliminates multi-minute stalls where a user’s message was blocked behind analytics traffic on the shared WebSocket.
+- **Idempotent retry on `chat.send` (`routes/api/send-stream.ts`)**: Transient transport failures (RPC timeout, circuit-breaker trip, connection drop) now retry once automatically with the same idempotency key. The gateway dedupes server-side, so a real double-send is impossible, and a transient gateway hiccup no longer surfaces as a user-visible failure.
+
+### 👁️ UX
+
+- **Smart gateway banner (`components/gateway-connection-banner.tsx`)**: The "Gateway offline" red banner is now suppressed while chat is demonstrably healthy. If a chat send completed in the last 60 s, a flapping `/api/ping` probe no longer raises a false alarm. Chat is the thing users notice — the banner now reflects that, not the state of the polling lane.
+
+### 🧠 Why this release
+
+For the last few weeks chat sometimes took 30 s–5 min to reach the gateway, even though the gateway itself was fine. Root cause: every user send and every background poll (costs, usage, sessions) shared a single WebSocket request queue. A parse-stall or slow poll on the gateway side would block everything behind it, including your next message. v4.1.0 splits the lanes so interactive traffic can never be queued behind background traffic, retries transient failures invisibly, and stops the banner from lying about connection health.
+
+---
+
 ## [3.0.0] — 2026-02-25 (feat/clean-sprint)
 
 ### 🚀 New Features

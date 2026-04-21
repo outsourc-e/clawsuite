@@ -333,20 +333,41 @@ export const Route = createFileRoute('/api/send-stream')({
                 }
               })
 
-              // Send the chat message via shared RPC
-              const sendResult = await gatewayRpc<{ runId?: string }>(
-                'chat.send',
-                {
-                  sessionKey,
-                  message: getGatewayMessage(message, attachments),
-                  thinking,
-                  fast: fastMode || undefined,
-                  attachments,
-                  deliver: false,
-                  timeoutMs: 120_000,
-                  idempotencyKey,
-                },
-              )
+              // Send the chat message via shared RPC (hot-lane priority).
+              // Retry once on transport timeout using the same idempotency key —
+              // the gateway dedupes server-side so a real double-send is impossible.
+              const sendParams = {
+                sessionKey,
+                message: getGatewayMessage(message, attachments),
+                thinking,
+                fast: fastMode || undefined,
+                attachments,
+                deliver: false,
+                timeoutMs: 120_000,
+                idempotencyKey,
+              }
+              let sendResult: { runId?: string }
+              try {
+                sendResult = await gatewayRpc<{ runId?: string }>(
+                  'chat.send',
+                  sendParams,
+                )
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err)
+                const isTransient =
+                  msg.includes('RPC timeout') ||
+                  msg.includes('circuit breaker') ||
+                  msg.includes('connection not open') ||
+                  msg.includes('ECONNRESET')
+                if (!isTransient) throw err
+                console.warn(
+                  `[send-stream] chat.send transient failure ("${msg}") — retrying once with same idempotency key`,
+                )
+                sendResult = await gatewayRpc<{ runId?: string }>(
+                  'chat.send',
+                  sendParams,
+                )
+              }
 
               // Send initial event with runId
               if (typeof sendResult.runId === 'string' && sendResult.runId.trim()) {

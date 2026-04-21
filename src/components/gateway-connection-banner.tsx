@@ -22,6 +22,10 @@ const HEALTH_CHECK_DELAY_MS = 2_000
 const REQUIRED_FAILURES = 2
 const DISMISS_STORAGE_KEY = 'clawsuite-gateway-banner-dismissed-until'
 const DISMISS_TTL_MS = 60 * 60 * 1000
+// If chat successfully completed within this window, the polling/WS lane
+// going unhealthy should NOT raise the red banner — chat is the thing
+// users actually notice. Show a quiet "background sync paused" pill instead.
+const CHAT_OK_GRACE_MS = 60_000
 
 type GatewayConnectionSetupFormProps = {
   variant?: 'banner' | 'card'
@@ -162,6 +166,7 @@ export function GatewayConnectionBanner() {
 
   const [healthState, setHealthState] = useState<'unknown' | 'healthy' | 'unhealthy'>('unknown')
   const [dismissed, setDismissed] = useState(false)
+  const [chatOkAt, setChatOkAt] = useState<number>(0)
   const consecutiveFailuresRef = useRef(0)
   const wasUnhealthyRef = useRef(false)
   const errorInfo = getConnectionErrorInfo(testError)
@@ -170,6 +175,19 @@ export function GatewayConnectionBanner() {
   useEffect(() => {
     void initialize()
   }, [initialize])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    function onChatOk(ev: Event) {
+      const detail = (ev as CustomEvent<{ at?: number }>).detail as
+        | { at?: number }
+        | undefined
+      const at = detail && typeof detail.at === 'number' ? detail.at : Date.now()
+      setChatOkAt(at)
+    }
+    window.addEventListener('gateway:chat-ok', onChatOk)
+    return () => window.removeEventListener('gateway:chat-ok', onChatOk)
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -245,7 +263,12 @@ export function GatewayConnectionBanner() {
     setDismissed(true)
   }
 
-  const showBanner = healthState === 'unhealthy' && !dismissed
+  // Suppress the red banner while chat is demonstrably healthy.
+  // If /api/ping failed but a real chat completed in the last 60s, the
+  // WS lane is slow but the user isn't actually blocked — avoid lying.
+  const chatRecentlyOk = Date.now() - chatOkAt < CHAT_OK_GRACE_MS
+  const showBanner =
+    healthState === 'unhealthy' && !dismissed && !chatRecentlyOk
 
   return (
     <AnimatePresence initial={false}>

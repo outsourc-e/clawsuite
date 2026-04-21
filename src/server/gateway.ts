@@ -46,6 +46,21 @@ type PendingRequest = {
   params?: unknown
   resolve: (value: unknown) => void
   reject: (reason?: unknown) => void
+  hot?: boolean
+}
+
+// RPC methods that are user-facing and should bypass the polling lane.
+// Latency-sensitive — these jump the queue and get sent immediately.
+const HOT_RPC_METHODS = new Set<string>([
+  'chat.send',
+  'chat.abort',
+  'session.create',
+  'sessions.create',
+  'session.new',
+])
+
+function isHotRpc(method: string): boolean {
+  return HOT_RPC_METHODS.has(method)
 }
 
 type InflightRequest = {
@@ -265,7 +280,14 @@ class GatewayClient {
         },
       }
 
-      this.requestQueue.push(request)
+      // Hot lane: user-facing RPCs (chat.send, chat.abort, session.create)
+      // jump the queue so they never wait behind background polls.
+      if (isHotRpc(method)) {
+        request.hot = true
+        this.requestQueue.unshift(request)
+      } else {
+        this.requestQueue.push(request)
+      }
       this.ensureConnected().catch(() => {
         // keep requests queued; reconnect loop will flush after reconnect
       })
