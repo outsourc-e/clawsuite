@@ -4,10 +4,27 @@ import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '@/server/auth-middleware'
 
 const SESSION_STATUS_METHODS = [
-  'sessions.usage',
+  // Order: cheapest first. 'sessions.usage' is on the gateway backoff
+  // list and often fast-fails immediately when the gateway is stalled —
+  // that's fine, we just want the first method that actually answers.
   'session.status',
   'sessions.status',
+  'sessions.usage',
 ]
+
+// Per-method budget. Each individual gateway RPC is already capped at 30s
+// inside the gateway client, but the /api/session-status endpoint itself
+// should never take more than ~5s to answer — it feeds a polling UI.
+const PER_METHOD_TIMEOUT_MS = 4_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race<T>([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    }),
+  ])
+}
 
 async function trySessionStatus(sessionKey?: string): Promise<unknown> {
   let lastError: unknown = null
@@ -15,9 +32,18 @@ async function trySessionStatus(sessionKey?: string): Promise<unknown> {
   if (sessionKey) params.sessionKey = sessionKey
   for (const method of SESSION_STATUS_METHODS) {
     try {
-      return await gatewayRpc(method, params)
+      return await withTimeout(
+        gatewayRpc(method, params),
+        PER_METHOD_TIMEOUT_MS,
+        method,
+      )
     } catch (error) {
       lastError = error
+      // Don't spam the next method if the whole gateway is clearly down
+      // with a connection-level error. Otherwise keep trying.
+      const msg =
+        error instanceof Error ? error.message.toLowerCase() : String(error)
+      if (msg.includes('gateway client is shut down')) break
     }
   }
   throw lastError instanceof Error
@@ -59,13 +85,20 @@ export const Route = createFileRoute('/api/session-status')({
           // Default to main session so agent hub model changes don't bleed into main chat
           const sessionKey = requestedKey || 'main'
 
-          // Fetch both status and usage data in parallel
+          // Fetch both status and usage data in parallel, each with a hard
+          // cap so this endpoint never blocks a polling UI for more than a
+          // few seconds. Prior behaviour: could hang 90s+ while serially
+          // trying 3 methods at 30s each. See gateway-stall reports.
           const [statusResult, usageResult] = await Promise.allSettled([
             trySessionStatus(sessionKey),
-            gatewayRpc<any>('sessions.usage', {
-              limit: 200,
-              includeContextWeight: true,
-            }),
+            withTimeout(
+              gatewayRpc<any>('sessions.usage', {
+                limit: 200,
+                includeContextWeight: true,
+              }),
+              PER_METHOD_TIMEOUT_MS,
+              'sessions.usage',
+            ),
           ])
 
           const payload =
