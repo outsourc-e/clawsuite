@@ -545,6 +545,7 @@ function ChatSidebarComponent({
   const isUsageActive = pathname === '/usage'
   const isCostsActive = pathname === '/costs'
   const isAgentsActive = pathname === '/agents'
+  const isOperationsActive = pathname === '/operations'
   const isNodesActive = pathname === '/nodes'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
@@ -789,6 +790,13 @@ function ChatSidebarComponent({
       label: 'Conductor',
       active: isAgentSwarmActive,
       dataTour: 'agent-hub',
+    },
+    {
+      kind: 'link',
+      to: '/operations',
+      icon: UserMultipleIcon,
+      label: 'Operations',
+      active: isOperationsActive,
     },
     {
       kind: 'link',
