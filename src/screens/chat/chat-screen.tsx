@@ -1185,9 +1185,20 @@ export function ChatScreen({
     staleTime: 30_000,
     refetchInterval: 60_000, // Re-check every 60s to clear stale errors
   })
-  // Don't show gateway errors for new chats or when SSE is connected (proves gateway works)
+
+  // Treat recent real chat activity as stronger evidence than a transient
+  // status probe failure. This prevents the UI from flashing "Gateway Offline"
+  // while a response is actively streaming, while we're still waiting for the
+  // assistant reply, or just after the gateway completed a run.
+  const suppressGatewayOfflineNotice =
+    isNewChat ||
+    connectionState === 'connected' ||
+    waitingForResponse ||
+    isRealtimeStreaming ||
+    Boolean(lastCompletedRunAt && Date.now() - lastCompletedRunAt < 15_000)
+
   const gatewayStatusError =
-    !isNewChat && connectionState !== 'connected'
+    !suppressGatewayOfflineNotice
       ? gatewayStatusQuery.error instanceof Error
         ? {
             message: gatewayStatusQuery.error.message,
@@ -2027,7 +2038,10 @@ export function ChatScreen({
   }, [gatewayError, gatewayErrorStatus, handleGatewayRefetch, showErrorNotice])
 
   const mobileHeaderStatus: 'connected' | 'connecting' | 'disconnected' =
-    connectionState === 'connected'
+    connectionState === 'connected' ||
+    waitingForResponse ||
+    isRealtimeStreaming ||
+    Boolean(lastCompletedRunAt && Date.now() - lastCompletedRunAt < 15_000)
       ? 'connected'
       : gatewayStatusQuery.data?.ok === false || gatewayStatusQuery.isError
         ? 'disconnected'

@@ -7,8 +7,9 @@ import type {
   SessionMeta,
 } from './types'
 
-type GatewayStatusResponse = {
+export type GatewayStatusResponse = {
   ok: boolean
+  connected?: boolean
   error?: string
   status?: number
 }
@@ -79,9 +80,17 @@ export async function fetchGatewayStatus(): Promise<GatewayStatusResponse> {
   const timeout = window.setTimeout(() => controller.abort(), 5000)
 
   try {
-    const res = await fetch('/api/ping', { signal: controller.signal })
+    // Use the richer gateway status endpoint instead of /api/ping.
+    // /api/ping only checks whether the WS proxy client can synchronously
+    // ensureConnected() right now, which is too brittle during transient
+    // reconnects and can false-flip chat to "Gateway Offline" while a real
+    // response is still streaming or immediately after it lands.
+    const res = await fetch('/api/gateway/status', { signal: controller.signal })
     if (!res.ok) {
-      const error = new Error(await readError(res)) as Error & {
+      const payload = (await res.json().catch(() => null)) as
+        | GatewayStatusResponse
+        | null
+      const error = new Error(payload?.error || (await readError(res))) as Error & {
         status?: number
       }
       error.status = res.status
@@ -91,6 +100,7 @@ export async function fetchGatewayStatus(): Promise<GatewayStatusResponse> {
     return {
       ...payload,
       status: res.status,
+      connected: payload.connected ?? payload.ok,
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
