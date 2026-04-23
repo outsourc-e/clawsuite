@@ -9,6 +9,8 @@ type SystemGlanceProps = {
   updatedAgo: string
   healthStatus: 'healthy' | 'warning' | 'critical' | 'offline'
   gatewayConnected: boolean
+  /** True ONLY while connected + initial payload still loading. Not the same as `gatewayConnected`. */
+  syncing?: boolean
   /** Context usage % from API (e.g. 47.3) — shown as MEMORY ring */
   sessionPercent?: number
   providers?: Array<{ name: string; cost: number; tokens: number }>
@@ -72,7 +74,10 @@ export function SystemGlance(props: SystemGlanceProps) {
     uptimeFormatted,
     updatedAgo,
     healthStatus,
-    gatewayConnected,
+    // gatewayConnected intentionally unused here — we show 'Syncing'
+    // only via the explicit `syncing` prop (see use-dashboard-data.ts).
+    gatewayConnected: _gatewayConnected,
+    syncing,
     sessionPercent,
     currentModel,
     compact = false,
@@ -100,7 +105,7 @@ export function SystemGlance(props: SystemGlanceProps) {
         {/* Single merged badge — no more duplicate HEALTHY */}
         <HealthBadge
           status={healthStatus}
-          syncing={gatewayConnected}
+          syncing={syncing}
         />
       </div>
 

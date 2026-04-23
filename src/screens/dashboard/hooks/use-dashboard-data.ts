@@ -354,7 +354,16 @@ export function useDashboardData(): UseDashboardDataResult {
 
     // ── Connection ──────────────────────────────────────────────────────────
     const connected = gatewayStatusQuery.data?.ok === true
-    const syncing = !gatewayStatusQuery.isLoading && connected
+    // 'Syncing' means: we know the gateway is reachable, but we're still
+    // waiting on the initial dashboard payload (session-status + sessions).
+    // Once both resolve for the first time, we're HEALTHY. Previously this
+    // flag was just `connected`, which made the badge permanently read
+    // "Syncing" even after the gateway replied. See #dashboard-badge bug.
+    const initialPayloadLoading =
+      sessionStatusQuery.isLoading || sessionsQuery.isLoading
+    const initialPayloadReady =
+      Boolean(sessionStatusQuery.data) || Boolean(sessionsQuery.data)
+    const syncing = connected && initialPayloadLoading && !initialPayloadReady
 
     // ── Session-status payload ──────────────────────────────────────────────
     const ssPayload = sessionStatusQuery.data?.payload

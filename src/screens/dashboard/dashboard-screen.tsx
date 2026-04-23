@@ -985,6 +985,7 @@ export function DashboardScreen() {
                   updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
                   healthStatus={healthStatus}
                   gatewayConnected={dashboardData.connection.connected}
+                  syncing={dashboardData.connection.syncing}
                   sessionPercent={dashboardData.usage.contextPercent ?? undefined}
                   providers={dashboardData.cost.byProvider}
                   currentModel={dashboardData.model.current}
