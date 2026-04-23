@@ -122,9 +122,23 @@ const HEARTBEAT_TIMEOUT_MS = 20000
 const HANDSHAKE_TIMEOUT_MS = 15000
 const RPC_TIMEOUT_MS = 30000
 
-// ── Circuit breaker ───────────────────────────────────────────────
+// ── Circuit breaker ─────────────────────────────────────
 const CIRCUIT_BREAKER_THRESHOLD = 15   // consecutive failures to trip (raised: one slow RPC shouldn't kill all)
 const CIRCUIT_BREAKER_COOLDOWN_MS = 10000 // how long to stay open
+
+// ── Per-method backoff ───────────────────────────────
+// Slow/expensive RPCs that are cheap to skip but expensive to queue. If
+// one of these times out, we back off further calls to THAT method for a
+// while — instead of hammering a broken gateway with 106 timeouts/hour.
+const BACKOFF_METHODS = new Set<string>([
+  'sessions.usage',
+  'sessions.costs',
+  'usage.analytics',
+  'usage.summary',
+  'usage.cost',       // singular — also timing out in the wild
+  'runs.list',        // can stall on large run histories
+])
+const BACKOFF_MS = 5 * 60 * 1000   // 5 min cooldown per-method after a timeout
 
 export function getGatewayConfig() {
   // Check if browser set a custom gateway URL (for network/mobile access)
@@ -225,6 +239,13 @@ class GatewayClient {
   private requestQueue: Array<PendingRequest> = []
   private inflight = new Map<string, InflightRequest>()
   private eventListeners = new Set<GatewayEventHandler>()
+  // Per-method backoff: map<method, timestamp until which method is blocked>
+  private methodBackoff = new Map<string, number>()
+  // Inflight dedup for expensive RPCs: if the same method is already in flight,
+  // subsequent callers get the same promise instead of queueing another copy.
+  // Prevents N pollers from each firing sessions.usage in parallel while
+  // one is already stuck.
+  private inflightByMethod = new Map<string, Promise<unknown>>()
 
   onEvent(handler: GatewayEventHandler): () => void {
     this.eventListeners.add(handler)
@@ -258,6 +279,25 @@ class GatewayClient {
       this.circuitOpen = false
     }
 
+    // Per-method backoff: if this RPC timed out recently, fast-fail instead of
+    // queueing yet another hopeless request. Protects the gateway from polling
+    // loops hammering an RPC it cannot answer (e.g. sessions.usage).
+    const backoffUntil = this.methodBackoff.get(method)
+    if (backoffUntil && Date.now() < backoffUntil) {
+      throw new Error(`Gateway method "${method}" on backoff (retry after ${new Date(backoffUntil).toISOString()})`)
+    }
+
+    // Inflight dedup: for known-expensive RPCs, if one is already in flight,
+    // share its result instead of queueing a parallel copy. Without this,
+    // N pollers each fire sessions.usage and all time out together before
+    // the backoff from the first one can take effect.
+    if (BACKOFF_METHODS.has(method)) {
+      const existing = this.inflightByMethod.get(method) as Promise<TPayload> | undefined
+      if (existing) {
+        return existing
+      }
+    }
+
     const requestId = randomUUID()
     let settled = false
 
@@ -271,6 +311,8 @@ class GatewayClient {
           settled = true
           this.circuitFailures = 0
           this.circuitOpen = false
+          // Successful response — clear any backoff on this method.
+          this.methodBackoff.delete(method)
           resolve(value as TPayload)
         },
         reject: (reason?: unknown) => {
@@ -294,6 +336,15 @@ class GatewayClient {
       this.flushQueue()
     })
 
+    // Register this call as the canonical inflight for its method, so parallel
+    // callers share the result. Cleared on settle (via finally).
+    if (BACKOFF_METHODS.has(method)) {
+      const tracked = rpcCall.finally(() => {
+        this.inflightByMethod.delete(method)
+      })
+      this.inflightByMethod.set(method, tracked)
+    }
+
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         if (settled) return // RPC already resolved/rejected — skip
@@ -310,6 +361,13 @@ class GatewayClient {
           console.warn(`[gateway] Circuit breaker OPEN after ${this.circuitFailures} consecutive timeouts (last: ${method})`)
         } else {
           console.warn(`[gateway] RPC timeout after ${RPC_TIMEOUT_MS}ms for ${method} (${this.circuitFailures}/${CIRCUIT_BREAKER_THRESHOLD})`)
+        }
+        // Back off THIS method specifically if it's one of the known-slow RPCs.
+        // Prevents polling loops from filling the log with timeouts and eating
+        // gateway CPU on serialization attempts that'll time out anyway.
+        if (BACKOFF_METHODS.has(method)) {
+          this.methodBackoff.set(method, Date.now() + BACKOFF_MS)
+          console.warn(`[gateway] Method "${method}" backing off for ${BACKOFF_MS / 1000}s after timeout`)
         }
         reject(new Error('Gateway RPC timeout'))
       }, RPC_TIMEOUT_MS)
