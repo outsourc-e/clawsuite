@@ -39,15 +39,22 @@ export const Route = createFileRoute('/api/cost')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-        // If this RPC is on backoff, skip the gateway entirely and serve
-        // stale cache. Saves the 5s wait on every polling call.
-        if (gatewayMethodOnBackoff('usage.cost') && lastSuccess) {
+        // If this RPC is on backoff, skip the gateway entirely.
+        if (gatewayMethodOnBackoff('usage.cost')) {
+          if (lastSuccess) {
+            return json({
+              ok: true,
+              cost: lastSuccess.data,
+              stale: true,
+              staleError: 'usage.cost on gateway backoff',
+              staleAgeMs: Date.now() - lastSuccess.ts,
+            })
+          }
           return json({
             ok: true,
-            cost: lastSuccess.data,
-            stale: true,
-            staleError: 'usage.cost on gateway backoff',
-            staleAgeMs: Date.now() - lastSuccess.ts,
+            cost: null,
+            unavailable: true,
+            reason: 'usage.cost on gateway backoff',
           })
         }
 

@@ -45,16 +45,25 @@ export const Route = createFileRoute('/api/usage')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-        // If sessions.usage is on backoff, skip the gateway entirely and
-        // serve stale cache. Avoids the 5s wait per polling call while the
-        // gateway is in quarantine.
-        if (gatewayMethodOnBackoff('sessions.usage') && lastSuccess) {
+        // If sessions.usage is on backoff, skip the gateway entirely.
+        // Serve stale cache when available, or a clearly-marked empty
+        // payload so the UI renders 'no data yet' instead of red-WARNING
+        // or hanging on a 5s timeout that will never succeed.
+        if (gatewayMethodOnBackoff('sessions.usage')) {
+          if (lastSuccess) {
+            return json({
+              ok: true,
+              usage: lastSuccess.data,
+              stale: true,
+              staleError: 'sessions.usage on gateway backoff',
+              staleAgeMs: Date.now() - lastSuccess.ts,
+            })
+          }
           return json({
             ok: true,
-            usage: lastSuccess.data,
-            stale: true,
-            staleError: 'sessions.usage on gateway backoff',
-            staleAgeMs: Date.now() - lastSuccess.ts,
+            usage: null,
+            unavailable: true,
+            reason: 'sessions.usage on gateway backoff',
           })
         }
 
