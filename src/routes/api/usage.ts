@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { gatewayRpc } from '../../server/gateway'
+import { gatewayMethodOnBackoff, gatewayRpc } from '../../server/gateway'
 import { getConfiguredProviderNames } from '../../server/providers'
 import {
   buildUsageSummary,
@@ -10,6 +10,9 @@ import { isAuthenticated } from '@/server/auth-middleware'
 
 const UNAVAILABLE_MESSAGE = 'Unavailable on this Gateway version'
 const REQUEST_TIMEOUT_MS = 5000 // 5 second timeout
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+let lastSuccess: { data: unknown; ts: number } | null = null
 
 function readErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -42,6 +45,19 @@ export const Route = createFileRoute('/api/usage')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        // If sessions.usage is on backoff, skip the gateway entirely and
+        // serve stale cache. Avoids the 5s wait per polling call while the
+        // gateway is in quarantine.
+        if (gatewayMethodOnBackoff('sessions.usage') && lastSuccess) {
+          return json({
+            ok: true,
+            usage: lastSuccess.data,
+            stale: true,
+            staleError: 'sessions.usage on gateway backoff',
+            staleAgeMs: Date.now() - lastSuccess.ts,
+          })
+        }
+
         try {
           const configuredProviders = getConfiguredProviderNames()
 
@@ -74,6 +90,7 @@ export const Route = createFileRoute('/api/usage')({
             usageStatusPayload,
           })
 
+          lastSuccess = { data: usage, ts: Date.now() }
           return json({ ok: true, usage })
         } catch (error) {
           if (isGatewayMethodUnavailable(error)) {
@@ -85,6 +102,17 @@ export const Route = createFileRoute('/api/usage')({
               },
               { status: 501 },
             )
+          }
+
+          // Serve stale cache when the gateway stalls.
+          if (lastSuccess && Date.now() - lastSuccess.ts < CACHE_TTL_MS) {
+            return json({
+              ok: true,
+              usage: lastSuccess.data,
+              stale: true,
+              staleError: readErrorMessage(error),
+              staleAgeMs: Date.now() - lastSuccess.ts,
+            })
           }
 
           return json(

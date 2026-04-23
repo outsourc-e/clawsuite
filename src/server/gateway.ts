@@ -138,7 +138,11 @@ const BACKOFF_METHODS = new Set<string>([
   'usage.cost',       // singular — also timing out in the wild
   'runs.list',        // can stall on large run histories
 ])
-const BACKOFF_MS = 5 * 60 * 1000   // 5 min cooldown per-method after a timeout
+const INITIAL_BACKOFF_MS = 5 * 60 * 1000   // 5 min cooldown per-method after a timeout
+const MAX_BACKOFF_MS = 30 * 60 * 1000      // cap at 30 min (exponential doubling)
+// Legacy alias kept in case anything imports BACKOFF_MS; prefer the two above.
+const BACKOFF_MS = INITIAL_BACKOFF_MS
+void BACKOFF_MS // ensure tsc treats this as "used" for the hot-reload path
 
 export function getGatewayConfig() {
   // Check if browser set a custom gateway URL (for network/mobile access)
@@ -241,6 +245,8 @@ class GatewayClient {
   private eventListeners = new Set<GatewayEventHandler>()
   // Per-method backoff: map<method, timestamp until which method is blocked>
   private methodBackoff = new Map<string, number>()
+  // Per-method backoff duration (doubles on consecutive timeouts, caps at MAX_BACKOFF_MS).
+  private methodBackoffDuration = new Map<string, number>()
   // Inflight dedup for expensive RPCs: if the same method is already in flight,
   // subsequent callers get the same promise instead of queueing another copy.
   // Prevents N pollers from each firing sessions.usage in parallel while
@@ -260,6 +266,11 @@ class GatewayClient {
       authenticated: this.authenticated,
       errorKind: this._lastErrorKind,
     }
+  }
+
+  isMethodOnBackoff(method: string): boolean {
+    const until = this.methodBackoff.get(method)
+    return Boolean(until && Date.now() < until)
   }
 
   async request<TPayload = unknown>(
@@ -313,6 +324,7 @@ class GatewayClient {
           this.circuitOpen = false
           // Successful response — clear any backoff on this method.
           this.methodBackoff.delete(method)
+          this.methodBackoffDuration.delete(method)
           resolve(value as TPayload)
         },
         reject: (reason?: unknown) => {
@@ -366,8 +378,16 @@ class GatewayClient {
         // Prevents polling loops from filling the log with timeouts and eating
         // gateway CPU on serialization attempts that'll time out anyway.
         if (BACKOFF_METHODS.has(method)) {
-          this.methodBackoff.set(method, Date.now() + BACKOFF_MS)
-          console.warn(`[gateway] Method "${method}" backing off for ${BACKOFF_MS / 1000}s after timeout`)
+          const prior = this.methodBackoffDuration.get(method) ?? 0
+          const next = Math.min(
+            prior > 0 ? prior * 2 : INITIAL_BACKOFF_MS,
+            MAX_BACKOFF_MS,
+          )
+          this.methodBackoffDuration.set(method, next)
+          this.methodBackoff.set(method, Date.now() + next)
+          console.warn(
+            `[gateway] Method "${method}" backing off for ${next / 1000}s after timeout`,
+          )
         }
         reject(new Error('Gateway RPC timeout'))
       }, RPC_TIMEOUT_MS)
@@ -964,6 +984,16 @@ export function gatewayIsReady(): boolean {
   const snapshot = gatewayClient.getConnectionSnapshot()
   // 1 === WebSocket.OPEN. Hard-code to avoid pulling in the ws module here.
   return snapshot.authenticated && snapshot.readyState === 1
+}
+
+/**
+ * Check whether a specific RPC method is currently on backoff (i.e. timed
+ * out recently and is being quarantined to avoid hammering a broken gateway).
+ * HTTP endpoints can call this before queuing an RPC to fast-fail or serve
+ * stale cache, instead of waiting for the request-path backoff throw.
+ */
+export function gatewayMethodOnBackoff(method: string): boolean {
+  return gatewayClient.isMethodOnBackoff(method)
 }
 
 export function gatewayConnectionSnapshot(): {

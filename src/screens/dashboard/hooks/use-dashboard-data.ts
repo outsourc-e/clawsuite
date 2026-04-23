@@ -780,11 +780,18 @@ export function useDashboardData(): UseDashboardDataResult {
       sessionStatusQuery.isLoading ||
       sessionsQuery.isLoading ||
       gatewayStatusQuery.isLoading
-    const isError =
-      sessionStatusQuery.isError ||
-      sessionsQuery.isError ||
-      gatewayStatusQuery.isError ||
-      costTimeseriesQuery.isError
+    // Only flag dashboard as 'error' when a CRITICAL query fails.
+    // - Critical = gateway-status + sessions. Without those the dashboard
+    //   genuinely can't render anything useful.
+    // - Auxiliary = session-status + cost timeseries. These are supplementary
+    //   (older Gateway versions, transient RPC backoff). One aux error should
+    //   NOT WARNING-flag the whole dashboard when the rest is healthy.
+    const criticalError =
+      gatewayStatusQuery.isError || sessionsQuery.isError
+    const auxErrorCount =
+      [sessionStatusQuery.isError, costTimeseriesQuery.isError].filter(Boolean)
+        .length
+    const isError = criticalError || auxErrorCount >= 2
 
     const status: DashboardData['status'] = isError
       ? 'error'
