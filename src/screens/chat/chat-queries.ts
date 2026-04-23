@@ -85,7 +85,12 @@ export async function fetchGatewayStatus(): Promise<GatewayStatusResponse> {
     // ensureConnected() right now, which is too brittle during transient
     // reconnects and can false-flip chat to "Gateway Offline" while a real
     // response is still streaming or immediately after it lands.
-    const res = await fetch('/api/gateway/status', { signal: controller.signal })
+    // fast=1 returns immediately when the WS client is already authenticated,
+    // instead of waiting on a full status RPC that could stall on a cold
+    // gateway. Falls back to a full probe if the WS isn't ready yet.
+    const res = await fetch('/api/gateway/status?fast=1', {
+      signal: controller.signal,
+    })
     if (!res.ok) {
       const payload = (await res.json().catch(() => null)) as
         | GatewayStatusResponse

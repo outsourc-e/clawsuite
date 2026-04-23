@@ -952,6 +952,28 @@ export async function gatewayConnectCheck(): Promise<void> {
   await gatewayClient.ensureConnected()
 }
 
+/**
+ * Fast, non-blocking readiness probe. Returns true when the WS is OPEN
+ * and the client has completed auth handshake. Safe to call on every
+ * request — never initiates a connection, never awaits an RPC.
+ *
+ * Used by /api/gateway/status to avoid waiting on a full RPC when the
+ * connection is already live (fixes initial-load false-offline flicker).
+ */
+export function gatewayIsReady(): boolean {
+  const snapshot = gatewayClient.getConnectionSnapshot()
+  // 1 === WebSocket.OPEN. Hard-code to avoid pulling in the ws module here.
+  return snapshot.authenticated && snapshot.readyState === 1
+}
+
+export function gatewayConnectionSnapshot(): {
+  readyState: number
+  authenticated: boolean
+  errorKind: import('../lib/connection-errors').ConnectionErrorKind | null
+} {
+  return gatewayClient.getConnectionSnapshot()
+}
+
 export async function cleanupGatewayConnection(): Promise<void> {
   await gatewayClient.shutdown()
 }

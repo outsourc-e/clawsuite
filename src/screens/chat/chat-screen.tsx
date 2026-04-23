@@ -1186,12 +1186,32 @@ export function ChatScreen({
     refetchInterval: 60_000, // Re-check every 60s to clear stale errors
   })
 
+  // Grace window after mount — don't flag "Gateway Offline" during the first
+  // few seconds while the initial probe is in flight. The WS proxy typically
+  // handshakes within 1–3s; a rigid check during that window produces the
+  // flicker the user saw on page load.
+  const mountAtRef = useRef<number>(Date.now())
+  const [isMountGraceActive, setIsMountGraceActive] = useState(true)
+  useEffect(() => {
+    mountAtRef.current = Date.now()
+    setIsMountGraceActive(true)
+    const timer = window.setTimeout(
+      () => setIsMountGraceActive(false),
+      5_000,
+    )
+    return () => window.clearTimeout(timer)
+  }, [])
+
   // Treat recent real chat activity as stronger evidence than a transient
   // status probe failure. This prevents the UI from flashing "Gateway Offline"
   // while a response is actively streaming, while we're still waiting for the
   // assistant reply, or just after the gateway completed a run.
   const suppressGatewayOfflineNotice =
     isNewChat ||
+    isMountGraceActive ||
+    // Status probe is still in flight on first mount — never flash offline
+    // before a real signal has arrived either way.
+    (gatewayStatusQuery.isLoading && !gatewayStatusQuery.data && !gatewayStatusQuery.error) ||
     connectionState === 'connected' ||
     waitingForResponse ||
     isRealtimeStreaming ||
