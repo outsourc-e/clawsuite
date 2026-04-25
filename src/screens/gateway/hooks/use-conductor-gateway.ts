@@ -246,20 +246,50 @@ function loadPersistedMission(): PersistedMission | null {
     ) {
       return null
     }
-    // Never restore running/decomposing — if the browser closed mid-mission, it's dead.
-    // Only restore 'complete' (reviewable) or 'idle'.
-    const isStale = phase === 'running' || phase === 'decomposing'
+    // Restore running/decomposing missions too — the backend orchestrator + workers
+    // are still alive in the gateway (sessions API). The UI just lost its local view.
+    // sessionsQuery will rehydrate workers by key; the existing worker-timeout effect
+    // transitions to 'complete' if the backend has actually finished while we were gone.
+    //
+    // Safety valve: missions older than MISSION_MAX_AGE_MS are considered abandoned
+    // (backend would have GC'd them by now) and fall back to idle.
+    const MISSION_MAX_AGE_MS = 6 * 60 * 60 * 1000 // 6 hours
+    const startedMs = missionStartedAt ? new Date(missionStartedAt).getTime() : 0
+    const isAbandoned =
+      phase !== 'complete' &&
+      Number.isFinite(startedMs) &&
+      startedMs > 0 &&
+      Date.now() - startedMs > MISSION_MAX_AGE_MS
+
+    if (isAbandoned) {
+      return {
+        goal: '',
+        phase: 'idle',
+        missionStartedAt: null,
+        isPaused: false,
+        pausedElapsedMs: 0,
+        accumulatedPausedMs: 0,
+        pauseStartedAt: null,
+        workerKeys: [],
+        workerLabels: [],
+        workerOutputs: {},
+        streamText: '',
+        planText: '',
+        completedAt: null,
+        tasks: [],
+      }
+    }
 
     return {
-      goal: isStale ? '' : goal,
-      phase: isStale ? 'idle' : phase,
-      missionStartedAt: isStale ? null : missionStartedAt,
-      isPaused: isStale ? false : isPaused,
-      pausedElapsedMs: isStale ? 0 : pausedElapsedMs,
-      accumulatedPausedMs: isStale ? 0 : accumulatedPausedMs,
-      pauseStartedAt: isStale ? null : pauseStartedAt,
-      workerKeys: isStale ? [] : workerKeys,
-      workerLabels: isStale ? [] : workerLabels,
+      goal,
+      phase,
+      missionStartedAt,
+      isPaused,
+      pausedElapsedMs,
+      accumulatedPausedMs,
+      pauseStartedAt,
+      workerKeys,
+      workerLabels,
       workerOutputs,
       streamText,
       planText,
