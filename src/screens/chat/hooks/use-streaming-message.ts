@@ -74,8 +74,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const processStoreEvent = useGatewayChatStore((s) => s.processEvent)
   const clearStreamingSession = useGatewayChatStore((s) => s.clearStreamingSession)
 
-  const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = 30_000
-  const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = 45_000
+  // The gateway/runtime can accept a message and then take a while before
+  // streaming activity resumes. Keep these generous so accepted messages
+  // are not falsely marked as failed during normal gateway lag.
+  const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = 90_000
+  const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = 180_000
 
   const stopFrame = useCallback(() => {
     if (frameRef.current !== null) {
@@ -521,83 +524,41 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       })
 
       try {
-        const response = await fetch('/api/send-stream', {
+        const requestBody = {
+          sessionKey: params.sessionKey,
+          friendlyId: params.friendlyId,
+          message: params.message,
+          thinking: params.thinking,
+          fastMode: params.fastMode,
+          attachments: params.attachments,
+          idempotencyKey: params.idempotencyKey ?? crypto.randomUUID(),
+        }
+
+        // Reliable-first path: land the user message via /api/send.
+        const sendResponse = await fetch('/api/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionKey: params.sessionKey,
-            friendlyId: params.friendlyId,
-            message: params.message,
-            thinking: params.thinking,
-            fastMode: params.fastMode,
-            attachments: params.attachments,
-            idempotencyKey: params.idempotencyKey ?? crypto.randomUUID(),
-          }),
+          body: JSON.stringify(requestBody),
           signal: abortController.signal,
         })
 
-        if (!response.ok) {
-          const errorText = await response.text()
-          throw new Error(errorText || 'Stream request failed')
+        if (!sendResponse.ok) {
+          const errorText = await sendResponse.text()
+          throw new Error(errorText || 'Send request failed')
         }
 
         markAccepted()
         schedulePostAcceptanceTimeout('accepted')
 
-        // HTTP 200 — message accepted by gateway. Clear optimistic "sending"
-        // status so the Retry timer never fires. The gateway does NOT echo
-        // user messages via SSE, so this is the only confirmation we get.
         if (params.idempotencyKey && onMessageAccepted) {
           onMessageAccepted(params.sessionKey, params.friendlyId, params.idempotencyKey)
         }
 
-        const reader = response.body?.getReader()
-        if (!reader) {
-          throw new Error('No response body')
-        }
-
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const events = buffer.split('\n\n')
-          buffer = events.pop() ?? ''
-
-          for (const eventBlock of events) {
-            if (!eventBlock.trim()) continue
-
-            const lines = eventBlock.split('\n')
-            let currentEvent = ''
-            let currentData = ''
-
-            for (const line of lines) {
-              if (line.startsWith('event: ')) {
-                currentEvent = line.slice(7).trim()
-              } else if (line.startsWith('data: ')) {
-                currentData += line.slice(6)
-              } else if (line.startsWith('data:')) {
-                currentData += line.slice(5)
-              }
-            }
-
-            if (!currentEvent || !currentData) continue
-            try {
-              processEvent(currentEvent, JSON.parse(currentData))
-            } catch {
-              // Ignore invalid SSE data.
-            }
-          }
-        }
-
-        const lifecyclePhase = lifecyclePhaseRef.current as StreamLifecyclePhase
-        if (!finishedRef.current && lifecyclePhase !== 'handoff') {
-          finishStream()
-        }
+        // Plain-send mode: do not call send-stream here. The previous
+        // stream-first path was flaky, and calling send-stream after /api/send
+        // risks duplicate dispatch or another long wait. History/chat-events
+        // can hydrate the assistant reply separately.
+        finishStream('accepted')
       } catch (err) {
         if ((err as Error).name === 'AbortError') return
         const errorMessage = err instanceof Error ? err.message : String(err)

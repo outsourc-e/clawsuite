@@ -997,7 +997,6 @@ export function ChatScreen({
         if (!res.ok) return ''
         const data = await res.json()
         const payload = data.payload ?? data
-        // Same logic as chat-composer: read model from status payload
         if (payload.model) return String(payload.model)
         if (payload.currentModel) return String(payload.currentModel)
         if (payload.modelAlias) return String(payload.modelAlias)
@@ -1009,7 +1008,10 @@ export function ChatScreen({
         return ''
       }
     },
-    refetchInterval: 30_000,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     retry: false,
   })
 

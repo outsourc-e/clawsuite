@@ -27,7 +27,7 @@ type GestureState = {
 
 function findCurrentTabIndex(pathname: string): number {
   if (pathname.startsWith('/dashboard')) return 0
-  if (pathname.startsWith('/agent-swarm') || pathname.startsWith('/agents')) {
+  if (pathname.startsWith('/agent-swarm') || pathname.startsWith('/agents') || pathname.startsWith('/operations')) {
     return 1
   }
   if (pathname.startsWith('/chat') || pathname === '/new' || pathname === '/') {

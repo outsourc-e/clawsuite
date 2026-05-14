@@ -824,12 +824,20 @@ if (!(globalThis as any)[GW_UHR_KEY]) {
     console.error('[unhandledRejection]', reason)
   })
 
-  // Graceful shutdown: clean up WebSocket on SIGTERM/SIGINT so the process
-  // exits cleanly instead of hanging on an open socket.
+  // Graceful shutdown: clean up WebSocket on SIGTERM/SIGINT.
+  // In Vite dev, do NOT force process.exit(0) here — that can take down the
+  // entire dev server during unrelated restarts/disconnect churn.
+  const isDevRuntime =
+    process.env.NODE_ENV !== 'production'
+    || process.env.npm_lifecycle_event === 'dev'
+    || process.argv.some((arg) => arg.includes('vite'))
+
   const shutdownHandler = () => {
     console.warn('[gateway] Received shutdown signal — cleaning up')
     gatewayClient.shutdown().catch(() => {}).finally(() => {
-      process.exit(0)
+      if (!isDevRuntime) {
+        process.exit(0)
+      }
     })
   }
   process.on('SIGTERM', shutdownHandler)
@@ -844,6 +852,14 @@ export async function gatewayRpc<TPayload = unknown>(
   method: string,
   params?: unknown,
 ): Promise<TPayload> {
+  // Temporary ClawSuite stability guard: sessions.usage is currently too slow
+  // and spammy against the OpenClaw gateway, and it is not required for chat
+  // delivery. Return a safe empty payload locally until usage metrics are
+  // rebuilt on a cheaper/cached source.
+  if (method === 'sessions.usage') {
+    return { sessions: [] } as TPayload
+  }
+
   return gatewayClient.request<TPayload>(method, params)
 }
 

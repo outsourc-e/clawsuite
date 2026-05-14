@@ -1,12 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { usePageTitle } from '@/hooks/use-page-title'
-import { AgentsScreen } from '@/screens/gateway/agents-screen'
+import { createFileRoute, Navigate } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/agents')({
   ssr: false,
   component: function AgentsRoute() {
-    usePageTitle('Agents')
-    return <AgentsScreen variant="registry" />
+    return <Navigate to="/operations" />
   },
   errorComponent: function AgentsError({ error }) {
     return (

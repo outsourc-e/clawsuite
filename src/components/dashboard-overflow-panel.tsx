@@ -42,7 +42,7 @@ const SYSTEM_ITEMS: Array<OverflowItem> = [
 const GATEWAY_ITEMS: Array<OverflowItem> = [
   { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
   { icon: Rocket01Icon, label: 'Conductor', to: '/conductor' },
-  { icon: ClipboardIcon, label: 'Operations', to: '/tasks' },
+  { icon: ClipboardIcon, label: 'Operations', to: '/operations' },
   { icon: ServerStack01Icon, label: 'Channels', to: '/channels' },
   { icon: ChartLineData02Icon, label: 'Costs', to: '/costs' },
 ]

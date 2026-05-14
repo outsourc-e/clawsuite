@@ -286,51 +286,64 @@ export function useDashboardData(): UseDashboardDataResult {
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
     queryFn: fetchSessions,
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   const gatewayStatusQuery = useQuery({
     queryKey: ['gateway', 'dashboard-status'],
     queryFn: fetchGatewayStatus,
     retry: false,
-    refetchInterval: 15_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   const sessionStatusQuery = useQuery({
     queryKey: ['gateway', 'session-status'],
     queryFn: fetchSessionStatus,
     retry: false,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    refetchInterval: 180_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   const costTimeseriesQuery = useQuery({
     queryKey: ['dashboard', 'cost-timeseries'],
     queryFn: fetchCostTimeseries,
     retry: false,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   const cronJobsQuery = useQuery({
     queryKey: ['cron', 'jobs'],
     queryFn: fetchCronJobs,
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   const skillsSummaryQuery = useQuery({
     queryKey: ['dashboard', 'skills'],
     queryFn: fetchInstalledSkills,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   const usageSummaryQuery = useQuery({
     queryKey: ['dashboard', 'usage'],
     queryFn: fetchUsage,
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   // ── Usage timeout (15s) — stops infinite skeleton ────────────────────────

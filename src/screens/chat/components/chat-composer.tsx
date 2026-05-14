@@ -623,7 +623,10 @@ function ChatComposerComponent({
   const currentModelQuery = useQuery({
     queryKey: ['gateway', 'session-status-model'],
     queryFn: fetchCurrentModelFromStatus,
-    refetchInterval: 30_000,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     retry: false,
   })
 

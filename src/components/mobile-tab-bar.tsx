@@ -45,7 +45,7 @@ const TABS: TabItem[] = [
     label: 'Conductor',
     icon: Rocket01Icon,
     to: '/conductor',
-    match: (p) => p.startsWith('/conductor') || p.startsWith('/agent-swarm') || p.startsWith('/agents'),
+    match: (p) => p.startsWith('/conductor') || p.startsWith('/agent-swarm') || p.startsWith('/agents') || p.startsWith('/operations'),
   },
   {
     id: 'chat',

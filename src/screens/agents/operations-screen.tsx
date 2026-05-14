@@ -146,7 +146,7 @@ export function OperationsScreen() {
             {error}
           </section>
         ) : view === 'outputs' ? (
-          <FullOutputsView />
+          <FullOutputsView agents={agents} items={recentActivity} />
         ) : (
           <>
             <motion.div

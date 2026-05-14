@@ -544,7 +544,7 @@ function ChatSidebarComponent({
   const isSessionsActive = pathname === '/sessions'
   const isUsageActive = pathname === '/usage'
   const isCostsActive = pathname === '/costs'
-  const isAgentsActive = pathname === '/agents'
+  const isAgentsActive = pathname === '/agents' || pathname === '/operations'
   const isNodesActive = pathname === '/nodes'
   const isSkillsActive = pathname === '/skills'
   const isFilesActive = pathname === '/files'
@@ -573,7 +573,7 @@ function ChatSidebarComponent({
     '/channels',
     '/sessions',
     '/usage',
-    '/agents',
+    '/operations',
     '/nodes',
     '/gateway/logs',
   ]
@@ -792,6 +792,13 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/operations',
+      icon: UserGroupIcon,
+      label: 'Operations',
+      active: isAgentsActive,
+    },
+    {
+      kind: 'link',
       to: '/terminal',
       icon: ComputerTerminal01Icon,
       label: 'Terminal',
@@ -881,13 +888,6 @@ function ChatSidebarComponent({
       icon: ChartLineData01Icon,
       label: 'Usage',
       active: isUsageActive,
-    },
-    {
-      kind: 'link',
-      to: '/agents',
-      icon: UserGroupIcon,
-      label: 'Agents',
-      active: isAgentsActive,
     },
     {
       kind: 'link',

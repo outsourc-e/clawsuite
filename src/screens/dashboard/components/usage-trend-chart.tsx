@@ -46,18 +46,33 @@ function formatTooltipCost(value: number): string {
 export function UsageTrendChart({ data, className }: UsageTrendChartProps) {
   const [view, setView] = useState<ViewMode>('tokens')
   const tokensByDay = data.timeseries.tokensByDay
+  const costByDay = data.timeseries.costByDay
 
   const chartData = useMemo(() => {
-    if (!tokensByDay || tokensByDay.length === 0) return []
-    return tokensByDay.map((entry) => ({
-      date: formatDateLabel(entry.date),
-      rawDate: entry.date,
-      input: entry.input,
-      output: entry.output,
-      cacheRead: entry.cacheRead,
-      cost: entry.cost,
-    }))
-  }, [tokensByDay])
+    if (tokensByDay && tokensByDay.length > 0) {
+      return tokensByDay.map((entry) => ({
+        date: formatDateLabel(entry.date),
+        rawDate: entry.date,
+        input: entry.input,
+        output: entry.output,
+        cacheRead: entry.cacheRead,
+        cost: entry.cost,
+      }))
+    }
+
+    if (costByDay && costByDay.length > 0) {
+      return costByDay.map((entry) => ({
+        date: formatDateLabel(entry.date),
+        rawDate: entry.date,
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cost: entry.amount,
+      }))
+    }
+
+    return []
+  }, [tokensByDay, costByDay])
 
   if (chartData.length === 0) {
     return (
@@ -72,7 +87,8 @@ export function UsageTrendChart({ data, className }: UsageTrendChartProps) {
     )
   }
 
-  const isTokenView = view === 'tokens'
+  const hasTokenSeries = Boolean(tokensByDay && tokensByDay.length > 0)
+  const isTokenView = view === 'tokens' && hasTokenSeries
 
   return (
     <div className={cn('rounded-2xl border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-5', className)}>
@@ -81,12 +97,13 @@ export function UsageTrendChart({ data, className }: UsageTrendChartProps) {
         <div className="flex items-center gap-1 rounded-lg border border-primary-200 dark:border-neutral-700 p-0.5">
           <button
             type="button"
-            onClick={() => setView('tokens')}
+            onClick={() => hasTokenSeries && setView('tokens')}
+            disabled={!hasTokenSeries}
             className={cn(
               'rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
-              view === 'tokens'
+              view === 'tokens' && hasTokenSeries
                 ? 'bg-primary-100 dark:bg-neutral-700 text-primary-900 dark:text-white'
-                : 'text-neutral-500 hover:text-primary-700 dark:hover:text-neutral-300',
+                : 'text-neutral-500 hover:text-primary-700 dark:hover:text-neutral-300 disabled:cursor-not-allowed disabled:opacity-40',
             )}
           >
             Tokens
@@ -106,20 +123,26 @@ export function UsageTrendChart({ data, className }: UsageTrendChartProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 mb-3 text-[10px] text-neutral-500 dark:text-neutral-400">
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
-          Input
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-full bg-orange-500" />
-          Output
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 opacity-60" />
-          Cache Read
-        </span>
-      </div>
+      {hasTokenSeries ? (
+        <div className="flex items-center gap-4 mb-3 text-[10px] text-neutral-500 dark:text-neutral-400">
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
+            Input
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full bg-orange-500" />
+            Output
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 opacity-60" />
+            Cache Read
+          </span>
+        </div>
+      ) : (
+        <div className="mb-3 text-[10px] text-neutral-500 dark:text-neutral-400">
+          Token breakdown is temporarily unavailable, showing cost trend fallback.
+        </div>
+      )}
 
       <ResponsiveContainer width="100%" height={240}>
         <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
