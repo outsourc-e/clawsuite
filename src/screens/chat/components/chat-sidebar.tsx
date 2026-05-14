@@ -595,7 +595,8 @@ function ChatSidebarComponent({
   const recentIssuesQuery = useQuery({
     queryKey: ['activity', 'recent-issues-indicator'],
     queryFn: fetchHasRecentIssues,
-    refetchInterval: 20_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
     retry: false,
   })
   const showDebugErrorDot = Boolean(recentIssuesQuery.data)

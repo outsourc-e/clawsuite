@@ -1176,16 +1176,21 @@ export function ChatScreen({
     }
   }, [waitingForResponse, isRealtimeStreaming, liveToolActivity, setLocalActivity])
 
+  // Mirror Hermes Workspace: trust the live SSE connection as the source of truth.
+  // Only run the explicit status probe when SSE is NOT connected, and even then
+  // do not poll. This eliminates the duplicate probes that were tripping the
+  // OCPlatform gateway circuit breaker.
   const gatewayStatusQuery = useQuery({
     queryKey: ['gateway', 'status'],
     queryFn: fetchGatewayStatus,
-    retry: 2,
-    retryDelay: 1000,
+    enabled: connectionState !== 'connected' && !isNewChat,
+    retry: 1,
+    retryDelay: 2000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: true,
-    staleTime: 60_000,
-    refetchInterval: 120_000, // background re-check; the banner gates on real failure below
+    refetchOnMount: false,
+    staleTime: 120_000,
+    refetchInterval: false, // no polling — only run on demand / when SSE drops
   })
   // Gateway banner gating:
   //   * never show in a new-chat surface
