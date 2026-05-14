@@ -103,18 +103,20 @@ export function WorkspaceShell() {
     queryKey: ['auth-status'],
     queryFn: async () => {
       const controller = new AbortController()
-      const timeout = globalThis.setTimeout(() => controller.abort(), 5_000)
+      // /api/auth-check is local (no gateway calls) — should respond in <100ms.
+      // If it doesn't, something is very wrong; fail fast instead of stalling.
+      const timeout = globalThis.setTimeout(() => controller.abort(), 2_000)
 
       let res: Response
       try {
         res = await fetch('/api/auth-check', { signal: controller.signal })
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new Error('Request timed out after 5 seconds')
+          throw new Error('Request timed out after 2 seconds')
         }
         throw error instanceof Error
           ? error
-          : new Error('Failed to connect to ClawSuite server')
+          : new Error('Failed to connect to ControlSuite server')
       } finally {
         globalThis.clearTimeout(timeout)
       }
@@ -125,14 +127,23 @@ export function WorkspaceShell() {
       return data
     },
     staleTime: 60_000,
-    retry: 2,
-    retryDelay: 1_000,
+    retry: 1,
+    retryDelay: 500,
   })
 
+  // Hard cap on the "Initializing" splash. Whatever the auth state is after
+  // ~3.5s, we proceed — the splash should never stick on mobile/Tailscale.
+  const [splashTimedOut, setSplashTimedOut] = useState(false)
+  useEffect(() => {
+    if (!authQuery.isLoading) return undefined
+    const id = globalThis.setTimeout(() => setSplashTimedOut(true), 3500)
+    return () => globalThis.clearTimeout(id)
+  }, [authQuery.isLoading])
+
   const authState = {
-    checked: !authQuery.isLoading,
-    authenticated: authQuery.data?.authenticated ?? false,
-    authRequired: authQuery.data?.authRequired ?? true,
+    checked: !authQuery.isLoading || splashTimedOut,
+    authenticated: authQuery.data?.authenticated ?? true,
+    authRequired: authQuery.data?.authRequired ?? false,
   }
 
   // Derive active session from URL
