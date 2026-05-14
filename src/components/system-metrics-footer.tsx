@@ -48,10 +48,15 @@ async function fetchMetrics(): Promise<SystemMetrics> {
   return res.json() as Promise<SystemMetrics>
 }
 
-export function SystemMetricsFooter() {
+type SystemMetricsFooterProps = {
+  enabled?: boolean
+}
+
+export function SystemMetricsFooter({ enabled = true }: SystemMetricsFooterProps) {
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null)
 
   useEffect(() => {
+    if (!enabled) return undefined
     let cancelled = false
 
     async function poll() {
@@ -64,14 +69,14 @@ export function SystemMetricsFooter() {
     }
 
     void poll()
-    const id = setInterval(() => void poll(), 5_000)
+    const id = setInterval(() => void poll(), 30_000)
     return () => {
       cancelled = true
       clearInterval(id)
     }
-  }, [])
+  }, [enabled])
 
-  if (!metrics) return null
+  if (!enabled || !metrics) return null
 
   const { cpu, ramUsed, ramTotal, diskPercent, uptime, gatewayConnected } = metrics
 

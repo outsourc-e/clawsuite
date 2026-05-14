@@ -143,12 +143,20 @@ export function WorkspaceShell() {
   const showDesktopSidebarBackdrop =
     !isMobile && !isOnChatRoute && !sidebarCollapsed
 
-  // Sessions query — shared across sidebar and chat
+  const shouldLivePollSessions =
+    pathname.startsWith('/chat') ||
+    pathname === '/new' ||
+    pathname === '/' ||
+    pathname.startsWith('/dashboard')
+
+  // Sessions query — shared across sidebar and chat, but keep it light.
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
     queryFn: fetchSessions,
-    refetchInterval: 15_000,
-    staleTime: 10_000,
+    refetchInterval: shouldLivePollSessions ? 60_000 : 120_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    staleTime: 60_000,
   })
 
   const sessions = sessionsQuery.data ?? []
@@ -416,7 +424,9 @@ export function WorkspaceShell() {
       </div>
 
       {isMobile ? <MobileTabBar /> : null}
-      {settings.showSystemMetricsFooter ? <SystemMetricsFooter /> : null}
+      {settings.showSystemMetricsFooter && pathname.startsWith('/dashboard') ? (
+        <SystemMetricsFooter enabled />
+      ) : null}
       <CommandPalette pathname={pathname} sessions={sessions} />
     </>
   )
