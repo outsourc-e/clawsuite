@@ -272,60 +272,12 @@ export function WorkspaceShell() {
     )
   }
 
-  if (authQuery.isError) {
-    const errorMessage =
-      authQuery.error instanceof Error
+  const authQueryErrorMessage =
+    authQuery.isError
+      ? authQuery.error instanceof Error
         ? authQuery.error.message
         : 'Failed to connect to ClawSuite server'
-    const showGatewayTip = /gateway|websocket/i.test(errorMessage)
-
-    return (
-      <div className="flex h-screen items-center justify-center bg-surface px-6">
-        <div className="w-full max-w-lg text-center">
-          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl border border-primary-800 bg-primary-900/80 text-2xl">
-            <span role="img" aria-label="Warning">
-              ⚠️
-            </span>
-          </div>
-          <h1 className="text-2xl font-semibold text-primary-100">
-            Could not connect to ClawSuite server
-          </h1>
-          <p className="mt-3 text-sm text-primary-300">
-            The server may still be starting up. Wait a moment and try again.
-          </p>
-          {showGatewayTip ? (
-            <p className="mt-3 text-sm text-accent-400">
-              Make sure OpenClaw gateway is running:{' '}
-              <code className="rounded bg-primary-900 px-1.5 py-0.5 text-xs text-primary-200">
-                openclaw gateway start
-              </code>
-            </p>
-          ) : null}
-          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={() => void authQuery.refetch()}
-            >
-              <HugeiconsIcon icon={RefreshIcon} size={18} strokeWidth={1.8} />
-              Retry
-            </Button>
-            <Button size="lg" onClick={() => window.location.reload()}>
-              Reload Page
-            </Button>
-          </div>
-          <details className="mt-5 text-left">
-            <summary className="cursor-pointer text-xs text-primary-400">
-              Details
-            </summary>
-            <p className="mt-2 rounded-lg border border-primary-800 bg-primary-900/80 px-3 py-2 text-xs text-primary-300">
-              {errorMessage}
-            </p>
-          </details>
-        </div>
-      </div>
-    )
-  }
+      : null
 
   // Show login screen if auth is required and not authenticated
   if (authState.authRequired && !authState.authenticated) {
@@ -345,6 +297,21 @@ export function WorkspaceShell() {
         style={shellStyle}
       >
         {/* Electron: native-style title bar (absolute over the padding) */}
+        {authQueryErrorMessage ? (
+          <div className="absolute inset-x-0 top-0 z-50 flex justify-center px-3 py-2 pointer-events-none">
+            <div className="pointer-events-auto rounded-lg border border-amber-500/30 bg-amber-500/12 px-3 py-2 text-xs text-amber-100 shadow-lg backdrop-blur-sm">
+              ClawSuite had a brief local auth-check hiccup, but the app is staying live.
+              <button
+                type="button"
+                className="ml-2 underline underline-offset-2"
+                onClick={() => void authQuery.refetch()}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {isElectron && (
           <div
             className="absolute inset-x-0 top-0 flex h-10 items-center border-b border-primary-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 z-40"
